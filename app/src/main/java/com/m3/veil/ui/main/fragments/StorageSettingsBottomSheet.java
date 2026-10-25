@@ -27,6 +27,20 @@ public class StorageSettingsBottomSheet extends BottomSheetDialogFragment {
     private MaterialButton btnClearCache;
     private MaterialSwitch switchAutoDownloadWifi, switchAutoDownloadCellular;
     private SharedPreferences prefs;
+    private androidx.activity.result.ActivityResultLauncher<String> backupPickerLauncher;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        backupPickerLauncher = registerForActivityResult(
+                new androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+                uri -> {
+                    if (uri != null) {
+                        promptRestorePassword(uri);
+                    }
+                }
+        );
+    }
 
     @Override
     public int getTheme() {
@@ -139,6 +153,114 @@ public class StorageSettingsBottomSheet extends BottomSheetDialogFragment {
         btnSelectiveClean.setCornerRadius((int) (12 * dp));
         btnSelectiveClean.setOnClickListener(v -> showSelectiveMediaCleanerDialog());
         container.addView(btnSelectiveClean);
+
+        // Encrypted Vault Backup & Restore Section
+        TextView backupHeader = new TextView(requireContext());
+        backupHeader.setText("ðŸ” Encrypted Vault Local Backup (.veilbackup)");
+        backupHeader.setTextSize(15.5f);
+        backupHeader.setTypeface(null, android.graphics.Typeface.BOLD);
+        backupHeader.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
+        backupHeader.setPadding(0, (int) (18 * dp), 0, (int) (6 * dp));
+        container.addView(backupHeader);
+
+        MaterialButton btnExportBackup = new MaterialButton(requireContext());
+        btnExportBackup.setText("ðŸ” Export Encrypted Local Backup (.veilbackup)");
+        btnExportBackup.setAllCaps(false);
+        btnExportBackup.setCornerRadius((int) (12 * dp));
+        btnExportBackup.setOnClickListener(v -> promptExportPassword());
+        container.addView(btnExportBackup);
+
+        MaterialButton btnRestoreBackup = new MaterialButton(requireContext());
+        btnRestoreBackup.setText("ðŸ“¥ Restore Vault from .veilbackup");
+        btnRestoreBackup.setAllCaps(false);
+        btnRestoreBackup.setCornerRadius((int) (12 * dp));
+        btnRestoreBackup.setOnClickListener(v -> {
+            if (backupPickerLauncher != null) {
+                backupPickerLauncher.launch("*/*");
+            }
+        });
+        container.addView(btnRestoreBackup);
+    }
+
+    private void promptExportPassword() {
+        android.widget.EditText input = new android.widget.EditText(requireContext());
+        input.setTransformationMethod(android.text.method.PasswordTransformationMethod.getInstance());
+        input.setHint("Enter strong backup passphrase");
+        float dp = getResources().getDisplayMetrics().density;
+        android.widget.FrameLayout container = new android.widget.FrameLayout(requireContext());
+        container.setPadding((int) (20 * dp), (int) (8 * dp), (int) (20 * dp), (int) (8 * dp));
+        container.addView(input);
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle("ðŸ” Encrypt Vault Backup")
+                .setMessage("Your backup will be encrypted with AES-256-GCM. Save this passwordâ€”it is required to restore your chats!")
+                .setView(container)
+                .setPositiveButton("Export", (dialog, which) -> {
+                    String pass = input.getText().toString().trim();
+                    if (pass.length() < 4) {
+                        Toast.makeText(requireContext(), "Passphrase must be at least 4 characters", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Toast.makeText(requireContext(), "Exporting encrypted backup...", Toast.LENGTH_SHORT).show();
+                    com.m3.veil.utils.VeilBackupManager.exportBackup(requireContext(), pass, new com.m3.veil.utils.VeilBackupManager.ExportCallback() {
+                        @Override
+                        public void onSuccess(java.io.File backupFile, android.net.Uri shareableUri, int chatCount, int messageCount) {
+                            if (!isAdded()) return;
+                            Toast.makeText(requireContext(), "Backup created: " + chatCount + " chats, " + messageCount + " messages", Toast.LENGTH_LONG).show();
+                            com.m3.veil.utils.VeilBackupManager.shareBackupFile(requireContext(), shareableUri, "VEIL Vault Backup (" + backupFile.getName() + ")");
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            if (!isAdded()) return;
+                            Toast.makeText(requireContext(), "Export error: " + error, Toast.LENGTH_LONG).show();
+                        }
+                    });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void promptRestorePassword(android.net.Uri backupUri) {
+        android.widget.EditText input = new android.widget.EditText(requireContext());
+        input.setTransformationMethod(android.text.method.PasswordTransformationMethod.getInstance());
+        input.setHint("Enter backup passphrase");
+        float dp = getResources().getDisplayMetrics().density;
+        android.widget.FrameLayout container = new android.widget.FrameLayout(requireContext());
+        container.setPadding((int) (20 * dp), (int) (8 * dp), (int) (20 * dp), (int) (8 * dp));
+        container.addView(input);
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle("ðŸ“¥ Restore Vault Backup")
+                .setMessage("Enter the passphrase used when exporting this .veilbackup file.")
+                .setView(container)
+                .setPositiveButton("Decrypt & Restore", (dialog, which) -> {
+                    String pass = input.getText().toString().trim();
+                    if (pass.isEmpty()) {
+                        Toast.makeText(requireContext(), "Passphrase cannot be empty", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Toast.makeText(requireContext(), "Decrypting and restoring vault...", Toast.LENGTH_SHORT).show();
+                    com.m3.veil.utils.VeilBackupManager.restoreBackup(requireContext(), backupUri, pass, new com.m3.veil.utils.VeilBackupManager.RestoreCallback() {
+                        @Override
+                        public void onSuccess(int chatsRestored, int messagesRestored) {
+                            if (!isAdded()) return;
+                            new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                                    .setTitle("ðŸŽ‰ Restore Successful")
+                                    .setMessage("Successfully restored " + chatsRestored + " chats and " + messagesRestored + " messages into your local vault.")
+                                    .setPositiveButton("OK", (d, w) -> dismiss())
+                                    .show();
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            if (!isAdded()) return;
+                            Toast.makeText(requireContext(), "Restore failed: " + error, Toast.LENGTH_LONG).show();
+                        }
+                    });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void showSelectiveMediaCleanerDialog() {

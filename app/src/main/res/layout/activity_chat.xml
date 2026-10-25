@@ -207,6 +207,53 @@
                 android:background="?attr/selectableItemBackgroundBorderless" />
         </LinearLayout>
 
+        <!-- Blind Match Speed Chat & Mutual Reveal Banner -->
+        <LinearLayout
+            android:id="@+id/speedChatBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_swatch_amber"
+            android:paddingStart="14dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="7dp"
+            android:paddingBottom="7dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⏳"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/tvSpeedTimerText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Speed Match: 03:00"
+                android:textColor="@color/textPrimary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMutualReveal"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="0dp"
+                android:paddingBottom="0dp"
+                android:text="🎭 Reveal Profile"
+                android:textAllCaps="false"
+                android:textSize="12sp"
+                app:cornerRadius="16dp" />
+
+        </LinearLayout>
+
         <!-- WhatsApp-Style Collapsible Pinned Message Banner -->
         <LinearLayout
             android:id="@+id/pinnedMessageBanner"

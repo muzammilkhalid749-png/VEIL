@@ -254,6 +254,12 @@ public class ChatActivity extends AppCompatActivity {
     private WaveformView lockedWaveformView;
 
     private boolean isRecording = false;
+
+    // Speed Match Roulette & Mutual Reveal
+    private android.os.CountDownTimer speedChatTimer;
+    private boolean userRequestedReveal = false;
+    private boolean partnerRequestedReveal = false;
+    private boolean isSpeedMatchRevealed = false;
     private boolean isRecordingLocked = false;
     private boolean isRecordingPaused = false;
     private long totalRecordingDuration = 0;
@@ -278,6 +284,10 @@ public class ChatActivity extends AppCompatActivity {
                 @Override
                 public void onMessageReceived(String dialogId, Message message) {
                     if (chatId != null && chatId.equals(dialogId)) {
+                        if (message != null && "[roulette_control:reveal_request]".equals(message.getText())) {
+                            handleInboundRouletteReveal();
+                            return;
+                        }
                         runOnUiThread(() -> reloadMessagesFromLocalVault());
                     }
                 }
@@ -394,6 +404,10 @@ public class ChatActivity extends AppCompatActivity {
             boolean matchesThisChat = (message != null && chatId != null && chatId.equals(message.getChatId()))
                     || (!isGroupChatContext() && peerId != null && peerId.equals(recipientId));
             if (matchesThisChat) {
+                if (message != null && "[roulette_control:reveal_request]".equals(message.getText())) {
+                    handleInboundRouletteReveal();
+                    return;
+                }
                 runOnUiThread(() -> {
                     android.content.SharedPreferences privacyPrefs = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE);
                     boolean sendReadReceipt = privacyPrefs.getBoolean("read_receipts_enabled", true);
@@ -762,6 +776,8 @@ public class ChatActivity extends AppCompatActivity {
                 Toast.makeText(this, "Message unpinned", Toast.LENGTH_SHORT).show();
             });
         }
+
+        setupSpeedChatRouletteHud();
 
         // Quick Features Bar Above Composer
         TextView chipQuickBlink = findViewById(R.id.chipQuickBlink);
@@ -2545,6 +2561,104 @@ public class ChatActivity extends AppCompatActivity {
         bottomSheetDialog.show();
     }
 
+    private void setupSpeedChatRouletteHud() {
+        if (chatId == null || !chatId.startsWith("roulette_")) return;
+
+        View speedChatBanner = findViewById(R.id.speedChatBanner);
+        TextView tvSpeedTimerText = findViewById(R.id.tvSpeedTimerText);
+        com.google.android.material.button.MaterialButton btnMutualReveal = findViewById(R.id.btnMutualReveal);
+
+        if (speedChatBanner == null || tvSpeedTimerText == null || btnMutualReveal == null) return;
+        speedChatBanner.setVisibility(View.VISIBLE);
+
+        btnMutualReveal.setOnClickListener(v -> {
+            if (isSpeedMatchRevealed) return;
+            userRequestedReveal = true;
+            btnMutualReveal.setText("✓ Waiting for partner...");
+            btnMutualReveal.setEnabled(false);
+
+            com.m3.veil.model.Message controlMsg = new com.m3.veil.model.Message(
+                    java.util.UUID.randomUUID().toString(),
+                    currentUserId,
+                    recipientId != null ? recipientId : "",
+                    "[roulette_control:reveal_request]",
+                    com.google.firebase.Timestamp.now(),
+                    "control"
+            );
+            com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, recipientId, controlMsg);
+
+            if (partnerRequestedReveal) {
+                completeMutualReveal();
+            } else {
+                Toast.makeText(this, "Reveal requested! Waiting for partner to accept.", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        speedChatTimer = new android.os.CountDownTimer(180000L, 1000L) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                if (isSpeedMatchRevealed) {
+                    cancel();
+                    return;
+                }
+                long sec = millisUntilFinished / 1000;
+                long m = sec / 60;
+                long s = sec % 60;
+                tvSpeedTimerText.setText(String.format(java.util.Locale.getDefault(), "Speed Match: %02d:%02d", m, s));
+            }
+
+            @Override
+            public void onFinish() {
+                if (isSpeedMatchRevealed || isFinishing()) return;
+                Toast.makeText(ChatActivity.this, "⏱️ 3-minute Speed Match expired! Conversation purged.", Toast.LENGTH_LONG).show();
+                finish();
+            }
+        }.start();
+    }
+
+    private void handleInboundRouletteReveal() {
+        runOnUiThread(() -> {
+            partnerRequestedReveal = true;
+            if (userRequestedReveal) {
+                completeMutualReveal();
+            } else {
+                com.google.android.material.button.MaterialButton btn = findViewById(R.id.btnMutualReveal);
+                if (btn != null) {
+                    btn.setText("🔥 Partner Wants to Reveal! Tap to Accept");
+                    btn.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, R.color.statusSuccess));
+                }
+                Toast.makeText(this, "🎭 Partner wants to reveal identities!", Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void completeMutualReveal() {
+        isSpeedMatchRevealed = true;
+        if (speedChatTimer != null) speedChatTimer.cancel();
+        View speedChatBanner = findViewById(R.id.speedChatBanner);
+        if (speedChatBanner != null) speedChatBanner.setVisibility(View.GONE);
+
+        if (recipientId != null && !recipientId.isEmpty()) {
+            com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("users").document(recipientId)
+                    .get()
+                    .addOnSuccessListener(doc -> {
+                        if (doc != null && doc.exists()) {
+                            String realName = doc.getString("username");
+                            if (realName != null) {
+                                recipientName = realName;
+                                TextView tvName = findViewById(R.id.recipientName);
+                                if (tvName != null) tvName.setText(realName);
+                            }
+                        }
+                    });
+        }
+        com.google.android.material.snackbar.Snackbar.make(
+                findViewById(android.R.id.content),
+                "🎉 Mutual Reveal Confirmed! Real profiles unmasked.",
+                com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+        ).show();
+    }
+
     private void showEmojiBottomSheet() {
         EmojiStickerBottomSheet sheet = new EmojiStickerBottomSheet();
         sheet.setOnEmojiSelectedListener(emoji -> {
@@ -2599,6 +2713,21 @@ public class ChatActivity extends AppCompatActivity {
             dialog.dismiss();
             replyToMessage(message);
         });
+
+        // Action: Comments / Discussion (Telegram-style channel post threads)
+        View actionComments = view.findViewById(R.id.actionComments);
+        if (actionComments != null) {
+            boolean isChannelMode = (currentLocalChat != null && "channel".equalsIgnoreCase(currentLocalChat.getType())) || (chatId != null && chatId.startsWith("channel_"));
+            actionComments.setVisibility(isChannelMode ? View.VISIBLE : View.GONE);
+            actionComments.setOnClickListener(v -> {
+                dialog.dismiss();
+                String postText = message.getText() != null ? message.getText() : "Media Post";
+                String author = message.getSenderName() != null ? message.getSenderName() : (recipientName != null ? recipientName : "Channel Post");
+                com.m3.veil.ui.chat.sheets.ChannelCommentsBottomSheet sheet =
+                        com.m3.veil.ui.chat.sheets.ChannelCommentsBottomSheet.newInstance(chatId, message.getId(), postText, author);
+                sheet.show(getSupportFragmentManager(), "ChannelCommentsBottomSheet");
+            });
+        }
 
         // Action: Copy
         View actionCopy = view.findViewById(R.id.actionCopy);
@@ -3412,7 +3541,12 @@ public class ChatActivity extends AppCompatActivity {
         List<Message> localEncrypted = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getMessages(chatId);
         messageList.clear();
         if (localEncrypted != null) {
-            messageList.addAll(localEncrypted);
+            for (Message m : localEncrypted) {
+                if (m.getText() != null && m.getText().startsWith("[roulette_control:")) {
+                    continue;
+                }
+                messageList.add(m);
+            }
         }
         if (messagesAdapter != null) {
             messagesAdapter.notifyDataSetChanged();
@@ -5994,6 +6128,9 @@ public class ChatActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (speedChatTimer != null) {
+            speedChatTimer.cancel();
+        }
         stopChatReplay(false);
         presenceHandler.removeCallbacks(presenceTicker);
         com.m3.veil.manager.VeilMessagesController.getInstance(this).removeObserver(messagesControllerObserver);

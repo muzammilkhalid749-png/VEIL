@@ -152,6 +152,13 @@
             android:theme="@style/Theme.VEIL" />
 
         <activity
+            android:name=".ui.chat.CreateChannelActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.VEIL"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".ui.chat.CameraGalleryActivity"
             android:exported="false"
             android:screenOrientation="portrait"

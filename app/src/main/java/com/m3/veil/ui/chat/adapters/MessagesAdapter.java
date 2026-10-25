@@ -903,6 +903,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         TextView dateHeaderText;
         TextView messageText, timeText, reactionsText;
         ImageView statusIcon;
+        View linkPreviewContainer;
+        ImageView ivLinkThumb;
+        TextView tvLinkDomain, tvLinkTitle, tvLinkDesc;
         View replyQuoteContainer;
         TextView replyQuoteName, replyQuoteText;
         public View messageBubble;
@@ -1007,6 +1010,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             dateHeaderContainer = itemView.findViewById(R.id.dateHeaderContainer);
             dateHeaderText = itemView.findViewById(R.id.dateHeaderText);
             messageText = itemView.findViewById(R.id.messageText);
+            linkPreviewContainer = itemView.findViewById(R.id.linkPreviewContainer);
+            ivLinkThumb = itemView.findViewById(R.id.ivLinkThumb);
+            tvLinkDomain = itemView.findViewById(R.id.tvLinkDomain);
+            tvLinkTitle = itemView.findViewById(R.id.tvLinkTitle);
+            tvLinkDesc = itemView.findViewById(R.id.tvLinkDesc);
             timeText = itemView.findViewById(R.id.timeText);
             statusIcon = itemView.findViewById(R.id.statusIcon);
             reactionsText = itemView.findViewById(R.id.reactionsText);
@@ -1106,6 +1114,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
 
         private void hideAllMediaContainers() {
+            if (linkPreviewContainer != null) linkPreviewContainer.setVisibility(View.GONE);
             if (voiceMessageContainer != null) voiceMessageContainer.setVisibility(View.GONE);
             if (imageMessageContainer != null) imageMessageContainer.setVisibility(View.GONE);
             if (videoMessageContainer != null) videoMessageContainer.setVisibility(View.GONE);
@@ -1484,6 +1493,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageText.setVisibility(View.VISIBLE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
+                    bindLinkPreview(message.getText(), linkPreviewContainer, ivLinkThumb, tvLinkDomain, tvLinkTitle, tvLinkDesc);
                     if (message.getText() != null && message.getText().contains("||") && message.getId() != null) {
                         messageText.setOnClickListener(v -> {
                             if (revealedSpoilers.contains(message.getId())) {
@@ -1589,6 +1599,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         View dateHeaderContainer;
         TextView dateHeaderText;
         TextView messageText, timeText, reactionsText;
+        View linkPreviewContainer;
+        ImageView ivLinkThumb;
+        TextView tvLinkDomain, tvLinkTitle, tvLinkDesc;
         View replyQuoteContainer;
         TextView replyQuoteName, replyQuoteText;
         public View messageBubble;
@@ -1691,6 +1704,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             dateHeaderContainer = itemView.findViewById(R.id.dateHeaderContainer);
             dateHeaderText = itemView.findViewById(R.id.dateHeaderText);
             messageText = itemView.findViewById(R.id.messageText);
+            linkPreviewContainer = itemView.findViewById(R.id.linkPreviewContainer);
+            ivLinkThumb = itemView.findViewById(R.id.ivLinkThumb);
+            tvLinkDomain = itemView.findViewById(R.id.tvLinkDomain);
+            tvLinkTitle = itemView.findViewById(R.id.tvLinkTitle);
+            tvLinkDesc = itemView.findViewById(R.id.tvLinkDesc);
+            linkPreviewContainer = itemView.findViewById(R.id.linkPreviewContainer);
+            ivLinkThumb = itemView.findViewById(R.id.ivLinkThumb);
+            tvLinkDomain = itemView.findViewById(R.id.tvLinkDomain);
+            tvLinkTitle = itemView.findViewById(R.id.tvLinkTitle);
+            tvLinkDesc = itemView.findViewById(R.id.tvLinkDesc);
             timeText = itemView.findViewById(R.id.timeText);
             reactionsText = itemView.findViewById(R.id.reactionsText);
             replyQuoteContainer = itemView.findViewById(R.id.replyQuoteContainer);
@@ -1787,6 +1810,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
 
         private void hideAllMediaContainers() {
+            if (linkPreviewContainer != null) linkPreviewContainer.setVisibility(View.GONE);
             if (voiceMessageContainer != null) voiceMessageContainer.setVisibility(View.GONE);
             if (imageMessageContainer != null) imageMessageContainer.setVisibility(View.GONE);
             if (videoMessageContainer != null) videoMessageContainer.setVisibility(View.GONE);
@@ -2270,6 +2294,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageText.setVisibility(View.VISIBLE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
+                    bindLinkPreview(message.getText(), linkPreviewContainer, ivLinkThumb, tvLinkDomain, tvLinkTitle, tvLinkDesc);
                     if (message.getText() != null && message.getText().contains("||") && message.getId() != null) {
                         messageText.setOnClickListener(v -> {
                             if (revealedSpoilers.contains(message.getId())) {
@@ -2390,6 +2415,60 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             set.setDuration(900);
             set.setStartDelay(delay);
             set.start();
+        }
+    }
+
+    private void bindLinkPreview(String text, View container, ImageView thumb, TextView domain, TextView title, TextView desc) {
+        if (container == null) return;
+        String url = com.m3.veil.utils.LinkPreviewHelper.extractUrl(text);
+        if (url == null) {
+            container.setVisibility(View.GONE);
+            return;
+        }
+
+        container.setTag(url);
+        container.setOnClickListener(v -> {
+            try {
+                android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url));
+                v.getContext().startActivity(intent);
+            } catch (Exception ignored) {}
+        });
+
+        com.m3.veil.utils.LinkPreviewHelper.LinkPreview cached = com.m3.veil.utils.LinkPreviewHelper.getCachedPreview(url);
+        if (cached != null) {
+            applyLinkPreview(cached, container, thumb, domain, title, desc);
+        } else {
+            container.setVisibility(View.GONE);
+            com.m3.veil.utils.LinkPreviewHelper.fetchPreview(url, preview -> {
+                if (url.equals(container.getTag())) {
+                    if (preview != null && preview.hasContent()) {
+                        applyLinkPreview(preview, container, thumb, domain, title, desc);
+                    } else {
+                        container.setVisibility(View.GONE);
+                    }
+                }
+            });
+        }
+    }
+
+    private void applyLinkPreview(com.m3.veil.utils.LinkPreviewHelper.LinkPreview preview, View container, ImageView thumb, TextView domain, TextView title, TextView desc) {
+        container.setVisibility(View.VISIBLE);
+        if (domain != null) domain.setText(preview.domain);
+        if (title != null) {
+            title.setVisibility(preview.title != null && !preview.title.isEmpty() ? View.VISIBLE : View.GONE);
+            title.setText(preview.title);
+        }
+        if (desc != null) {
+            desc.setVisibility(preview.description != null && !preview.description.isEmpty() ? View.VISIBLE : View.GONE);
+            desc.setText(preview.description);
+        }
+        if (thumb != null) {
+            if (preview.imageBitmap != null) {
+                thumb.setVisibility(View.VISIBLE);
+                thumb.setImageBitmap(preview.imageBitmap);
+            } else {
+                thumb.setVisibility(View.GONE);
+            }
         }
     }
 }

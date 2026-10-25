@@ -87,6 +87,29 @@ public class VoiceWaveformView extends View {
         invalidate();
     }
 
+    public void setAmplitudes(float[] amplitudes) {
+        if (amplitudes != null && amplitudes.length > 0) {
+            this.barCount = amplitudes.length;
+            this.barHeights = new float[this.barCount];
+            for (int i = 0; i < this.barCount; i++) {
+                this.barHeights[i] = Math.max(0.12f, Math.min(1.0f, amplitudes[i]));
+            }
+            invalidate();
+        }
+    }
+
+    public void setAmplitudes(byte[] amplitudes) {
+        if (amplitudes != null && amplitudes.length > 0) {
+            this.barCount = amplitudes.length;
+            this.barHeights = new float[this.barCount];
+            for (int i = 0; i < this.barCount; i++) {
+                float val = (amplitudes[i] & 0xFF) / 255.0f;
+                this.barHeights[i] = Math.max(0.12f, Math.min(1.0f, val));
+            }
+            invalidate();
+        }
+    }
+
     private void generateDefaultWaveform(String seed) {
         long seedVal = seed.hashCode();
         Random random = new Random(seedVal);

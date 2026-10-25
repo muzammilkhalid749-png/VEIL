@@ -107,6 +107,64 @@
             android:textSize="15.5sp"
             android:lineSpacingExtra="1.5dp" />
 
+        <!-- Rich Link Preview Card (WhatsApp / Telegram style) -->
+        <LinearLayout
+            android:id="@+id/linkPreviewContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="4dp"
+            android:background="@drawable/bg_link_preview_card"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/ivLinkThumb"
+                android:layout_width="match_parent"
+                android:layout_height="140dp"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <TextView
+                    android:id="@+id/tvLinkDomain"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/message_text_secondary"
+                    android:textSize="11sp"
+                    android:textAllCaps="true"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/tvLinkTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="@color/message_text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/tvLinkDesc"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="@color/message_text_secondary"
+                    android:textSize="12sp"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- Photo / Image Message Container (WhatsApp Edge-to-Edge Media Card) -->
         <LinearLayout
             android:id="@+id/imageMessageContainer"

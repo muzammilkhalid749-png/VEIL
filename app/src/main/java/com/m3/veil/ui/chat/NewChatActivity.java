@@ -99,9 +99,7 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
         View btnNewChannel = findViewById(R.id.btnNewChannel);
         if (btnNewChannel != null) {
             btnNewChannel.setOnClickListener(v -> {
-                Intent intent = new Intent(this, NewGroupActivity.class);
-                intent.putExtra("isChannel", true);
-                startActivity(intent);
+                startActivity(new Intent(this, CreateChannelActivity.class));
                 finish();
             });
         }
@@ -163,9 +161,7 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
     }
 
     private void showCreateChannelDialog() {
-        Intent intent = new Intent(this, NewGroupActivity.class);
-        intent.putExtra("isChannel", true);
-        startActivity(intent);
+        startActivity(new Intent(this, CreateChannelActivity.class));
         finish();
     }
 
