@@ -77,6 +77,9 @@ public class UserProfileActivity extends AppCompatActivity {
         });
 
         peerUserId = getIntent().getStringExtra("userId");
+        if (peerUserId != null && peerUserId.trim().isEmpty()) {
+            peerUserId = null;
+        }
         peerUserName = getIntent().getStringExtra("userName");
         chatId = getIntent().getStringExtra("chatId");
         isGroup = getIntent().getBooleanExtra("isGroup", false);
@@ -109,7 +112,8 @@ public class UserProfileActivity extends AppCompatActivity {
                 }
             });
         }
-        if (avatarSrc == null && peerUserId != null) {
+        if (avatarSrc == null && peerUserId != null && !peerUserId.trim().isEmpty()
+                && !peerUserId.startsWith("group_") && !peerUserId.startsWith("channel_")) {
             FirebaseFirestore.getInstance().collection("users").document(peerUserId).get().addOnSuccessListener(doc -> {
                 if (doc.exists() && profileAvatarImage != null) {
                     String remoteAvatar = doc.getString("avatar");

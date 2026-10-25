@@ -550,17 +550,27 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         chatId = getIntent().getStringExtra("chatId");
+        if (chatId == null) {
+            chatId = getIntent().getStringExtra("chat_id");
+        }
         recipientId = getIntent().getStringExtra("recipientId");
+        if (recipientId == null) {
+            recipientId = getIntent().getStringExtra("recipient_id");
+        }
+        if (recipientId != null && recipientId.trim().isEmpty()) {
+            recipientId = null;
+        }
         recipientName = getIntent().getStringExtra("recipientName");
 
-        // Resolve missing recipient details from chatId if launched from notification
-        if (recipientId == null && chatId != null) {
+        // Resolve missing recipient details from chatId if launched from notification or 1-on-1 chat
+        if (recipientId == null && chatId != null && !chatId.startsWith("group_") && !chatId.startsWith("channel_")) {
             String[] parts = chatId.split("_");
             if (parts.length == 2) {
                 recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
             }
         }
-        if (recipientName == null && recipientId != null) {
+        if (recipientName == null && recipientId != null && !recipientId.trim().isEmpty()
+                && !recipientId.startsWith("group_") && !recipientId.startsWith("channel_")) {
             db.collection("users").document(recipientId).get().addOnSuccessListener(doc -> {
                 if (doc.exists()) {
                     String dName = doc.getString("displayName");
@@ -576,7 +586,8 @@ public class ChatActivity extends AppCompatActivity {
 
         // Initialize WebRTC P2P Manager & DataChannel
         com.m3.veil.webrtc.WebRtcManager.getInstance(this).init(currentUserId);
-        if (recipientId != null) {
+        if (recipientId != null && !recipientId.trim().isEmpty()
+                && !recipientId.startsWith("group_") && !recipientId.startsWith("channel_")) {
             com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
         }
         com.m3.veil.webrtc.WebRtcManager.getInstance(this).addEventListener(p2pChatListener);
@@ -604,7 +615,8 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         com.m3.veil.database.EncryptedChatDatabase.getInstance(this).addListener(localDbListener);
-        this.isP2PActive = com.m3.veil.webrtc.WebRtcManager.getInstance(this).isPeerConnected(recipientId);
+        this.isP2PActive = (recipientId != null && !recipientId.trim().isEmpty())
+                && com.m3.veil.webrtc.WebRtcManager.getInstance(this).isPeerConnected(recipientId);
 
         ensureLocalChatExists();
         if (isNetworkAvailable() && chatId != null) {
@@ -1691,7 +1703,9 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void fetchRecipientPublicKey() {
-        if (recipientId == null) return;
+        if (recipientId == null || recipientId.trim().isEmpty()) return;
+        if (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_"))) return;
+        if (recipientId.startsWith("group_") || recipientId.startsWith("channel_")) return;
         if (recipientUserListener != null) {
             recipientUserListener.remove();
         }

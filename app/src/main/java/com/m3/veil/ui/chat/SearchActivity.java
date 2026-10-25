@@ -445,16 +445,24 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
         intent.putExtra("recipientName", chat.getName());
         intent.putExtra("isPinVerified", isPinVerified);
 
-        String recipientId = "";
+        String recipientId = null;
         if (chat.getParticipants() != null) {
             for (String id : chat.getParticipants()) {
-                if (!id.equals(currentUserId)) {
+                if (id != null && !id.equals(currentUserId)) {
                     recipientId = id;
                     break;
                 }
             }
         }
-        intent.putExtra("recipientId", recipientId);
+        if ((recipientId == null || recipientId.trim().isEmpty()) && chat.getId() != null && !chat.isGroup()) {
+            String[] parts = chat.getId().split("_");
+            if (parts.length == 2) {
+                recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+            }
+        }
+        if (recipientId != null && !recipientId.trim().isEmpty()) {
+            intent.putExtra("recipientId", recipientId);
+        }
 
         String matchedMsgId = matchedMessageIdByChatId.get(chat.getId());
         if (matchedMsgId != null && !matchedMsgId.isEmpty()) {

@@ -1362,7 +1362,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         intent.putExtra("recipientName", chat.getName());
         intent.putExtra("isPinVerified", isPinVerified);
 
-        String recipientId = "";
+        String recipientId = null;
         if (chat.getParticipants() != null) {
             for (String id : chat.getParticipants()) {
                 if (id != null && !id.equals(currentUserId)) {
@@ -1371,7 +1371,15 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                 }
             }
         }
-        intent.putExtra("recipientId", recipientId);
+        if ((recipientId == null || recipientId.trim().isEmpty()) && chat.getId() != null && !chat.isGroup()) {
+            String[] parts = chat.getId().split("_");
+            if (parts.length == 2) {
+                recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+            }
+        }
+        if (recipientId != null && !recipientId.trim().isEmpty()) {
+            intent.putExtra("recipientId", recipientId);
+        }
         startActivity(intent);
     }
 
