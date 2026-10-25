@@ -76,7 +76,9 @@ public class PrivacySettingsActivity extends AppCompatActivity {
             getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         }
 
+        androidx.activity.EdgeToEdge.enable(this);
         setContentView(R.layout.activity_privacy_settings);
+        com.m3.veil.utils.UiAnimator.enableEdgeToEdge(this, findViewById(android.R.id.content));
         bindViews();
         setupListeners();
         refreshUi();

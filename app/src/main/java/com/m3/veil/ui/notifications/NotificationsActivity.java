@@ -98,7 +98,9 @@ public class NotificationsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        androidx.activity.EdgeToEdge.enable(this);
         setContentView(R.layout.activity_notifications);
+        com.m3.veil.utils.UiAnimator.enableEdgeToEdge(this, findViewById(android.R.id.content));
 
         chatDb = EncryptedChatDatabase.getInstance(this);
         featureManager = VeilFeatureManager.getInstance(this);

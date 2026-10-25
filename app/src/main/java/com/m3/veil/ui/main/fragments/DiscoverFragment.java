@@ -193,9 +193,7 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
             swipeRefreshLayout.setOnRefreshListener(this::loadLocalPosts);
         }
 
-        fabCreatePost.setOnClickListener(v -> {
-            startActivity(new Intent(getContext(), CreatePostActivity.class));
-        });
+        fabCreatePost.setVisibility(View.GONE);
     }
 
     public void setCategoryFilter(String category) {
@@ -323,6 +321,15 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
         postsAdapter = new PostsAdapter(postList, this);
         postsRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         postsRecyclerView.setAdapter(postsAdapter);
+
+        postsRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                if (Math.abs(dy) > 4 && getActivity() instanceof com.m3.veil.ui.main.MainActivity) {
+                    ((com.m3.veil.ui.main.MainActivity) getActivity()).setBottomNavAndFabVisible(dy <= 0);
+                }
+            }
+        });
     }
 
     private void updateEmptyState() {

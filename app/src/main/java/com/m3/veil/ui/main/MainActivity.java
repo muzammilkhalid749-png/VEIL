@@ -42,6 +42,8 @@ public class MainActivity extends AppCompatActivity {
     private ViewPager2 viewPager;
     private BottomNavigationView bottomNavigation;
     private FloatingActionButton fabNewMessage;
+    private View bottomNavContainer;
+    private boolean isBottomNavVisible = true;
 
     private View appLogo;
     private TextView toolbarTitle;
@@ -169,7 +171,11 @@ public class MainActivity extends AppCompatActivity {
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main_container), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             findViewById(R.id.appBarLayout).setPadding(systemBars.left, systemBars.top, systemBars.right, 0);
-            bottomNavigation.setPadding(0, 0, 0, systemBars.bottom);
+            if (bottomNavContainer != null) {
+                bottomNavContainer.setPadding(0, 0, 0, systemBars.bottom);
+            } else if (bottomNavigation != null) {
+                bottomNavigation.setPadding(0, 0, 0, systemBars.bottom);
+            }
             return insets;
         });
     }
@@ -177,6 +183,7 @@ public class MainActivity extends AppCompatActivity {
     private void initializeViews() {
         viewPager = findViewById(R.id.viewPager);
         bottomNavigation = findViewById(R.id.bottomNavigation);
+        bottomNavContainer = findViewById(R.id.bottomNavContainer);
         fabNewMessage = findViewById(R.id.fabNewMessage);
         appLogo = findViewById(R.id.appLogo);
         toolbarTitle = findViewById(R.id.toolbarTitle);
@@ -209,6 +216,7 @@ public class MainActivity extends AppCompatActivity {
                 viewPager.setCurrentItem(targetPos, false);
             }
             updateToolbarForTab(targetPos);
+            updateFabForTab(targetPos);
             return true;
         });
 
@@ -224,33 +232,14 @@ public class MainActivity extends AppCompatActivity {
                 if (bottomNavigation.getSelectedItemId() != navId) {
                     bottomNavigation.getMenu().findItem(navId).setChecked(true);
                 }
-                if (position == 0) {
-                    fabNewMessage.show();
-                } else {
-                    fabNewMessage.hide();
-                }
+                updateFabForTab(position);
                 updateToolbarForTab(position);
             }
         });
     }
 
     private void setupClickListeners() {
-        fabNewMessage.setOnClickListener(v -> {
-            startActivity(new Intent(this, NewChatActivity.class));
-        });
-
-        // Quick Persona Switcher on tapping app logo or toolbar title
-        View.OnClickListener personaSwitchClick = v -> {
-            HomeFragment hf = getHomeFragment();
-            if (hf != null) {
-                hf.showPersonaSwitcherDialog();
-            } else {
-                ProfileFragment pf = getProfileFragment();
-                if (pf != null) pf.openPersonaManager();
-            }
-        };
-        if (appLogo != null) appLogo.setOnClickListener(personaSwitchClick);
-        if (toolbarTitle != null) toolbarTitle.setOnClickListener(personaSwitchClick);
+        updateFabForTab(0);
 
         // Feature #107: Secret Inbox Gesture — Long-press toolbar opens Hidden Secret Vault
         android.view.View toolbar = findViewById(R.id.toolbar);
@@ -265,8 +254,75 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void refreshActivePersonaToolbarBadge() {
-        if (viewPager != null && viewPager.getCurrentItem() == 0) {
-            updateToolbarForTab(0);
+        if (toolbarTitle != null && viewPager != null && viewPager.getCurrentItem() == 0) {
+            toolbarTitle.setText(R.string.app_name);
+        }
+    }
+
+    public void setBottomNavAndFabVisible(boolean visible) {
+        if (isBottomNavVisible == visible) return;
+        isBottomNavVisible = visible;
+        if (bottomNavContainer == null) {
+            bottomNavContainer = findViewById(R.id.bottomNavContainer);
+        }
+        if (bottomNavContainer == null) return;
+
+        float targetY = visible ? 0f : (float) (bottomNavContainer.getHeight() + 150);
+        bottomNavContainer.animate()
+                .translationY(targetY)
+                .setDuration(220)
+                .setInterpolator(new androidx.interpolator.view.animation.FastOutSlowInInterpolator())
+                .start();
+
+        if (fabNewMessage != null) {
+            if (visible) {
+                fabNewMessage.animate()
+                        .translationY(0f)
+                        .setDuration(220)
+                        .setInterpolator(new androidx.interpolator.view.animation.FastOutSlowInInterpolator())
+                        .withStartAction(fabNewMessage::show)
+                        .start();
+            } else {
+                fabNewMessage.animate()
+                        .translationY(targetY)
+                        .setDuration(220)
+                        .setInterpolator(new androidx.interpolator.view.animation.FastOutSlowInInterpolator())
+                        .withEndAction(fabNewMessage::hide)
+                        .start();
+            }
+        }
+    }
+
+    public void updateFabForTab(int position) {
+        if (fabNewMessage == null) return;
+        switch (position) {
+            case 0: // Chats / Home
+                fabNewMessage.setImageResource(R.drawable.ic_edit);
+                fabNewMessage.setContentDescription("New Chat");
+                fabNewMessage.setOnClickListener(v -> startActivity(new Intent(this, NewChatActivity.class)));
+                fabNewMessage.show();
+                break;
+            case 1: // Discover / Moments
+                fabNewMessage.setImageResource(R.drawable.ic_add);
+                fabNewMessage.setContentDescription("Create Moment");
+                fabNewMessage.setOnClickListener(v -> startActivity(new Intent(this, CreatePostActivity.class)));
+                fabNewMessage.show();
+                break;
+            case 2: // Calls
+                fabNewMessage.setImageResource(R.drawable.ic_call);
+                fabNewMessage.setContentDescription("New Call");
+                fabNewMessage.setOnClickListener(v -> {
+                    CallsFragment cf = getCallsFragment();
+                    if (cf != null) {
+                        cf.showCallHubMenu();
+                    }
+                });
+                fabNewMessage.show();
+                break;
+            case 3: // Settings & Profile
+            default:
+                fabNewMessage.hide();
+                break;
         }
     }
 
@@ -280,13 +336,7 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 if (appLogo != null) appLogo.setVisibility(android.view.View.VISIBLE);
-                com.m3.veil.model.Persona activePersona = VeilFeatureManager.getInstance(this).getActivePersona();
-                if (activePersona != null && !"primary".equalsIgnoreCase(activePersona.getPersonaId())) {
-                    String mood = activePersona.getMood() != null ? activePersona.getMood() + " " : "🎭 ";
-                    toolbarTitle.setText("VEIL • " + mood + activePersona.getDisplayName());
-                } else {
-                    toolbarTitle.setText(R.string.app_name);
-                }
+                toolbarTitle.setText(R.string.app_name);
                 if (searchButton != null) {
                     searchButton.setVisibility(android.view.View.GONE);
                 }

@@ -46,7 +46,9 @@ public class NotificationSettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        androidx.activity.EdgeToEdge.enable(this);
         setContentView(R.layout.activity_notification_settings);
+        com.m3.veil.utils.UiAnimator.enableEdgeToEdge(this, findViewById(android.R.id.content));
 
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 

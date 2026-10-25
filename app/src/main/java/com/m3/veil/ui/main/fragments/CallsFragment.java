@@ -77,8 +77,7 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
         loadingBar = view.findViewById(R.id.loadingBar);
         fabNewCall = view.findViewById(R.id.fabNewCall);
 
-        UiAnimator.attachSpringPress(fabNewCall);
-        fabNewCall.setOnClickListener(v -> showCallHubMenu());
+        fabNewCall.setVisibility(View.GONE);
 
         setupRecyclerView();
         loadLocalCalls();
@@ -439,6 +438,15 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
             }
         };
         new ItemTouchHelper(swipeCallback).attachToRecyclerView(callsRecyclerView);
+
+        callsRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                if (Math.abs(dy) > 4 && getActivity() instanceof com.m3.veil.ui.main.MainActivity) {
+                    ((com.m3.veil.ui.main.MainActivity) getActivity()).setBottomNavAndFabVisible(dy <= 0);
+                }
+            }
+        });
     }
 
     private void loadLocalCalls() {

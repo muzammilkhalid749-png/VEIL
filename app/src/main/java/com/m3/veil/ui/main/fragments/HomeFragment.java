@@ -409,6 +409,15 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             }
         };
         new ItemTouchHelper(swipeCallback).attachToRecyclerView(chatsRecyclerView);
+
+        chatsRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                if (Math.abs(dy) > 4 && getActivity() instanceof com.m3.veil.ui.main.MainActivity) {
+                    ((com.m3.veil.ui.main.MainActivity) getActivity()).setBottomNavAndFabVisible(dy <= 0);
+                }
+            }
+        });
     }
 
     private void setupSearchAndFilters() {
