@@ -3588,9 +3588,15 @@ public class ChatActivity extends AppCompatActivity {
                             if (mId == null) mId = mDoc.getId();
                             String mType = mDoc.getString("type");
                             String mText = mDoc.getString("text");
+                            if (mText != null && mText.startsWith("ENC:v1:")) {
+                                mText = EncryptionManager.decryptGroupPayload(chatId, mText);
+                            }
                             String sId = mDoc.getString("senderId");
                             String sName = mDoc.getString("senderName");
                             String pollJson = mDoc.getString("pollJson");
+                            if (pollJson != null && pollJson.startsWith("ENC:v1:")) {
+                                pollJson = EncryptionManager.decryptGroupPayload(chatId, pollJson);
+                            }
                             boolean isEdited = VeilFirestoreUtils.getSafeBoolean(mDoc, "edited", false);
                             Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", Timestamp.now());
 

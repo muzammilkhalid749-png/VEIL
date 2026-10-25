@@ -48,6 +48,7 @@ import com.m3.veil.ui.chat.ChatActivity;
 import com.m3.veil.ui.chat.NewChatActivity;
 import com.m3.veil.ui.chat.NewGroupActivity;
 import com.m3.veil.ui.main.adapters.ChatsAdapter;
+import com.m3.veil.utils.EncryptionManager;
 import com.m3.veil.utils.VeilFirestoreUtils;
 import com.m3.veil.webrtc.WebRtcManager;
 
@@ -1190,8 +1191,14 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 com.m3.veil.model.Message existingMsg = EncryptedChatDatabase.getInstance(requireContext()).getMessageById(mId);
                                                 String mType = mDoc.getString("type");
                                                 String mText = mDoc.getString("text");
+                                                if (mText != null && mText.startsWith("ENC:v1:")) {
+                                                    mText = EncryptionManager.decryptGroupPayload(finalGroupId, mText);
+                                                }
                                                 Boolean isEditedObj = mDoc.getBoolean("edited");
                                                 String pollJson = mDoc.getString("pollJson");
+                                                if (pollJson != null && pollJson.startsWith("ENC:v1:")) {
+                                                    pollJson = EncryptionManager.decryptGroupPayload(finalGroupId, pollJson);
+                                                }
                                                 if (existingMsg == null) {
                                                     String sId = mDoc.getString("senderId");
                                                     String sName = mDoc.getString("senderName");

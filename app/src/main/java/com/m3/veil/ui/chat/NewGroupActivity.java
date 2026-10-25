@@ -289,7 +289,7 @@ public class NewGroupActivity extends AppCompatActivity {
         groupDoc.put("creatorId", currentUserId);
         groupDoc.put("creatorName", currentUsername);
         groupDoc.put("participants", participants);
-        groupDoc.put("lastMessage", welcomeMsg.getContent());
+        groupDoc.put("lastMessage", "🔒 " + (isChannelMode ? "Broadcast Channel created" : "P2P Encrypted Group created"));
         groupDoc.put("lastMessageSenderId", currentUserId);
         groupDoc.put("lastMessageSenderName", currentUsername);
         groupDoc.put("timestamp", Timestamp.now());

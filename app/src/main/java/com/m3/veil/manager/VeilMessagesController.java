@@ -916,7 +916,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             msgMap.put("chatId", groupId);
             msgMap.put("senderId", msg.getSenderId() != null ? msg.getSenderId() : getCurrentUserId());
             msgMap.put("senderName", msg.getSenderName() != null ? msg.getSenderName() : getCurrentUserName());
-            msgMap.put("text", msg.getText() != null ? msg.getText() : "");
+            String rawText = msg.getText() != null ? msg.getText() : "";
+            String encryptedText = EncryptionManager.encryptGroupPayload(groupId, rawText);
+            msgMap.put("text", encryptedText);
+            msgMap.put("isEncrypted", true);
             msgMap.put("type", msg.getType() != null ? msg.getType() : "text");
             Timestamp tsVal = msg.getTimestamp() != null ? msg.getTimestamp() : Timestamp.now();
             msgMap.put("timestamp", tsVal);
@@ -925,7 +928,12 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             msgMap.put("replySenderName", msg.getReplySenderName());
             msgMap.put("blink", msg.isBlink());
             msgMap.put("voiceFilter", msg.getVoiceFilter());
-            msgMap.put("pollJson", msg.getPollJson());
+            String rawPoll = msg.getPollJson();
+            if (rawPoll != null && !rawPoll.isEmpty()) {
+                msgMap.put("pollJson", EncryptionManager.encryptGroupPayload(groupId, rawPoll));
+            } else {
+                msgMap.put("pollJson", null);
+            }
             msgMap.put("thumbnail", msg.getThumbnail());
             msgMap.put("vanishTimer", msg.getVanishTimer());
             msgMap.put("vanishMode", msg.getVanishMode());
@@ -949,7 +957,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     groupSummary.put("participants", chat.getParticipants());
                 }
             }
-            groupSummary.put("lastMessage", msg.getText() != null ? msg.getText() : "[" + msg.getType() + "]");
+            groupSummary.put("lastMessage", "🔒 " + (msg.getType() != null && !msg.getType().equals("text") ? ("[" + msg.getType() + "]") : "Encrypted Message"));
             groupSummary.put("lastMessageSenderId", msg.getSenderId() != null ? msg.getSenderId() : getCurrentUserId());
             groupSummary.put("lastMessageSenderName", msg.getSenderName() != null ? msg.getSenderName() : getCurrentUserName());
             groupSummary.put("timestamp", tsVal);
