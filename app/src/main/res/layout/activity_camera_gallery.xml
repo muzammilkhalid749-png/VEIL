@@ -28,79 +28,98 @@
         android:visibility="gone" />
 
     <!-- 3. Top Controls Bar -->
-    <RelativeLayout
+    <LinearLayout
         android:id="@+id/topControlsBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:paddingStart="16dp"
-        android:paddingTop="36dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="12dp">
+        android:orientation="vertical">
 
-        <ImageView
-            android:id="@+id/btnCloseCamera"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_alignParentStart="true"
-            android:layout_centerVertical="true"
-            android:background="@drawable/bg_circle_translucent"
-            android:padding="8dp"
-            android:src="@drawable/ic_close"
-            app:tint="@android:color/white" />
+        <!-- Top inset spacer: dynamically updated to systemBars.top -->
+        <View
+            android:id="@+id/statusInsetSpacerCamera"
+            android:layout_width="match_parent"
+            android:layout_height="0dp" />
 
-        <!-- Video Recording Timer Pill (Center) -->
-        <LinearLayout
-            android:id="@+id/layoutRecordingTimer"
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:layout_centerInParent="true"
-            android:background="@drawable/bg_timer_pill"
-            android:gravity="center_vertical"
-            android:paddingStart="12dp"
-            android:paddingEnd="14dp"
-            android:visibility="gone">
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
 
             <ImageView
-                android:layout_width="8dp"
-                android:layout_height="8dp"
-                android:layout_marginEnd="8dp"
-                android:src="@drawable/circle_red" />
+                android:id="@+id/btnCloseCamera"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="@drawable/bg_circle_translucent"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="10dp"
+                android:src="@drawable/ic_close"
+                android:contentDescription="@string/back"
+                app:tint="@android:color/white" />
+
+            <!-- Video Recording Timer Pill (Center) -->
+            <LinearLayout
+                android:id="@+id/layoutRecordingTimer"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_centerInParent="true"
+                android:background="@drawable/bg_timer_pill"
+                android:gravity="center_vertical"
+                android:paddingStart="12dp"
+                android:paddingEnd="14dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:src="@drawable/circle_red" />
+
+                <TextView
+                    android:id="@+id/tvRecordingTimer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="00:00"
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/tvRecordingTimer"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="00:00"
-                android:textColor="@android:color/white"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+                android:id="@+id/btnArMaskToggle"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_toStartOf="@id/btnFlashToggle"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/bg_circle_translucent"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="🎭"
+                android:textSize="20sp" />
 
-        <TextView
-            android:id="@+id/btnArMaskToggle"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_toStartOf="@id/btnFlashToggle"
-            android:layout_centerVertical="true"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/bg_circle_translucent"
-            android:gravity="center"
-            android:text="🎭"
-            android:textSize="18sp" />
+            <ImageView
+                android:id="@+id/btnFlashToggle"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="@drawable/bg_circle_translucent"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="10dp"
+                android:src="@drawable/ic_flash_off"
+                android:contentDescription="Flash Toggle"
+                app:tint="@android:color/white" />
 
-        <ImageView
-            android:id="@+id/btnFlashToggle"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:background="@drawable/bg_circle_translucent"
-            android:padding="8dp"
-            android:src="@drawable/ic_flash_off"
-            app:tint="@android:color/white" />
+        </RelativeLayout>
 
-    </RelativeLayout>
+    </LinearLayout>
 
     <!-- 4. Bottom Viewfinder Controls (Shutter, Flip, Horizontal Carousel) -->
     <LinearLayout
@@ -374,69 +393,86 @@
         android:visibility="gone">
 
         <!-- Top Gallery Bar -->
-        <RelativeLayout
+        <LinearLayout
             android:id="@+id/layoutGalleryHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingStart="16dp"
-            android:paddingTop="36dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="12dp">
+            android:background="#0B0F17"
+            android:orientation="vertical">
 
-            <ImageView
-                android:id="@+id/btnBackFromGallery"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_alignParentStart="true"
-                android:layout_centerVertical="true"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:padding="8dp"
-                android:src="@drawable/ic_arrow_back"
-                app:tint="@android:color/white" />
+            <!-- Inset spacer for gallery status bar -->
+            <View
+                android:id="@+id/statusInsetSpacerGallery"
+                android:layout_width="match_parent"
+                android:layout_height="0dp" />
 
-            <!-- Album Dropdown Selector -->
-            <LinearLayout
-                android:id="@+id/btnAlbumDropdown"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_centerVertical="true"
-                android:layout_toEndOf="@id/btnBackFromGallery"
-                android:background="?attr/selectableItemBackground"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="8dp"
-                android:paddingEnd="12dp">
-
-                <TextView
-                    android:id="@+id/tvCurrentAlbumName"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="All Media"
-                    android:textColor="@android:color/white"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="16dp">
 
                 <ImageView
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:layout_marginStart="4dp"
-                    android:src="@drawable/ic_arrow_down"
+                    android:id="@+id/btnBackFromGallery"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_alignParentStart="true"
+                    android:layout_centerVertical="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_arrow_back"
+                    android:contentDescription="@string/back"
                     app:tint="@android:color/white" />
-            </LinearLayout>
 
-            <!-- Multi-Select Count Display -->
-            <TextView
-                android:id="@+id/tvGallerySelectCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:textColor="@color/veil_primary"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                <!-- Album Dropdown Selector -->
+                <LinearLayout
+                    android:id="@+id/btnAlbumDropdown"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:layout_centerVertical="true"
+                    android:layout_toEndOf="@id/btnBackFromGallery"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="12dp">
 
-        </RelativeLayout>
+                    <TextView
+                        android:id="@+id/tvCurrentAlbumName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="All Media"
+                        android:textColor="@android:color/white"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="6dp"
+                        android:src="@drawable/ic_arrow_down"
+                        app:tint="@android:color/white" />
+                </LinearLayout>
+
+                <!-- Multi-Select Count Display -->
+                <TextView
+                    android:id="@+id/tvGallerySelectCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:textColor="@color/veil_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+            </RelativeLayout>
+
+        </LinearLayout>
 
         <!-- 3-Column Media Grid -->
         <FrameLayout
@@ -456,7 +492,36 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
+                android:indeterminateTint="@color/veil_primary"
                 android:visibility="gone" />
+
+            <!-- Empty State -->
+            <LinearLayout
+                android:id="@+id/layoutGalleryEmptyState"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:src="@drawable/ic_image"
+                    app:tint="#66FFFFFF" />
+
+                <TextView
+                    android:id="@+id/tvGalleryEmptyMessage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="No photos or videos found"
+                    android:textColor="#99FFFFFF"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium" />
+            </LinearLayout>
 
             <!-- Bottom Floating Action Bar for Selected Items -->
             <FrameLayout

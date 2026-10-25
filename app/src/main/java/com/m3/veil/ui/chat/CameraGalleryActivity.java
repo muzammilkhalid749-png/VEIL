@@ -26,6 +26,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -139,6 +140,8 @@ public class CameraGalleryActivity extends AppCompatActivity {
     private TextView tvGallerySelectCount;
     private RecyclerView rvFullGalleryGrid;
     private ProgressBar galleryLoaderProgressBar;
+    private LinearLayout layoutGalleryEmptyState;
+    private TextView tvGalleryEmptyMessage;
     private FrameLayout layoutFloatingSend;
     private ExtendedFloatingActionButton fabSendSelected;
 
@@ -224,11 +227,25 @@ public class CameraGalleryActivity extends AppCompatActivity {
             layoutFullGallery.setTranslationY(0f);
         }
 
-        if (checkPermissions()) {
+        if (hasCameraPermission()) {
             startCamera();
+        }
+        if (hasStoragePermission()) {
             loadMediaLibrary();
-        } else {
+        }
+        if (!hasCameraPermission() || !hasStoragePermission()) {
             requestPermissions();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (hasStoragePermission() && allMediaItems.isEmpty()) {
+            loadMediaLibrary();
+        }
+        if (hasCameraPermission() && cameraProvider == null) {
+            startCamera();
         }
     }
 
@@ -237,24 +254,25 @@ public class CameraGalleryActivity extends AppCompatActivity {
         if (root == null) return;
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            View topControls = findViewById(R.id.topControlsBar);
-            if (topControls != null) {
-                topControls.setPadding(
-                        topControls.getPaddingStart(),
-                        systemBars.top + (int) (8 * getResources().getDisplayMetrics().density),
-                        topControls.getPaddingEnd(),
-                        topControls.getPaddingBottom()
-                );
+
+            View cameraSpacer = findViewById(R.id.statusInsetSpacerCamera);
+            if (cameraSpacer != null) {
+                ViewGroup.LayoutParams lp = cameraSpacer.getLayoutParams();
+                if (lp != null && lp.height != systemBars.top) {
+                    lp.height = systemBars.top;
+                    cameraSpacer.setLayoutParams(lp);
+                }
             }
-            View galleryHeader = findViewById(R.id.layoutGalleryHeader);
-            if (galleryHeader != null) {
-                galleryHeader.setPadding(
-                        galleryHeader.getPaddingStart(),
-                        systemBars.top + (int) (8 * getResources().getDisplayMetrics().density),
-                        galleryHeader.getPaddingEnd(),
-                        galleryHeader.getPaddingBottom()
-                );
+
+            View gallerySpacer = findViewById(R.id.statusInsetSpacerGallery);
+            if (gallerySpacer != null) {
+                ViewGroup.LayoutParams lp = gallerySpacer.getLayoutParams();
+                if (lp != null && lp.height != systemBars.top) {
+                    lp.height = systemBars.top;
+                    gallerySpacer.setLayoutParams(lp);
+                }
             }
+
             View bottomBar = findViewById(R.id.bottomCameraControls);
             if (bottomBar != null) {
                 bottomBar.setPadding(
@@ -300,6 +318,8 @@ public class CameraGalleryActivity extends AppCompatActivity {
         tvGallerySelectCount = findViewById(R.id.tvGallerySelectCount);
         rvFullGalleryGrid = findViewById(R.id.rvFullGalleryGrid);
         galleryLoaderProgressBar = findViewById(R.id.galleryLoaderProgressBar);
+        layoutGalleryEmptyState = findViewById(R.id.layoutGalleryEmptyState);
+        tvGalleryEmptyMessage = findViewById(R.id.tvGalleryEmptyMessage);
         layoutFloatingSend = findViewById(R.id.layoutFloatingSend);
         fabSendSelected = findViewById(R.id.fabSendSelected);
 
@@ -869,7 +889,10 @@ public class CameraGalleryActivity extends AppCompatActivity {
     }
 
     private void showAlbumMenu() {
-        if (albumMap.isEmpty()) return;
+        if (albumMap.isEmpty()) {
+            Toast.makeText(this, "No media albums found", Toast.LENGTH_SHORT).show();
+            return;
+        }
         PopupMenu popup = new PopupMenu(this, btnAlbumDropdown);
         popup.getMenu().add(0, 0, 0, "All Media (" + allMediaItems.size() + ")");
         int index = 1;
@@ -911,6 +934,9 @@ public class CameraGalleryActivity extends AppCompatActivity {
             }
         }
         fullGalleryAdapter.notifyDataSetChanged();
+        if (layoutGalleryEmptyState != null) {
+            layoutGalleryEmptyState.setVisibility(displayedMediaItems.isEmpty() ? View.VISIBLE : View.GONE);
+        }
     }
 
     private void updateSelectionUI(List<GalleryMediaItem> selectedItems) {
@@ -926,7 +952,19 @@ public class CameraGalleryActivity extends AppCompatActivity {
     }
 
     private void loadMediaLibrary() {
+        if (!hasStoragePermission()) {
+            if (layoutGalleryEmptyState != null) {
+                layoutGalleryEmptyState.setVisibility(View.VISIBLE);
+                if (tvGalleryEmptyMessage != null) {
+                    tvGalleryEmptyMessage.setText("Storage permission required to view media");
+                }
+            }
+            return;
+        }
         galleryLoaderProgressBar.setVisibility(View.VISIBLE);
+        if (layoutGalleryEmptyState != null) {
+            layoutGalleryEmptyState.setVisibility(View.GONE);
+        }
         mediaScanExecutor.execute(() -> {
             List<GalleryMediaItem> queried = new ArrayList<>();
             Map<String, MediaAlbum> albums = new HashMap<>();
@@ -943,7 +981,7 @@ public class CameraGalleryActivity extends AppCompatActivity {
             try (Cursor c = cr.query(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                     imgCols, null, null,
-                    MediaStore.Images.Media.DATE_ADDED + " DESC LIMIT 200")) {
+                    MediaStore.Images.Media.DATE_ADDED + " DESC")) {
                 if (c != null) {
                     int idCol = c.getColumnIndexOrThrow(MediaStore.Images.Media._ID);
                     int dataCol = c.getColumnIndex(MediaStore.Images.Media.DATA);
@@ -951,7 +989,9 @@ public class CameraGalleryActivity extends AppCompatActivity {
                     int bNameCol = c.getColumnIndex(MediaStore.Images.Media.BUCKET_DISPLAY_NAME);
                     int dateCol = c.getColumnIndex(MediaStore.Images.Media.DATE_ADDED);
 
-                    while (c.moveToNext()) {
+                    int count = 0;
+                    while (c.moveToNext() && count < 300) {
+                        count++;
                         long id = c.getLong(idCol);
                         String path = dataCol != -1 ? c.getString(dataCol) : null;
                         String bucketId = bIdCol != -1 ? c.getString(bIdCol) : "other";
@@ -961,6 +1001,8 @@ public class CameraGalleryActivity extends AppCompatActivity {
 
                         queried.add(new GalleryMediaItem(id, uri, path, false, 0, bucketId, bucketName, date));
 
+                        if (bucketId == null) bucketId = "other";
+                        if (bucketName == null) bucketName = "Other";
                         if (!albums.containsKey(bucketId)) {
                             albums.put(bucketId, new MediaAlbum(bucketId, bucketName, uri, 1));
                         } else {
@@ -968,7 +1010,9 @@ public class CameraGalleryActivity extends AppCompatActivity {
                         }
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                Log.e(TAG, "Error querying images from MediaStore", e);
+            }
 
             // 2. Videos
             String[] vidCols = {
@@ -982,7 +1026,7 @@ public class CameraGalleryActivity extends AppCompatActivity {
             try (Cursor c = cr.query(
                     MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
                     vidCols, null, null,
-                    MediaStore.Video.Media.DATE_ADDED + " DESC LIMIT 100")) {
+                    MediaStore.Video.Media.DATE_ADDED + " DESC")) {
                 if (c != null) {
                     int idCol = c.getColumnIndexOrThrow(MediaStore.Video.Media._ID);
                     int dataCol = c.getColumnIndex(MediaStore.Video.Media.DATA);
@@ -991,7 +1035,9 @@ public class CameraGalleryActivity extends AppCompatActivity {
                     int durCol = c.getColumnIndex(MediaStore.Video.Media.DURATION);
                     int dateCol = c.getColumnIndex(MediaStore.Video.Media.DATE_ADDED);
 
-                    while (c.moveToNext()) {
+                    int count = 0;
+                    while (c.moveToNext() && count < 150) {
+                        count++;
                         long id = c.getLong(idCol);
                         String path = dataCol != -1 ? c.getString(dataCol) : null;
                         String bucketId = bIdCol != -1 ? c.getString(bIdCol) : "other";
@@ -1002,6 +1048,8 @@ public class CameraGalleryActivity extends AppCompatActivity {
 
                         queried.add(new GalleryMediaItem(id, uri, path, true, dur, bucketId, bucketName, date));
 
+                        if (bucketId == null) bucketId = "other";
+                        if (bucketName == null) bucketName = "Other";
                         if (!albums.containsKey(bucketId)) {
                             albums.put(bucketId, new MediaAlbum(bucketId, bucketName, uri, 1));
                         } else {
@@ -1009,7 +1057,9 @@ public class CameraGalleryActivity extends AppCompatActivity {
                         }
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                Log.e(TAG, "Error querying videos from MediaStore", e);
+            }
 
             // Sort all by date descending
             Collections.sort(queried, (a, b) -> Long.compare(b.getDateAdded(), a.getDateAdded()));
@@ -1036,24 +1086,44 @@ public class CameraGalleryActivity extends AppCompatActivity {
         });
     }
 
-    private boolean checkPermissions() {
-        boolean cameraGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
-        boolean audioGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
-        boolean storageGranted;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            storageGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+    private boolean hasStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+                    || ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+                    || ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED;
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
                     || ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED;
         } else {
-            storageGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+            return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
         }
-        return cameraGranted && audioGranted && storageGranted;
+    }
+
+    private boolean hasCameraPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean hasAudioPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean checkPermissions() {
+        return hasCameraPermission() && hasAudioPermission() && hasStoragePermission();
     }
 
     private void requestPermissions() {
         List<String> list = new ArrayList<>();
-        list.add(Manifest.permission.CAMERA);
-        list.add(Manifest.permission.RECORD_AUDIO);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (!hasCameraPermission()) {
+            list.add(Manifest.permission.CAMERA);
+        }
+        if (!hasAudioPermission()) {
+            list.add(Manifest.permission.RECORD_AUDIO);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            list.add(Manifest.permission.READ_MEDIA_IMAGES);
+            list.add(Manifest.permission.READ_MEDIA_VIDEO);
+            list.add(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             list.add(Manifest.permission.READ_MEDIA_IMAGES);
             list.add(Manifest.permission.READ_MEDIA_VIDEO);
         } else {
@@ -1066,19 +1136,18 @@ public class CameraGalleryActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQ_CODE) {
-            boolean allGranted = true;
-            for (int res : grantResults) {
-                if (res != PackageManager.PERMISSION_GRANTED) {
-                    allGranted = false;
-                    break;
-                }
-            }
-            if (allGranted) {
+            if (hasCameraPermission() && cameraProvider == null) {
                 startCamera();
+            }
+            if (hasStoragePermission()) {
                 loadMediaLibrary();
             } else {
-                Toast.makeText(this, "Camera and Storage permissions are required", Toast.LENGTH_SHORT).show();
-                finish();
+                if (layoutGalleryEmptyState != null) {
+                    layoutGalleryEmptyState.setVisibility(View.VISIBLE);
+                    if (tvGalleryEmptyMessage != null) {
+                        tvGalleryEmptyMessage.setText("Storage permission required to view media");
+                    }
+                }
             }
         }
     }
