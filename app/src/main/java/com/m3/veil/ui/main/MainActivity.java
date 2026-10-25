@@ -181,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
                 androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams lp =
                         (androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams) fabNewMessage.getLayoutParams();
                 int navHeight = (int) (56 * getResources().getDisplayMetrics().density);
-                int fabSpacing = (int) (16 * getResources().getDisplayMetrics().density);
+                int fabSpacing = (int) (52 * getResources().getDisplayMetrics().density);
                 lp.bottomMargin = navHeight + fabSpacing + systemBars.bottom;
                 fabNewMessage.setLayoutParams(lp);
             }

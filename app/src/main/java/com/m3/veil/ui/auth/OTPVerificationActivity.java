@@ -343,9 +343,21 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
 
     private void showLoading(boolean show) {
-        progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
-        verifyButton.setVisibility(show ? View.INVISIBLE : View.VISIBLE);
-        otpView.setEnabled(!show);
+        if (progressBar != null) {
+            progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        if (verifyButton != null) {
+            verifyButton.setEnabled(!show);
+            verifyButton.setText(show ? "" : getString(R.string.verify_continue));
+            boolean hasFullOtp = otpView != null && otpView.getText() != null && otpView.getText().length() == 6;
+            verifyButton.setAlpha(show ? 0.85f : (hasFullOtp ? 1.0f : 0.6f));
+        }
+        if (otpView != null) {
+            otpView.setEnabled(!show);
+        }
+        if (resendCodeText != null) {
+            resendCodeText.setEnabled(!show && isResendEnabled);
+        }
     }
 
     private void showSnackbar(String message) {

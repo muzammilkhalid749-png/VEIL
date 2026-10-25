@@ -4,19 +4,19 @@
     android:id="@+id/pin_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/splash_background">
+    android:background="@color/colorBackground">
 
     <!-- Top Navigation Bar -->
     <ImageView
         android:id="@+id/backButton"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
         android:layout_gravity="top|start"
         android:layout_marginStart="16dp"
         android:layout_marginTop="12dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/back"
-        android:padding="8dp"
+        android:padding="10dp"
         android:src="@drawable/ic_arrow_back"
         app:tint="@color/textPrimary" />
 
@@ -39,14 +39,24 @@
             android:paddingTop="56dp"
             android:paddingBottom="24dp">
 
-            <!-- Hero Shield Header -->
-            <ImageView
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:layout_marginBottom="16dp"
-                android:contentDescription="@string/setup_secure_pin"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_shield_locked" />
+            <!-- Hero Shield Header Container -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="@color/colorPrimaryContainer"
+                app:cardCornerRadius="36dp"
+                app:cardElevation="0dp">
+
+                <ImageView
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/setup_secure_pin"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_shield_locked"
+                    app:tint="@color/colorPrimary" />
+            </androidx.cardview.widget.CardView>
 
             <TextView
                 android:id="@+id/titleText"
@@ -54,20 +64,20 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
                 android:gravity="center"
-                android:letterSpacing="0.01"
+                android:letterSpacing="0.02"
                 android:text="@string/setup_secure_pin"
                 android:textColor="@color/textPrimary"
-                android:textSize="22sp"
+                android:textSize="24sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/subtitleText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="8dp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
-                android:lineSpacingExtra="2dp"
+                android:lineSpacingExtra="3dp"
                 android:text="@string/pin_hint"
                 android:textColor="@color/textSecondary"
                 android:textSize="14sp" />
@@ -77,8 +87,8 @@
                 android:id="@+id/pinDotsContainer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="8dp"
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="16dp"
                 android:gravity="center"
                 android:orientation="horizontal" />
 
@@ -90,7 +100,7 @@
                 android:layout_marginBottom="12dp"
                 android:fontFamily="sans-serif-medium"
                 android:gravity="center"
-                android:textColor="@color/error_red"
+                android:textColor="@color/statusError"
                 android:textSize="13sp"
                 android:visibility="gone" />
 
@@ -111,38 +121,38 @@
                     <Button
                         android:id="@+id/button1"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="1"
-                        android:textColor="@color/textPrimary"
-                        android:textSize="22sp" />
+                        android:textColor="@color/keypad_digit_text"
+                        android:textSize="24sp" />
 
                     <Button
                         android:id="@+id/button2"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="2"
-                        android:textColor="@color/textPrimary"
-                        android:textSize="22sp" />
+                        android:textColor="@color/keypad_digit_text"
+                        android:textSize="24sp" />
 
                     <Button
                         android:id="@+id/button3"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="3"
-                        android:textColor="@color/textPrimary"
-                        android:textSize="22sp" />
+                        android:textColor="@color/keypad_digit_text"
+                        android:textSize="24sp" />
                 </LinearLayout>
 
                 <!-- Row 2: 4, 5, 6 -->
@@ -154,38 +164,38 @@
                     <Button
                         android:id="@+id/button4"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="4"
-                        android:textColor="@color/textPrimary"
-                        android:textSize="22sp" />
+                        android:textColor="@color/keypad_digit_text"
+                        android:textSize="24sp" />
 
                     <Button
                         android:id="@+id/button5"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="5"
-                        android:textColor="@color/textPrimary"
-                        android:textSize="22sp" />
+                        android:textColor="@color/keypad_digit_text"
+                        android:textSize="24sp" />
 
                     <Button
                         android:id="@+id/button6"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="6"
-                        android:textColor="@color/textPrimary"
-                        android:textSize="22sp" />
+                        android:textColor="@color/keypad_digit_text"
+                        android:textSize="24sp" />
                 </LinearLayout>
 
                 <!-- Row 3: 7, 8, 9 -->
@@ -197,38 +207,38 @@
                     <Button
                         android:id="@+id/button7"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="7"
-                        android:textColor="@color/textPrimary"
-                        android:textSize="22sp" />
+                        android:textColor="@color/keypad_digit_text"
+                        android:textSize="24sp" />
 
                     <Button
                         android:id="@+id/button8"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="8"
-                        android:textColor="@color/textPrimary"
-                        android:textSize="22sp" />
+                        android:textColor="@color/keypad_digit_text"
+                        android:textSize="24sp" />
 
                     <Button
                         android:id="@+id/button9"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="9"
-                        android:textColor="@color/textPrimary"
-                        android:textSize="22sp" />
+                        android:textColor="@color/keypad_digit_text"
+                        android:textSize="24sp" />
                 </LinearLayout>
 
                 <!-- Row 4: Delete, 0, Clear -->
@@ -240,37 +250,37 @@
                     <Button
                         android:id="@+id/buttonDelete"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif"
                         android:text="⌫"
-                        android:textColor="@color/textSecondary"
+                        android:textColor="@color/keypad_control_text"
                         android:textSize="20sp" />
 
                     <Button
                         android:id="@+id/button0"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="0"
-                        android:textColor="@color/textPrimary"
-                        android:textSize="22sp" />
+                        android:textColor="@color/keypad_digit_text"
+                        android:textSize="24sp" />
 
                     <Button
                         android:id="@+id/buttonClear"
                         android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_margin="5dp"
+                        android:layout_height="64dp"
+                        android:layout_margin="6dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="C"
-                        android:textColor="@color/textSecondary"
+                        android:textColor="@color/keypad_control_text"
                         android:textSize="18sp" />
                 </LinearLayout>
 
@@ -281,7 +291,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
-                android:layout_marginTop="20dp"
+                android:layout_marginTop="24dp"
                 android:maxWidth="340dp"
                 android:orientation="horizontal">
 
@@ -297,7 +307,7 @@
                     android:textAllCaps="false"
                     android:textColor="@color/textSecondary"
                     android:textSize="14sp"
-                    app:cornerRadius="14dp" />
+                    app:cornerRadius="16dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/confirmButton"
@@ -314,7 +324,7 @@
                     android:textSize="14sp"
                     android:textStyle="bold"
                     app:backgroundTint="@color/colorPrimary"
-                    app:cornerRadius="14dp" />
+                    app:cornerRadius="16dp" />
             </LinearLayout>
 
             <!-- Loading Indicator -->

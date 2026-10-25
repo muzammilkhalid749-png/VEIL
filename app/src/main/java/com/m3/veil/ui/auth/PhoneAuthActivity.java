@@ -42,6 +42,7 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
     private Button continueButton;
     private Button anonymousJoinButton;
     private ProgressBar progressBar;
+    private ProgressBar anonymousProgressBar;
     private LinearLayout countryPickerContainer;
     private TextView countryCodeText, flagEmoji;
 
@@ -51,6 +52,9 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
 
     private List<Country> countries;
     private Country selectedCountry;
+    private boolean isLoading = false;
+    private final android.os.Handler timeoutHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable timeoutRunnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,8 +70,8 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
         setupTextWatchers();
         setupPhoneNumberFormatting();
 
-        // Set default country based on device locale
-        setSelectedCountry(CountryData.getDefaultCountry());
+        // Auto-detect and set country based on SIM, carrier, timezone, or device locale
+        setSelectedCountry(CountryData.detectCountry(this));
     }
 
     private void handleWindowInsets() {
@@ -82,6 +86,7 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
         continueButton = findViewById(R.id.continueButton);
         anonymousJoinButton = findViewById(R.id.anonymousJoinButton);
         progressBar = findViewById(R.id.progressBar);
+        anonymousProgressBar = findViewById(R.id.anonymousProgressBar);
         countryPickerContainer = findViewById(R.id.countryPickerContainer);
         countryCodeText = findViewById(R.id.countryCodeText);
         flagEmoji = findViewById(R.id.flagEmoji);
@@ -109,14 +114,14 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
     }
 
     private void signInAnonymously() {
-        showLoading(true);
+        showLoading(true, true);
         String phrase = com.m3.veil.utils.AnonymousAuthManager.generateRecoveryPhrase();
         String email = com.m3.veil.utils.AnonymousAuthManager.getEmailFromPhrase(phrase);
         String password = com.m3.veil.utils.AnonymousAuthManager.getPasswordFromPhrase(phrase);
 
         mAuth.createUserWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this, task -> {
-                    showLoading(false);
+                    showLoading(false, true);
                     if (task.isSuccessful()) {
                         // Persist recovery phrase in encrypted preferences
                         try {
@@ -214,6 +219,7 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
 
 
     private void updateContinueButtonState() {
+        if (isLoading) return;
         String phoneNumber = phoneNumberEditText.getText().toString().trim();
         boolean isValid = phoneNumber.length() >= 7 && selectedCountry != null;
         continueButton.setEnabled(isValid);
@@ -276,7 +282,7 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
 
         String firebaseNumber = result.formattedNumber;
 
-        showLoading(true);
+        showLoading(true, false);
         sendVerificationCode(firebaseNumber);
     }
     // Update your country selection method to set formatting
@@ -306,6 +312,17 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
         );
     }
     private void sendVerificationCode(String phoneNumber) {
+        if (timeoutRunnable != null) {
+            timeoutHandler.removeCallbacks(timeoutRunnable);
+        }
+        timeoutRunnable = () -> {
+            if (isLoading && !isFinishing() && !isDestroyed()) {
+                showLoading(false, false);
+                showSnackbar(getString(R.string.verification_failed, "Request timed out. Please try again."));
+            }
+        };
+        timeoutHandler.postDelayed(timeoutRunnable, 30000);
+
         PhoneAuthOptions options =
                 PhoneAuthOptions.newBuilder(mAuth)
                         .setPhoneNumber(phoneNumber)
@@ -315,20 +332,23 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
                             @Override
                             public void onVerificationCompleted(@NonNull PhoneAuthCredential credential) {
                                 // Auto-retrieval or instant validation
-                                showLoading(false);
+                                if (timeoutRunnable != null) timeoutHandler.removeCallbacks(timeoutRunnable);
+                                showLoading(false, false);
                                 signInWithPhoneAuthCredential(credential);
                             }
 
                             @Override
                             public void onVerificationFailed(@NonNull FirebaseException e) {
-                                showLoading(false);
+                                if (timeoutRunnable != null) timeoutHandler.removeCallbacks(timeoutRunnable);
+                                showLoading(false, false);
                                 showSnackbar(getString(R.string.verification_failed, e.getMessage()));
                             }
 
                             @Override
                             public void onCodeSent(@NonNull String verificationId,
                                                    @NonNull PhoneAuthProvider.ForceResendingToken token) {
-                                showLoading(false);
+                                if (timeoutRunnable != null) timeoutHandler.removeCallbacks(timeoutRunnable);
+                                showLoading(false, false);
                                 PhoneAuthActivity.this.verificationId = verificationId;
                                 resendToken = token;
 
@@ -361,9 +381,52 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
     }
 
     private void showLoading(boolean show) {
-        progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
-        continueButton.setVisibility(show ? View.INVISIBLE : View.VISIBLE);
-        anonymousJoinButton.setVisibility(show ? View.INVISIBLE : View.VISIBLE);
+        showLoading(show, false);
+    }
+
+    private void showLoading(boolean show, boolean isAnonymous) {
+        isLoading = show;
+
+        if (show) {
+            if (isAnonymous) {
+                if (anonymousProgressBar != null) anonymousProgressBar.setVisibility(View.VISIBLE);
+                if (anonymousJoinButton != null) {
+                    anonymousJoinButton.setText("");
+                    anonymousJoinButton.setEnabled(false);
+                }
+                if (continueButton != null) {
+                    continueButton.setEnabled(false);
+                    continueButton.setAlpha(0.6f);
+                }
+            } else {
+                if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
+                if (continueButton != null) {
+                    continueButton.setText("");
+                    continueButton.setEnabled(false);
+                    continueButton.setAlpha(0.85f);
+                }
+                if (anonymousJoinButton != null) {
+                    anonymousJoinButton.setEnabled(false);
+                    anonymousJoinButton.setAlpha(0.6f);
+                }
+            }
+            if (phoneNumberEditText != null) phoneNumberEditText.setEnabled(false);
+            if (countryPickerContainer != null) countryPickerContainer.setEnabled(false);
+        } else {
+            if (progressBar != null) progressBar.setVisibility(View.GONE);
+            if (anonymousProgressBar != null) anonymousProgressBar.setVisibility(View.GONE);
+            if (continueButton != null) {
+                continueButton.setText(R.string.continue_text);
+            }
+            if (anonymousJoinButton != null) {
+                anonymousJoinButton.setText(R.string.join_anonymously);
+                anonymousJoinButton.setEnabled(true);
+                anonymousJoinButton.setAlpha(1.0f);
+            }
+            if (phoneNumberEditText != null) phoneNumberEditText.setEnabled(true);
+            if (countryPickerContainer != null) countryPickerContainer.setEnabled(true);
+            updateContinueButtonState();
+        }
     }
 
     private void showSnackbar(String message) {
@@ -376,5 +439,13 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
         startActivity(intent);
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
         finish();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (timeoutHandler != null && timeoutRunnable != null) {
+            timeoutHandler.removeCallbacks(timeoutRunnable);
+        }
     }
 }

@@ -14,6 +14,9 @@
     <color name="textPrimary">#F8FAFC</color>
     <color name="textSecondary">#94A3B8</color>
     <color name="textTertiary">#64748B</color>
+    <color name="keypad_button_bg">#1E293B</color>
+    <color name="keypad_digit_color">#FFFFFF</color>
+    <color name="keypad_control_color">#94A3B8</color>
     <color name="statusSuccess">#10B981</color>
     <color name="statusWarning">#F59E0B</color>
     <color name="statusError">#EF4444</color>

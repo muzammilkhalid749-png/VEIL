@@ -167,20 +167,34 @@
                 android:textColor="@color/textSecondary"
                 android:textSize="12sp" />
 
-            <!-- Primary Continue Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/continueButton"
-                style="@style/Widget.Material3.Button.UnelevatedButton"
+            <!-- Primary Continue Button with Centered In-Button Spinner -->
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:letterSpacing="0.01"
-                android:text="@string/continue_text"
-                android:textAllCaps="false"
-                android:textColor="@android:color/white"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                app:backgroundTint="@color/colorPrimary"
-                app:cornerRadius="14dp" />
+                android:layout_height="52dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/continueButton"
+                    style="@style/Widget.Material3.Button.UnelevatedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:letterSpacing="0.01"
+                    android:text="@string/continue_text"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/colorPrimary"
+                    app:cornerRadius="14dp" />
+
+                <ProgressBar
+                    android:id="@+id/progressBar"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_gravity="center"
+                    android:indeterminate="true"
+                    android:indeterminateTint="@android:color/white"
+                    android:visibility="gone" />
+            </FrameLayout>
 
             <!-- OR Divider -->
             <LinearLayout
@@ -213,21 +227,35 @@
                     android:background="@color/colorOutline" />
             </LinearLayout>
 
-            <!-- Anonymous Mode Join Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/anonymousJoinButton"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+            <!-- Anonymous Mode Join Button with Centered In-Button Spinner -->
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:letterSpacing="0.01"
-                android:text="@string/join_anonymously"
-                android:textAllCaps="false"
-                android:textColor="@color/veil_accent"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                app:cornerRadius="14dp"
-                app:strokeColor="@color/veil_accent"
-                app:strokeWidth="1.5dp" />
+                android:layout_height="52dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/anonymousJoinButton"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:letterSpacing="0.01"
+                    android:text="@string/join_anonymously"
+                    android:textAllCaps="false"
+                    android:textColor="@color/veil_accent"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="14dp"
+                    app:strokeColor="@color/veil_accent"
+                    app:strokeWidth="1.5dp" />
+
+                <ProgressBar
+                    android:id="@+id/anonymousProgressBar"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_gravity="center"
+                    android:indeterminate="true"
+                    android:indeterminateTint="@color/veil_accent"
+                    android:visibility="gone" />
+            </FrameLayout>
 
             <!-- Restore Account Link -->
             <TextView
@@ -243,14 +271,6 @@
                 android:text="Restore Anonymous Account"
                 android:textColor="@color/veil_accent"
                 android:textSize="13sp" />
-
-            <!-- Progress Indicator -->
-            <ProgressBar
-                android:id="@+id/progressBar"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginTop="16dp"
-                android:visibility="gone" />
 
             <!-- Privacy Shield Badge -->
             <TextView
