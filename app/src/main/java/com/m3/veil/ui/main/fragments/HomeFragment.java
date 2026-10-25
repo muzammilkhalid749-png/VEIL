@@ -1099,7 +1099,11 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                 String gName = doc.getString("groupName");
                                 String lastMsg = doc.getString("lastMessage");
                                 String chatType = doc.getString("type");
-                                if (chatType == null || chatType.isEmpty()) {
+                                boolean isDirectChat = "direct".equalsIgnoreCase(chatType)
+                                        || (!gId.startsWith("group_") && !gId.startsWith("channel_") && !gId.startsWith("lounge_") && gId.contains("_"));
+                                if (isDirectChat) {
+                                    chatType = "direct";
+                                } else if (chatType == null || chatType.isEmpty()) {
                                     chatType = gId.startsWith("channel_") ? "channel" : "group";
                                 }
                                 String adminId = doc.getString("adminId");
@@ -1114,16 +1118,41 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                 com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
                                 if (ts == null) ts = com.google.firebase.Timestamp.now();
 
+                                String peerId = null;
+                                if (parts != null) {
+                                    for (String p : parts) {
+                                        if (p != null && !p.equals(uid)) {
+                                            peerId = p;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (peerId == null && gId.contains("_")) {
+                                    String[] split = gId.split("_");
+                                    if (split.length == 2) {
+                                        peerId = split[0].equals(uid) ? split[1] : split[0];
+                                    }
+                                }
+
+                                String chatTitle = gName;
+                                if (isDirectChat) {
+                                    if (chatTitle == null || chatTitle.isEmpty() || "Encrypted Group".equals(chatTitle) || "Direct Chat".equals(chatTitle)) {
+                                        chatTitle = "Veil Contact";
+                                    }
+                                } else if (chatTitle == null || chatTitle.isEmpty()) {
+                                    chatTitle = "channel".equals(chatType) ? "Broadcast Channel" : "Encrypted Group";
+                                }
+
                                 Chat existing = EncryptedChatDatabase.getInstance(requireContext()).getChat(gId);
                                 if (existing == null) {
                                     Chat newGroup = new Chat(
                                             gId,
-                                            gName != null ? gName : ("channel".equals(chatType) ? "Broadcast Channel" : "Encrypted Group"),
-                                            lastMsg != null ? lastMsg : ("channel".equals(chatType) ? "Broadcast channel created" : "Group invite received"),
+                                            chatTitle,
+                                            lastMsg != null ? lastMsg : (isDirectChat ? "Direct chat created" : ("channel".equals(chatType) ? "Broadcast channel created" : "Group invite received")),
                                             ts,
                                             avatar,
                                             0,
-                                            true,
+                                            !isDirectChat,
                                             false,
                                             chatType,
                                             parts != null ? parts : new java.util.ArrayList<>()
@@ -1137,8 +1166,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     updated = true;
                                 } else {
                                     boolean changed = false;
-                                    if (gName != null && !gName.equals(existing.getName())) {
-                                        existing.setName(gName);
+                                    if (chatTitle != null && !chatTitle.equals(existing.getName()) && !"Encrypted Group".equals(chatTitle)) {
+                                        existing.setName(chatTitle);
                                         changed = true;
                                     }
                                     if (lastMsg != null && !lastMsg.equals(existing.getLastMessage())) {
@@ -1157,11 +1186,32 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     if (isPublicObj != null) existing.setPublic(isPublicObj);
                                     if (handle != null) existing.setHandle(handle);
                                     existing.setType(chatType);
-                                    existing.setGroup(true);
+                                    existing.setGroup(!isDirectChat);
                                     if (changed) {
                                         EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(existing);
                                         updated = true;
                                     }
+                                }
+
+                                if (isDirectChat && peerId != null && (chatTitle == null || "Veil User".equals(chatTitle))) {
+                                    final String fPeerId = peerId;
+                                    final String fGId = gId;
+                                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                            .collection("users").document(fPeerId).get()
+                                            .addOnSuccessListener(userDoc -> {
+                                                if (userDoc != null && userDoc.exists() && getContext() != null) {
+                                                    String dName = userDoc.getString("displayName");
+                                                    if (dName == null || dName.isEmpty()) dName = userDoc.getString("username");
+                                                    if (dName != null && !dName.isEmpty()) {
+                                                        Chat c = EncryptedChatDatabase.getInstance(requireContext()).getChat(fGId);
+                                                        if (c != null && !dName.equals(c.getName())) {
+                                                            c.setName(dName);
+                                                            EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(c);
+                                                            if (isAdded()) loadLocalEncryptedChats();
+                                                        }
+                                                    }
+                                                }
+                                            });
                                 }
 
                                 // Establish P2P connections with group participants
@@ -1200,8 +1250,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 if (pollJson != null && pollJson.startsWith("ENC:v1:")) {
                                                     pollJson = EncryptionManager.decryptGroupPayload(finalGroupId, pollJson);
                                                 }
+                                                String sId = mDoc.getString("senderId");
                                                 if (existingMsg == null) {
-                                                    String sId = mDoc.getString("senderId");
                                                     String sName = mDoc.getString("senderName");
                                                     com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
                                                     com.m3.veil.model.Message m = new com.m3.veil.model.Message(
@@ -1224,7 +1274,25 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                     m.setRead(isFromMe);
                                                     EncryptedChatDatabase.getInstance(requireContext()).saveMessage(finalGroupId, m);
                                                     anyNewMsg = true;
+
+                                                    if (!isFromMe) {
+                                                        java.util.Map<String, Object> ack = new java.util.HashMap<>();
+                                                        ack.put("delivered", true);
+                                                        mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                                        if (sId != null && !sId.isEmpty()) {
+                                                            WebRtcManager.getInstance(requireContext()).sendReceipt(sId, mId, true, false);
+                                                        }
+                                                    }
                                                 } else {
+                                                    boolean isFromMe = uid.equals(sId);
+                                                    if (!isFromMe && !existingMsg.isDelivered()) {
+                                                        existingMsg.setDelivered(true);
+                                                        EncryptedChatDatabase.getInstance(requireContext())
+                                                                .updateMessageStatus(mId, true, existingMsg.isRead());
+                                                        java.util.Map<String, Object> ack = new java.util.HashMap<>();
+                                                        ack.put("delivered", true);
+                                                        mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                                    }
                                                     boolean msgChanged = false;
                                                     if ("deleted".equals(mType) && !"deleted".equals(existingMsg.getType())) {
                                                         EncryptedChatDatabase.getInstance(requireContext()).markMessageDeleted(finalGroupId, mId);

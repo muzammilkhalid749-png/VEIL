@@ -667,7 +667,18 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         if (dialogId == null) return;
         boolean isGroupOrChannel = (chat != null && chat.isGroupChat())
                 || dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_");
-        if (!isGroupOrChannel && (recipientId == null || recipientId.isEmpty())) return;
+        String finalRecipientId = recipientId;
+        if (!isGroupOrChannel && (finalRecipientId == null || finalRecipientId.isEmpty())) {
+            if (dialogId.contains("_")) {
+                String[] parts = dialogId.split("_");
+                if (parts.length == 2) {
+                    String myId = getCurrentUserId();
+                    finalRecipientId = parts[0].equals(myId) ? parts[1] : parts[0];
+                }
+            }
+        }
+        if (!isGroupOrChannel && (finalRecipientId == null || finalRecipientId.isEmpty())) return;
+        final String effectiveRecipientId = finalRecipientId;
         message.setChatId(dialogId);
 
         mStageQueue.post(() -> {
@@ -705,7 +716,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             File localFile = (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty())
                     ? new File(message.getLocalFilePath()) : null;
 
-            dispatchMessageInternal(dialogId, recipientId, message, localFile);
+            dispatchMessageInternal(dialogId, effectiveRecipientId, message, localFile);
         });
     }
 
@@ -1025,11 +1036,19 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             msgMap.put("delivered", false);
             msgMap.put("read", false);
 
+            fs.collection("groups").document(directChatId)
+                    .collection("messages").document(msg.getId())
+                    .set(msgMap)
+                    .addOnSuccessListener(aVoid -> Log.d(TAG, "Direct message synced to groups/" + directChatId + "/messages/" + msg.getId()))
+                    .addOnFailureListener(e -> Log.e(TAG, "Direct message sync to groups failed: " + e.getMessage(), e));
+
             fs.collection("chats").document(directChatId)
                     .collection("messages").document(msg.getId())
-                    .set(msgMap);
+                    .set(msgMap)
+                    .addOnFailureListener(e -> Log.w(TAG, "Direct message mirror to chats notice: " + e.getMessage()));
 
             Map<String, Object> chatSummary = new HashMap<>();
+            chatSummary.put("groupId", directChatId);
             chatSummary.put("chatId", directChatId);
             List<String> participants = new ArrayList<>();
             if (myId != null && !myId.isEmpty()) participants.add(myId);
@@ -1048,9 +1067,19 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             chatSummary.put("timestampMs", tsVal.toDate().getTime());
             chatSummary.put("isGroup", false);
             chatSummary.put("type", "direct");
+            if (chat != null && chat.getName() != null && !chat.getName().isEmpty()) {
+                chatSummary.put("groupName", chat.getName());
+            } else {
+                chatSummary.put("groupName", "Direct Chat");
+            }
+
+            fs.collection("groups").document(directChatId)
+                    .set(chatSummary, com.google.firebase.firestore.SetOptions.merge())
+                    .addOnFailureListener(e -> Log.w(TAG, "Direct chat summary to groups notice: " + e.getMessage()));
 
             fs.collection("chats").document(directChatId)
-                    .set(chatSummary, com.google.firebase.firestore.SetOptions.merge());
+                    .set(chatSummary, com.google.firebase.firestore.SetOptions.merge())
+                    .addOnFailureListener(e -> Log.w(TAG, "Direct chat summary to chats notice: " + e.getMessage()));
         } catch (Exception e) {
             Log.w(TAG, "Firestore direct message sync notice: " + e.getMessage());
         }

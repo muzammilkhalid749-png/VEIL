@@ -2243,12 +2243,16 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             }
          }
 
-         // Dual-channel receipt delivery: update Firestore message document
+         // Dual-channel receipt delivery: update Firestore message document in groups & chats
          try {
             String cId = getChatId(this.currentUserId, peerId);
             java.util.Map<String, Object> upd = new java.util.HashMap<>();
             if (delivered) upd.put("delivered", true);
             if (read) upd.put("read", true);
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("groups").document(cId)
+                    .collection("messages").document(messageId)
+                    .set(upd, com.google.firebase.firestore.SetOptions.merge());
             com.google.firebase.firestore.FirebaseFirestore.getInstance()
                     .collection("chats").document(cId)
                     .collection("messages").document(messageId)

@@ -3658,17 +3658,21 @@ public class ChatActivity extends AppCompatActivity {
     private void attachDirectRealtimeListeners() {
         if (chatId == null || db == null) return;
 
-        // Perfect Negotiation: only the lexicographically larger peer initiates on start to avoid glare
-        if (recipientId != null && !recipientId.isEmpty() && currentUserId != null && currentUserId.compareTo(recipientId) > 0) {
+        // Initiate WebRTC mesh link when opening conversation
+        if (recipientId != null && !recipientId.isEmpty()) {
             com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
         }
 
         if (directMessagesListener != null) directMessagesListener.remove();
-        directMessagesListener = db.collection("chats").document(chatId)
+        directMessagesListener = db.collection("groups").document(chatId)
                 .collection("messages")
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
                 .addSnapshotListener(this, (snapshots, error) -> {
-                    if (error != null || snapshots == null) return;
+                    if (error != null) {
+                        Log.e("ChatActivity", "Direct message listener error on groups: " + error.getMessage(), error);
+                        return;
+                    }
+                    if (snapshots == null) return;
                     boolean changed = false;
                     for (com.google.firebase.firestore.DocumentSnapshot mDoc : snapshots.getDocuments()) {
                         try {
@@ -3748,6 +3752,10 @@ public class ChatActivity extends AppCompatActivity {
                                     ack.put("delivered", true);
                                     ack.put("read", true);
                                     mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                    try {
+                                        db.collection("chats").document(chatId).collection("messages").document(mId)
+                                                .set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                    } catch (Throwable ignored) {}
 
                                     if (recipientId != null) {
                                         com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this)
@@ -3755,6 +3763,26 @@ public class ChatActivity extends AppCompatActivity {
                                     }
                                     changed = true;
                                 } else {
+                                    if (!existing.isRead()) {
+                                        existing.setRead(true);
+                                        existing.setDelivered(true);
+                                        com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this)
+                                                .updateMessageStatus(mId, true, true);
+                                        Map<String, Object> ack = new HashMap<>();
+                                        ack.put("delivered", true);
+                                        ack.put("read", true);
+                                        mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                        try {
+                                            db.collection("chats").document(chatId).collection("messages").document(mId)
+                                                    .set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                        } catch (Throwable ignored) {}
+
+                                        if (recipientId != null) {
+                                            com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this)
+                                                    .sendReceipt(recipientId, mId, true, true);
+                                        }
+                                        changed = true;
+                                    }
                                     if ("deleted".equals(mType) && !"deleted".equals(existing.getType())) {
                                         com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markMessageDeleted(chatId, mId);
                                         changed = true;
@@ -3796,6 +3824,8 @@ public class ChatActivity extends AppCompatActivity {
                     m.setRead(true);
                     if (chatId != null && !isGroupChatContext() && db != null) {
                         try {
+                            db.collection("groups").document(chatId).collection("messages").document(m.getId())
+                                    .update("delivered", true, "read", true);
                             db.collection("chats").document(chatId).collection("messages").document(m.getId())
                                     .update("delivered", true, "read", true);
                         } catch (Exception ignored) {}
