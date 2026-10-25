@@ -320,7 +320,9 @@ public class SignalingClient {
 
                         // Prune processed signal immediately for zero-knowledge privacy.
                         // Removed documents trigger DocumentChange.Type.REMOVED which is filtered above.
-                        doc.getReference().delete();
+                        try {
+                            doc.getReference().delete();
+                        } catch (Throwable ignored) {}
                     }
                 });
     }

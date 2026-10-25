@@ -70,6 +70,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     private TextView secretVaultCount;
     private View secretVaultDivider;
     private com.google.firebase.firestore.ListenerRegistration groupsListenerRegistration;
+    private com.google.firebase.firestore.ListenerRegistration directChatsListenerRegistration;
 
     private TextView btnActivePersona;
     private TextView tvMeshStatusPill;
@@ -1252,6 +1253,130 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                             }
                         });
             }
+
+            if (directChatsListenerRegistration == null) {
+                directChatsListenerRegistration = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .collection("chats")
+                        .whereArrayContains("participants", uid)
+                        .addSnapshotListener((snapshots, error) -> {
+                            if (error != null || snapshots == null || getContext() == null) return;
+                            boolean updated = false;
+                            for (com.google.firebase.firestore.DocumentSnapshot doc : snapshots.getDocuments()) {
+                                String cId = doc.getString("chatId");
+                                if (cId == null) cId = doc.getId();
+                                @SuppressWarnings("unchecked")
+                                java.util.List<String> parts = (java.util.List<String>) doc.get("participants");
+                                String peerId = null;
+                                if (parts != null) {
+                                    for (String p : parts) {
+                                        if (p != null && !p.equals(uid)) {
+                                            peerId = p;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (peerId == null && cId.contains("_")) {
+                                    String[] split = cId.split("_");
+                                    if (split.length == 2) {
+                                        peerId = split[0].equals(uid) ? split[1] : split[0];
+                                    }
+                                }
+                                if (peerId == null) continue;
+
+                                String lastMsg = doc.getString("lastMessage");
+                                com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
+                                if (ts == null) ts = com.google.firebase.Timestamp.now();
+
+                                Chat existing = EncryptedChatDatabase.getInstance(requireContext()).getChat(cId);
+                                if (existing == null) {
+                                    Chat newChat = new Chat(
+                                            cId,
+                                            "Encrypted Chat",
+                                            lastMsg != null ? lastMsg : "Direct chat created",
+                                            ts,
+                                            null,
+                                            0,
+                                            false,
+                                            false,
+                                            "direct",
+                                            parts != null ? parts : new java.util.ArrayList<>()
+                                    );
+                                    EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(newChat);
+                                    updated = true;
+                                }
+
+                                // Sync recent messages for this 1-on-1 chat
+                                final String finalChatId = cId;
+                                final String finalPeerId = peerId;
+                                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                        .collection("chats")
+                                        .document(finalChatId)
+                                        .collection("messages")
+                                        .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                                        .limit(30)
+                                        .get()
+                                        .addOnSuccessListener(msgSnaps -> {
+                                            if (msgSnaps == null || getContext() == null) return;
+                                            boolean anyNew = false;
+                                            for (com.google.firebase.firestore.DocumentSnapshot mDoc : msgSnaps.getDocuments()) {
+                                                try {
+                                                    String mId = mDoc.getString("id");
+                                                    if (mId == null) mId = mDoc.getId();
+                                                    com.m3.veil.model.Message existingMsg = EncryptedChatDatabase.getInstance(requireContext()).getMessageById(mId);
+                                                    String mType = mDoc.getString("type");
+                                                    String mText = mDoc.getString("text");
+                                                    if (mText != null && mText.startsWith("ENC:v1:")) {
+                                                        mText = EncryptionManager.decryptGroupPayload(finalChatId, mText);
+                                                    }
+                                                    String sId = mDoc.getString("senderId");
+                                                    String sName = mDoc.getString("senderName");
+                                                    com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
+
+                                                    if (existingMsg == null) {
+                                                        com.m3.veil.model.Message m = new com.m3.veil.model.Message(
+                                                                mId,
+                                                                sId != null ? sId : "",
+                                                                finalPeerId,
+                                                                mText != null ? mText : "",
+                                                                mTs,
+                                                                mType != null ? mType : "text"
+                                                        );
+                                                        m.setChatId(finalChatId);
+                                                        m.setSenderName(sName);
+                                                        m.setDelivered(true);
+                                                        m.setPending(false);
+                                                        m.setRead(false);
+                                                        EncryptedChatDatabase.getInstance(requireContext()).saveMessage(finalChatId, m);
+
+                                                        // Acknowledge delivery on Firestore so sender sees double ticks immediately!
+                                                        if (sId != null && !sId.equals(uid)) {
+                                                            mDoc.getReference().update("delivered", true);
+                                                        }
+                                                        anyNew = true;
+                                                    } else {
+                                                        // Sync delivery/read status back to sender's local database
+                                                        boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
+                                                        boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
+                                                        if (sId != null && sId.equals(uid)) {
+                                                            if ((!existingMsg.isDelivered() && docDelivered) || (!existingMsg.isRead() && docRead)) {
+                                                                EncryptedChatDatabase.getInstance(requireContext())
+                                                                        .updateMessageStatus(mId, docDelivered, docRead);
+                                                                anyNew = true;
+                                                            }
+                                                        }
+                                                    }
+                                                } catch (Exception ignored) {}
+                                            }
+                                            if (anyNew && isAdded()) {
+                                                loadLocalEncryptedChats();
+                                            }
+                                        });
+                            }
+                            if (updated && isAdded()) {
+                                loadLocalEncryptedChats();
+                            }
+                        });
+            }
         }
         updatePersonaAndMeshHeader();
         loadLocalEncryptedChats();
@@ -1284,6 +1409,10 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         if (groupsListenerRegistration != null) {
             groupsListenerRegistration.remove();
             groupsListenerRegistration = null;
+        }
+        if (directChatsListenerRegistration != null) {
+            directChatsListenerRegistration.remove();
+            directChatsListenerRegistration = null;
         }
         if (getContext() != null) {
             EncryptedChatDatabase.getInstance(requireContext()).removeListener(dbListener);

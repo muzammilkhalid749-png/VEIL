@@ -2243,6 +2243,18 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             }
          }
 
+         // Dual-channel receipt delivery: update Firestore message document
+         try {
+            String cId = getChatId(this.currentUserId, peerId);
+            java.util.Map<String, Object> upd = new java.util.HashMap<>();
+            if (delivered) upd.put("delivered", true);
+            if (read) upd.put("read", true);
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("chats").document(cId)
+                    .collection("messages").document(messageId)
+                    .set(upd, com.google.firebase.firestore.SetOptions.merge());
+         } catch (Throwable ignored) {}
+
       }
    }
 
@@ -2785,7 +2797,19 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    }
 
    public void onOfferReceived(final String fromUserId, String sdp) {
-      final PeerConnection pc = this.getOrCreatePeerConnection(fromUserId, false);
+      if (fromUserId == null || sdp == null) return;
+      PeerConnection existingPc = (PeerConnection)this.peerConnections.get(fromUserId);
+      if (existingPc != null && existingPc.signalingState() == PeerConnection.SignalingState.HAVE_LOCAL_OFFER) {
+         boolean isPolite = this.currentUserId != null && this.currentUserId.compareTo(fromUserId) < 0;
+         if (!isPolite) {
+            Log.i("WebRtcManager", "Impolite peer ignoring collision offer from " + fromUserId);
+            return;
+         }
+         Log.i("WebRtcManager", "Polite peer resetting local offer to accept remote offer from " + fromUserId);
+         this.closePeerConnection(fromUserId);
+         existingPc = null;
+      }
+      final PeerConnection pc = (existingPc != null) ? existingPc : this.getOrCreatePeerConnection(fromUserId, false);
       SessionDescription remoteDesc = new SessionDescription(Type.OFFER, sdp);
       pc.setRemoteDescription(new SimpleSdpObserver() {
          public void onSetSuccess() {
@@ -2806,28 +2830,34 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    }
 
    public void onAnswerReceived(String fromUserId, String sdp) {
+      if (fromUserId == null || sdp == null) return;
       PeerConnection pc = (PeerConnection)this.peerConnections.get(fromUserId);
-      if (pc != null) {
+      if (pc != null && pc.signalingState() == PeerConnection.SignalingState.HAVE_LOCAL_OFFER) {
          SessionDescription remoteDesc = new SessionDescription(Type.ANSWER, sdp);
          pc.setRemoteDescription(new SimpleSdpObserver(), remoteDesc);
       }
-
    }
 
    public void onIceCandidateReceived(String fromUserId, IceCandidate candidate) {
+      if (fromUserId == null || candidate == null) return;
       PeerConnection pc = (PeerConnection)this.peerConnections.get(fromUserId);
-      if (pc != null) {
-         pc.addIceCandidate(candidate);
+      if (pc != null && pc.getRemoteDescription() != null) {
+         try {
+            pc.addIceCandidate(candidate);
+         } catch (Exception ignored) {}
       }
-
    }
 
    public void onWakeUpReceived(String fromUserId, String chatId) {
-      this.initiateConnection(fromUserId);
+      if (fromUserId != null && this.currentUserId != null && this.currentUserId.compareTo(fromUserId) > 0) {
+         this.initiateConnection(fromUserId);
+      }
    }
 
    public void onPeerOnline(String peerId) {
-      this.initiateConnection(peerId);
+      if (peerId != null && this.currentUserId != null && this.currentUserId.compareTo(peerId) > 0) {
+         this.initiateConnection(peerId);
+      }
    }
 
    public static String getChatId(String user1, String user2) {

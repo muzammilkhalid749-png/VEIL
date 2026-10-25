@@ -116,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
         if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
             com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this,
                     com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser());
+            com.m3.veil.services.VeilMeshDaemonService.start(this);
         }
 
         WebRtcManager.getInstance(this).addEventListener(globalCallListener);

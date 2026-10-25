@@ -870,6 +870,9 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 // so offline members / multi-device participants always receive group/channel messages even before P2P mesh links open
                 if (isGroup && dialogId != null) {
                     syncGroupOrChannelMessageToFirestore(chat, dialogId, msg);
+                } else if (dialogId != null) {
+                    // 1-on-1 Direct Chat: sync E2EE encrypted message & metadata to Firestore chats/{dialogId}
+                    syncDirectMessageToFirestore(chat, dialogId, recipientId, msg);
                 }
 
                 String jsonPayloadStr = buildJsonFallbackString(dialogId, msg);
@@ -971,6 +974,88 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         }
     }
 
+    private void syncDirectMessageToFirestore(@Nullable Chat chat, String dialogId, @Nullable String recipientId, Message msg) {
+        try {
+            com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+            String myId = getCurrentUserId();
+            String targetPeer = (recipientId != null && !recipientId.isEmpty()) ? recipientId : msg.getReceiverId();
+            if (targetPeer == null || targetPeer.isEmpty()) {
+                if (dialogId != null && dialogId.contains("_")) {
+                    String[] parts = dialogId.split("_");
+                    if (parts.length == 2) {
+                        targetPeer = parts[0].equals(myId) ? parts[1] : parts[0];
+                    }
+                }
+            }
+            if (targetPeer == null || targetPeer.isEmpty()) {
+                targetPeer = dialogId;
+            }
+            String directChatId = (dialogId != null && !dialogId.isEmpty()) ? dialogId : WebRtcManager.getChatId(myId, targetPeer);
+
+            Map<String, Object> msgMap = new HashMap<>();
+            msgMap.put("id", msg.getId());
+            msgMap.put("chatId", directChatId);
+            msgMap.put("senderId", msg.getSenderId() != null ? msg.getSenderId() : myId);
+            msgMap.put("senderName", msg.getSenderName() != null ? msg.getSenderName() : getCurrentUserName());
+            msgMap.put("receiverId", targetPeer);
+
+            String rawText = msg.getText() != null ? msg.getText() : "";
+            // Encrypt payload using AES-256-GCM keyed by directChatId (zero plain text on cloud)
+            String encryptedText = EncryptionManager.encryptGroupPayload(directChatId, rawText);
+            msgMap.put("text", encryptedText);
+            msgMap.put("isEncrypted", true);
+            msgMap.put("type", msg.getType() != null ? msg.getType() : "text");
+            Timestamp tsVal = msg.getTimestamp() != null ? msg.getTimestamp() : Timestamp.now();
+            msgMap.put("timestamp", tsVal);
+            msgMap.put("timestampMs", tsVal.toDate().getTime());
+            msgMap.put("replyToMessageId", msg.getReplyToMessageId());
+            msgMap.put("replySenderName", msg.getReplySenderName());
+            msgMap.put("blink", msg.isBlink());
+            msgMap.put("voiceFilter", msg.getVoiceFilter());
+            String rawPoll = msg.getPollJson();
+            if (rawPoll != null && !rawPoll.isEmpty()) {
+                msgMap.put("pollJson", EncryptionManager.encryptGroupPayload(directChatId, rawPoll));
+            } else {
+                msgMap.put("pollJson", null);
+            }
+            msgMap.put("thumbnail", msg.getThumbnail());
+            msgMap.put("mediaUrl", msg.getMediaUrl());
+            msgMap.put("vanishTimer", msg.getVanishTimer());
+            msgMap.put("vanishMode", msg.getVanishMode());
+            msgMap.put("delivered", false);
+            msgMap.put("read", false);
+
+            fs.collection("chats").document(directChatId)
+                    .collection("messages").document(msg.getId())
+                    .set(msgMap);
+
+            Map<String, Object> chatSummary = new HashMap<>();
+            chatSummary.put("chatId", directChatId);
+            List<String> participants = new ArrayList<>();
+            if (myId != null && !myId.isEmpty()) participants.add(myId);
+            if (targetPeer != null && !targetPeer.isEmpty() && !participants.contains(targetPeer)) participants.add(targetPeer);
+            if (participants.size() < 2 && directChatId.contains("_")) {
+                String[] p = directChatId.split("_");
+                for (String part : p) {
+                    if (part != null && !part.isEmpty() && !participants.contains(part)) participants.add(part);
+                }
+            }
+            chatSummary.put("participants", participants);
+            chatSummary.put("lastMessage", "🔒 " + (msg.getType() != null && !msg.getType().equals("text") ? ("[" + msg.getType() + "]") : "Encrypted Message"));
+            chatSummary.put("lastMessageSenderId", msg.getSenderId() != null ? msg.getSenderId() : myId);
+            chatSummary.put("lastMessageSenderName", msg.getSenderName() != null ? msg.getSenderName() : getCurrentUserName());
+            chatSummary.put("timestamp", tsVal);
+            chatSummary.put("timestampMs", tsVal.toDate().getTime());
+            chatSummary.put("isGroup", false);
+            chatSummary.put("type", "direct");
+
+            fs.collection("chats").document(directChatId)
+                    .set(chatSummary, com.google.firebase.firestore.SetOptions.merge());
+        } catch (Exception e) {
+            Log.w(TAG, "Firestore direct message sync notice: " + e.getMessage());
+        }
+    }
+
     private boolean sendMediaP2P(String peerId, Message msg, File localFile) {
         try {
             boolean isConnected = WebRtcManager.getInstance(mContext).isPeerConnected(peerId);
@@ -1043,6 +1128,14 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                                 .collection("groups").document(dialogId)
                                 .collection("messages").document(messageId)
                                 .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                    } else {
+                        Map<String, Object> upd = new HashMap<>();
+                        upd.put("text", EncryptionManager.encryptGroupPayload(dialogId, newText.trim()));
+                        upd.put("edited", true);
+                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                .collection("chats").document(dialogId)
+                                .collection("messages").document(messageId)
+                                .set(upd, com.google.firebase.firestore.SetOptions.merge());
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Failed to broadcast edit message frame", e);
@@ -1094,6 +1187,14 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                             upd.put("text", "🚫 This message was deleted");
                             com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                     .collection("groups").document(dialogId)
+                                    .collection("messages").document(messageId)
+                                    .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                        } else {
+                            Map<String, Object> upd = new HashMap<>();
+                            upd.put("type", "deleted");
+                            upd.put("text", "🚫 This message was deleted");
+                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    .collection("chats").document(dialogId)
                                     .collection("messages").document(messageId)
                                     .set(upd, com.google.firebase.firestore.SetOptions.merge());
                         }
@@ -1158,6 +1259,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         upd.put("reactions", finalReactions);
                         com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                 .collection("groups").document(dialogId)
+                                .collection("messages").document(messageId)
+                                .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                    } catch (Exception ignored) {}
+                } else {
+                    try {
+                        Map<String, Object> upd = new HashMap<>();
+                        upd.put("reactions", finalReactions);
+                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                .collection("chats").document(dialogId)
                                 .collection("messages").document(messageId)
                                 .set(upd, com.google.firebase.firestore.SetOptions.merge());
                     } catch (Exception ignored) {}
@@ -1280,6 +1390,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                             upd.put("pollJson", updatedJson);
                             com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                     .collection("groups").document(dialogId)
+                                    .collection("messages").document(messageId)
+                                    .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                        } catch (Exception ignored) {}
+                    } else {
+                        try {
+                            Map<String, Object> upd = new HashMap<>();
+                            upd.put("pollJson", updatedJson);
+                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    .collection("chats").document(dialogId)
                                     .collection("messages").document(messageId)
                                     .set(upd, com.google.firebase.firestore.SetOptions.merge());
                         } catch (Exception ignored) {}
