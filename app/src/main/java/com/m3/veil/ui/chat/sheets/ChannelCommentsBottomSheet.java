@@ -28,6 +28,7 @@ import com.google.firebase.firestore.Query;
 import com.m3.veil.R;
 import com.m3.veil.manager.VeilFeatureManager;
 import com.m3.veil.model.Persona;
+import com.m3.veil.utils.VeilFirestoreUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -181,8 +182,7 @@ public class ChannelCommentsBottomSheet extends BottomSheetDialogFragment {
                         String authorName = doc.getString("authorName");
                         String authorAvatar = doc.getString("authorAvatar");
                         String text = doc.getString("text");
-                        Long ts = doc.getLong("timestamp");
-                        long timestamp = ts != null ? ts : System.currentTimeMillis();
+                        long timestamp = VeilFirestoreUtils.getSafeTimestampMillis(doc, "timestamp", System.currentTimeMillis());
 
                         commentList.add(new ChannelComment(id, authorId, authorName, authorAvatar, text, timestamp));
                     }

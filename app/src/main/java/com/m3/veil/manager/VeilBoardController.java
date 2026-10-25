@@ -18,6 +18,7 @@ import com.google.firebase.auth.FirebaseUser;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.model.Persona;
 import com.m3.veil.model.Post;
+import com.m3.veil.utils.VeilFirestoreUtils;
 import com.m3.veil.webrtc.P2PFileTransferHelper;
 import com.m3.veil.webrtc.VeilPacket;
 import com.m3.veil.webrtc.WebRtcManager;
@@ -518,12 +519,12 @@ public class VeilBoardController implements EncryptedChatDatabase.DatabaseChange
                             String content = doc.getString("content");
                             String category = doc.getString("category");
                             String type = doc.getString("type");
-                            com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
+                            com.google.firebase.Timestamp ts = VeilFirestoreUtils.getSafeTimestamp(doc, "timestamp", com.google.firebase.Timestamp.now());
                             String img = doc.getString("imageUrl");
-                            Long likes = doc.getLong("likesCount");
-                            Long comments = doc.getLong("commentsCount");
+                            long likes = VeilFirestoreUtils.getSafeLong(doc, "likesCount", 0);
+                            long comments = VeilFirestoreUtils.getSafeLong(doc, "commentsCount", 0);
                             String pollJson = doc.getString("pollJson");
-                            Long exp = doc.getLong("expiresAtMillis");
+                            long exp = VeilFirestoreUtils.getSafeTimestampMillis(doc, "expiresAtMillis", 0);
 
                             Post post = new Post(
                                     id,
@@ -536,10 +537,10 @@ public class VeilBoardController implements EncryptedChatDatabase.DatabaseChange
                             );
                             if (category != null) post.setCategory(category);
                             if (img != null) post.setImageUrl(img);
-                            if (likes != null) post.setLikesCount(likes.intValue());
-                            if (comments != null) post.setCommentsCount(comments.intValue());
+                            post.setLikesCount((int) likes);
+                            post.setCommentsCount((int) comments);
                             if (pollJson != null) post.setPollJson(pollJson);
-                            if (exp != null) post.setExpiresAtMillis(exp);
+                            if (exp > 0) post.setExpiresAtMillis(exp);
 
                             mPostsById.put(id, post);
                             mFeedList.add(post);

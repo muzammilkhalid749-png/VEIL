@@ -27,6 +27,7 @@ import com.m3.veil.R;
 import com.m3.veil.manager.VeilFeatureManager;
 import com.m3.veil.model.Persona;
 import com.m3.veil.utils.UiAnimator;
+import com.m3.veil.utils.VeilFirestoreUtils;
 
 import java.util.Locale;
 
@@ -110,8 +111,8 @@ public class WalletBottomSheet extends BottomSheetDialogFragment {
             db.collection("users").document(currentUserId).get().addOnSuccessListener(doc -> {
                 if (getContext() == null || !isAdded()) return;
                 if (doc.exists() && doc.contains("veilCoins")) {
-                    Long remoteCoins = doc.getLong("veilCoins");
-                    if (remoteCoins != null && remoteCoins > featureManager.getVeilCoins()) {
+                    long remoteCoins = VeilFirestoreUtils.getSafeLong(doc, "veilCoins", 0);
+                    if (remoteCoins > featureManager.getVeilCoins()) {
                         int diff = (int) (remoteCoins - featureManager.getVeilCoins());
                         featureManager.addCoins(diff);
                         updateBalanceDisplay();

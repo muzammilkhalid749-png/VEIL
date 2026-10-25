@@ -25,6 +25,7 @@ import com.m3.veil.model.Chat;
 import com.m3.veil.services.VeilMeshDaemonService;
 import com.m3.veil.utils.EncryptionManager;
 import com.m3.veil.utils.MediaEncryptionHelper;
+import com.m3.veil.utils.VeilFirestoreUtils;
 import com.m3.veil.webrtc.P2PFileTransferHelper;
 import com.m3.veil.webrtc.VeilPacket;
 import com.m3.veil.webrtc.WebRtcManager;
@@ -872,9 +873,9 @@ public class StatusController {
                             MediaType mediaType = ("IMAGE".equalsIgnoreCase(typeStr) || "PHOTO".equalsIgnoreCase(typeStr)) ? MediaType.IMAGE :
                                     ("VIDEO".equalsIgnoreCase(typeStr) ? MediaType.VIDEO : MediaType.TEXT);
                             String bgColor = doc.getString("bgColorHex");
-                            Long fontIdx = doc.getLong("fontStyleIndex");
-                            Long ts = doc.getLong("timestampMs");
-                            Long exp = doc.getLong("expiresAtMs");
+                            long fontIdx = VeilFirestoreUtils.getSafeLong(doc, "fontStyleIndex", 0);
+                            long ts = VeilFirestoreUtils.getSafeTimestampMillis(doc, "timestampMs", now);
+                            long exp = VeilFirestoreUtils.getSafeTimestampMillis(doc, "expiresAtMs", now + 86400000L);
 
                             StatusSegment segment = new StatusSegment(
                                     sId,
@@ -884,12 +885,12 @@ public class StatusController {
                                     mediaType,
                                     null,
                                     bgColor != null ? bgColor : "#008069",
-                                    fontIdx != null ? fontIdx.intValue() : 0,
-                                    ts != null ? ts : now,
+                                    (int) fontIdx,
+                                    ts,
                                     PrivacyAcl.ALL_CONTACTS,
                                     authorId != null && authorId.equals(myUid)
                             );
-                            if (exp != null) segment.expiresAtMs = exp;
+                            segment.expiresAtMs = exp;
 
                             statusItemCache.put(sId, segment);
                             PeerStatusChain chain = allPeerChains.get(segment.authorId);

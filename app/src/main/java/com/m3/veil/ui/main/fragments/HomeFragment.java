@@ -48,6 +48,7 @@ import com.m3.veil.ui.chat.ChatActivity;
 import com.m3.veil.ui.chat.NewChatActivity;
 import com.m3.veil.ui.chat.NewGroupActivity;
 import com.m3.veil.ui.main.adapters.ChatsAdapter;
+import com.m3.veil.utils.VeilFirestoreUtils;
 import com.m3.veil.webrtc.WebRtcManager;
 
 import java.util.ArrayList;
@@ -1183,7 +1184,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                             if (msgSnaps == null || getContext() == null) return;
                                             boolean anyNewMsg = false;
                                             for (com.google.firebase.firestore.DocumentSnapshot mDoc : msgSnaps.getDocuments()) {
-                                                String mId = mDoc.getString("id");
+                                                try {
+                                                    String mId = mDoc.getString("id");
                                                 if (mId == null) mId = mDoc.getId();
                                                 com.m3.veil.model.Message existingMsg = EncryptedChatDatabase.getInstance(requireContext()).getMessageById(mId);
                                                 String mType = mDoc.getString("type");
@@ -1193,10 +1195,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 if (existingMsg == null) {
                                                     String sId = mDoc.getString("senderId");
                                                     String sName = mDoc.getString("senderName");
-                                                    Long tsMs = mDoc.getLong("timestamp");
-                                                    com.google.firebase.Timestamp mTs = tsMs != null
-                                                            ? new com.google.firebase.Timestamp(new java.util.Date(tsMs))
-                                                            : com.google.firebase.Timestamp.now();
+                                                    com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
                                                     com.m3.veil.model.Message m = new com.m3.veil.model.Message(
                                                             mId,
                                                             sId != null ? sId : "",
@@ -1231,6 +1230,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                         msgChanged = true;
                                                     }
                                                     if (msgChanged) anyNewMsg = true;
+                                                }
+                                                } catch (Exception docEx) {
+                                                    android.util.Log.w("HomeFragment", "Error processing group message doc: " + docEx.getMessage());
                                                 }
                                             }
                                             if (anyNewMsg && isAdded()) {

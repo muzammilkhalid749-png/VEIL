@@ -918,7 +918,9 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             msgMap.put("senderName", msg.getSenderName() != null ? msg.getSenderName() : getCurrentUserName());
             msgMap.put("text", msg.getText() != null ? msg.getText() : "");
             msgMap.put("type", msg.getType() != null ? msg.getType() : "text");
-            msgMap.put("timestamp", msg.getTimestamp() != null ? msg.getTimestamp() : Timestamp.now());
+            Timestamp tsVal = msg.getTimestamp() != null ? msg.getTimestamp() : Timestamp.now();
+            msgMap.put("timestamp", tsVal);
+            msgMap.put("timestampMs", tsVal.toDate().getTime());
             msgMap.put("replyToMessageId", msg.getReplyToMessageId());
             msgMap.put("replySenderName", msg.getReplySenderName());
             msgMap.put("blink", msg.isBlink());
@@ -950,7 +952,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             groupSummary.put("lastMessage", msg.getText() != null ? msg.getText() : "[" + msg.getType() + "]");
             groupSummary.put("lastMessageSenderId", msg.getSenderId() != null ? msg.getSenderId() : getCurrentUserId());
             groupSummary.put("lastMessageSenderName", msg.getSenderName() != null ? msg.getSenderName() : getCurrentUserName());
-            groupSummary.put("timestamp", msg.getTimestamp() != null ? msg.getTimestamp() : Timestamp.now());
+            groupSummary.put("timestamp", tsVal);
+            groupSummary.put("timestampMs", tsVal.toDate().getTime());
             groupSummary.put("isGroup", true);
 
             fs.collection("groups").document(groupId)

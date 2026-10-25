@@ -105,6 +105,7 @@ import com.m3.veil.utils.AudioRecorderHelper;
 import com.m3.veil.utils.EncryptionManager;
 import com.m3.veil.utils.MediaEncryptionHelper;
 import com.m3.veil.utils.UiAnimator;
+import com.m3.veil.utils.VeilFirestoreUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -3582,50 +3583,53 @@ public class ChatActivity extends AppCompatActivity {
                     if (error != null || snapshots == null) return;
                     boolean changed = false;
                     for (com.google.firebase.firestore.DocumentSnapshot mDoc : snapshots.getDocuments()) {
-                        String mId = mDoc.getString("id");
-                        if (mId == null) mId = mDoc.getId();
-                        String mType = mDoc.getString("type");
-                        String mText = mDoc.getString("text");
-                        String sId = mDoc.getString("senderId");
-                        String sName = mDoc.getString("senderName");
-                        String pollJson = mDoc.getString("pollJson");
-                        Boolean isEditedObj = mDoc.getBoolean("edited");
-                        Long tsMs = mDoc.getLong("timestamp");
-                        Timestamp mTs = tsMs != null ? new Timestamp(new Date(tsMs)) : Timestamp.now();
+                        try {
+                            String mId = mDoc.getString("id");
+                            if (mId == null) mId = mDoc.getId();
+                            String mType = mDoc.getString("type");
+                            String mText = mDoc.getString("text");
+                            String sId = mDoc.getString("senderId");
+                            String sName = mDoc.getString("senderName");
+                            String pollJson = mDoc.getString("pollJson");
+                            boolean isEdited = VeilFirestoreUtils.getSafeBoolean(mDoc, "edited", false);
+                            Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", Timestamp.now());
 
-                        Message existing = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).getMessageById(mId);
-                        if (existing == null) {
-                            Message m = new Message(
-                                    mId,
-                                    sId != null ? sId : "",
-                                    chatId,
-                                    mText != null ? mText : "",
-                                    mTs,
-                                    mType != null ? mType : "text"
-                            );
-                            m.setChatId(chatId);
-                            m.setSenderName(sName);
-                            m.setReplyToMessageId(mDoc.getString("replyToMessageId"));
-                            m.setReplySenderName(mDoc.getString("replySenderName"));
-                            m.setPollJson(pollJson);
-                            if (Boolean.TRUE.equals(isEditedObj)) m.setEdited(true);
-                            m.setDelivered(true);
-                            m.setPending(false);
-                            m.setRead(true);
-                            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveMessage(chatId, m);
-                            changed = true;
-                        } else {
-                            if ("deleted".equals(mType) && !"deleted".equals(existing.getType())) {
-                                com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markMessageDeleted(chatId, mId);
+                            Message existing = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).getMessageById(mId);
+                            if (existing == null) {
+                                Message m = new Message(
+                                        mId,
+                                        sId != null ? sId : "",
+                                        chatId,
+                                        mText != null ? mText : "",
+                                        mTs,
+                                        mType != null ? mType : "text"
+                                );
+                                m.setChatId(chatId);
+                                m.setSenderName(sName);
+                                m.setReplyToMessageId(mDoc.getString("replyToMessageId"));
+                                m.setReplySenderName(mDoc.getString("replySenderName"));
+                                m.setPollJson(pollJson);
+                                if (isEdited) m.setEdited(true);
+                                m.setDelivered(true);
+                                m.setPending(false);
+                                m.setRead(true);
+                                com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveMessage(chatId, m);
                                 changed = true;
-                            } else if (Boolean.TRUE.equals(isEditedObj) && mText != null && !mText.equals(existing.getText())) {
-                                com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).updateMessageText(chatId, mId, mText);
-                                changed = true;
+                            } else {
+                                if ("deleted".equals(mType) && !"deleted".equals(existing.getType())) {
+                                    com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markMessageDeleted(chatId, mId);
+                                    changed = true;
+                                } else if (isEdited && mText != null && !mText.equals(existing.getText())) {
+                                    com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).updateMessageText(chatId, mId, mText);
+                                    changed = true;
+                                }
+                                if (pollJson != null && !pollJson.equals(existing.getPollJson())) {
+                                    com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).updateMessagePollJson(chatId, mId, pollJson);
+                                    changed = true;
+                                }
                             }
-                            if (pollJson != null && !pollJson.equals(existing.getPollJson())) {
-                                com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).updateMessagePollJson(chatId, mId, pollJson);
-                                changed = true;
-                            }
+                        } catch (Exception docEx) {
+                            android.util.Log.w("ChatActivity", "Error parsing Firestore group message doc: " + docEx.getMessage());
                         }
                     }
                     if (changed) {
