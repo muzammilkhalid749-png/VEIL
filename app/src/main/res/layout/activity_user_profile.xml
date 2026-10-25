@@ -57,9 +57,12 @@
         android:padding="32dp">
 
         <de.hdodenhof.circleimageview.CircleImageView
+            android:id="@+id/profileAvatarImage"
             android:layout_width="120dp"
             android:layout_height="120dp"
-            android:src="@drawable/ic_person" />
+            android:src="@drawable/ic_person"
+            android:clickable="true"
+            android:focusable="true" />
 
         <TextView
             android:id="@+id/profileNameText"

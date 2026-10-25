@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.LruCache;
 import android.util.Size;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -34,6 +35,7 @@ public class RecentMediaHorizontalAdapter extends RecyclerView.Adapter<RecentMed
     private final OnRecentMediaClickListener listener;
     private final ExecutorService executor = Executors.newFixedThreadPool(3);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private static final LruCache<Uri, Bitmap> sThumbCache = new LruCache<>(100);
 
     public RecentMediaHorizontalAdapter(List<GalleryMediaItem> items, OnRecentMediaClickListener listener) {
         this.items = items;
@@ -65,6 +67,11 @@ public class RecentMediaHorizontalAdapter extends RecyclerView.Adapter<RecentMed
 
     private void loadThumbnailAsync(Uri uri, ImageView imageView) {
         if (uri == null) return;
+        Bitmap cached = sThumbCache.get(uri);
+        if (cached != null && !cached.isRecycled()) {
+            imageView.setImageBitmap(cached);
+            return;
+        }
         final ContentResolver cr = imageView.getContext().getContentResolver();
         executor.execute(() -> {
             Bitmap thumb = null;
@@ -81,6 +88,9 @@ public class RecentMediaHorizontalAdapter extends RecyclerView.Adapter<RecentMed
             } catch (Exception ignored) {}
 
             final Bitmap res = thumb;
+            if (res != null) {
+                sThumbCache.put(uri, res);
+            }
             mainHandler.post(() -> {
                 if (uri.equals(imageView.getTag()) && res != null) {
                     imageView.setImageBitmap(res);

@@ -93,6 +93,40 @@ public class UserProfileActivity extends AppCompatActivity {
             nameText.setText(peerUserName);
         }
 
+        de.hdodenhof.circleimageview.CircleImageView profileAvatarImage = findViewById(R.id.profileAvatarImage);
+        String avatarSrc = (chat != null && chat.getAvatar() != null && !chat.getAvatar().isEmpty())
+                ? chat.getAvatar() : null;
+        if (profileAvatarImage != null) {
+            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, avatarSrc, peerUserName, isGroup);
+            final String finalAvatarSrc = avatarSrc;
+            profileAvatarImage.setOnClickListener(v -> {
+                if (finalAvatarSrc != null && !finalAvatarSrc.isEmpty()) {
+                    Intent viewerIntent = new Intent(this, MediaViewerActivity.class);
+                    viewerIntent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, finalAvatarSrc);
+                    viewerIntent.putExtra(MediaViewerActivity.EXTRA_MEDIA_TYPE, "image");
+                    viewerIntent.putExtra(MediaViewerActivity.EXTRA_SENDER_NAME, peerUserName != null ? peerUserName : "Profile");
+                    startActivity(viewerIntent);
+                }
+            });
+        }
+        if (avatarSrc == null && peerUserId != null) {
+            FirebaseFirestore.getInstance().collection("users").document(peerUserId).get().addOnSuccessListener(doc -> {
+                if (doc.exists() && profileAvatarImage != null) {
+                    String remoteAvatar = doc.getString("avatar");
+                    if (remoteAvatar != null && !remoteAvatar.isEmpty()) {
+                        com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, remoteAvatar, peerUserName, isGroup);
+                        profileAvatarImage.setOnClickListener(v -> {
+                            Intent viewerIntent = new Intent(this, MediaViewerActivity.class);
+                            viewerIntent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, remoteAvatar);
+                            viewerIntent.putExtra(MediaViewerActivity.EXTRA_MEDIA_TYPE, "image");
+                            viewerIntent.putExtra(MediaViewerActivity.EXTRA_SENDER_NAME, peerUserName != null ? peerUserName : "Profile");
+                            startActivity(viewerIntent);
+                        });
+                    }
+                }
+            });
+        }
+
         tvBlockUser = findViewById(R.id.tvBlockUser);
         ivBlockUser = findViewById(R.id.ivBlockUser);
 

@@ -676,6 +676,15 @@ public class ChatActivity extends AppCompatActivity {
         TextView nameText = findViewById(R.id.recipientName);
         nameText.setText(recipientName != null ? recipientName : getString(R.string.anonymous));
 
+        ImageView recipientAvatar = findViewById(R.id.recipientAvatar);
+        if (recipientAvatar != null) {
+            String avSource = (currentLocalChat != null && currentLocalChat.getAvatar() != null)
+                    ? currentLocalChat.getAvatar() : null;
+            boolean isGrp = (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_")))
+                    || (currentLocalChat != null && currentLocalChat.isGroup());
+            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(recipientAvatar, avSource, recipientName, isGrp);
+        }
+
         findViewById(R.id.backButton).setOnClickListener(v -> finish());
 
         findViewById(R.id.profileArea).setOnClickListener(v -> {

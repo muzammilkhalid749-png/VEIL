@@ -366,7 +366,7 @@ public class NewGroupActivity extends AppCompatActivity {
             void bind(User user, boolean isSelected, OnItemClickListener listener) {
                 name.setText(user.getDisplayName() != null ? user.getDisplayName() : "Anonymous");
                 username.setText("@" + user.getUsername());
-                avatar.setImageResource(R.drawable.ic_person);
+                com.m3.veil.utils.VeilAvatarLoader.loadAvatar(avatar, user.getAvatar(), user.getDisplayName(), false);
 
                 if (isSelected) {
                     ivCheckbox.setImageResource(R.drawable.ic_check_circle);

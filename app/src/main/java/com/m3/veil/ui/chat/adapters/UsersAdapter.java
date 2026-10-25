@@ -64,21 +64,8 @@ public class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.UserViewHold
             name.setText(user.getDisplayName() != null ? user.getDisplayName() : "Anonymous");
             username.setText("@" + user.getUsername());
             
-            // Set avatar with Base64 decoding support
-            boolean avatarLoaded = false;
-            if (user.getAvatar() != null && !user.getAvatar().isEmpty()) {
-                try {
-                    byte[] decoded = android.util.Base64.decode(user.getAvatar(), android.util.Base64.DEFAULT);
-                    android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(decoded, 0, decoded.length);
-                    if (bmp != null) {
-                        avatar.setImageBitmap(bmp);
-                        avatarLoaded = true;
-                    }
-                } catch (Exception ignored) {}
-            }
-            if (!avatarLoaded) {
-                avatar.setImageResource(R.drawable.ic_person);
-            }
+            // Universal Telegram-Parity Avatar Loader
+            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(avatar, user.getAvatar(), user.getDisplayName(), false);
 
             itemView.setOnClickListener(v -> {
                 if (listener != null) listener.onUserClick(user);

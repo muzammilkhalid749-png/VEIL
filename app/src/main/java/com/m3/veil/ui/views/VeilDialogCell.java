@@ -920,14 +920,20 @@ public class VeilDialogCell extends View {
         mAvatarCirclePaint.setShader(mAvatarShader);
         canvas.drawCircle(cx, cy, avatarDrawRadius, mAvatarCirclePaint);
 
-        // Built-in Avatar Bitmap or Initials
-        Bitmap presetBitmap = null;
-        if (mChat.getAvatar() != null && mChat.getAvatar().startsWith("avatar_")) {
-            presetBitmap = getOrLoadAvatarBitmap(mChat.getAvatar(), (int) (avatarDrawRadius * 2));
+        // Universal Decoded Avatar Bitmap or Initials (Telegram Parity)
+        Bitmap avatarBitmap = null;
+        if (mChat.getAvatar() != null && !mChat.getAvatar().trim().isEmpty()) {
+            avatarBitmap = com.m3.veil.utils.VeilAvatarLoader.getAvatarBitmap(
+                    getContext(),
+                    mChat.getAvatar(),
+                    mChat.getName(),
+                    (int) (avatarDrawRadius * 2),
+                    mChat.isGroup()
+            );
         }
-        if (presetBitmap != null && !presetBitmap.isRecycled()) {
+        if (avatarBitmap != null && !avatarBitmap.isRecycled()) {
             mAvatarRect.set(cx - avatarDrawRadius, cy - avatarDrawRadius, cx + avatarDrawRadius, cy + avatarDrawRadius);
-            canvas.drawBitmap(presetBitmap, null, mAvatarRect, null);
+            canvas.drawBitmap(avatarBitmap, null, mAvatarRect, null);
         } else {
             Paint.FontMetrics fm = mAvatarTextPaint.getFontMetrics();
             float textBaseline = cy - (fm.ascent + fm.descent) / 2f;

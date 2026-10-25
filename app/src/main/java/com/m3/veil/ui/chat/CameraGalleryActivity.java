@@ -22,6 +22,7 @@ import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.GestureDetector;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
@@ -140,6 +141,30 @@ public class CameraGalleryActivity extends AppCompatActivity {
     private ProgressBar galleryLoaderProgressBar;
     private FrameLayout layoutFloatingSend;
     private ExtendedFloatingActionButton fabSendSelected;
+
+    // Telegram-Grade Camera Members
+    private static final int MODE_PHOTO = 0;
+    private static final int MODE_VIDEO = 1;
+    private int currentCameraMode = MODE_PHOTO;
+    private boolean isVideoLocked = false;
+    private float touchDownY = 0f;
+
+    // Zoom Pills
+    private LinearLayout layoutZoomPills;
+    private TextView btnZoom05x;
+    private TextView btnZoom1x;
+    private TextView btnZoom2x;
+    private TextView btnZoom5x;
+
+    // Mode Switcher
+    private LinearLayout layoutCameraModes;
+    private TextView btnModePhoto;
+    private TextView btnModeVideo;
+
+    // Shutter Lock Indicator
+    private LinearLayout layoutShutterLock;
+    private ImageView ivShutterLockIcon;
+    private TextView tvShutterLockText;
 
     // CameraX Members
     private ProcessCameraProvider cameraProvider;
@@ -278,6 +303,20 @@ public class CameraGalleryActivity extends AppCompatActivity {
         layoutFloatingSend = findViewById(R.id.layoutFloatingSend);
         fabSendSelected = findViewById(R.id.fabSendSelected);
 
+        layoutZoomPills = findViewById(R.id.layoutZoomPills);
+        btnZoom05x = findViewById(R.id.btnZoom05x);
+        btnZoom1x = findViewById(R.id.btnZoom1x);
+        btnZoom2x = findViewById(R.id.btnZoom2x);
+        btnZoom5x = findViewById(R.id.btnZoom5x);
+
+        layoutCameraModes = findViewById(R.id.layoutCameraModes);
+        btnModePhoto = findViewById(R.id.btnModePhoto);
+        btnModeVideo = findViewById(R.id.btnModeVideo);
+
+        layoutShutterLock = findViewById(R.id.layoutShutterLock);
+        ivShutterLockIcon = findViewById(R.id.ivShutterLockIcon);
+        tvShutterLockText = findViewById(R.id.tvShutterLockText);
+
         // Adapters setup
         recentMediaAdapter = new RecentMediaHorizontalAdapter(recentMediaItems, item -> openMediaEditor(item.getUri(), item.isVideo() ? "video" : "image"));
         rvRecentMediaHorizontal.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
@@ -324,15 +363,28 @@ public class CameraGalleryActivity extends AppCompatActivity {
         });
 
         // Lens Flip (Front / Back) with 180° rotation
-        btnFlipLens.setOnClickListener(v -> {
-            lensFacing = (lensFacing == CameraSelector.LENS_FACING_BACK)
-                    ? CameraSelector.LENS_FACING_FRONT
-                    : CameraSelector.LENS_FACING_BACK;
-            ObjectAnimator.ofFloat(btnFlipLens, "rotation", 0f, 180f).setDuration(250).start();
-            bindCameraUseCases();
-        });
+        btnFlipLens.setOnClickListener(v -> flipLens());
 
-        // Dual-Action Shutter (Tap: Photo, Long-Press: Video)
+        // Quick Zoom Pills (0.5x, 1x, 2x, 5x - Telegram Parity)
+        if (btnZoom05x != null) btnZoom05x.setOnClickListener(v -> setZoomRatio(0.5f, btnZoom05x));
+        if (btnZoom1x != null) btnZoom1x.setOnClickListener(v -> setZoomRatio(1.0f, btnZoom1x));
+        if (btnZoom2x != null) btnZoom2x.setOnClickListener(v -> setZoomRatio(2.0f, btnZoom2x));
+        if (btnZoom5x != null) btnZoom5x.setOnClickListener(v -> setZoomRatio(5.0f, btnZoom5x));
+
+        // Camera Mode Switcher (PHOTO | VIDEO)
+        if (btnModePhoto != null) btnModePhoto.setOnClickListener(v -> setCameraMode(MODE_PHOTO));
+        if (btnModeVideo != null) btnModeVideo.setOnClickListener(v -> setCameraMode(MODE_VIDEO));
+
+        // Shutter Lock Click to Stop
+        if (layoutShutterLock != null) {
+            layoutShutterLock.setOnClickListener(v -> {
+                if (isRecording) {
+                    stopRecording();
+                }
+            });
+        }
+
+        // Telegram-Grade Shutter (Tap Photo / Tap Video Toggle / Hold to Record with Slide-Up Lock)
         shutterButton.setOnTouchListener(new View.OnTouchListener() {
             private boolean isLongPressed = false;
             private final Handler longPressHandler = new Handler(Looper.getMainLooper());
@@ -343,17 +395,49 @@ public class CameraGalleryActivity extends AppCompatActivity {
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
+                if (currentCameraMode == MODE_VIDEO) {
+                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                        animateShutterPress(true);
+                        return true;
+                    } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                        animateShutterPress(false);
+                        if (isRecording) {
+                            stopRecording();
+                        } else {
+                            startRecording();
+                        }
+                        return true;
+                    }
+                    return false;
+                }
+
+                // MODE_PHOTO
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
                         isLongPressed = false;
-                        longPressHandler.postDelayed(longPressRunnable, 400); // 400ms threshold for video
+                        touchDownY = event.getRawY();
+                        isVideoLocked = false;
+                        longPressHandler.postDelayed(longPressRunnable, 350);
                         animateShutterPress(true);
+                        return true;
+
+                    case MotionEvent.ACTION_MOVE:
+                        if (isRecording && !isVideoLocked) {
+                            float deltaY = touchDownY - event.getRawY();
+                            if (deltaY > 100) { // user slid finger up
+                                lockRecording();
+                            }
+                        }
                         return true;
 
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
                         longPressHandler.removeCallbacks(longPressRunnable);
                         animateShutterPress(false);
+                        if (isVideoLocked) {
+                            // Video is locked hands-free! Keep recording!
+                            return true;
+                        }
                         if (isLongPressed) {
                             stopRecording();
                         } else {
@@ -454,6 +538,12 @@ public class CameraGalleryActivity extends AppCompatActivity {
             @Override
             public boolean onSingleTapConfirmed(MotionEvent e) {
                 focusOnPoint(e.getX(), e.getY());
+                return true;
+            }
+
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                flipLens();
                 return true;
             }
 
@@ -684,6 +774,12 @@ public class CameraGalleryActivity extends AppCompatActivity {
         // Turn shutter button red
         shutterButton.setBackgroundResource(R.drawable.bg_shutter_recording);
         shutterInnerCircle.setBackgroundColor(Color.parseColor("#EF4444"));
+        if (currentCameraMode == MODE_PHOTO && layoutShutterLock != null) {
+            layoutShutterLock.setVisibility(View.VISIBLE);
+            if (tvShutterLockText != null) {
+                tvShutterLockText.setText("Slide up to lock");
+            }
+        }
 
         androidx.camera.video.PendingRecording pendingRecording = videoCapture.getOutput().prepareRecording(this, outputOptions);
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
@@ -709,9 +805,20 @@ public class CameraGalleryActivity extends AppCompatActivity {
         timerHandler.removeCallbacks(timerRunnable);
         layoutRecordingTimer.setVisibility(View.GONE);
 
+        isVideoLocked = false;
+        if (layoutShutterLock != null) {
+            layoutShutterLock.setVisibility(View.GONE);
+            if (tvShutterLockText != null) {
+                tvShutterLockText.setText("Slide up to lock");
+            }
+        }
         // Restore shutter button
         shutterButton.setBackgroundResource(R.drawable.bg_shutter_outer);
-        shutterInnerCircle.setBackgroundResource(R.drawable.bg_shutter_inner);
+        if (currentCameraMode == MODE_VIDEO) {
+            shutterInnerCircle.setBackgroundResource(R.drawable.bg_shutter_recording);
+        } else {
+            shutterInnerCircle.setBackgroundResource(R.drawable.bg_shutter_inner);
+        }
 
         if (currentRecording != null) {
             currentRecording.stop();
@@ -996,5 +1103,88 @@ public class CameraGalleryActivity extends AppCompatActivity {
         super.onDestroy();
         stopRecording();
         mediaScanExecutor.shutdown();
+    }
+
+    private void flipLens() {
+        lensFacing = (lensFacing == CameraSelector.LENS_FACING_BACK)
+                ? CameraSelector.LENS_FACING_FRONT
+                : CameraSelector.LENS_FACING_BACK;
+        if (btnFlipLens != null) {
+            ObjectAnimator.ofFloat(btnFlipLens, "rotation", 0f, 180f).setDuration(250).start();
+        }
+        bindCameraUseCases();
+    }
+
+    private void setCameraMode(int mode) {
+        currentCameraMode = mode;
+        if (mode == MODE_PHOTO) {
+            if (btnModePhoto != null) btnModePhoto.setTextColor(Color.parseColor("#FFCC00"));
+            if (btnModeVideo != null) btnModeVideo.setTextColor(Color.parseColor("#88FFFFFF"));
+            if (!isRecording && shutterInnerCircle != null) {
+                shutterInnerCircle.setBackgroundResource(R.drawable.bg_shutter_inner);
+            }
+        } else {
+            if (btnModeVideo != null) btnModeVideo.setTextColor(Color.parseColor("#FFCC00"));
+            if (btnModePhoto != null) btnModePhoto.setTextColor(Color.parseColor("#88FFFFFF"));
+            if (!isRecording && shutterInnerCircle != null) {
+                shutterInnerCircle.setBackgroundResource(R.drawable.bg_shutter_recording);
+            }
+        }
+    }
+
+    private void setZoomRatio(float ratio, TextView activePill) {
+        if (camera == null) return;
+        CameraInfo info = camera.getCameraInfo();
+        if (info.getZoomState().getValue() == null) return;
+        float minZoom = info.getZoomState().getValue().getMinZoomRatio();
+        float maxZoom = info.getZoomState().getValue().getMaxZoomRatio();
+        float target = Math.max(minZoom, Math.min(ratio, maxZoom));
+        camera.getCameraControl().setZoomRatio(target);
+
+        updateZoomPillUI(activePill);
+    }
+
+    private void updateZoomPillUI(TextView activePill) {
+        TextView[] pills = new TextView[]{btnZoom05x, btnZoom1x, btnZoom2x, btnZoom5x};
+        for (TextView pill : pills) {
+            if (pill == null) continue;
+            if (pill == activePill) {
+                pill.setBackgroundResource(R.drawable.bg_zoom_pill_active);
+                pill.setTextColor(Color.BLACK);
+            } else {
+                pill.setBackgroundResource(R.drawable.bg_zoom_pill_inactive);
+                pill.setTextColor(Color.WHITE);
+            }
+        }
+    }
+
+    private void lockRecording() {
+        isVideoLocked = true;
+        if (layoutShutterLock != null) {
+            layoutShutterLock.setVisibility(View.VISIBLE);
+            if (tvShutterLockText != null) {
+                tvShutterLockText.setText("Recording Locked • Tap to Stop");
+            }
+        }
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+            if (layoutFullGallery != null && layoutFullGallery.getVisibility() == View.VISIBLE) {
+                return super.onKeyDown(keyCode, event);
+            }
+            if (currentCameraMode == MODE_VIDEO) {
+                if (isRecording) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+            } else {
+                takePhoto();
+            }
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
     }
 }

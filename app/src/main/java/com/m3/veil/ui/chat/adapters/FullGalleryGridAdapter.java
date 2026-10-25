@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.LruCache;
 import android.util.Size;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -41,6 +42,7 @@ public class FullGalleryGridAdapter extends RecyclerView.Adapter<FullGalleryGrid
     private final OnGalleryInteractionListener listener;
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private static final LruCache<Uri, Bitmap> sThumbCache = new LruCache<>(300);
 
     public FullGalleryGridAdapter(List<GalleryMediaItem> items, OnGalleryInteractionListener listener) {
         this.items = items;
@@ -148,6 +150,11 @@ public class FullGalleryGridAdapter extends RecyclerView.Adapter<FullGalleryGrid
 
     private void loadThumbnailAsync(Uri uri, ImageView imageView) {
         if (uri == null) return;
+        Bitmap cached = sThumbCache.get(uri);
+        if (cached != null && !cached.isRecycled()) {
+            imageView.setImageBitmap(cached);
+            return;
+        }
         final ContentResolver cr = imageView.getContext().getContentResolver();
         executor.execute(() -> {
             Bitmap thumb = null;
@@ -164,6 +171,9 @@ public class FullGalleryGridAdapter extends RecyclerView.Adapter<FullGalleryGrid
             } catch (Exception ignored) {}
 
             final Bitmap res = thumb;
+            if (res != null) {
+                sThumbCache.put(uri, res);
+            }
             mainHandler.post(() -> {
                 if (uri.equals(imageView.getTag()) && res != null) {
                     imageView.setImageBitmap(res);

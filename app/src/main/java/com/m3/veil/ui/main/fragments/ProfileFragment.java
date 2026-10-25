@@ -1161,14 +1161,8 @@ public class ProfileFragment extends Fragment {
             profileUsername.setText("@username");
         }
 
-        if (profileImage != null && user.getAvatar() != null && !user.getAvatar().isEmpty()) {
-            try {
-                byte[] decoded = android.util.Base64.decode(user.getAvatar(), android.util.Base64.DEFAULT);
-                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(decoded, 0, decoded.length);
-                if (bmp != null) {
-                    profileImage.setImageBitmap(bmp);
-                }
-            } catch (Exception ignored) {}
+        if (profileImage != null) {
+            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileImage, user.getAvatar(), user.getDisplayName(), false);
         }
     }
 
