@@ -900,7 +900,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
                 final boolean finalTransmitted = anyTransmitted;
                 if (anyTransmitted || isGroup) {
-                    mStorageQueue.execute(() -> mDatabase.updateMessageStatus(msg.getId(), finalTransmitted, false));
+                    mStorageQueue.execute(() -> mDatabase.updateMessageStatus(msg.getId(), false, false));
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error encoding and dispatching message packet", e);
@@ -962,6 +962,11 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
     private boolean sendMediaP2P(String peerId, Message msg, File localFile) {
         try {
+            boolean isConnected = WebRtcManager.getInstance(mContext).isPeerConnected(peerId);
+            if (!isConnected) {
+                Log.d(TAG, "Peer " + peerId + " is currently offline; enqueuing media P2P transfer");
+                return false;
+            }
             WebRtcManager.getInstance(mContext).sendFileMessage(peerId, msg, localFile,
                     new P2PFileTransferHelper.FileTransferCallback() {
                         @Override

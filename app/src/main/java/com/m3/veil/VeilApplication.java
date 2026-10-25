@@ -31,6 +31,13 @@ public class VeilApplication extends Application {
         instance = this;
         userPreferences = new UserPreferences(this);
 
+        // Initialize user-configured Night / Light / System Theme Mode
+        try {
+            android.content.SharedPreferences appPrefs = getSharedPreferences("veil_appearance_prefs", MODE_PRIVATE);
+            int themeMode = appPrefs.getInt("theme_mode", androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(themeMode);
+        } catch (Throwable ignored) {}
+
         // Telegram-grade Hardware Profiler & Auto-Adaptive Performance Controller
         VeilPerformanceController.init(this);
 

@@ -149,9 +149,10 @@ public class MainActivity extends AppCompatActivity {
         try {
             android.content.SharedPreferences appPrefs = getSharedPreferences("veil_appearance_prefs", MODE_PRIVATE);
             boolean amoled = appPrefs.getBoolean("amoled_pure_black", false);
+            boolean isNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
             View mainContainer = findViewById(R.id.main_container);
             if (mainContainer != null) {
-                if (amoled) {
+                if (amoled && isNight) {
                     mainContainer.setBackgroundColor(android.graphics.Color.BLACK);
                 } else {
                     mainContainer.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, R.color.colorBackground));

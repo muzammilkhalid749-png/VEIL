@@ -116,7 +116,7 @@ public class CameraGalleryActivity extends AppCompatActivity {
 
     // Camera Views
     private PreviewView cameraPreviewView;
-    private com.m3.veil.utils.VeilArMaskRenderer.OverlayView arMaskOverlayView;
+    private com.m3.veil.utils.VeilArMaskOverlayView arMaskOverlayView;
     private View viewFocusRing;
     private ImageView btnCloseCamera;
     private ImageView btnFlashToggle;

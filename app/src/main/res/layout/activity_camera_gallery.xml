@@ -14,7 +14,7 @@
         app:scaleType="fillCenter" />
 
     <!-- Real-Time AR Mask Overlay View (#211) -->
-    <com.m3.veil.utils.VeilArMaskRenderer.OverlayView
+    <com.m3.veil.utils.VeilArMaskOverlayView
         android:id="@+id/arMaskOverlayView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />

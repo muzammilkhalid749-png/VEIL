@@ -31,6 +31,7 @@ import com.m3.veil.utils.FileMediaManager;
 import com.m3.veil.utils.ImageLoader;
 import com.m3.veil.utils.VoicePlayerManager;
 
+import android.content.Context;
 import android.content.Intent;
 import org.json.JSONObject;
 
@@ -1158,6 +1159,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 com.m3.veil.ui.views.ChatMessageCell cell = (com.m3.veil.ui.views.ChatMessageCell) messageBubble;
                 int pos = getAdapterPosition() - 1;
                 cell.setMessageObject(message, true, computeClusterPosition(pos), false);
+                try {
+                    android.content.SharedPreferences appPrefs = itemView.getContext().getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
+                    String accent = appPrefs.getString("chat_bubble_accent", null);
+                    if (accent != null && !accent.isEmpty()) {
+                        cell.setCustomBubbleColor(android.graphics.Color.parseColor(accent));
+                    }
+                } catch (Exception ignored) {}
             }
             attachDoubleTapAndLongPress(messageBubble, itemView, message);
             
@@ -1523,6 +1531,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 
                 messageText.setTypeface(null, android.graphics.Typeface.NORMAL);
                 messageText.setTextColor(itemView.getContext().getResources().getColor(R.color.message_text_primary));
+                try {
+                    android.content.SharedPreferences appPrefs = itemView.getContext().getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
+                    float textSize = appPrefs.getFloat("chat_text_size_sp", 15.5f);
+                    if (textSize > 0 && messageText != null) {
+                        messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, textSize);
+                    }
+                } catch (Exception ignored) {}
                 if ("call".equals(message.getType())) {
                     if (statusIcon != null) statusIcon.setVisibility(View.GONE);
                 } else {
@@ -2324,6 +2339,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 
                 messageText.setTypeface(null, android.graphics.Typeface.NORMAL);
                 messageText.setTextColor(itemView.getContext().getResources().getColor(R.color.message_text_primary));
+                try {
+                    android.content.SharedPreferences appPrefs = itemView.getContext().getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
+                    float textSize = appPrefs.getFloat("chat_text_size_sp", 15.5f);
+                    if (textSize > 0 && messageText != null) {
+                        messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, textSize);
+                    }
+                } catch (Exception ignored) {}
                 
                 if (replyQuoteContainer != null) {
                     if (message.getReplyToMessageId() != null) {

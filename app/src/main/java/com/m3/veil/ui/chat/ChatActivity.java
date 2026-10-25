@@ -1,5 +1,7 @@
 package com.m3.veil.ui.chat;
 
+import com.yalantis.ucrop.UCrop;
+import android.graphics.drawable.GradientDrawable;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.graphics.Color;
@@ -128,6 +130,7 @@ public class ChatActivity extends AppCompatActivity {
     private static final int REQ_PICK_CONTACT = 104;
     private static final int REQ_CAPTURE_CAMERA = 105;
     private static final int REQ_CAMERA_GALLERY = 106;
+    private static final int REQ_PICK_WALLPAPER = 107;
     private static final int REQ_VIEW_ONCE_MEDIA = 109;
 
     private static final int PERM_REQ_AUDIO = 200;
@@ -1592,6 +1595,37 @@ public class ChatActivity extends AppCompatActivity {
             }
         } else if (requestCode == REQ_VIEW_ONCE_MEDIA) {
             reloadMessagesFromLocalVault();
+        } else if (requestCode == REQ_PICK_WALLPAPER && resultCode == RESULT_OK && data != null) {
+            Uri selectedUri = data.getData();
+            if (selectedUri != null) {
+                File dir = new File(getFilesDir(), "app_wallpapers");
+                if (!dir.exists()) dir.mkdirs();
+                File destFile = new File(dir, "chat_wp_" + (chatId != null ? chatId : "custom") + "_" + System.currentTimeMillis() + ".jpg");
+                Uri destUri = Uri.fromFile(destFile);
+
+                UCrop.Options options = new UCrop.Options();
+                options.setCompressionFormat(Bitmap.CompressFormat.JPEG);
+                options.setCompressionQuality(92);
+                options.setToolbarColor(ContextCompat.getColor(this, R.color.colorSurface));
+                options.setStatusBarColor(ContextCompat.getColor(this, R.color.colorSurface));
+                options.setToolbarWidgetColor(ContextCompat.getColor(this, R.color.textPrimary));
+                options.setToolbarTitle("Crop Chat Wallpaper");
+
+                UCrop.of(selectedUri, destUri)
+                        .withAspectRatio(9, 16)
+                        .withMaxResultSize(1080, 1920)
+                        .withOptions(options)
+                        .start(this);
+            }
+        } else if (requestCode == UCrop.REQUEST_CROP && resultCode == RESULT_OK && data != null) {
+            Uri resultUri = UCrop.getOutput(data);
+            if (resultUri != null && chatId != null) {
+                String wpStr = resultUri.toString();
+                com.m3.veil.database.EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, wpStr);
+                if (currentLocalChat != null) currentLocalChat.setWallpaperColor(wpStr);
+                applyChatWallpaper();
+                Toast.makeText(this, "Chat wallpaper applied", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -1789,49 +1823,7 @@ public class ChatActivity extends AppCompatActivity {
         updateBlockedState(isChatBlocked, currentLocalChat.getBlockedBy());
         updateRecipientHeader();
 
-        if (currentLocalChat.getWallpaperColor() != null && !currentLocalChat.getWallpaperColor().isEmpty()) {
-            try {
-                View chatRoot = findViewById(R.id.chat_root);
-                if (chatRoot != null) {
-                    chatRoot.setBackgroundColor(android.graphics.Color.parseColor(currentLocalChat.getWallpaperColor()));
-                }
-            } catch (Exception ignored) {}
-        } else {
-            try {
-                android.content.SharedPreferences appPrefs = getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
-                boolean amoled = appPrefs.getBoolean("amoled_pure_black", false);
-                String wpType = appPrefs.getString("wallpaper_type", "default");
-                String wpValue = appPrefs.getString("wallpaper_value", null);
-                int wpDim = appPrefs.getInt("wallpaper_dim", 0);
-                View chatRoot = findViewById(R.id.chat_root);
-                if (chatRoot != null) {
-                    if (amoled && ("default".equals(wpType) || wpValue == null || wpValue.isEmpty())) {
-                        chatRoot.setBackgroundColor(android.graphics.Color.BLACK);
-                    } else if (wpValue != null && !wpValue.isEmpty()) {
-                        if ("image".equals(wpType)) {
-                            android.graphics.drawable.Drawable d = android.graphics.drawable.Drawable.createFromPath(android.net.Uri.parse(wpValue).getPath());
-                            if (d != null) {
-                                if (wpDim > 0) {
-                                    int alpha = Math.max(0, Math.min(230, (int) (wpDim * 2.3f)));
-                                    d.setColorFilter(android.graphics.Color.argb(alpha, 0, 0, 0), android.graphics.PorterDuff.Mode.SRC_ATOP);
-                                }
-                                chatRoot.setBackground(d);
-                            }
-                        } else if ("color".equals(wpType)) {
-                            int baseColor = android.graphics.Color.parseColor(wpValue);
-                            if (wpDim > 0) {
-                                float factor = Math.max(0.1f, 1.0f - (wpDim / 120f));
-                                int r = (int) (android.graphics.Color.red(baseColor) * factor);
-                                int g = (int) (android.graphics.Color.green(baseColor) * factor);
-                                int b = (int) (android.graphics.Color.blue(baseColor) * factor);
-                                baseColor = android.graphics.Color.rgb(r, g, b);
-                            }
-                            chatRoot.setBackgroundColor(baseColor);
-                        }
-                    }
-                }
-            } catch (Exception ignored) {}
-        }
+        applyChatWallpaper();
 
         if (currentLocalChat.getName() != null && !currentLocalChat.getName().isEmpty()) {
             recipientName = currentLocalChat.getName();
@@ -1841,6 +1833,93 @@ public class ChatActivity extends AppCompatActivity {
 
         updateChannelRoleComposerState();
         updatePresenceAndToolbarStatus();
+    }
+
+    private void applyChatWallpaper() {
+        View chatRoot = findViewById(R.id.chat_root);
+        ImageView doodleOverlay = findViewById(R.id.chatDoodleOverlay);
+        if (chatRoot == null) return;
+
+        android.content.SharedPreferences appPrefs = getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
+        boolean amoled = appPrefs.getBoolean("amoled_pure_black", false);
+        boolean doodleEnabled = appPrefs.getBoolean("doodle_pattern_enabled", false);
+        int wpDim = appPrefs.getInt("wallpaper_dim", 0);
+
+        String rawWallpaper = currentLocalChat != null ? currentLocalChat.getWallpaperColor() : null;
+        String wpType = (rawWallpaper != null && !rawWallpaper.isEmpty()) ? "custom" : appPrefs.getString("wallpaper_type", "default");
+        String wpValue = (rawWallpaper != null && !rawWallpaper.isEmpty()) ? rawWallpaper : appPrefs.getString("wallpaper_value", null);
+
+        boolean isNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+
+        try {
+            if (wpValue != null && wpValue.startsWith("gradient:")) {
+                String[] parts = wpValue.substring("gradient:".length()).split(":");
+                int[] colors = new int[parts.length];
+                for (int i = 0; i < parts.length; i++) {
+                    int c = android.graphics.Color.parseColor(parts[i]);
+                    if (wpDim > 0) {
+                        float factor = Math.max(0.15f, 1.0f - (wpDim / 100f));
+                        int r = (int) (android.graphics.Color.red(c) * factor);
+                        int g = (int) (android.graphics.Color.green(c) * factor);
+                        int b = (int) (android.graphics.Color.blue(c) * factor);
+                        c = android.graphics.Color.rgb(r, g, b);
+                    }
+                    colors[i] = c;
+                }
+                android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, colors);
+                chatRoot.setBackground(gd);
+            } else if (wpValue != null && ("image".equals(wpType) || wpValue.startsWith("file:") || wpValue.startsWith("content:") || wpValue.startsWith("/"))) {
+                android.net.Uri uri = wpValue.startsWith("/") ? android.net.Uri.fromFile(new File(wpValue)) : android.net.Uri.parse(wpValue);
+                android.graphics.drawable.Drawable d = null;
+                try {
+                    java.io.InputStream is = getContentResolver().openInputStream(uri);
+                    if (is != null) {
+                        d = android.graphics.drawable.Drawable.createFromStream(is, uri.toString());
+                        is.close();
+                    }
+                } catch (Exception ex) {
+                    d = android.graphics.drawable.Drawable.createFromPath(uri.getPath());
+                }
+                if (d != null) {
+                    if (wpDim > 0) {
+                        int alpha = Math.max(0, Math.min(230, (int) (wpDim * 2.3f)));
+                        d.setColorFilter(android.graphics.Color.argb(alpha, 0, 0, 0), android.graphics.PorterDuff.Mode.SRC_ATOP);
+                    }
+                    chatRoot.setBackground(d);
+                } else {
+                    int defaultBg = isNight ? (amoled ? android.graphics.Color.BLACK : ContextCompat.getColor(this, R.color.chat_wallpaper_bg))
+                            : ContextCompat.getColor(this, R.color.chat_wallpaper_bg);
+                    chatRoot.setBackgroundColor(defaultBg);
+                }
+            } else if (wpValue != null && wpValue.startsWith("#")) {
+                int baseColor = android.graphics.Color.parseColor(wpValue);
+                if (wpDim > 0) {
+                    float factor = Math.max(0.15f, 1.0f - (wpDim / 100f));
+                    int r = (int) (android.graphics.Color.red(baseColor) * factor);
+                    int g = (int) (android.graphics.Color.green(baseColor) * factor);
+                    int b = (int) (android.graphics.Color.blue(baseColor) * factor);
+                    baseColor = android.graphics.Color.rgb(r, g, b);
+                }
+                chatRoot.setBackgroundColor(baseColor);
+            } else {
+                int defaultBg = isNight ? (amoled ? android.graphics.Color.BLACK : ContextCompat.getColor(this, R.color.chat_wallpaper_bg))
+                        : ContextCompat.getColor(this, R.color.chat_wallpaper_bg);
+                chatRoot.setBackgroundColor(defaultBg);
+            }
+        } catch (Exception e) {
+            int fallback = isNight ? (amoled ? android.graphics.Color.BLACK : ContextCompat.getColor(this, R.color.chat_wallpaper_bg))
+                    : ContextCompat.getColor(this, R.color.chat_wallpaper_bg);
+            chatRoot.setBackgroundColor(fallback);
+        }
+
+        if (doodleOverlay != null) {
+            doodleOverlay.setVisibility(doodleEnabled ? View.VISIBLE : View.GONE);
+            if (doodleEnabled) {
+                int tintColor = isNight ? android.graphics.Color.parseColor("#22FFFFFF") : android.graphics.Color.parseColor("#18000000");
+                doodleOverlay.setColorFilter(tintColor, android.graphics.PorterDuff.Mode.SRC_IN);
+            }
+        }
     }
 
     private void updateChannelRoleComposerState() {
@@ -3662,17 +3741,29 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void applyEmotionHeatmapGradient() {
+        android.content.SharedPreferences appPrefs = getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
+        boolean enabled = appPrefs.getBoolean("ambient_emotion_gradient", false);
+        if (!enabled) {
+            return;
+        }
         if (currentLocalChat != null && currentLocalChat.getWallpaperColor() != null && !currentLocalChat.getWallpaperColor().isEmpty()) {
             return;
         }
         View chatRoot = findViewById(R.id.chat_root);
         if (chatRoot == null) return;
 
+        boolean isNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
         com.m3.veil.utils.VeilLocalIntelligenceEngine.EmotionAnalysisResult emotion =
                 com.m3.veil.utils.VeilLocalIntelligenceEngine.getInstance().analyzeThreadEmotion(messageList);
+        int startColor = emotion.gradientStartColor;
+        int endColor = emotion.gradientEndColor;
+        if (!isNight) {
+            startColor = android.graphics.Color.parseColor("#FFFBEB");
+            endColor = android.graphics.Color.parseColor("#F1F5F9");
+        }
         android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{emotion.gradientStartColor, emotion.gradientEndColor}
+                new int[]{startColor, endColor}
         );
         chatRoot.setBackground(gd);
     }
@@ -5266,59 +5357,131 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showChatWallpaperDialog() {
-        String[] names = {"Default Theme", "Midnight Abyss (#0D1117)", "Cyber Indigo (#121026)", "Emerald Matrix (#091E1A)", "Crimson Velvet (#240B15)"};
-        String[] hexes = {"", "#0D1117", "#121026", "#091E1A", "#240B15"};
-
-        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        BottomSheetDialog sheet = new BottomSheetDialog(this, R.style.ModernBottomSheetDialogTheme);
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundResource(R.drawable.bottom_sheet_background);
-        int padH = (int) (24 * getResources().getDisplayMetrics().density);
+        root.setBackgroundResource(R.drawable.bg_bottom_sheet_modern);
+        int padH = (int) (22 * getResources().getDisplayMetrics().density);
         int padV = (int) (16 * getResources().getDisplayMetrics().density);
         root.setPadding(padH, padV, padH, padV * 2);
 
         View handle = new View(this);
-        int handleW = (int) (36 * getResources().getDisplayMetrics().density);
+        int handleW = (int) (38 * getResources().getDisplayMetrics().density);
         int handleH = (int) (4 * getResources().getDisplayMetrics().density);
         LinearLayout.LayoutParams handleLp = new LinearLayout.LayoutParams(handleW, handleH);
         handleLp.gravity = Gravity.CENTER_HORIZONTAL;
-        handleLp.bottomMargin = (int) (16 * getResources().getDisplayMetrics().density);
+        handleLp.bottomMargin = (int) (14 * getResources().getDisplayMetrics().density);
         handle.setLayoutParams(handleLp);
         handle.setBackgroundResource(R.drawable.bg_voice_circle_incoming);
         root.addView(handle);
 
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("🌈 Custom Chat Wallpaper");
+        tvTitle.setText("🌈 Chat Wallpaper");
         tvTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
         tvTitle.setTextSize(19);
         tvTitle.setTypeface(null, Typeface.BOLD);
-        tvTitle.setPadding(0, 0, 0, (int) (16 * getResources().getDisplayMetrics().density));
+        tvTitle.setPadding(0, 0, 0, (int) (12 * getResources().getDisplayMetrics().density));
         root.addView(tvTitle);
 
-        for (int i = 0; i < names.length; i++) {
-            final String hex = hexes[i];
-            final String name = names[i];
+        // Pick Photo from Gallery Button
+        com.google.android.material.button.MaterialButton btnGallery = new com.google.android.material.button.MaterialButton(this);
+        btnGallery.setText("🖼️ Choose from Gallery (Crop 9:16)");
+        btnGallery.setCornerRadius((int) (12 * getResources().getDisplayMetrics().density));
+        btnGallery.setOnClickListener(v -> {
+            sheet.dismiss();
+            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("image/*");
+            startActivityForResult(Intent.createChooser(intent, "Choose Chat Wallpaper"), REQ_PICK_WALLPAPER);
+        });
+        root.addView(btnGallery);
 
-            TextView row = new TextView(this);
-            row.setText(name);
-            row.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
-            row.setTextSize(15.5f);
-            row.setPadding(0, (int) (12 * getResources().getDisplayMetrics().density), 0, (int) (12 * getResources().getDisplayMetrics().density));
-            row.setClickable(true);
-            row.setFocusable(true);
-            row.setOnClickListener(v -> {
-                sheet.dismiss();
-                com.m3.veil.database.EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, hex);
-                if (hex.isEmpty()) {
-                    recreate();
+        // Reset to Theme Default Button
+        com.google.android.material.button.MaterialButton btnDefault = new com.google.android.material.button.MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnDefault.setText("✨ Use Default Theme Wallpaper");
+        btnDefault.setCornerRadius((int) (12 * getResources().getDisplayMetrics().density));
+        LinearLayout.LayoutParams defLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        defLp.topMargin = (int) (8 * getResources().getDisplayMetrics().density);
+        defLp.bottomMargin = (int) (16 * getResources().getDisplayMetrics().density);
+        btnDefault.setLayoutParams(defLp);
+        btnDefault.setOnClickListener(v -> {
+            sheet.dismiss();
+            com.m3.veil.database.EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, "");
+            if (currentLocalChat != null) currentLocalChat.setWallpaperColor("");
+            applyChatWallpaper();
+            Toast.makeText(this, "Wallpaper reset to theme default", Toast.LENGTH_SHORT).show();
+        });
+        root.addView(btnDefault);
+
+        // Solid & Gradient Preset Rows
+        String[] sectionTitles = {
+                "Light Presets (Clean & Soft):",
+                "Dark Presets (Deep Obsidian):",
+                "Gradient Presets:"
+        };
+
+        String[][] presetNames = {
+                {"Warm Cream", "Mint Foam", "Pastel Sky", "Rose Whisper", "Clean Slate"},
+                {"Midnight Abyss", "Cyber Indigo", "Emerald Matrix", "Crimson Velvet", "Deep Ocean"},
+                {"Sunset Horizon", "Oceanic Aqua", "Cyber Aurora", "Midnight Nebula"}
+        };
+
+        String[][] presetValues = {
+                {"#FAF7F2", "#F0FDF4", "#F0F9FF", "#FFF1F2", "#F8FAFC"},
+                {"#0D1117", "#121026", "#091E1A", "#240B15", "#0A192F"},
+                {"gradient:#FF512F:#DD2476", "gradient:#00C9FF:#92FE9D", "gradient:#8A2387:#E94057:#F27121", "gradient:#0F2027:#203A43:#2C5364"}
+        };
+
+        for (int s = 0; s < sectionTitles.length; s++) {
+            TextView secTitle = new TextView(this);
+            secTitle.setText(sectionTitles[s]);
+            secTitle.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+            secTitle.setTextSize(12.5f);
+            secTitle.setPadding(0, (int) (6 * getResources().getDisplayMetrics().density), 0, (int) (8 * getResources().getDisplayMetrics().density));
+            root.addView(secTitle);
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            rowLp.bottomMargin = (int) (14 * getResources().getDisplayMetrics().density);
+            row.setLayoutParams(rowLp);
+
+            for (int p = 0; p < presetNames[s].length; p++) {
+                final String val = presetValues[s][p];
+                final String name = presetNames[s][p];
+
+                View swatch = new View(this);
+                int size = (int) (38 * getResources().getDisplayMetrics().density);
+                LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(size, size);
+                swLp.rightMargin = (int) (10 * getResources().getDisplayMetrics().density);
+                swatch.setLayoutParams(swLp);
+
+                if (val.startsWith("gradient:")) {
+                    String[] parts = val.substring("gradient:".length()).split(":");
+                    int[] colors = new int[parts.length];
+                    for (int c = 0; c < parts.length; c++) colors[c] = Color.parseColor(parts[c]);
+                    swatch.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, colors));
                 } else {
-                    loadLocalChatSettings();
+                    swatch.setBackgroundColor(Color.parseColor(val));
                 }
-            });
+
+                swatch.setClickable(true);
+                swatch.setFocusable(true);
+                swatch.setOnClickListener(v -> {
+                    sheet.dismiss();
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, val);
+                    if (currentLocalChat != null) currentLocalChat.setWallpaperColor(val);
+                    applyChatWallpaper();
+                    Toast.makeText(this, "Wallpaper: " + name, Toast.LENGTH_SHORT).show();
+                });
+                row.addView(swatch);
+            }
             root.addView(row);
         }
 
-        sheet.setContentView(root);
+        scroll.addView(root);
+        sheet.setContentView(scroll);
         sheet.show();
     }
 

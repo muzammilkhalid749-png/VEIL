@@ -37,7 +37,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"
             android:layout_marginBottom="14dp"
-            android:text="Real-time chat styling with themes, photo crop, and dimming:"
+            android:text="Real-time chat styling with themes, wallpapers, doodle art, and bubble geometry:"
             android:textColor="@color/colorTextSecondary"
             android:textSize="12.5sp" />
 
@@ -45,7 +45,7 @@
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardLivePreview"
             android:layout_width="match_parent"
-            android:layout_height="160dp"
+            android:layout_height="170dp"
             android:layout_marginBottom="16dp"
             app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
@@ -65,6 +65,16 @@
                     android:scaleType="centerCrop"
                     android:visibility="gone" />
 
+                <!-- Doodle Texture Overlay Preview -->
+                <ImageView
+                    android:id="@+id/ivPreviewDoodleOverlay"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/bg_chat_doodle_pattern"
+                    android:scaleType="centerCrop"
+                    android:alpha="0.25"
+                    android:visibility="gone" />
+
                 <!-- Dim Overlay -->
                 <View
                     android:id="@+id/viewPreviewDimOverlay"
@@ -82,6 +92,7 @@
 
                     <!-- Incoming Bubble -->
                     <LinearLayout
+                        android:id="@+id/previewIncomingBubble"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:maxWidth="240dp"
@@ -94,11 +105,12 @@
                         android:layout_marginBottom="8dp">
 
                         <TextView
+                            android:id="@+id/tvPreviewIncomingText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Veil zero-trace encrypted chat ✨"
                             android:textColor="@color/colorTextPrimary"
-                            android:textSize="13sp" />
+                            android:textSize="14sp" />
                     </LinearLayout>
 
                     <!-- Outgoing Bubble -->
@@ -121,7 +133,7 @@
                             android:layout_height="wrap_content"
                             android:text="Live wallpaper preview looks awesome! 🚀"
                             android:textColor="@android:color/white"
-                            android:textSize="13sp" />
+                            android:textSize="14sp" />
                     </LinearLayout>
                 </LinearLayout>
             </FrameLayout>
@@ -162,7 +174,7 @@
                 android:paddingStart="10dp"
                 android:paddingTop="6dp"
                 android:paddingBottom="6dp"
-                android:text="Light Theme"
+                android:text="Light Theme (Airy &amp; Clean)"
                 android:textColor="@color/colorTextPrimary"
                 android:textSize="14sp" />
 
@@ -203,7 +215,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="True 0% power black for battery savings"
+                    android:text="True 0% power black in Dark Theme for battery savings"
                     android:textColor="@color/colorTextSecondary"
                     android:textSize="12sp" />
             </LinearLayout>
@@ -242,11 +254,108 @@
             app:cornerRadius="12dp"
             android:layout_marginBottom="12dp" />
 
-        <!-- Color Presets -->
+        <!-- Doodle Pattern Switch -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="14dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✨ Telegram/WhatsApp Doodle Artwork"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textSize="14sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Superimpose subtle privacy doodle artwork onto wallpaper"
+                    android:textColor="@color/colorTextSecondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchDoodlePattern"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <!-- Light Color Presets -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Solid Color Presets:"
+            android:text="Light Solid Presets (Clean &amp; Soft):"
+            android:textColor="@color/colorTextSecondary"
+            android:textSize="12sp"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="14dp">
+
+            <View
+                android:id="@+id/wpPresetLightWarm"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="10dp"
+                android:background="#FAF7F2"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/wpPresetLightMint"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="10dp"
+                android:background="#F0FDF4"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/wpPresetLightSky"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="10dp"
+                android:background="#F0F9FF"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/wpPresetLightRose"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="10dp"
+                android:background="#FFF1F2"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/wpPresetLightSlate"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="#F8FAFC"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+
+        <!-- Dark Color Presets -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dark Solid Presets (Deep Obsidian):"
             android:textColor="@color/colorTextSecondary"
             android:textSize="12sp"
             android:layout_marginBottom="8dp" />
@@ -299,6 +408,58 @@
                 android:layout_width="38dp"
                 android:layout_height="38dp"
                 android:background="#0A192F"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+
+        <!-- Gradient Presets -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Gradient Presets:"
+            android:textColor="@color/colorTextSecondary"
+            android:textSize="12sp"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="14dp">
+
+            <View
+                android:id="@+id/wpPresetGradSunset"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="10dp"
+                android:background="#FF512F"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/wpPresetGradOcean"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="10dp"
+                android:background="#00C9FF"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/wpPresetGradAurora"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="10dp"
+                android:background="#8A2387"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/wpPresetGradMidnight"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="#203A43"
                 android:clickable="true"
                 android:focusable="true" />
         </LinearLayout>
@@ -362,7 +523,25 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="20dp">
+            android:layout_marginBottom="16dp">
+
+            <View
+                android:id="@+id/colorIndigo"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="10dp"
+                android:background="#4F46E5"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/colorBlue"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_color_swatch_blue"
+                android:clickable="true"
+                android:focusable="true" />
 
             <View
                 android:id="@+id/colorCyan"
@@ -401,13 +580,101 @@
                 android:focusable="true" />
 
             <View
-                android:id="@+id/colorBlue"
+                android:id="@+id/colorCrimson"
                 android:layout_width="38dp"
                 android:layout_height="38dp"
-                android:background="@drawable/bg_color_swatch_blue"
+                android:background="#E11D48"
                 android:clickable="true"
                 android:focusable="true" />
         </LinearLayout>
+
+        <!-- Section 4: Chat Bubble Geometry & Style -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📐 Chat Bubble Corner Geometry"
+            android:textColor="@color/colorTextPrimary"
+            android:textSize="14.5sp"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginBottom="8dp" />
+
+        <RadioGroup
+            android:id="@+id/rgBubbleCornerStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <RadioButton
+                android:id="@+id/rbCornerTelegram"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Telegram (18dp)"
+                android:textSize="13sp"
+                android:textColor="@color/colorTextPrimary" />
+
+            <RadioButton
+                android:id="@+id/rbCornerModern"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Soft (14dp)"
+                android:textSize="13sp"
+                android:textColor="@color/colorTextPrimary" />
+
+            <RadioButton
+                android:id="@+id/rbCornerWhatsApp"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="WhatsApp (8dp)"
+                android:textSize="13sp"
+                android:textColor="@color/colorTextPrimary" />
+        </RadioGroup>
+
+        <!-- Section 5: Chat Text Size -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🔤 Chat Message Text Size"
+                android:textColor="@color/colorTextPrimary"
+                android:textSize="14sp"
+                android:fontFamily="sans-serif-medium" />
+
+            <TextView
+                android:id="@+id/tvChatTextSize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="15.5 sp"
+                android:textColor="@color/colorPrimary"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sliderChatTextSize"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:valueFrom="12"
+            android:valueTo="22"
+            android:stepSize="0.5"
+            android:value="15.5" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/colorOutline"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp" />
 
         <!-- Reset Button -->
         <com.google.android.material.button.MaterialButton
@@ -415,7 +682,7 @@
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:text="Reset to Default Wallpaper &amp; Accent"
+            android:text="Reset to Default Theme, Wallpaper &amp; Accent"
             android:textColor="@color/colorError"
             app:strokeColor="@color/colorError"
             app:cornerRadius="12dp" />
