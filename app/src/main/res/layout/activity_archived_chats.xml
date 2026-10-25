@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/archived_chats_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorBackground">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <!-- App Bar -->
+        <LinearLayout
+            android:id="@+id/appBarLayout"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/colorSurface"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="16dp">
+
+            <ImageView
+                android:id="@+id/btnBack"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:padding="8dp"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@color/textPrimary"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Back" />
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Archived Chats"
+                android:textColor="@color/textPrimary"
+                android:textSize="18sp"
+                android:fontFamily="sans-serif-medium"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/colorOutline" />
+
+        <!-- Info Notice -->
+        <LinearLayout
+            android:id="@+id/archivedNotice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="16dp"
+            android:background="@color/colorSurfaceVariant">
+
+            <ImageView
+                android:id="@+id/ivNoticeIcon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_archive"
+                app:tint="@color/textSecondary" />
+
+            <TextView
+                android:id="@+id/tvNoticeText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:text="Chats are archived and will remain archived until you manually unarchive them."
+                android:textColor="@color/textSecondary"
+                android:textSize="13sp"
+                android:lineSpacingExtra="2dp" />
+
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/colorOutline" />
+
+        <!-- Content Frame -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <!-- Archived RecyclerView -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/archivedRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingTop="4dp"
+                android:paddingBottom="24dp"
+                android:clipToPadding="false" />
+
+            <!-- Empty State -->
+            <LinearLayout
+                android:id="@+id/emptyState"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone"
+                android:padding="32dp">
+
+                <ImageView
+                    android:id="@+id/ivEmptyIcon"
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:src="@drawable/ic_archive"
+                    app:tint="@color/textSecondary"
+                    android:layout_marginBottom="16dp" />
+
+                <TextView
+                    android:id="@+id/tvEmptyTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="No archived chats"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="18sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:id="@+id/tvEmptySubtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Chats you archive will appear here"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="14sp"
+                    android:gravity="center" />
+
+            </LinearLayout>
+
+        </FrameLayout>
+
+    </LinearLayout>
+
+</RelativeLayout>

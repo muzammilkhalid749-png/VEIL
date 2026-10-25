@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Left Bubble -->
+    <path
+        android:fillColor="@color/veil_primary"
+        android:pathData="M 70,100 a 40,40 0 1,1 0,0.1 z" />
+
+    <!-- Right Bubble -->
+    <path
+        android:fillColor="@color/veil_primary_light"
+        android:pathData="M 130,100 a 40,40 0 1,1 0,0.1 z" />
+
+    <!-- Shield -->
+    <path
+        android:fillColor="@color/veil_accent"
+        android:pathData="M 95,95 L 100,90 L 105,95 L 105,105 L 100,110 L 95,105 Z" />
+
+</vector>

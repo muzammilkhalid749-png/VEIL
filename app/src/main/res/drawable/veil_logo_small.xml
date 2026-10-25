@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+
+    <!-- Simplified version of the main logo -->
+    <path
+        android:fillColor="@color/veil_accent"
+        android:pathData="M 6,16 C 6,10 10,6 16,6 C 22,6 26,10 26,16 C 26,22 22,26 16,26 C 10,26 6,22 6,16 Z" />
+
+    <path
+        android:fillColor="@color/veil_primary"
+        android:pathData="M 16,16 C 16,12 18,10 22,10 C 26,10 28,12 28,16 C 28,20 26,22 22,22 C 18,22 16,20 16,16 Z" />
+
+    <path
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="2"
+        android:pathData="M 16,16 L 22,16" />
+
+</vector>

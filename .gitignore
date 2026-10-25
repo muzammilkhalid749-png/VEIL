@@ -1,0 +1,21 @@
+*.iml
+.gradle
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Temporary scratch & build artifacts
+/tmp_*
+tmp_*
+/build_*.txt
+/webrtc_*.txt
+*.apk
+node_modules/
+**/node_modules/
+
+

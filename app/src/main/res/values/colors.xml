@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Modern Java UI Featherweight Palette (Light) -->
+    <color name="colorBackground">#FAFAFC</color>
+    <color name="colorSurface">#FFFFFF</color>
+    <color name="colorSurfaceVariant">#F1F5F9</color>
+    <color name="surfaceVariant">#F1F5F9</color>
+    <color name="colorOutline">#E2E8F0</color>
+    <color name="dividerColor">#E2E8F0</color>
+    <color name="colorPrimary">#4F46E5</color>
+    <color name="colorOnPrimary">#FFFFFF</color>
+    <color name="colorSecondary">#0D9488</color>
+    <color name="colorPrimaryContainer">#EEF2FF</color>
+    <color name="colorOnPrimaryContainer">#3730A3</color>
+    <color name="textPrimary">#0F172A</color>
+    <color name="textSecondary">#64748B</color>
+    <color name="textTertiary">#94A3B8</color>
+    <color name="statusSuccess">#10B981</color>
+    <color name="statusWarning">#F59E0B</color>
+    <color name="statusError">#EF4444</color>
+
+    <!-- Legacy / Semantic Mappings for Modern Java UI (Light) -->
+    <color name="veil_primary_dark">#FAFAFC</color>
+    <color name="veil_primary">#FFFFFF</color>
+    <color name="veil_primary_light">#F1F5F9</color>
+    <color name="veil_accent">#4F46E5</color>
+    <color name="veil_accent_light">#EEF2FF</color>
+    <color name="veil_accent_dark">#3730A3</color>
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="error_red">#EF4444</color>
+
+    <color name="colorTextPrimary">#0F172A</color>
+    <color name="colorTextSecondary">#64748B</color>
+    <color name="colorError">#EF4444</color>
+    <color name="colorSuccess">#10B981</color>
+
+    <!-- Attachment Icon Container Tints (Soft Pastels) -->
+    <color name="attach_image_bg">#EEF2FF</color>
+    <color name="attach_image_icon">#4F46E5</color>
+    <color name="attach_video_bg">#FDF2F8</color>
+    <color name="attach_video_icon">#EC4899</color>
+    <color name="attach_document_bg">#EFF6FF</color>
+    <color name="attach_document_icon">#3B82F6</color>
+    <color name="attach_location_bg">#ECFDF5</color>
+    <color name="attach_location_icon">#10B981</color>
+    <color name="attach_contact_bg">#F0FDFA</color>
+    <color name="attach_contact_icon">#0D9488</color>
+    <color name="attach_camera_bg">#FFFBEB</color>
+    <color name="attach_camera_icon">#F59E0B</color>
+
+    <!-- Veil Signature Message Bubble Colors (Light Theme - Modern Indigo Aesthetic) -->
+    <color name="message_bubble_sent">#EEF2FF</color>
+    <color name="message_bubble_received">#FFFFFF</color>
+    <color name="message_text_primary">#0F172A</color>
+    <color name="message_text_secondary">#64748B</color>
+    <color name="message_status_sent">#94A3B8</color>
+    <color name="message_status_read">#4F46E5</color>
+    <color name="message_inner_card_bg">#0D000000</color>
+    <color name="message_divider">#14000000</color>
+    <color name="message_action_button">#4F46E5</color>
+    <color name="message_quote_strip">#4F46E5</color>
+    <color name="message_quote_bg">#0A4F46E5</color>
+    <color name="voice_waveform_played">#4F46E5</color>
+    <color name="voice_waveform_unplayed">#94A3B8</color>
+    <color name="chat_wallpaper_bg">#F8FAFC</color>
+</resources>

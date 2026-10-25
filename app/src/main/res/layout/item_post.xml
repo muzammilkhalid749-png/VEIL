@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="16dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginTop="6dp"
+    android:layout_marginBottom="6dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="@color/colorOutline"
+    app:cardBackgroundColor="@color/colorSurface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="12dp">
+
+            <de.hdodenhof.circleimageview.CircleImageView
+                android:id="@+id/authorAvatar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_person"
+                app:civ_border_width="1dp"
+                app:civ_border_color="@color/colorOutline" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginStart="12dp">
+
+                <TextView
+                    android:id="@+id/authorUsername"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@username"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:id="@+id/timeText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="2 hours ago"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp"
+                    android:fontFeatureSettings="tnum" />
+
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_more_vert"
+                app:tint="@color/textSecondary"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="6dp" />
+
+        </LinearLayout>
+
+        <!-- Content -->
+        <TextView
+            android:id="@+id/postContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="This is a sample anonymous post content."
+            android:textColor="@color/textPrimary"
+            android:textSize="15sp"
+            android:lineSpacingExtra="3dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Hairline Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/colorOutline"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Footer / Actions -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Like Button -->
+            <LinearLayout
+                android:id="@+id/likeButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="6dp"
+                android:background="?attr/selectableItemBackground"
+                android:layout_marginEnd="16dp">
+
+                <ImageView
+                    android:id="@+id/likeIcon"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_heart_outline"
+                    app:tint="@color/textSecondary" />
+
+                <TextView
+                    android:id="@+id/likesCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="13sp"
+                    android:fontFeatureSettings="tnum"
+                    android:layout_marginStart="6dp" />
+            </LinearLayout>
+
+            <!-- Comment Button -->
+            <LinearLayout
+                android:id="@+id/commentButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="6dp"
+                android:background="?attr/selectableItemBackground"
+                android:layout_marginEnd="16dp">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_comment"
+                    app:tint="@color/textSecondary" />
+
+                <TextView
+                    android:id="@+id/commentsCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="13sp"
+                    android:fontFeatureSettings="tnum"
+                    android:layout_marginStart="6dp" />
+            </LinearLayout>
+
+            <!-- Share Button -->
+            <LinearLayout
+                android:id="@+id/shareButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="6dp"
+                android:background="?attr/selectableItemBackground">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_share"
+                    app:tint="@color/textSecondary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Share"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="13sp"
+                    android:layout_marginStart="6dp" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

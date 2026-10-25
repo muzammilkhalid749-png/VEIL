@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:background="@drawable/bottom_sheet_background"
+    android:paddingTop="16dp"
+    android:paddingBottom="24dp">
+
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:background="@color/text_secondary"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        app:cornerRadius="2dp"/>
+        
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Your Personas"
+        android:textColor="@color/text_primary"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:padding="16dp"/>
+
+    <TextView
+        android:id="@+id/currentPersonaText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Current: @username"
+        android:textColor="@color/veil_accent"
+        android:textSize="16sp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="16dp"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/veil_primary_light"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        android:id="@+id/actionCreatePersona"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="+ Create New Persona"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp"
+        android:padding="16dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"/>
+
+</LinearLayout>

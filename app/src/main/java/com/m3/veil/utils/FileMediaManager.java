@@ -1,0 +1,191 @@
+package com.m3.veil.utils;
+
+import android.content.ActivityNotFoundException;
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
+import android.widget.Toast;
+
+import androidx.core.content.FileProvider;
+
+import com.google.firebase.auth.FirebaseAuth;
+import com.m3.veil.model.Message;
+
+import java.io.File;
+
+public class FileMediaManager {
+    private static final String TAG = "FileMediaManager";
+
+    public interface DownloadCallback {
+        void onSuccess(File decryptedFile);
+        void onProgress(boolean inProgress);
+        void onError(Exception e);
+    }
+
+    public static File getDecryptedFile(Context context, Message message, String defaultExt) {
+        if (message != null && message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
+            File local = new File(message.getLocalFilePath());
+            if (local.exists() && local.length() > 0) {
+                return local;
+            }
+        }
+        String ext = defaultExt;
+        if ("image".equals(message.getType())) ext = ".jpg";
+        else if ("video".equals(message.getType())) ext = ".mp4";
+        else if ("voice".equals(message.getType())) ext = ".m4a";
+        else if ("document".equals(message.getType())) {
+            // Check if text has original extension
+            String text = message.getText();
+            if (text != null && text.contains(".")) {
+                int pipeIndex = text.indexOf("|");
+                String name = pipeIndex != -1 ? text.substring(0, pipeIndex) : text;
+                int dotIndex = name.lastIndexOf(".");
+                if (dotIndex != -1) {
+                    ext = name.substring(dotIndex);
+                }
+            }
+        }
+        return new File(context.getExternalCacheDir(), "dec_" + message.getId() + ext);
+    }
+
+    public static void downloadAndDecryptMedia(Context context, Message message, String defaultExt, DownloadCallback callback) {
+        File decryptedFile = getDecryptedFile(context, message, defaultExt);
+        if (decryptedFile != null && decryptedFile.exists() && decryptedFile.length() > 0) {
+            if (callback != null) callback.onSuccess(decryptedFile);
+            return;
+        }
+
+        // Complete Privacy WebRTC P2P architecture: Media files are never stored in cloud storage.
+        if (callback != null) {
+            callback.onProgress(false);
+            callback.onError(new Exception("Media awaiting peer-to-peer WebRTC transfer"));
+        }
+    }
+
+    public static void openFileWithSystemViewer(Context context, File file) {
+        if (file == null || !file.exists()) {
+            Toast.makeText(context, "File does not exist", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            Uri uri = FileProvider.getUriForFile(context, context.getPackageName() + ".provider", file);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(uri, getMimeType(file.getName()));
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(Intent.createChooser(intent, "Open file with"));
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(context, "No app found to open this file", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(context, "Could not open file: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public static void openLocationInMaps(Context context, String locationText) {
+        if (locationText == null || locationText.trim().isEmpty()) return;
+        try {
+            Uri mapUri;
+            if (locationText.startsWith("geo:")) {
+                mapUri = Uri.parse(locationText);
+            } else {
+                mapUri = Uri.parse("geo:0,0?q=" + Uri.encode(locationText));
+            }
+            Intent intent = new Intent(Intent.ACTION_VIEW, mapUri);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            // Fallback to browser Google Maps
+            try {
+                String query = locationText.replace("geo:", "");
+                int q = query.indexOf("?q=");
+                if (q != -1) query = query.substring(q + 3);
+                Uri webUri = Uri.parse("https://www.google.com/maps/search/?api=1&query=" + Uri.encode(query));
+                Intent webIntent = new Intent(Intent.ACTION_VIEW, webUri);
+                webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(webIntent);
+            } catch (Exception ex) {
+                Toast.makeText(context, "Unable to open maps: " + ex.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(context, "Unable to open maps: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public static void openContactDialer(Context context, String phone) {
+        if (phone == null || phone.trim().isEmpty()) return;
+        try {
+            Intent intent = new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phone.trim()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(context, "Unable to dial: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public static void saveContactToPhonebook(Context context, String name, String phone) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_INSERT);
+            intent.setType(android.provider.ContactsContract.Contacts.CONTENT_TYPE);
+            if (name != null && !name.isEmpty()) {
+                intent.putExtra(android.provider.ContactsContract.Intents.Insert.NAME, name);
+            }
+            if (phone != null && !phone.isEmpty()) {
+                intent.putExtra(android.provider.ContactsContract.Intents.Insert.PHONE, phone);
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(context, "Unable to save contact: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public static int getDocumentBadgeColor(String extension) {
+        if (extension == null) return 0xFF64748B;
+        String ext = extension.toLowerCase(java.util.Locale.ROOT).replace(".", "");
+        switch (ext) {
+            case "pdf":
+                return 0xFFEF4444; // Red
+            case "doc":
+            case "docx":
+            case "txt":
+            case "rtf":
+                return 0xFF3B82F6; // Blue
+            case "xls":
+            case "xlsx":
+            case "csv":
+                return 0xFF10B981; // Green
+            case "ppt":
+            case "pptx":
+                return 0xFFF59E0B; // Orange
+            case "zip":
+            case "rar":
+            case "7z":
+            case "tar":
+            case "gz":
+                return 0xFF8B5CF6; // Purple
+            case "apk":
+                return 0xFF059669; // Teal
+            case "mp3":
+            case "wav":
+            case "aac":
+            case "flac":
+                return 0xFFEC4899; // Pink
+            default:
+                return 0xFF64748B; // Slate
+        }
+    }
+
+    private static String getMimeType(String filename) {
+        String extension = "";
+        int i = filename.lastIndexOf('.');
+        if (i > 0) {
+            extension = filename.substring(i + 1).toLowerCase();
+        }
+        android.webkit.MimeTypeMap mime = android.webkit.MimeTypeMap.getSingleton();
+        String type = mime.getMimeTypeFromExtension(extension);
+        return type != null ? type : "*/*";
+    }
+}

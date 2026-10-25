@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/call_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent">
+
+    <!-- Fullscreen Remote Video View (WhatsApp Video Port Parity) -->
+    <org.webrtc.SurfaceViewRenderer
+        android:id="@+id/remoteVideoView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="invisible" />
+
+    <!-- Gradient overlay for video calls so text and controls remain readable -->
+    <View
+        android:id="@+id/videoScrimOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#44000000"
+        android:visibility="gone" />
+
+    <!-- Floating PIP Local Video View (Corner Window) -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardLocalVideo"
+        android:layout_width="110dp"
+        android:layout_height="160dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="56dp"
+        android:layout_marginEnd="16dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="10dp"
+        app:cardBackgroundColor="@android:color/black"
+        android:visibility="gone">
+
+        <org.webrtc.SurfaceViewRenderer
+            android:id="@+id/localVideoView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </androidx.cardview.widget.CardView>
+
+    <!-- Top info container -->
+    <LinearLayout
+        android:id="@+id/topCallInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="60dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_message_received"
+            android:backgroundTint="@color/colorSurfaceVariant"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="6dp">
+
+            <ImageView
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginEnd="6dp"
+                android:src="@drawable/ic_lock"
+                app:tint="@color/colorPrimary" />
+
+            <TextView
+                android:id="@+id/tvCallSecurityBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="End-to-End Encrypted Call"
+                android:textColor="@color/colorPrimary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/callContactName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Contact Name"
+            android:textColor="@color/colorTextPrimary"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/callStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Calling..."
+            android:textColor="@color/colorTextSecondary"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <!-- Center Avatar with Pulse Ring (Audio Call Stage) -->
+    <FrameLayout
+        android:id="@+id/avatarContainer"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:layout_centerInParent="true">
+
+        <View
+            android:id="@+id/avatarPulseRing"
+            android:layout_width="180dp"
+            android:layout_height="180dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_attach_item"
+            android:backgroundTint="@color/colorSurfaceVariant" />
+
+        <de.hdodenhof.circleimageview.CircleImageView
+            android:id="@+id/callAvatar"
+            android:layout_width="130dp"
+            android:layout_height="130dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_profile_placeholder"
+            app:civ_border_color="@color/colorPrimary"
+            app:civ_border_width="3dp" />
+    </FrameLayout>
+
+    <!-- Bottom Controls Container -->
+    <LinearLayout
+        android:id="@+id/callControlsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="40dp"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <!-- Video & Audio Effects Pill Bar (Face Mask/Blur, Voice FX, Screen Share, More/Reactions) -->
+        <HorizontalScrollView
+            android:id="@+id/callEffectsRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="18dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:id="@+id/btnVideoMasking"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_filter_chip"
+                    android:gravity="center"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:text="🎭 Face Mask &amp; Blur"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold"
+                    android:visibility="visible" />
+
+                <TextView
+                    android:id="@+id/btnVoiceMasking"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_filter_chip"
+                    android:gravity="center"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:text="🎙️ Voice FX"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btnScreenShare"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_filter_chip"
+                    android:gravity="center"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:text="📱 Share Screen"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btnCallMore"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:background="@drawable/bg_filter_chip"
+                    android:gravity="center"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:text="✨ Reactions &amp; More"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- Secondary controls row: Flip Camera, Mic, Speaker, Video -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:layout_marginBottom="32dp">
+
+            <!-- Switch / Flip Camera (visible on video call) -->
+            <LinearLayout
+                android:id="@+id/btnSwitchCamera"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:layout_marginEnd="24dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/ivSwitchCamera"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_attach_item"
+                    android:backgroundTint="@color/colorSurfaceVariant"
+                    android:padding="16dp"
+                    android:src="@drawable/ic_flip_camera"
+                    app:tint="@color/colorTextPrimary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Flip"
+                    android:textColor="@color/colorTextSecondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Mic Toggle -->
+            <LinearLayout
+                android:id="@+id/btnToggleMic"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:layout_marginEnd="24dp">
+
+                <ImageView
+                    android:id="@+id/ivToggleMic"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_attach_item"
+                    android:backgroundTint="@color/colorSurfaceVariant"
+                    android:padding="16dp"
+                    android:src="@drawable/ic_mic"
+                    app:tint="@color/colorTextPrimary" />
+
+                <TextView
+                    android:id="@+id/tvToggleMic"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Mute"
+                    android:textColor="@color/colorTextSecondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Speaker Toggle -->
+            <LinearLayout
+                android:id="@+id/btnToggleSpeaker"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:layout_marginEnd="24dp">
+
+                <ImageView
+                    android:id="@+id/ivToggleSpeaker"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_attach_item"
+                    android:backgroundTint="@color/colorSurfaceVariant"
+                    android:padding="16dp"
+                    android:src="@drawable/ic_call"
+                    app:tint="@color/colorTextPrimary" />
+
+                <TextView
+                    android:id="@+id/tvToggleSpeaker"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Speaker"
+                    android:textColor="@color/colorTextSecondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Video Toggle -->
+            <LinearLayout
+                android:id="@+id/btnToggleVideo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/ivToggleVideo"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_attach_item"
+                    android:backgroundTint="@color/colorSurfaceVariant"
+                    android:padding="16dp"
+                    android:src="@drawable/ic_video"
+                    app:tint="@color/colorTextPrimary" />
+
+                <TextView
+                    android:id="@+id/tvToggleVideo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Video"
+                    android:textColor="@color/colorTextSecondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Call Action Buttons Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <!-- Red End / Decline Call Button -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/btnEndCall"
+                    android:layout_width="68dp"
+                    android:layout_height="68dp"
+                    android:background="@drawable/bg_attach_item"
+                    android:backgroundTint="@color/colorError"
+                    android:padding="18dp"
+                    android:src="@drawable/ic_call"
+                    android:rotation="135"
+                    app:tint="@android:color/white" />
+
+                <TextView
+                    android:id="@+id/tvEndCallLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Decline"
+                    android:textColor="@color/colorTextSecondary"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+            <!-- Green Accept Call Button (for incoming calls) -->
+            <LinearLayout
+                android:id="@+id/layoutAcceptCall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:layout_marginStart="64dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/btnAcceptCall"
+                    android:layout_width="68dp"
+                    android:layout_height="68dp"
+                    android:background="@drawable/bg_attach_item"
+                    android:backgroundTint="@color/colorSuccess"
+                    android:padding="18dp"
+                    android:src="@drawable/ic_call"
+                    app:tint="@android:color/white" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Accept"
+                    android:textColor="@color/colorSuccess"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</RelativeLayout>

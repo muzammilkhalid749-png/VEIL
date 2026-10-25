@@ -1,0 +1,506 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/privacy_settings_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/colorBackground">
+
+    <!-- Header Toolbar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/colorSurface"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="16dp">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="@color/textPrimary"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Back" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Privacy &amp; Security"
+            android:textColor="@color/textPrimary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/colorOutline" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Privacy Score Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1.2dp"
+                app:strokeColor="@color/colorPrimary"
+                app:cardBackgroundColor="@color/colorSurface">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🛡️ Cryptographic Privacy Score"
+                            android:textColor="@color/textPrimary"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvPrivacyScoreVal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="90/100"
+                            android:textColor="@color/colorPrimary"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <ProgressBar
+                        android:id="@+id/pbPrivacyScore"
+                        style="@android:style/Widget.ProgressBar.Horizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="8dp"
+                        android:layout_marginTop="10dp"
+                        android:layout_marginBottom="8dp"
+                        android:max="100"
+                        android:progress="90"
+                        android:progressTint="@color/colorPrimary" />
+
+                    <TextView
+                        android:id="@+id/tvPrivacyScoreSummary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Hardware Keystore + E2EE Ratchet + SQLCipher active"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Section 1: Authentication & Vault -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="AUTHENTICATION &amp; VAULT"
+                android:textColor="@color/colorPrimary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Master App PIN -->
+            <LinearLayout
+                android:id="@+id/rowMasterPin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Master App PIN Lock"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="15.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvMasterPinStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Not configured"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_arrow_forward"
+                    app:tint="@color/textSecondary" />
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorOutline" />
+
+            <!-- Secret Vault Password -->
+            <LinearLayout
+                android:id="@+id/rowSecretVaultPassword"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Secret Vault Dedicated Password"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="15.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvVaultPasswordStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Protects hidden conversations (no default bypass)"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_arrow_forward"
+                    app:tint="@color/textSecondary" />
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorOutline" />
+
+            <!-- Decoy PIN -->
+            <LinearLayout
+                android:id="@+id/rowDecoyPin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Decoy Account PIN"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="15.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvDecoyPinStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Opens fake harmless session under duress"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_arrow_forward"
+                    app:tint="@color/textSecondary" />
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorOutline" />
+
+            <!-- Panic Safe Word -->
+            <LinearLayout
+                android:id="@+id/rowSafeWord"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🚨 Panic Safe-Word Trigger"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="15.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvSafeWordStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Typing in chat shreds all SQLCipher database data"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_arrow_forward"
+                    app:tint="@color/textSecondary" />
+            </LinearLayout>
+
+            <!-- Section 2: Chat & Presence Privacy -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CHAT &amp; PRESENCE PRIVACY"
+                android:textColor="@color/colorPrimary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Screenshot Blocking -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Screenshot &amp; Screen Record Protection"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="15.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Applies FLAG_SECURE window masking"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchFlagSecure"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorOutline" />
+
+            <!-- Stealth Typing -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Stealth Typing"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="15.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Do not send typing status packets to peers"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchStealthTyping"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorOutline" />
+
+            <!-- Fake Offline -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Fake Offline Mode"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="15.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Always appear offline on P2P mesh network"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchFakeOffline"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorOutline" />
+
+            <!-- Blocked Users -->
+            <LinearLayout
+                android:id="@+id/rowBlockedUsers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Blocked Contacts"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="15.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvBlockedCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0 contacts"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_arrow_forward"
+                    app:tint="@color/textSecondary" />
+            </LinearLayout>
+
+            <!-- Section 3: Destructive Actions -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DESTRUCTIVE ZERO-TRACE CONTROLS"
+                android:textColor="@color/colorError"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Instant Secure Wipe -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnInstantSecureWipe"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="💥 Instant Cryptographic Secure Wipe"
+                app:cornerRadius="12dp"
+                android:backgroundTint="@color/colorError"
+                android:textColor="@android:color/white"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

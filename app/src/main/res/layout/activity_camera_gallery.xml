@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cameraGalleryRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <!-- 1. Live CameraX Viewfinder (Full Screen) -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/cameraPreviewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:scaleType="fillCenter" />
+
+    <!-- Real-Time AR Mask Overlay View (#211) -->
+    <com.m3.veil.utils.VeilArMaskRenderer.OverlayView
+        android:id="@+id/arMaskOverlayView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- 2. Animated Tap-to-Focus Ring Overlay -->
+    <View
+        android:id="@+id/viewFocusRing"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:background="@drawable/bg_focus_ring"
+        android:visibility="gone" />
+
+    <!-- 3. Top Controls Bar -->
+    <RelativeLayout
+        android:id="@+id/topControlsBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:paddingStart="16dp"
+        android:paddingTop="36dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="12dp">
+
+        <ImageView
+            android:id="@+id/btnCloseCamera"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:background="@drawable/bg_circle_translucent"
+            android:padding="8dp"
+            android:src="@drawable/ic_close"
+            app:tint="@android:color/white" />
+
+        <!-- Video Recording Timer Pill (Center) -->
+        <LinearLayout
+            android:id="@+id/layoutRecordingTimer"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_centerInParent="true"
+            android:background="@drawable/bg_timer_pill"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="14dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_marginEnd="8dp"
+                android:src="@drawable/circle_red" />
+
+            <TextView
+                android:id="@+id/tvRecordingTimer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="00:00"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/btnArMaskToggle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_toStartOf="@id/btnFlashToggle"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/bg_circle_translucent"
+            android:gravity="center"
+            android:text="🎭"
+            android:textSize="18sp" />
+
+        <ImageView
+            android:id="@+id/btnFlashToggle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:background="@drawable/bg_circle_translucent"
+            android:padding="8dp"
+            android:src="@drawable/ic_flash_off"
+            app:tint="@android:color/white" />
+
+    </RelativeLayout>
+
+    <!-- 4. Bottom Viewfinder Controls (Shutter, Flip, Horizontal Carousel) -->
+    <LinearLayout
+        android:id="@+id/bottomCameraControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:paddingBottom="32dp">
+
+        <!-- Swipe up for gallery indicator -->
+        <LinearLayout
+            android:id="@+id/btnSwipeUpGallery"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_timer_pill"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="6dp">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_expand_less"
+                app:tint="@android:color/white" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="Swipe up for gallery"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Horizontal Quick-Access Recent Media Strip -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvRecentMediaHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginBottom="20dp"
+            android:clipToPadding="false"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp" />
+
+        <!-- Shutter Button Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="32dp"
+            android:paddingEnd="32dp">
+
+            <!-- Open Full Gallery Button -->
+            <ImageView
+                android:id="@+id/btnOpenFullGallery"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_circle_translucent"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="12dp"
+                android:src="@drawable/ic_image"
+                app:tint="@android:color/white" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <!-- Large Concentric Dual-Action Shutter Button -->
+            <FrameLayout
+                android:id="@+id/shutterButton"
+                android:layout_width="76dp"
+                android:layout_height="76dp"
+                android:background="@drawable/bg_shutter_outer"
+                android:clickable="true"
+                android:focusable="true">
+
+                <View
+                    android:id="@+id/shutterInnerCircle"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_shutter_inner" />
+
+            </FrameLayout>
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <!-- Lens Flip Button (Front / Rear) -->
+            <ImageView
+                android:id="@+id/btnFlipLens"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_circle_translucent"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="11dp"
+                android:src="@drawable/ic_flip_camera"
+                app:tint="@android:color/white" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- 5. Full-Screen In-App Media Gallery Overlay (Expands on swipe up / tap) -->
+    <LinearLayout
+        android:id="@+id/layoutFullGallery"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#0B0F17"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <!-- Top Gallery Bar -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="16dp"
+            android:paddingTop="36dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="12dp">
+
+            <ImageView
+                android:id="@+id/btnBackFromGallery"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="8dp"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@android:color/white" />
+
+            <!-- Album Dropdown Selector -->
+            <LinearLayout
+                android:id="@+id/btnAlbumDropdown"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_centerVertical="true"
+                android:layout_toEndOf="@id/btnBackFromGallery"
+                android:background="?attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingEnd="12dp">
+
+                <TextView
+                    android:id="@+id/tvCurrentAlbumName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="All Media"
+                    android:textColor="@android:color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="4dp"
+                    android:src="@drawable/ic_arrow_down"
+                    app:tint="@android:color/white" />
+            </LinearLayout>
+
+            <!-- Multi-Select Count Display -->
+            <TextView
+                android:id="@+id/tvGallerySelectCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:textColor="@color/veil_primary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+        </RelativeLayout>
+
+        <!-- 3-Column Media Grid -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvFullGalleryGrid"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="80dp" />
+
+            <ProgressBar
+                android:id="@+id/galleryLoaderProgressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:visibility="gone" />
+
+            <!-- Bottom Floating Action Bar for Selected Items -->
+            <FrameLayout
+                android:id="@+id/layoutFloatingSend"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:padding="20dp"
+                android:visibility="gone">
+
+                <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+                    android:id="@+id/fabSendSelected"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="end"
+                    android:text="Send (1)"
+                    android:textColor="@android:color/white"
+                    app:backgroundTint="@color/veil_primary"
+                    app:icon="@drawable/ic_send"
+                    app:iconTint="@android:color/white" />
+
+            </FrameLayout>
+
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <!-- 6. White Flash Scrim for Shutter Effect -->
+    <View
+        android:id="@+id/viewFlashScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/white"
+        android:visibility="gone" />
+
+</FrameLayout>

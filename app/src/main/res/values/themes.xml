@@ -1,0 +1,99 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.VEIL" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorOnPrimary">@color/colorOnPrimary</item>
+        <item name="colorPrimaryContainer">@color/colorPrimaryContainer</item>
+        <item name="colorOnPrimaryContainer">@color/colorOnPrimaryContainer</item>
+        <item name="colorSurface">@color/colorSurface</item>
+        <item name="colorSurfaceVariant">@color/colorSurfaceVariant</item>
+        <item name="colorOutline">@color/colorOutline</item>
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <item name="bottomSheetDialogTheme">@style/ModernBottomSheetDialogTheme</item>
+    </style>
+
+    <style name="Theme.VEIL" parent="Base.Theme.VEIL" />
+
+    <style name="SplashTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <style name="UCropTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+        <item name="android:windowTranslucentStatus">true</item>
+    </style>
+
+    <style name="ModernBottomSheetDialogTheme" parent="Theme.Material3.DayNight.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/ModernBottomSheetStyle</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <style name="ModernBottomSheetStyle" parent="Widget.Material3.BottomSheet">
+        <item name="android:background">@android:color/transparent</item>
+    </style>
+
+    <style name="OTPInputLayout" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">@color/veil_accent</item>
+        <item name="boxStrokeWidth">1.5dp</item>
+        <item name="boxCornerRadiusBottomEnd">12dp</item>
+        <item name="boxCornerRadiusBottomStart">12dp</item>
+        <item name="boxCornerRadiusTopEnd">12dp</item>
+        <item name="boxCornerRadiusTopStart">12dp</item>
+        <item name="hintTextColor">@color/text_secondary</item>
+        <item name="android:paddingBottom">8dp</item>
+    </style>
+
+    <!-- TextInputLayout Style -->
+    <style name="Widget.VEIL.TextInputLayout" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeWidth">1dp</item>
+        <item name="boxStrokeWidthFocused">2dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.VEIL.SmallComponent</item>
+    </style>
+
+    <style name="Widget.VEIL.TextInputLayout.OTP" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeWidth">1dp</item>
+        <item name="boxStrokeWidthFocused">2dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.VEIL.SmallComponent</item>
+        <item name="counterOverflowTextColor">@android:color/holo_red_light</item>
+        <item name="counterTextColor">@color/text_secondary</item>
+    </style>
+
+    <!-- Shape Appearances -->
+    <style name="ShapeAppearance.VEIL.SmallComponent" parent="ShapeAppearance.Material3.SmallComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">14dp</item>
+    </style>
+
+    <style name="VeilInputLayout" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">@color/veil_accent</item>
+        <item name="boxStrokeWidth">1.5dp</item>
+        <item name="boxCornerRadiusBottomEnd">14dp</item>
+        <item name="boxCornerRadiusBottomStart">14dp</item>
+        <item name="boxCornerRadiusTopEnd">14dp</item>
+        <item name="boxCornerRadiusTopStart">14dp</item>
+        <item name="hintTextColor">@color/text_secondary</item>
+        <item name="android:textColorHint">@color/text_secondary</item>
+        <item name="android:paddingBottom">8dp</item>
+    </style>
+
+    <style name="SettingItem">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">56dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:padding">16dp</item>
+        <item name="android:background">?android:attr/selectableItemBackground</item>
+    </style>
+
+</resources>

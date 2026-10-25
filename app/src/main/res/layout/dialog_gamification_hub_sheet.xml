@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bottom_sheet_background"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="14dp"
+    android:paddingBottom="28dp">
+
+    <!-- Handle Bar -->
+    <View
+        android:layout_width="36dp"
+        android:layout_height="4dp"
+        android:background="@color/colorOutline"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🏆 VEIL Rank &amp; Anonymous Economy"
+        android:textColor="@color/textPrimary"
+        android:textSize="20sp"
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Earn XP by chatting, unlock badges, and spend VeilCoins:"
+        android:textColor="@color/textSecondary"
+        android:textSize="13sp"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Level & XP Card -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:strokeWidth="1.2dp"
+        app:strokeColor="@color/colorOutline"
+        app:cardBackgroundColor="@color/colorSurfaceVariant"
+        android:layout_marginBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:id="@+id/tvHubLevelTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="🎖️ Cypherpunk Level 2"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:id="@+id/tvHubCoinsBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_pill_primary"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:text="🪙 120 VC"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/pbXpProgress"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:max="100"
+                android:progress="65"
+                android:progressTint="@color/colorPrimary"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:id="@+id/tvHubStatsLine"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔥 3-Day Streak  •  ⭐ 14 Karma  •  65/100 XP to Level 3"
+                android:textColor="@color/textSecondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Marketplace / Actions List -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnClaimBonus"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="🎁 Claim Daily Activity Bonus (+50 VC, +25 XP)"
+        android:layout_marginBottom="8dp"
+        app:cornerRadius="12dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnUnlockNeonTheme"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="🎨 Unlock Cyberpunk Neon Skin (100 VC)"
+        android:layout_marginBottom="8dp"
+        app:cornerRadius="12dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnUnlockUnlimitedPersonas"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="🎭 Unlock Unlimited Personas Tier (150 VC)"
+        android:layout_marginBottom="8dp"
+        app:cornerRadius="12dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnOpenWalletSheet"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="💳 Open P2P Crypto &amp; Token Wallet"
+        app:cornerRadius="12dp" />
+
+</LinearLayout>

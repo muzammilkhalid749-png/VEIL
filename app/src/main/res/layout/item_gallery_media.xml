@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="115dp"
+    android:padding="2dp">
+
+    <!-- Normal Media Item Container -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardMediaContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:cardCornerRadius="4dp"
+        app:cardElevation="0dp"
+        app:strokeWidth="0dp"
+        app:cardBackgroundColor="@color/colorSurfaceVariant">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <ImageView
+                android:id="@+id/ivThumbnail"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop" />
+
+            <!-- Selected tint overlay -->
+            <View
+                android:id="@+id/selectedOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#404F46E5"
+                android:visibility="gone" />
+
+            <!-- Video Duration Pill (Bottom Left) -->
+            <LinearLayout
+                android:id="@+id/videoDurationPill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|start"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_media_overlay_pill"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginEnd="3dp"
+                    android:src="@drawable/ic_play_arrow"
+                    app:tint="@android:color/white" />
+
+                <TextView
+                    android:id="@+id/tvVideoDuration"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0:30"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Selection Checkbox / Badge (Top Right) -->
+            <FrameLayout
+                android:id="@+id/selectionBadge"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="top|end"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_circle_translucent">
+
+                <ImageView
+                    android:id="@+id/ivCheckmark"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_check"
+                    app:tint="@android:color/white"
+                    android:visibility="gone" />
+            </FrameLayout>
+        </FrameLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Camera Tile Container (Item 0) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardCameraTile"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:cardCornerRadius="4dp"
+        app:cardElevation="0dp"
+        app:strokeWidth="1dp"
+        app:strokeColor="@color/colorOutline"
+        app:cardBackgroundColor="#151C28"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_camera"
+                app:tint="@color/veil_primary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="Camera"
+                android:textColor="@android:color/white"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+</FrameLayout>

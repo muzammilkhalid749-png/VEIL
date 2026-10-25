@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/mediaViewerRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- Photo Container -->
+    <com.m3.veil.ui.views.ZoomableImageView
+        android:id="@+id/photoViewer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+
+    <!-- Video Container -->
+    <FrameLayout
+        android:id="@+id/videoContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <VideoView
+            android:id="@+id/videoViewer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center" />
+
+        <!-- Center Frosted Glass Play/Pause Button -->
+        <FrameLayout
+            android:id="@+id/videoCenterPlayBtn"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_video_play_glass"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:id="@+id/ivCenterPlayIcon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="center"
+                android:layout_marginStart="2dp"
+                android:src="@drawable/ic_play_arrow"
+                app:tint="@android:color/white" />
+        </FrameLayout>
+
+        <!-- Bottom Video Controls Bar -->
+        <LinearLayout
+            android:id="@+id/videoControlsBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="#99000000"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="24dp">
+
+            <ImageView
+                android:id="@+id/btnBottomPlayPause"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_play_arrow"
+                app:tint="@android:color/white" />
+
+            <TextView
+                android:id="@+id/tvVideoElapsed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="0:00"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+
+            <SeekBar
+                android:id="@+id/videoSeekBar"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:max="100"
+                android:progressTint="@android:color/white"
+                android:thumbTint="@android:color/white" />
+
+            <TextView
+                android:id="@+id/tvVideoTotal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0:00"
+                android:textColor="#B3FFFFFF"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Top Overlay App Bar -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="#99000000"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingTop="36dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="12dp">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="8dp"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="@android:color/white" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Media"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Today"
+                android:textColor="#B3FFFFFF"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/btnShare"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="9dp"
+            android:src="@drawable/ic_share"
+            app:tint="@android:color/white" />
+
+        <ImageView
+            android:id="@+id/btnSave"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="8dp"
+            android:src="@drawable/ic_download"
+            app:tint="@android:color/white" />
+    </LinearLayout>
+
+    <!-- Bottom Caption Bar -->
+    <LinearLayout
+        android:id="@+id/bottomCaptionBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#B3000000"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="24dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:lineSpacingExtra="3dp" />
+    </LinearLayout>
+
+    <!-- Loading Spinner -->
+    <ProgressBar
+        android:id="@+id/viewerProgressBar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        android:indeterminateTint="@android:color/white"
+        android:visibility="gone" />
+
+</FrameLayout>

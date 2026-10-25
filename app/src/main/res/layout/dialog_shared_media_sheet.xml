@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bottom_sheet_background"
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="24dp">
+
+    <!-- Handle Bar -->
+    <View
+        android:layout_width="36dp"
+        android:layout_height="4dp"
+        android:background="@color/colorOutline"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="📁 Shared Media &amp; Vault Items"
+        android:textColor="@color/textPrimary"
+        android:textSize="20sp"
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:id="@+id/tvSharedMediaSubtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Encrypted files, voice notes, and starred items in this chat"
+        android:textColor="@color/textSecondary"
+        android:textSize="12.5sp"
+        android:layout_marginBottom="14dp" />
+
+    <!-- Filter chips -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:layout_marginBottom="14dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/chipMediaAll"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_filter_chip"
+                android:gravity="center"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="All"
+                android:textColor="@color/textPrimary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/chipMediaImages"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_filter_chip"
+                android:gravity="center"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="🖼️ Images"
+                android:textColor="@color/textSecondary"
+                android:textSize="13sp"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/chipMediaVoice"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_filter_chip"
+                android:gravity="center"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="🎤 Voice"
+                android:textColor="@color/textSecondary"
+                android:textSize="13sp"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/chipMediaPolls"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_filter_chip"
+                android:gravity="center"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="📊 Polls"
+                android:textColor="@color/textSecondary"
+                android:textSize="13sp"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/chipMediaStarred"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_filter_chip"
+                android:gravity="center"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="⭐ Starred"
+                android:textColor="@color/textSecondary"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Scrollable Items Container -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="340dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Empty State -->
+            <LinearLayout
+                android:id="@+id/sharedMediaEmptyState"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingTop="32dp"
+                android:paddingBottom="32dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📂"
+                    android:textSize="36sp"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="No items found"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Shared photos, voice notes, and starred messages\nwill appear in this vault."
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12.5sp"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/sharedMediaItemsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</LinearLayout>

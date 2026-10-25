@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/main_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorBackground">
+
+    <!-- App Bar -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/colorSurface"
+        app:elevation="0dp">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/colorSurface">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingEnd="8dp">
+
+                <!-- App Logo and Name -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:id="@+id/appLogo"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:src="@drawable/veil_logo_small"
+                        android:layout_marginEnd="10dp" />
+
+                    <TextView
+                        android:id="@+id/toolbarTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/app_name"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="20sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.02" />
+
+                </LinearLayout>
+
+                <!-- Action Icons -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_alignParentEnd="true">
+
+                    <!-- Search Icon -->
+                    <ImageView
+                        android:id="@+id/searchButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_search"
+                        app:tint="@color/textPrimary"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="8dp"
+                        android:layout_marginEnd="4dp" />
+
+                    <!-- Primary Action (New Chat/Post/Call) -->
+                    <ImageView
+                        android:id="@+id/newChatButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_add"
+                        app:tint="@color/textPrimary"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="8dp"
+                        android:layout_marginEnd="4dp" />
+
+                    <!-- More / Overflow Menu -->
+                    <ImageView
+                        android:id="@+id/moreButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_more_vert"
+                        app:tint="@color/textPrimary"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="8dp" />
+
+                </LinearLayout>
+
+            </RelativeLayout>
+
+        </androidx.appcompat.widget.Toolbar>
+
+        <!-- Subtle Hairline Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/colorOutline" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- ViewPager for Fragments -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/viewPager"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
+    <!-- Bottom Navigation -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical">
+
+        <!-- Subtle Hairline Top Border -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/colorOutline" />
+
+        <com.google.android.material.bottomnavigation.BottomNavigationView
+            android:id="@+id/bottomNavigation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/colorSurface"
+            app:menu="@menu/bottom_navigation_menu"
+            app:itemIconTint="@drawable/bottom_nav_icon_colors"
+            app:itemTextColor="@drawable/bottom_nav_text_colors"
+            app:labelVisibilityMode="labeled"
+            app:elevation="0dp" />
+    </LinearLayout>
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabNewMessage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="80dp"
+        android:src="@drawable/ic_edit"
+        app:backgroundTint="@color/colorPrimary"
+        app:tint="@android:color/white"
+        app:elevation="4dp"
+        app:borderWidth="0dp" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

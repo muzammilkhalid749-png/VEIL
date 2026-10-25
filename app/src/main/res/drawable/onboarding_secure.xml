@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Shield Background -->
+    <path
+        android:fillColor="@color/veil_primary_light"
+        android:strokeColor="@color/veil_primary_dark"
+        android:strokeWidth="2"
+        android:pathData="M 100,40
+                        C 60,40 40,60 40,100
+                        C 40,140 60,160 100,160
+                        C 140,160 160,140 160,100
+                        C 160,60 140,40 100,40 Z" />
+
+    <!-- Shield Detail -->
+    <path
+        android:fillColor="@color/veil_accent"
+        android:strokeColor="@color/veil_primary_dark"
+        android:strokeWidth="1"
+        android:pathData="M 100,50
+                        C 70,50 50,70 50,100
+                        C 50,130 70,150 100,150
+                        C 130,150 150,130 150,100
+                        C 150,70 130,50 100,50 Z" />
+
+    <!-- Lock Body -->
+    <path
+        android:fillColor="@color/text_primary"
+        android:pathData="M 85,100
+                        L 85,80
+                        C 85,75 89,71 94,71
+                        L 106,71
+                        C 111,71 115,75 115,80
+                        L 115,100
+                        Z" />
+
+    <!-- Lock Shackle -->
+    <path
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="4"
+        android:pathData="M 105,80
+                        C 115,80 125,75 125,65
+                        C 125,55 115,50 105,50
+                        C 95,50 85,55 85,65
+                        C 85,75 95,80 105,80" />
+
+    <!-- Checkmark -->
+    <path
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="4"
+        android:pathData="M 80,110
+                        L 95,125
+                        L 120,95" />
+
+</vector>

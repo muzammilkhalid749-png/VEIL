@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bottom_sheet_background"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="28dp">
+
+    <!-- Handle Bar -->
+    <View
+        android:layout_width="36dp"
+        android:layout_height="4dp"
+        android:background="@color/colorOutline"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🔑 1-Time Whisper Key"
+        android:textColor="@color/textPrimary"
+        android:textSize="20sp"
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Single-use ephemeral key that self-destructs upon connection:"
+        android:textColor="@color/textSecondary"
+        android:textSize="13sp"
+        android:layout_marginBottom="18dp" />
+
+    <!-- My Generated Key Card -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp"
+        app:strokeWidth="1dp"
+        app:strokeColor="#F59E0B"
+        app:cardBackgroundColor="@color/surfaceVariant"
+        android:layout_marginBottom="18dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="YOUR ONETIME BURN KEY"
+                android:textColor="#F59E0B"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:id="@+id/tvWhisperMyCode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="WHISPER-0000"
+                android:textColor="@color/textPrimary"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.15"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCopyWhisperCode"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:text="📋 Copy Key"
+                android:textSize="13sp"
+                app:cornerRadius="10dp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="OR ENTER PEER'S KEY TO CONNECT"
+        android:textColor="@color/textSecondary"
+        android:textSize="11.5sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="8dp" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilPeerWhisperCode"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxStrokeColor="@color/colorPrimary">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etPeerWhisperCode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Paste peer's whisper key (e.g. WHISPER-XXXX)"
+            android:textAllCaps="true"
+            android:fontFamily="monospace"
+            android:singleLine="true" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnConnectWhisper"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:text="Connect &amp; Burn Key"
+        app:cornerRadius="12dp" />
+
+</LinearLayout>

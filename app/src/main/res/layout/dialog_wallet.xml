@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_bottom_sheet_modern"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="32dp">
+
+    <!-- Drag Handle -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_attach_item"
+        android:backgroundTint="@color/colorOutline" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Veil Privacy Wallet"
+        android:textColor="@color/colorTextPrimary"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <!-- Balance Card -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_message_sent"
+        android:backgroundTint="@color/colorPrimary"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Available Balance"
+            android:textColor="#CCFFFFFF"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/walletBalanceText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="$250.00"
+            android:textColor="@android:color/white"
+            android:textSize="32sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/walletSubtitleText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Level 1 • 0 XP • Encrypted Ledger"
+            android:textColor="#CCFFFFFF"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Send / Add Mode Switcher -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/tabSend"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:backgroundTint="@color/colorPrimary"
+            android:text="Send"
+            android:textColor="@android:color/white"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/tabReceive"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:backgroundTint="@color/colorSurfaceVariant"
+            android:text="Receive / Add"
+            android:textColor="@color/colorTextPrimary"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Send Container -->
+    <LinearLayout
+        android:id="@+id/sendContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="vertical">
+
+        <EditText
+            android:id="@+id/walletRecipientInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_message_received"
+            android:backgroundTint="@color/colorSurfaceVariant"
+            android:hint="Recipient @username"
+            android:inputType="text"
+            android:padding="14dp"
+            android:textColor="@color/colorTextPrimary"
+            android:textColorHint="@color/colorTextSecondary"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/walletAmountInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_message_received"
+            android:backgroundTint="@color/colorSurfaceVariant"
+            android:hint="Amount ($ USD)"
+            android:inputType="numberDecimal"
+            android:padding="14dp"
+            android:textColor="@color/colorTextPrimary"
+            android:textColorHint="@color/colorTextSecondary"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btnConfirmSend"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="16dp"
+            android:backgroundTint="@color/colorPrimary"
+            android:text="Send Anonymously"
+            android:textColor="@android:color/white"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Receive Container -->
+    <LinearLayout
+        android:id="@+id/receiveContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@drawable/ic_veil_shield"
+            app:tint="@color/colorPrimary" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Your Veil Wallet Address"
+            android:textColor="@color/colorTextPrimary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/walletAddressText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="0x71C94B2E58A6D19F90A"
+            android:textColor="@color/colorPrimary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnCopyAddress"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="@color/colorSurfaceVariant"
+            android:text="Copy Address"
+            android:textColor="@color/colorTextPrimary"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btnClaimDailyBonus"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="16dp"
+            android:backgroundTint="@color/colorPrimary"
+            android:text="🎁 Claim Daily Streak Bonus (+25 VC)"
+            android:textColor="@android:color/white"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</LinearLayout>

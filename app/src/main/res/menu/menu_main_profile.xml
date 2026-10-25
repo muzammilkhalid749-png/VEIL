@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_edit_profile"
+        android:icon="@drawable/ic_edit"
+        android:title="Edit Profile" />
+    <item
+        android:id="@+id/action_switch_persona"
+        android:icon="@drawable/ic_account"
+        android:title="Switch Persona" />
+    <item
+        android:id="@+id/action_privacy_checkup"
+        android:icon="@drawable/ic_privacy"
+        android:title="Privacy Checkup" />
+    <item
+        android:id="@+id/action_security_console"
+        android:icon="@drawable/ic_shield_locked"
+        android:title="Security Console" />
+    <item
+        android:id="@+id/action_logout"
+        android:icon="@drawable/ic_close"
+        android:title="Sign Out" />
+</menu>

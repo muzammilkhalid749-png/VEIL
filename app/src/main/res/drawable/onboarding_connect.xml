@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Background Circle -->
+    <path
+        android:fillColor="@color/veil_primary_light"
+        android:strokeColor="@color/veil_primary_dark"
+        android:strokeWidth="2"
+        android:pathData="M 100,40
+                        C 60,40 40,60 40,100
+                        C 40,140 60,160 100,160
+                        C 140,160 160,140 160,100
+                        C 160,60 140,40 100,40 Z" />
+
+    <!-- Left Speech Bubble -->
+    <path
+        android:fillColor="@color/veil_accent"
+        android:strokeColor="@color/veil_primary_dark"
+        android:strokeWidth="1"
+        android:pathData="M 60,90
+                        C 60,70 75,55 95,55
+                        C 115,55 130,70 130,90
+                        C 130,110 115,125 95,125
+                        C 75,125 60,110 60,90 Z" />
+
+    <!-- Right Speech Bubble -->
+    <path
+        android:fillColor="@color/veil_accent"
+        android:strokeColor="@color/veil_primary_dark"
+        android:strokeWidth="1"
+        android:pathData="M 110,90
+                        C 110,70 125,55 145,55
+                        C 165,55 180,70 180,90
+                        C 180,110 165,125 145,125
+                        C 125,125 110,110 110,90 Z" />
+
+    <!-- Connection Lines -->
+    <path
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="3"
+        android:pathData="M 130,90 L 110,90" />
+
+    <!-- Lightning Bolt -->
+    <path
+        android:fillColor="@color/text_primary"
+        android:pathData="M 120,70
+                        L 130,85
+                        L 125,85
+                        L 135,100
+                        L 115,85
+                        L 120,85 Z" />
+
+    <!-- Message Lines in Left Bubble -->
+    <path
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="2"
+        android:pathData="M 70,85 L 90,85" />
+    <path
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="2"
+        android:pathData="M 70,95 L 100,95" />
+    <path
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="2"
+        android:pathData="M 70,105 L 85,105" />
+
+    <!-- Message Lines in Right Bubble -->
+    <path
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="2"
+        android:pathData="M 120,85 L 140,85" />
+    <path
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="2"
+        android:pathData="M 120,95 L 150,95" />
+    <path
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="2"
+        android:pathData="M 120,105 L 135,105" />
+
+</vector>

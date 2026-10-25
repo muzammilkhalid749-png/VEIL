@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/otp_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/splash_background"
+    android:paddingStart="32dp"
+    android:paddingEnd="32dp">
+
+    <!-- Back Button -->
+    <ImageView
+        android:id="@+id/backButton"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:src="@drawable/ic_arrow_back"
+        android:layout_marginTop="56dp"
+        android:layout_marginStart="8dp"
+        app:tint="@color/text_primary" />
+
+    <!-- Main Content -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_centerInParent="true"
+        android:paddingTop="40dp"
+        android:paddingBottom="40dp">
+
+        <!-- Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginBottom="50dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/verify_phone_number"
+                android:textColor="@color/text_primary"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+
+            <TextView
+                android:id="@+id/phoneNumberText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+1 XXX-XXX-1234"
+                android:textColor="@color/text_secondary"
+                android:textSize="15sp"
+                android:layout_marginTop="8dp"
+                android:gravity="center" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/enter_otp_hint"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp"
+                android:layout_marginTop="4dp"
+                android:gravity="center" />
+
+        </LinearLayout>
+
+        <!-- Professional OTP View with CORRECT ATTRIBUTES -->
+        <com.mukeshsolanki.OtpView
+            android:id="@+id/otpView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginBottom="32dp"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:clickable="true"
+            android:cursorVisible="true"
+            android:inputType="number"
+            app:OtpViewType="rectangle"
+            app:OtpItemCount="6"
+            app:OtpItemHeight="45dp"
+            app:OtpItemWidth="35dp"
+            app:OtpItemRadius="12dp"
+            app:OtpItemSpacing="12dp"
+            app:OtpLineColor="@color/veil_accent"
+            app:OtpLineWidth="2dp"
+            app:OtpHideLineWhenFilled="true" />
+
+        <!-- Timer and Resend Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="32dp">
+
+            <TextView
+                android:id="@+id/timerText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="02:00"
+                android:textColor="@color/veil_accent"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="•"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp" />
+
+            <TextView
+                android:id="@+id/resendCodeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/resend_code"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp"
+                android:clickable="false" />
+
+        </LinearLayout>
+
+        <!-- Verify Button -->
+        <Button
+            android:id="@+id/verifyButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/verify_continue"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:backgroundTint="@color/colorPrimary"
+            app:cornerRadius="28dp"
+            app:rippleColor="@color/veil_primary_light"
+            android:letterSpacing="0.02"
+            android:layout_marginTop="16dp" />
+
+        <!-- Progress Bar -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center"
+            android:layout_marginTop="16dp"
+            android:visibility="gone" />
+
+        <!-- Support Text -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/having_trouble"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:layout_gravity="center"
+            android:layout_marginTop="32dp" />
+
+    </LinearLayout>
+
+</RelativeLayout>

@@ -1,0 +1,460 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/veil_primary_dark">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/veil_primary"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="4dp"
+        android:paddingEnd="16dp"
+        android:elevation="4dp">
+
+        <ImageView
+            android:id="@+id/backButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="@color/text_primary"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Profile"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp">
+
+        <de.hdodenhof.circleimageview.CircleImageView
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@drawable/ic_person" />
+
+        <TextView
+            android:id="@+id/profileNameText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Username"
+            android:textColor="@color/text_primary"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp" />
+            
+        <TextView
+            android:id="@+id/profileSubtitleText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="End-to-End Encrypted Contact"
+            android:textColor="@color/veil_accent"
+            android:textSize="14sp"
+            android:layout_marginTop="8dp" />
+
+    </LinearLayout>
+    
+    <LinearLayout
+        android:id="@+id/callActionsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="16dp">
+        
+        <LinearLayout
+            android:id="@+id/btnProfileAudioCall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginEnd="32dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_call"
+                android:background="@drawable/bg_circle_icon"
+                android:backgroundTint="#4CAF50"
+                android:padding="12dp"
+                app:tint="@android:color/white" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Audio"
+                android:textColor="@color/text_primary"
+                android:layout_marginTop="8dp"/>
+        </LinearLayout>
+        
+        <LinearLayout
+            android:id="@+id/btnProfileVideoCall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_camera"
+                android:background="@drawable/bg_circle_icon"
+                android:backgroundTint="#2196F3"
+                android:padding="12dp"
+                app:tint="@android:color/white" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Video"
+                android:textColor="@color/text_primary"
+                android:layout_marginTop="8dp"/>
+        </LinearLayout>
+        
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/colorOutline"
+        android:layout_marginTop="32dp" />
+
+    <LinearLayout
+        android:id="@+id/btnMedia"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+        
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_image"
+            app:tint="@color/text_primary" />
+            
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="16dp">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Media, links, and docs"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+                
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 files"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Group Participants Section (Visible in Group Mode) -->
+    <LinearLayout
+        android:id="@+id/layoutGroupMembers"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvParticipantsHeader"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Participants"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/btnAddParticipant"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_add"
+                android:padding="6dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                app:tint="@color/colorPrimary"
+                android:contentDescription="Add Member" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/llGroupParticipants"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/btnMute"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+        
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_notifications"
+            app:tint="@color/text_primary" />
+            
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="16dp">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Mute notifications"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+        </LinearLayout>
+        
+        <Switch
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/btnEncryption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+        
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_lock"
+            app:tint="@color/text_primary" />
+            
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="16dp">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Encryption"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+                
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Messages and calls are end-to-end encrypted. Tap to verify."
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/btnVanishTimer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+        
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_timer"
+            app:tint="@color/text_primary" />
+            
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="16dp">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Vanish Timer"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+                
+            <TextView
+                android:id="@+id/vanishTimerStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Off"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/btnVanishMode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+        
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_check"
+            app:tint="@color/text_primary" />
+            
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="16dp">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Vanish Mode"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+                
+            <TextView
+                android:id="@+id/vanishModeStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="After Send"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+    
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/colorOutline"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp" />
+
+    <LinearLayout
+        android:id="@+id/btnClearChat"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+        
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_close"
+            app:tint="@color/colorError" />
+            
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Clear Chat"
+            android:textColor="@color/colorError"
+            android:textSize="16sp"
+            android:layout_marginStart="16dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/btnBlockUser"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+        
+        <ImageView
+            android:id="@+id/ivBlockUser"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_close"
+            app:tint="#F44336" />
+            
+        <TextView
+            android:id="@+id/tvBlockUser"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Block User"
+            android:textColor="#F44336"
+            android:textSize="16sp"
+            android:layout_marginStart="16dp" />
+    </LinearLayout>
+    </LinearLayout>
+    </ScrollView>
+</LinearLayout>

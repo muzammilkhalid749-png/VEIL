@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="300dp"
+    android:height="300dp"
+    android:viewportWidth="300"
+    android:viewportHeight="300">
+
+    <!-- Fixed syntax - using correct attribute names -->
+    <group>
+        <!-- Top Left Cluster -->
+        <path
+            android:fillColor="#3300D4FF"
+            android:pathData="M 40,60 a 1.5,1.5 0 1,1 0,0.1 z" />
+        <path
+            android:fillColor="#1A00D4FF"
+            android:pathData="M 25,45 a 1,1 0 1,1 0,0.1 z" />
+        <path
+            android:fillColor="#4D00D4FF"
+            android:pathData="M 55,35 a 2,2 0 1,1 0,0.1 z" />
+        <path
+            android:fillColor="#2600D4FF"
+            android:pathData="M 30,75 a 1.2,1.2 0 1,1 0,0.1 z" />
+
+        <!-- Top Right Cluster -->
+        <path
+            android:fillColor="#3300D4FF"
+            android:pathData="M 260,40 a 1.8,1.8 0 1,1 0,0.1 z" />
+        <path
+            android:fillColor="#1A00D4FF"
+            android:pathData="M 245,65 a 1.3,1.3 0 1,1 0,0.1 z" />
+        <path
+            android:fillColor="#4D00D4FF"
+            android:pathData="M 275,55 a 1,1 0 1,1 0,0.1 z" />
+        <path
+            android:fillColor="#2600D4FF"
+            android:pathData="M 250,25 a 2.2,2.2 0 1,1 0,0.1 z" />
+
+        <!-- Bottom Clusters (simplified) -->
+        <path
+            android:fillColor="#3300D4FF"
+            android:pathData="M 35,245 a 1.5,1.5 0 1,1 0,0.1 z" />
+        <path
+            android:fillColor="#1A00D4FF"
+            android:pathData="M 265,255 a 1.4,1.4 0 1,1 0,0.1 z" />
+    </group>
+</vector>

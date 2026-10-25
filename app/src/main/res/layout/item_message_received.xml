@@ -1,0 +1,1175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="1.5dp"
+    android:paddingBottom="1.5dp">
+
+    <!-- Centered Date Header Pill (WhatsApp Style) -->
+    <LinearLayout
+        android:id="@+id/dateHeaderContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingTop="10dp"
+        android:paddingBottom="6dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/dateHeaderText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_date_header_pill"
+            android:paddingStart="12dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="4dp"
+            android:text="TODAY"
+            android:textColor="@color/message_text_secondary"
+            android:textSize="11.5sp"
+            android:fontFamily="sans-serif-medium"
+            android:elevation="0.5dp" />
+
+    </LinearLayout>
+
+    <!-- Telegram/Veil Custom Canvas Received Message Bubble -->
+    <com.m3.veil.ui.views.ChatMessageCell
+        android:id="@+id/messageBubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:layout_marginEnd="52dp"
+        android:orientation="vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:elevation="0.8dp">
+
+        <!-- Quoted Reply Container (WhatsApp Style) -->
+        <LinearLayout
+            android:id="@+id/replyQuoteContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minWidth="160dp"
+            android:orientation="horizontal"
+            android:background="@drawable/bg_quote_received"
+            android:padding="6dp"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone">
+
+            <!-- Accent Left Vertical Stripe -->
+            <View
+                android:layout_width="4dp"
+                android:layout_height="match_parent"
+                android:background="@color/message_quote_strip"
+                android:layout_marginEnd="8dp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/replyQuoteName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Sender"
+                    android:textColor="@color/message_quote_strip"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/replyQuoteText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Quote text"
+                    android:textColor="@color/message_text_secondary"
+                    android:textSize="12.5sp"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Plain Text Message -->
+        <TextView
+            android:id="@+id/messageText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="3dp"
+            android:paddingEnd="3dp"
+            android:text="Received message"
+            android:textColor="@color/message_text_primary"
+            android:textSize="15.5sp"
+            android:lineSpacingExtra="1.5dp" />
+
+        <!-- Photo / Image Message Container (WhatsApp Edge-to-Edge Media Card) -->
+        <LinearLayout
+            android:id="@+id/imageMessageContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/imageCardView"
+                android:layout_width="254dp"
+                android:layout_height="214dp"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp"
+                app:cardBackgroundColor="@android:color/transparent">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <ImageView
+                        android:id="@+id/messageImage"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:background="#15000000" />
+
+                    <!-- Bottom gradient scrim -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_gravity="bottom"
+                        android:background="@drawable/bg_gradient_bottom_scrim" />
+
+                    <!-- Centered progress loader -->
+                    <ProgressBar
+                        android:id="@+id/imageProgressBar"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="center"
+                        android:indeterminateTint="@android:color/white"
+                        android:visibility="gone" />
+
+                    <!-- Centered WhatsApp Media Download / Progress Overlay -->
+                    <FrameLayout
+                        android:id="@+id/imageDownloadOverlay"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:visibility="gone">
+
+                        <!-- State 1: IDLE (Download down arrow + file size) -->
+                        <LinearLayout
+                            android:id="@+id/imageDownloadIdleLayout"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:minWidth="56dp"
+                            android:minHeight="56dp"
+                            android:background="@drawable/bg_media_download_circle"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:paddingTop="6dp"
+                            android:paddingBottom="6dp"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:src="@drawable/ic_download"
+                                app:tint="@android:color/white" />
+
+                            <TextView
+                                android:id="@+id/imageDownloadSizeText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:textColor="@android:color/white"
+                                android:textSize="10.5sp"
+                                android:textStyle="bold"
+                                android:text="1.2 MB" />
+                        </LinearLayout>
+
+                        <!-- State 2: DOWNLOADING (Circular progress bar + center Stop/Cancel icon) -->
+                        <FrameLayout
+                            android:id="@+id/imageDownloadingLayout"
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:background="@drawable/bg_media_download_circle"
+                            android:visibility="gone"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ProgressBar
+                                android:id="@+id/imageDownloadProgress"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:layout_gravity="center"
+                                android:indeterminateTint="@android:color/white" />
+
+                            <ImageView
+                                android:id="@+id/imageDownloadCancelBtn"
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_close"
+                                app:tint="@android:color/white" />
+                        </FrameLayout>
+
+                        <!-- State 3: RETRY (Retry icon + "Retry" text) -->
+                        <LinearLayout
+                            android:id="@+id/imageDownloadRetryLayout"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:minWidth="56dp"
+                            android:minHeight="56dp"
+                            android:background="@drawable/bg_media_download_circle"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:paddingTop="6dp"
+                            android:paddingBottom="6dp"
+                            android:visibility="gone"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:src="@drawable/ic_undo"
+                                app:tint="@android:color/white" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:textColor="@android:color/white"
+                                android:textSize="10sp"
+                                android:textStyle="bold"
+                                android:text="Retry" />
+                        </LinearLayout>
+                    </FrameLayout>
+
+                    <!-- WhatsApp Overlaid Timestamp Pill -->
+                    <LinearLayout
+                        android:id="@+id/imageOverlayPill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom|end"
+                        android:layout_margin="6dp"
+                        android:background="@drawable/bg_media_overlay_pill"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/imageTimeText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="10:00"
+                            android:textColor="@android:color/white"
+                            android:textSize="10.5sp" />
+                    </LinearLayout>
+                </FrameLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Optional Image Caption -->
+            <TextView
+                android:id="@+id/imageCaptionText"
+                android:layout_width="254dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:paddingStart="3dp"
+                android:paddingEnd="3dp"
+                android:textColor="@color/message_text_primary"
+                android:textSize="14.5sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Video Message Container (WhatsApp Style) -->
+        <LinearLayout
+            android:id="@+id/videoMessageContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/videoCardView"
+                android:layout_width="254dp"
+                android:layout_height="214dp"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp"
+                app:cardBackgroundColor="@android:color/transparent">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <ImageView
+                        android:id="@+id/messageVideoThumbnail"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:background="#15000000" />
+
+                    <!-- Bottom gradient scrim -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_gravity="bottom"
+                        android:background="@drawable/bg_gradient_bottom_scrim" />
+
+                    <!-- Centered Glass Play Button -->
+                    <FrameLayout
+                        android:id="@+id/videoPlayButtonContainer"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_video_play_glass">
+
+                        <ImageView
+                            android:id="@+id/videoPlayIcon"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:layout_marginStart="2dp"
+                            android:src="@drawable/ic_play_arrow"
+                            app:tint="@android:color/white" />
+
+                        <ProgressBar
+                            android:id="@+id/videoProgressBar"
+                            android:layout_width="26dp"
+                            android:layout_height="26dp"
+                            android:layout_gravity="center"
+                            android:indeterminateTint="@android:color/white"
+                            android:visibility="gone" />
+                    </FrameLayout>
+
+                    <!-- Centered WhatsApp Video Download / Progress Overlay -->
+                    <FrameLayout
+                        android:id="@+id/videoDownloadOverlay"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:visibility="gone">
+
+                        <!-- State 1: IDLE (Download down arrow + file size) -->
+                        <LinearLayout
+                            android:id="@+id/videoDownloadIdleLayout"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:minWidth="56dp"
+                            android:minHeight="56dp"
+                            android:background="@drawable/bg_media_download_circle"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:paddingTop="6dp"
+                            android:paddingBottom="6dp"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:src="@drawable/ic_download"
+                                app:tint="@android:color/white" />
+
+                            <TextView
+                                android:id="@+id/videoDownloadSizeText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:textColor="@android:color/white"
+                                android:textSize="10.5sp"
+                                android:textStyle="bold"
+                                android:text="3.2 MB" />
+                        </LinearLayout>
+
+                        <!-- State 2: DOWNLOADING (Circular progress bar + center Stop/Cancel icon) -->
+                        <FrameLayout
+                            android:id="@+id/videoDownloadingLayout"
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:background="@drawable/bg_media_download_circle"
+                            android:visibility="gone"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ProgressBar
+                                android:id="@+id/videoDownloadProgress"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:layout_gravity="center"
+                                android:indeterminateTint="@android:color/white" />
+
+                            <ImageView
+                                android:id="@+id/videoDownloadCancelBtn"
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_close"
+                                app:tint="@android:color/white" />
+                        </FrameLayout>
+
+                        <!-- State 3: RETRY (Retry icon + "Retry" text) -->
+                        <LinearLayout
+                            android:id="@+id/videoDownloadRetryLayout"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:minWidth="56dp"
+                            android:minHeight="56dp"
+                            android:background="@drawable/bg_media_download_circle"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:paddingTop="6dp"
+                            android:paddingBottom="6dp"
+                            android:visibility="gone"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:src="@drawable/ic_undo"
+                                app:tint="@android:color/white" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:textColor="@android:color/white"
+                                android:textSize="10sp"
+                                android:textStyle="bold"
+                                android:text="Retry" />
+                        </LinearLayout>
+                    </FrameLayout>
+
+                    <!-- Duration Badge (Bottom Left) -->
+                    <LinearLayout
+                        android:id="@+id/videoDurationContainer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom|start"
+                        android:layout_margin="6dp"
+                        android:background="@drawable/bg_media_overlay_pill"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="11dp"
+                            android:layout_height="11dp"
+                            android:layout_marginEnd="3dp"
+                            android:src="@drawable/ic_videocam"
+                            app:tint="@android:color/white" />
+
+                        <TextView
+                            android:id="@+id/videoDurationText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0:30"
+                            android:textColor="@android:color/white"
+                            android:textSize="10.5sp" />
+                    </LinearLayout>
+
+                    <!-- Overlaid Timestamp (Bottom Right) -->
+                    <LinearLayout
+                        android:id="@+id/videoOverlayPill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom|end"
+                        android:layout_margin="6dp"
+                        android:background="@drawable/bg_media_overlay_pill"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/videoTimeText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="10:00"
+                            android:textColor="@android:color/white"
+                            android:textSize="10.5sp" />
+                    </LinearLayout>
+                </FrameLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Optional Video Caption -->
+            <TextView
+                android:id="@+id/videoCaptionText"
+                android:layout_width="254dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:paddingStart="3dp"
+                android:paddingEnd="3dp"
+                android:textColor="@color/message_text_primary"
+                android:textSize="14.5sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Voice Note Container (WhatsApp Exact Architecture for Received) -->
+        <LinearLayout
+            android:id="@+id/voiceMessageContainer"
+            android:layout_width="256dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="2dp"
+            android:visibility="gone">
+
+            <!-- Top Row: Mic Avatar Badge + Play Button + Waveform -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!-- WhatsApp Voice Note Mic Avatar Badge -->
+                <FrameLayout
+                    android:id="@+id/voiceMicBadge"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp">
+
+                    <de.hdodenhof.circleimageview.CircleImageView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_person" />
+
+                    <!-- Small Corner Mic Badge -->
+                    <FrameLayout
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_gravity="bottom|end"
+                        android:background="@drawable/bg_poll_checkbox_checked">
+
+                        <ImageView
+                            android:layout_width="10dp"
+                            android:layout_height="10dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_mic"
+                            app:tint="@android:color/white" />
+                    </FrameLayout>
+                </FrameLayout>
+
+                <!-- 38dp Circular Action Button -->
+                <FrameLayout
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_voice_circle_received">
+
+                    <ImageView
+                        android:id="@+id/voiceActionButton"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_play_arrow"
+                        app:tint="@android:color/white" />
+
+                    <ProgressBar
+                        android:id="@+id/voiceProgressBar"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:indeterminateTint="@android:color/white"
+                        android:visibility="gone" />
+                </FrameLayout>
+
+                <!-- Audio Waveform Visualization -->
+                <com.m3.veil.ui.views.VoiceWaveformView
+                    android:id="@+id/voiceWaveformView"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="6dp" />
+
+                <!-- Legacy Fallbacks (Invisible) -->
+                <View
+                    android:id="@+id/voiceLine"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
+                <SeekBar
+                    android:id="@+id/voiceSeekBar"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- Bottom Waveform Row: Duration Counter + Speed Pill -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:paddingStart="90dp"
+                android:paddingEnd="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/voiceDurationText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0:00"
+                    android:textColor="@color/message_text_secondary"
+                    android:textSize="11sp" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <!-- WhatsApp Style Speed Pill (1x -> 1.5x -> 2x) -->
+                <TextView
+                    android:id="@+id/voiceSpeedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_voice_speed_pill_received"
+                    android:paddingStart="7dp"
+                    android:paddingEnd="7dp"
+                    android:paddingTop="1.5dp"
+                    android:paddingBottom="1.5dp"
+                    android:text="1x"
+                    android:textColor="@color/message_text_primary"
+                    android:textSize="10.5sp"
+                    android:textStyle="bold"
+                    android:clickable="true"
+                    android:focusable="true" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Document Message Container (WhatsApp Exact Document Row: _name_removed__res_0x7f0e05ab.xml) -->
+        <LinearLayout
+            android:id="@+id/documentMessageContainer"
+            android:layout_width="256dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="9dp"
+                android:background="@drawable/bg_doc_inner_card">
+
+                <!-- Document Color-Coded Icon Badge -->
+                <FrameLayout
+                    android:id="@+id/documentIconContainer"
+                    android:layout_width="38dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/bg_doc_badge">
+
+                    <ImageView
+                        android:id="@+id/documentIcon"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="top|center_horizontal"
+                        android:layout_marginTop="4dp"
+                        android:src="@drawable/ic_document"
+                        app:tint="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/documentExtensionBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom|center_horizontal"
+                        android:layout_marginBottom="3dp"
+                        android:text="PDF"
+                        android:textColor="@android:color/white"
+                        android:textSize="7.5sp"
+                        android:textStyle="bold"
+                        android:visibility="visible" />
+                </FrameLayout>
+
+                <!-- Document Title -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="6dp">
+
+                    <TextView
+                        android:id="@+id/documentFileName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Document.pdf"
+                        android:textColor="@color/message_text_primary"
+                        android:textSize="14.5sp"
+                        android:maxLines="2"
+                        android:ellipsize="middle" />
+                </LinearLayout>
+
+                <!-- Circular Action / Download Button -->
+                <FrameLayout
+                    android:layout_width="30dp"
+                    android:layout_height="30dp">
+
+                    <ImageView
+                        android:id="@+id/documentActionIcon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_download"
+                        app:tint="@color/message_text_secondary" />
+
+                    <ProgressBar
+                        android:id="@+id/documentProgressBar"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:indeterminateTint="@color/message_action_button"
+                        android:visibility="gone" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <!-- WhatsApp Document Metadata Row Below Card -->
+            <TextView
+                android:id="@+id/documentFileSize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginStart="4dp"
+                android:text="PDF • 1.2 MB"
+                android:textColor="@color/message_text_secondary"
+                android:textSize="11.5sp" />
+        </LinearLayout>
+
+        <!-- Location Message Container (WhatsApp Exact Map Frame: _name_removed__res_0x7f0e0607.xml) -->
+        <LinearLayout
+            android:id="@+id/locationMessageContainer"
+            android:layout_width="256dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <!-- Map Thumbnail Preview Frame -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="136dp"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp">
+
+                <com.m3.veil.ui.views.WhatsAppMapPreviewView
+                    android:id="@+id/locationMapCanvas"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="2dp">
+
+                <TextView
+                    android:id="@+id/locationTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Current Location"
+                    android:textColor="@color/message_text_primary"
+                    android:textSize="14.5sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/locationSubtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:text="Accurate to 10 m • Tap to open map"
+                    android:textColor="@color/message_text_secondary"
+                    android:textSize="12sp"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Contact Message Container (WhatsApp Exact Contact Card: _name_removed__res_0x7f0e0591.xml) -->
+        <LinearLayout
+            android:id="@+id/contactMessageContainer"
+            android:layout_width="256dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp">
+
+                <de.hdodenhof.circleimageview.CircleImageView
+                    android:id="@+id/contactAvatar"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:src="@drawable/ic_person" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="12dp">
+
+                    <TextView
+                        android:id="@+id/contactName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Contact Name"
+                        android:textColor="@color/message_text_primary"
+                        android:textSize="15.5sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                    <TextView
+                        android:id="@+id/contactPhone"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:text="+1 234 567 890"
+                        android:textColor="@color/message_text_secondary"
+                        android:textSize="12sp"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0.8dp"
+                android:layout_marginTop="4dp"
+                android:background="@color/message_divider" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="38dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/contactActionMessage"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="Message"
+                    android:gravity="center"
+                    android:background="?attr/selectableItemBackground"
+                    android:textColor="@color/message_action_button"
+                    android:textSize="13.5sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <View
+                    android:layout_width="0.8dp"
+                    android:layout_height="22dp"
+                    android:background="@color/message_divider" />
+
+                <TextView
+                    android:id="@+id/contactActionSave"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:text="Save contact"
+                    android:gravity="center"
+                    android:background="?attr/selectableItemBackground"
+                    android:textColor="@color/message_action_button"
+                    android:textSize="13.5sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <!-- Legacy invisible reference -->
+                <TextView
+                    android:id="@+id/contactAction"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- WhatsApp Exact Poll Bubble (_name_removed__res_0x7f0e0649.xml) -->
+        <LinearLayout
+            android:id="@+id/pollMessageContainer"
+            android:layout_width="264dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="4dp"
+            android:visibility="gone">
+
+            <!-- poll_name (Question) -->
+            <TextView
+                android:id="@+id/pollQuestionText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Poll Question"
+                android:textColor="@color/message_text_primary"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif-medium"
+                android:textStyle="bold" />
+
+            <!-- poll_type_label (_name_removed__res_0x7f0e053d.xml) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/pollTypeIcon"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_check"
+                    app:tint="@color/message_text_secondary" />
+
+                <TextView
+                    android:id="@+id/pollSubtitleText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:text="Select one"
+                    android:textColor="@color/message_text_secondary"
+                    android:textSize="12.5sp" />
+            </LinearLayout>
+
+            <!-- poll_options -->
+            <LinearLayout
+                android:id="@+id/pollOptionsLinearLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical" />
+
+            <!-- view_details_divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0.8dp"
+                android:layout_marginTop="6dp"
+                android:background="@color/message_divider" />
+
+            <!-- view_details ("View votes") -->
+            <TextView
+                android:id="@+id/pollTotalVotesText"
+                android:layout_width="match_parent"
+                android:layout_height="38dp"
+                android:gravity="center"
+                android:background="?attr/selectableItemBackground"
+                android:text="View votes"
+                android:textColor="@color/message_action_button"
+                android:textSize="14sp"
+                android:fontFamily="sans-serif-medium" />
+        </LinearLayout>
+
+        <!-- WhatsApp Exact View-Once Bubble (_name_removed__res_0x7f0e069c.xml) -->
+        <LinearLayout
+            android:id="@+id/blinkMessageContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="195dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="4dp"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:layout_width="28dp"
+                android:layout_height="28dp">
+
+                <TextView
+                    android:id="@+id/blinkBadgeIcon"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:gravity="center"
+                    android:background="@drawable/bg_view_once_ring"
+                    android:text="1"
+                    android:textColor="@color/colorPrimary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/blinkProgressBar"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:indeterminateTint="@color/colorPrimary"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/blinkTitleText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Photo"
+                    android:textColor="@color/message_text_primary"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/blinkSubtitleText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="View once"
+                    android:textColor="@color/message_text_secondary"
+                    android:textSize="11.5sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- WhatsApp Call Message Container -->
+        <LinearLayout
+            android:id="@+id/callMessageContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="195dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:id="@+id/callIconContainer"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_call_icon_circle"
+                android:layout_gravity="center_vertical">
+
+                <ImageView
+                    android:id="@+id/callIcon"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_call_incoming"
+                    app:tint="@color/statusError" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/callTitleText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Missed voice call"
+                    android:textColor="@color/message_text_primary"
+                    android:textSize="14.5sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/callSubtitleText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:text="Tap to call back"
+                    android:textColor="@color/message_text_secondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- WhatsApp Bubble Bottom Info (Edited / Starred / Vanish / Timestamp) -->
+        <LinearLayout
+            android:id="@+id/bubbleInfoContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_gravity="end"
+            android:layout_marginTop="1dp"
+            android:layout_marginStart="8dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvStarredBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:text="★"
+                android:textColor="@color/message_text_secondary"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvVanishBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:text="⏱️"
+                android:textColor="@color/message_text_secondary"
+                android:textSize="10sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvEditedBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:text="Edited"
+                android:textColor="@color/message_text_secondary"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/timeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="10:00"
+                android:textColor="@color/message_text_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+    </com.m3.veil.ui.views.ChatMessageCell>
+
+    <!-- Reactions Floating Container -->
+    <TextView
+        android:id="@+id/reactionsText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:layout_marginTop="-6dp"
+        android:layout_marginStart="10dp"
+        android:background="@drawable/bg_reaction"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:textColor="@color/text_primary"
+        android:textSize="12sp"
+        android:visibility="gone"
+        android:elevation="2dp" />
+
+</LinearLayout>

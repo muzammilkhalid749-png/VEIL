@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="dot_size">12dp</dimen>
+    <dimen name="dot_margin">8dp</dimen>
+    <dimen name="onboarding_image_size">220dp</dimen>
+    <dimen name="onboarding_bottom_padding">40dp</dimen>
+    <dimen name="pin_dot_size">16dp</dimen>
+    <dimen name="pin_dot_margin">8dp</dimen>
+    <dimen name="fab_margin">16dp</dimen>
+</resources>

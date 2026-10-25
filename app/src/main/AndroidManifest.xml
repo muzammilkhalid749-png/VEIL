@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi.direct" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
+    <application
+        android:name=".VeilApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.VEIL">
+        <activity
+            android:name=".ui.auth.PhoneAuthActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.auth.OTPVerificationActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.onboard.OnboardingActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.auth.UsernameActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.auth.PinSetupActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.auth.PinUnlockActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.auth.RecoveryPhraseActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.auth.RestoreAnonymousActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.chat.NewChatActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.chat.NewGroupActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.chat.ArchivedChatsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.settings.PrivacySettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.notifications.NotificationsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.settings.NotificationSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.chat.SearchActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.chat.CallActivity"
+            android:launchMode="singleTask"
+            android:taskAffinity=":voip"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden|uiMode"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:showForAllUsers="true"
+            android:excludeFromRecents="true"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.splash.SplashActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".ui.chat.ChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+            
+        <activity
+            android:name=".ui.chat.MediaEditActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
+            android:theme="@style/Theme.VEIL" />
+
+        <activity
+            android:name=".ui.chat.MediaViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
+            android:theme="@style/Theme.VEIL" />
+
+        <activity
+            android:name=".ui.chat.CameraGalleryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.VEIL"
+            android:windowSoftInputMode="adjustNothing" />
+            
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/UCropTheme"/>
+
+        <activity
+            android:name=".ui.main.CreatePostActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.main.MainActivity"
+            android:launchMode="singleTop"
+            android:exported="true" />
+            
+        <activity
+            android:name=".ui.chat.UserProfileActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <service
+            android:name=".calling.VeilCallService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|camera|mediaProjection|phoneCall" />
+
+        <service
+            android:name=".calling.VeilConnectionService"
+            android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.telecom.ConnectionService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".services.MyFirebaseMessagingService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".services.VeilMeshDaemonService"
+            android:stopWithTask="false"
+            android:exported="false" />
+
+        <receiver
+            android:name=".services.VeilSchedulerDaemon$AlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.m3.veil.ACTION_SCHEDULER_WAKE" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>

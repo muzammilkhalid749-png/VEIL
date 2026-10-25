@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp"
+    android:background="?android:attr/selectableItemBackground">
+
+    <ImageView
+        android:id="@+id/userProfileImage"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:src="@drawable/ic_profile_placeholder"
+        android:background="@drawable/circle_background"
+        android:scaleType="centerCrop" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginStart="16dp">
+
+        <TextView
+            android:id="@+id/userNameText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="You"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/actionSubtext"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap to remove"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/emojiText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Reaction"
+        android:textSize="24sp"
+        android:layout_marginStart="16dp" />
+
+</LinearLayout>

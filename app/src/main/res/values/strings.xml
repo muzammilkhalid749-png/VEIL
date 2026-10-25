@@ -1,0 +1,121 @@
+<resources>
+    <string name="app_name">VEIL</string>
+
+    <!-- Auth -->
+    <string name="welcome_to_veil">Welcome to VEIL</string>
+    <string name="tagline">Private, secure messaging</string>
+    <string name="enter_phone_number">Enter your phone number</string>
+    <string name="continue_text">Continue</string>
+    <string name="or_text">OR</string>
+    <string name="join_anonymously">Join Anonymously</string>
+    <string name="terms_agreement">By continuing, you agree to our Terms of Service and Privacy Policy</string>
+    <string name="privacy_priority">Your privacy is our priority</string>
+
+    <string name="verify_phone_number">Verify Phone Number</string>
+    <string name="enter_otp_hint">Enter the 6-digit code we sent to you</string>
+    <string name="resend_code">Resend code</string>
+    <string name="verify_continue">Verify &amp; Continue</string>
+    <string name="having_trouble">Having trouble? Contact support</string>
+
+    <string name="complete_profile">Complete Your Profile</string>
+    <string name="choose_username_hint">Choose a unique username to get started</string>
+    <string name="username">Username</string>
+    <string name="display_name_optional">Display Name (Optional)</string>
+    <string name="username_guidelines">Username Guidelines</string>
+    <string name="username_rules">• 4-20 characters\n• Letters, numbers, and underscores only\n• Must start with a letter</string>
+    <string name="continue_to_veil">Continue to VEIL</string>
+    <string name="generate_random_profile">Generate random profile</string>
+    <string name="enter_desired_username">Enter your desired username</string>
+
+    <!-- Main Navigation -->
+    <string name="home">Home</string>
+    <string name="discover">Discover</string>
+    <string name="calls">Calls</string>
+    <string name="profile">Profile</string>
+
+    <!-- Home Fragment -->
+    <string name="no_conversations">No conversations yet</string>
+    <string name="start_new_conversation_hint">Start a new conversation to get started</string>
+    <string name="start_chat">Start Chat</string>
+
+    <!-- Discover Fragment -->
+    <string name="veilboard">VeilBoard</string>
+    <string name="no_veils">No Veils yet</string>
+    <string name="be_first_share">Be the first to share your thoughts anonymously.</string>
+    <string name="nothing_here_yet">Nothing here yet</string>
+    <string name="be_first_post">Be the first to post something on VeilBoard!</string>
+    <string name="create_veil">Create Veil</string>
+    <string name="post">Post</string>
+    <string name="share_thoughts_hint">Share your thoughts anonymously...</string>
+    <string name="identity_hidden">Your identity is hidden</string>
+    <string name="share_veil">Share Veil</string>
+    <string name="veil_posted">Veil posted!</string>
+    <string name="fail_post">Failed to post: %s</string>
+    <string name="enter_valid_otp">Please enter a valid 6-digit code</string>
+    <string name="invalid_otp">Invalid verification code</string>
+    <string name="sending_new_code">Sending new code...</string>
+    <string name="fail_resend_code">Failed to resend code: %s</string>
+    <string name="code_sent_success">New code sent successfully</string>
+    <string name="error_create_profile">Error creating user profile</string>
+    <string name="error_setup_prefs">Error setting up user preferences</string>
+    <string name="anon_auth_fail">Anonymous authentication failed: %s</string>
+    <string name="select_country">Please select a country</string>
+    <string name="verification_failed">Verification failed: %s</string>
+    <string name="auth_failed">Authentication failed</string>
+
+    <!-- Chat Activity -->
+    <string name="type_message">Type a message...</string>
+    <string name="recipient_name">Recipient Name</string>
+    <string name="online">online</string>
+    <string name="send_message">Send message</string>
+    <string name="anonymous">Anonymous</string>
+
+    <!-- Profile & Settings -->
+    <string name="privacy_controls">Privacy Controls</string>
+    <string name="stealth_mode">Stealth Mode</string>
+    <string name="stealth_mode_desc">Hide online status and typing</string>
+    <string name="quick_actions">Quick Actions</string>
+    <string name="my_qr">My QR</string>
+    <string name="saved">Saved</string>
+    <string name="settings">Settings</string>
+    <string name="account">Account</string>
+    <string name="privacy_security">Privacy &amp; Security</string>
+    <string name="notifications">Notifications</string>
+    <string name="appearance">Appearance</string>
+    <string name="data_storage">Data &amp; Storage</string>
+    <string name="language">Language</string>
+    <string name="help_center">Help Center</string>
+    <string name="about_veil">About VEIL</string>
+    <string name="logout">Logout</string>
+
+    <!-- PIN Setup -->
+    <string name="setup_secure_pin">Set Up Secure PIN</string>
+    <string name="pin_hint">Protect your messages with a 4-6 digit PIN</string>
+    <string name="confirm_your_pin">Confirm Your PIN</string>
+    <string name="reenter_pin_hint">Re-enter your PIN to confirm</string>
+    <string name="confirm_pin">Confirm PIN</string>
+    <string name="skip_for_now">Skip for now</string>
+    <string name="pin_secure_storage">Your PIN is stored securely on your device only</string>
+    <string name="enter_pin_protect_hint">Enter a 4-6 digit PIN to protect your messages</string>
+
+    <!-- Search -->
+    <string name="search">Search</string>
+    <string name="search_hint">Search messages, people, groups...</string>
+    <string name="search_desc">Search across all your conversations</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title_1">Secure &amp; Private</string>
+    <string name="onboarding_desc_1">Your conversations are protected with end-to-end encryption. Only you and the recipient can read what\'s sent.</string>
+    <string name="onboarding_title_2">Connect Instantly</string>
+    <string name="onboarding_desc_2">Message anyone around the world instantly. Share photos, videos, and files securely.</string>
+    <string name="onboarding_title_3">Control Your Privacy</string>
+    <string name="onboarding_desc_3">Customize your privacy settings. Choose who can contact you and see your status.</string>
+    <string name="get_started">Get Started</string>
+    <string name="next">Next</string>
+    <string name="skip">Skip</string>
+
+    <!-- Calls Fragment -->
+    <string name="no_calls_yet">No Calls Yet</string>
+    <string name="start_first_call">Start your first voice or video call</string>
+    <string name="new_call">New Call</string>
+</resources>

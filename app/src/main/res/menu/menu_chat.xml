@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_view_profile"
+        android:title="View Profile &amp; Trust Score" />
+    <item
+        android:id="@+id/action_blink_mode"
+        android:title="⚡ Toggle Blink (View-Once)" />
+    <item
+        android:id="@+id/action_create_poll"
+        android:title="📊 Create Inline Poll" />
+    <item
+        android:id="@+id/action_doodle_pad"
+        android:title="🎨 Anonymous Doodle Pad" />
+    <item
+        android:id="@+id/action_voice_filter"
+        android:title="🎙️ Voice Mask Filter" />
+    <item
+        android:id="@+id/action_truth_or_dare"
+        android:title="🎲 Truth or Dare Icebreaker" />
+    <item
+        android:id="@+id/action_vanish_timer"
+        android:title="⏱️ Vanish Timer" />
+    <item
+        android:id="@+id/action_vanish_mode"
+        android:title="👁️ Vanish Mode (After Read / After Send)" />
+    <item
+        android:id="@+id/action_chat_wallpaper"
+        android:title="🌈 Custom Chat Wallpaper" />
+    <item
+        android:id="@+id/action_chat_lock"
+        android:title="🔒 Chat Lock (PIN)" />
+    <item
+        android:id="@+id/action_secret_inbox"
+        android:title="🕵️ Toggle Secret Vault Folder" />
+    <item
+        android:id="@+id/action_group_events"
+        android:title="📅 Group Events &amp; Calendar" />
+    <item
+        android:id="@+id/action_group_subgroups"
+        android:title="📁 Secret Sub-Groups &amp; Topics" />
+    <item
+        android:id="@+id/action_group_themes"
+        android:title="🎨 Group Themes &amp; Wallpaper" />
+    <item
+        android:id="@+id/action_group_achievements"
+        android:title="🏆 Group Achievements" />
+    <item
+        android:id="@+id/action_schedule_message"
+        android:title="⏰ Schedule Message / Channel Post" />
+    <item
+        android:id="@+id/action_read_later_reminders"
+        android:title="📌 Read-Later Reminders" />
+    <item
+        android:id="@+id/action_time_travel_replay"
+        android:title="⏳ Time-Travel Chat Replay (#210)" />
+    <item
+        android:id="@+id/action_p2p_minigames"
+        android:title="🎮 In-Chat P2P Minigames (#219)" />
+    <item
+        android:id="@+id/action_clear_chat"
+        android:title="Clear Chat" />
+    <item
+        android:id="@+id/action_block_user"
+        android:title="Block User" />
+</menu>

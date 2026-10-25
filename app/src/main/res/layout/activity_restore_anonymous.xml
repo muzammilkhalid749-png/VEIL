@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/restore_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/splash_background"
+    android:paddingStart="32dp"
+    android:paddingEnd="32dp">
+
+    <!-- Back Button -->
+    <ImageView
+        android:id="@+id/backButton"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:src="@drawable/ic_arrow_back"
+        android:layout_marginTop="56dp"
+        android:layout_marginStart="8dp"
+        app:tint="@color/text_primary" />
+
+    <!-- Main Content -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_centerInParent="true"
+        android:paddingTop="40dp"
+        android:paddingBottom="40dp">
+
+        <!-- Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginBottom="40dp">
+
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/ic_shield"
+                android:scaleType="fitCenter"
+                android:layout_marginBottom="24dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Restore Account"
+                android:textColor="@color/text_primary"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.02" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Enter your 12-word recovery phrase"
+                android:textColor="@color/text_secondary"
+                android:textSize="15sp"
+                android:layout_marginTop="8dp" />
+
+        </LinearLayout>
+
+        <!-- Input Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/input_background"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <EditText
+                android:id="@+id/phraseEditText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="e.g. apple banana..."
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:textSize="16sp"
+                android:maxLines="3"
+                android:background="@null"
+                android:padding="0dp" />
+
+        </LinearLayout>
+
+        <!-- Continue Button -->
+        <Button
+            android:id="@+id/restoreButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Restore"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:backgroundTint="@color/veil_accent"
+            app:cornerRadius="28dp"
+            app:rippleColor="@color/veil_primary_light"
+            android:letterSpacing="0.02"
+            android:layout_marginTop="32dp" />
+
+        <!-- Progress Bar -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center"
+            android:layout_marginTop="16dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</RelativeLayout>

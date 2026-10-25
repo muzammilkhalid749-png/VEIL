@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/auth_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/splash_background"
+    android:paddingStart="32dp"
+    android:paddingEnd="32dp">
+
+    <!-- Back Button -->
+    <ImageView
+        android:id="@+id/backButton"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:src="@drawable/ic_arrow_back"
+        android:layout_marginTop="56dp"
+        android:layout_marginStart="8dp"
+        android:visibility="gone"
+        app:tint="@color/text_primary" />
+
+    <!-- Main Content -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_centerInParent="true"
+        android:paddingTop="40dp"
+        android:paddingBottom="40dp">
+
+        <!-- Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginBottom="60dp">
+
+            <ImageView
+                android:layout_width="100dp"
+                android:layout_height="100dp"
+                android:src="@drawable/veil_logo"
+                android:scaleType="fitCenter"
+                android:layout_marginBottom="24dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/welcome_to_veil"
+                android:textColor="@color/text_primary"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.02" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/tagline"
+                android:textColor="@color/text_secondary"
+                android:textSize="15sp"
+                android:layout_marginTop="8dp" />
+
+        </LinearLayout>
+
+        <!-- Phone Input Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/enter_phone_number"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/exampleText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Example: XXX-XXXXXXX"
+            android:visibility="gone"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:layout_marginTop="4dp" />
+
+        <!-- Custom Country Picker -->
+        <LinearLayout
+            android:id="@+id/countryPickerContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/input_background"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:id="@+id/flagEmoji"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🇺🇸"
+                android:textSize="18sp"
+                android:layout_marginEnd="12dp" />
+
+            <TextView
+                android:id="@+id/countryCodeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+1"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginEnd="8dp" />
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_arrow_down"
+                app:tint="@color/text_secondary" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="20dp"
+                android:background="@color/veil_accent"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
+
+            <!-- Phone Number Input -->
+            <EditText
+                android:id="@+id/phoneNumberEditText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/username"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:textSize="16sp"
+                android:inputType="phone"
+                android:maxLines="1"
+                android:background="@null"
+                android:padding="0dp"
+                android:autofillHints="phone" />
+
+        </LinearLayout>
+
+        <!-- Terms Text -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/terms_agreement"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:lineSpacingExtra="2dp"
+            android:layout_marginTop="32dp" />
+
+        <!-- Continue Button -->
+        <Button
+            android:id="@+id/continueButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/continue_text"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:backgroundTint="@color/colorPrimary"
+            app:cornerRadius="28dp"
+            app:rippleColor="@color/veil_primary_light"
+            android:letterSpacing="0.02"
+            android:layout_marginTop="32dp" />
+
+        <!-- OR Divider -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="24dp">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="@color/veil_primary_light" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/or_text"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="@color/veil_primary_light" />
+
+        </LinearLayout>
+
+        <!-- Anonymous Join Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/anonymousJoinButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/join_anonymously"
+            android:textColor="@color/veil_accent"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:strokeColor="@color/veil_accent"
+            app:strokeWidth="2dp"
+            app:cornerRadius="28dp"
+            app:rippleColor="@color/veil_primary_light"
+            android:letterSpacing="0.02" />
+
+        <TextView
+            android:id="@+id/restoreAccountText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Restore Anonymous Account"
+            android:textColor="@color/veil_accent"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:layout_marginTop="16dp"
+            android:clickable="true"
+            android:focusable="true"/>
+
+        <!-- Progress Bar -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center"
+            android:layout_marginTop="16dp"
+            android:visibility="gone" />
+
+        <!-- Footer -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/privacy_priority"
+            android:textColor="@color/veil_accent"
+            android:textSize="13sp"
+            android:layout_gravity="center"
+            android:layout_marginTop="40dp"
+            android:drawablePadding="6dp"
+            android:drawableStart="@drawable/ic_shield"
+            android:contentDescription="@string/privacy_priority" />
+
+    </LinearLayout>
+
+</RelativeLayout>

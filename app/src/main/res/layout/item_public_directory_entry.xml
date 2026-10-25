@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp"
+    android:background="?attr/selectableItemBackground">
+
+    <de.hdodenhof.circleimageview.CircleImageView
+        android:id="@+id/ivDirAvatar"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@drawable/ic_channel"
+        app:civ_border_width="1dp"
+        app:civ_border_color="@color/colorOutline" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvDirName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Channel Name"
+                android:textColor="@color/textPrimary"
+                android:textSize="15.5sp"
+                android:textStyle="bold"
+                android:singleLine="true"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/tvDirBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_filter_chip"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:text="Channel"
+                android:textColor="@color/colorPrimary"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvDirHandle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@channel_handle • 120 subscribers"
+            android:textColor="@color/textSecondary"
+            android:textSize="12sp"
+            android:singleLine="true" />
+
+        <TextView
+            android:id="@+id/tvDirDesc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Channel description text..."
+            android:textColor="@color/textSecondary"
+            android:textSize="12sp"
+            android:maxLines="2"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnDirJoin"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:text="Join"
+        android:textSize="12sp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        app:cornerRadius="10dp" />
+
+</LinearLayout>

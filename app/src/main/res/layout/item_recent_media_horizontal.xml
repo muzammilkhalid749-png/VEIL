@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="64dp"
+    android:layout_height="64dp"
+    android:layout_marginEnd="6dp"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="#33FFFFFF"
+    app:cardBackgroundColor="#1A202C">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ImageView
+            android:id="@+id/ivRecentThumb"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop" />
+
+        <!-- Video indicator -->
+        <ImageView
+            android:id="@+id/ivRecentVideoIcon"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="3dp"
+            android:src="@drawable/ic_play_arrow"
+            app:tint="@android:color/white"
+            android:visibility="gone" />
+
+    </FrameLayout>
+</com.google.android.material.card.MaterialCardView>

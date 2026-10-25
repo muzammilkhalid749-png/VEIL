@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/recovery_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/splash_background"
+    android:paddingStart="32dp"
+    android:paddingEnd="32dp">
+
+    <!-- Back Button -->
+    <ImageView
+        android:id="@+id/backButton"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:src="@drawable/ic_arrow_back"
+        android:layout_marginTop="56dp"
+        android:layout_marginStart="8dp"
+        app:tint="@color/text_primary" />
+
+    <!-- Main Content -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_centerInParent="true"
+        android:paddingTop="40dp"
+        android:paddingBottom="40dp">
+
+        <!-- Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginBottom="40dp">
+
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/ic_shield_locked"
+                android:scaleType="fitCenter"
+                android:layout_marginBottom="24dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Recovery Phrase"
+                android:textColor="@color/text_primary"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Save these 12 words securely. They are the ONLY way to recover your anonymous account."
+                android:textColor="@color/text_secondary"
+                android:textSize="15sp"
+                android:layout_marginTop="8dp"
+                android:gravity="center" />
+
+        </LinearLayout>
+
+        <!-- Phrase Display Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/input_background"
+            android:padding="24dp"
+            android:gravity="center"
+            android:layout_marginBottom="40dp">
+
+            <TextView
+                android:id="@+id/phraseText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/veil_accent"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:lineSpacingExtra="8dp" />
+        </LinearLayout>
+
+        <!-- Action Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp">
+
+            <Button
+                android:id="@+id/copyButton"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="Copy"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp"
+                android:background="@drawable/button_outline"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/confirmButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="56dp"
+                android:text="I've Saved It"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:background="@drawable/button_primary"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</RelativeLayout>

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorBackground">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Call History List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/callsRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingTop="8dp"
+            android:paddingBottom="96dp" />
+
+        <!-- Empty State -->
+        <LinearLayout
+            android:id="@+id/emptyState"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:src="@drawable/ic_call_empty"
+                android:layout_marginBottom="20dp"
+                app:tint="@color/textSecondary"
+                android:contentDescription="@string/no_calls_yet" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/no_calls_yet"
+                android:textColor="@color/textPrimary"
+                android:textSize="20sp"
+                android:fontFamily="sans-serif-medium"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/start_first_call"
+                android:textColor="@color/textSecondary"
+                android:textSize="14sp"
+                android:gravity="center"
+                android:lineSpacingExtra="2dp" />
+
+        </LinearLayout>
+
+        <!-- Loading State -->
+        <ProgressBar
+            android:id="@+id/loadingBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminateTint="@color/colorPrimary"
+            android:visibility="visible" />
+
+    </FrameLayout>
+
+    <!-- Call Actions FAB -->
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/fabNewCall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="80dp"
+        android:text="@string/new_call"
+        android:textColor="@android:color/white"
+        android:icon="@drawable/ic_call"
+        app:backgroundTint="@color/colorPrimary"
+        app:iconTint="@android:color/white"
+        app:elevation="4dp" />
+
+</RelativeLayout>
