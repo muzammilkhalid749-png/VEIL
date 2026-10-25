@@ -577,9 +577,15 @@ public class ChatActivity extends AppCompatActivity {
                     if (dName == null || dName.isEmpty()) dName = doc.getString("username");
                     if (dName != null) {
                         recipientName = dName;
-                        TextView nameView = findViewById(R.id.recipientName);
-                        if (nameView != null) nameView.setText(recipientName);
                     }
+                    String remoteAvatar = doc.getString("avatar");
+                    if (remoteAvatar != null && !remoteAvatar.isEmpty()) {
+                        if (currentLocalChat != null) {
+                            currentLocalChat.setAvatar(remoteAvatar);
+                            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveOrUpdateChat(currentLocalChat);
+                        }
+                    }
+                    updateRecipientHeader();
                 }
             });
         }
@@ -673,6 +679,30 @@ public class ChatActivity extends AppCompatActivity {
         });
     }
 
+    private void updateRecipientHeader() {
+        TextView nameText = findViewById(R.id.recipientName);
+        if (nameText != null) {
+            nameText.setText(recipientName != null ? recipientName : getString(R.string.anonymous));
+        }
+
+        ImageView recipientAvatar = findViewById(R.id.recipientAvatar);
+        if (recipientAvatar != null) {
+            String avSource = null;
+            if (currentLocalChat != null && currentLocalChat.getAvatar() != null && !currentLocalChat.getAvatar().trim().isEmpty()) {
+                avSource = currentLocalChat.getAvatar();
+            }
+            if (avSource == null && cachedRecipientUser != null && cachedRecipientUser.getAvatar() != null && !cachedRecipientUser.getAvatar().trim().isEmpty()) {
+                avSource = cachedRecipientUser.getAvatar();
+            }
+            if (avSource == null && getIntent() != null) {
+                avSource = getIntent().getStringExtra("recipientAvatar");
+            }
+            boolean isGrp = (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_")))
+                    || (currentLocalChat != null && currentLocalChat.isGroup());
+            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(recipientAvatar, avSource, recipientName, isGrp);
+        }
+    }
+
     private void initializeViews() {
         messagesRecyclerView = findViewById(R.id.messagesRecyclerView);
         layoutScrollToBottom = findViewById(R.id.layoutScrollToBottom);
@@ -685,17 +715,7 @@ public class ChatActivity extends AppCompatActivity {
             });
         }
 
-        TextView nameText = findViewById(R.id.recipientName);
-        nameText.setText(recipientName != null ? recipientName : getString(R.string.anonymous));
-
-        ImageView recipientAvatar = findViewById(R.id.recipientAvatar);
-        if (recipientAvatar != null) {
-            String avSource = (currentLocalChat != null && currentLocalChat.getAvatar() != null)
-                    ? currentLocalChat.getAvatar() : null;
-            boolean isGrp = (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_")))
-                    || (currentLocalChat != null && currentLocalChat.isGroup());
-            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(recipientAvatar, avSource, recipientName, isGrp);
-        }
+        updateRecipientHeader();
 
         findViewById(R.id.backButton).setOnClickListener(v -> finish());
 
@@ -1717,9 +1737,16 @@ public class ChatActivity extends AppCompatActivity {
                 if (user.getPublicKey() != null && !user.getPublicKey().isEmpty()) {
                     recipientPublicKey = user.getPublicKey();
                 }
+                if (user.getAvatar() != null && !user.getAvatar().isEmpty()) {
+                    if (currentLocalChat != null && (currentLocalChat.getAvatar() == null || currentLocalChat.getAvatar().isEmpty() || "avatar_1".equals(currentLocalChat.getAvatar()))) {
+                        currentLocalChat.setAvatar(user.getAvatar());
+                        com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(currentLocalChat);
+                    }
+                }
                 isRecipientOnline = user.isUserOnline();
                 recipientLastSeenFormatted = user.getFormattedLastSeen();
                 updatePresenceAndToolbarStatus();
+                updateRecipientHeader();
             }
         });
     }
@@ -1748,6 +1775,7 @@ public class ChatActivity extends AppCompatActivity {
             );
             com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(currentLocalChat);
         }
+        updateRecipientHeader();
     }
 
     private void loadLocalChatSettings() {
@@ -1759,6 +1787,7 @@ public class ChatActivity extends AppCompatActivity {
         currentVanishMode = currentLocalChat.getVanishMode() != null ? currentLocalChat.getVanishMode() : "after_send";
         isChatBlocked = currentLocalChat.isBlocked();
         updateBlockedState(isChatBlocked, currentLocalChat.getBlockedBy());
+        updateRecipientHeader();
 
         if (currentLocalChat.getWallpaperColor() != null && !currentLocalChat.getWallpaperColor().isEmpty()) {
             try {

@@ -184,12 +184,13 @@
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
         android:layout_marginEnd="20dp"
-        android:layout_marginBottom="80dp"
+        android:layout_marginBottom="96dp"
         android:src="@drawable/ic_edit"
         app:backgroundTint="@color/colorPrimary"
         app:tint="@android:color/white"
         app:elevation="4dp"
         app:borderWidth="0dp"
-        android:contentDescription="@string/create_veil" />
+        android:contentDescription="@string/create_veil"
+        android:visibility="gone" />
 
 </RelativeLayout>

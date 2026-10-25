@@ -5,16 +5,24 @@
     android:layout_height="match_parent"
     android:background="@color/colorBackground">
 
-    <FrameLayout
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:id="@+id/homeCoordinatorLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <!-- Chats Content -->
-        <LinearLayout
-            android:id="@+id/chatsContentLayout"
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/homeAppBarLayout"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            app:elevation="0dp">
+
+            <LinearLayout
+                android:id="@+id/homeHeaderSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                app:layout_scrollFlags="scroll|enterAlways">
 
             <!-- Active Persona & P2P Security Status Bar -->
             <LinearLayout
@@ -395,34 +403,38 @@
                 android:background="@color/colorOutline"
                 android:visibility="gone" />
 
-            <!-- Chats List -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/chatsRecyclerView"
+            </LinearLayout>
+
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <!-- Chats List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/chatsRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior"
+            android:paddingTop="4dp"
+            android:paddingBottom="96dp"
+            android:clipToPadding="false"
+            android:nestedScrollingEnabled="true"
+            android:scrollbars="vertical" />
+
+        <!-- WhatsApp Status Feed List (when Status filter is active) -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/statusFeedScrollView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior"
+            android:visibility="gone"
+            android:paddingBottom="96dp"
+            android:clipToPadding="false">
+
+            <LinearLayout
+                android:id="@+id/statusFeedContainer"
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:paddingTop="4dp"
-                android:paddingBottom="96dp"
-                android:clipToPadding="false" />
-
-            <!-- WhatsApp Status Feed List (when Status filter is active) -->
-            <androidx.core.widget.NestedScrollView
-                android:id="@+id/statusFeedScrollView"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:visibility="gone"
-                android:paddingBottom="96dp"
-                android:clipToPadding="false">
-
-                <LinearLayout
-                    android:id="@+id/statusFeedContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-            </androidx.core.widget.NestedScrollView>
-
-        </LinearLayout>
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </androidx.core.widget.NestedScrollView>
 
         <!-- Empty State -->
         <LinearLayout
@@ -486,6 +498,6 @@
             android:indeterminateTint="@color/colorPrimary"
             android:visibility="visible" />
 
-    </FrameLayout>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
 </RelativeLayout>

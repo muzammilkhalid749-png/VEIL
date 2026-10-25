@@ -253,9 +253,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         if (this.isTyping != typing) {
             this.isTyping = typing;
             if (typing) {
-                notifyItemInserted(getItemCount());
+                notifyItemInserted(getItemCount() - 1);
             } else {
-                notifyItemRemoved(getItemCount() + 1);
+                notifyItemRemoved(getItemCount());
             }
         }
     }
@@ -265,7 +265,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         if (position == 0) return VIEW_TYPE_NOTICE;
         if (isTyping && position == getItemCount() - 1) return VIEW_TYPE_TYPING;
         
-        if (messages.get(position - 1).getSenderId().equals(currentUserId)) {
+        int msgIndex = position - 1;
+        if (msgIndex < 0 || msgIndex >= messages.size()) {
+            return VIEW_TYPE_SENT;
+        }
+        if (messages.get(msgIndex).getSenderId().equals(currentUserId)) {
             return VIEW_TYPE_SENT;
         } else {
             return VIEW_TYPE_RECEIVED;
@@ -292,7 +296,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-        if (holder instanceof NoticeViewHolder) {
+        if (position == 0 || holder instanceof NoticeViewHolder) {
             return;
         }
         
@@ -302,6 +306,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
 
         int msgIndex = position - 1;
+        if (msgIndex < 0 || msgIndex >= messages.size()) {
+            return;
+        }
         Message message = messages.get(msgIndex);
         String time = "";
         if (message.getTimestamp() != null) {
@@ -521,18 +528,24 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
                         return false;
                     }
-
-                    @Override
-                    public void onLongPress(android.view.MotionEvent e) {
-                        if (longClickListener != null) {
-                            longClickListener.onMessageLongClick(message, rootItemView);
-                        }
-                    }
                 });
+        detector.setIsLongpressEnabled(false);
         bubbleView.setOnTouchListener((v, event) -> {
             detector.onTouchEvent(event);
             return false;
         });
+
+        View.OnLongClickListener longClick = v -> {
+            if (longClickListener != null) {
+                longClickListener.onMessageLongClick(message, rootItemView != null ? rootItemView : bubbleView);
+                return true;
+            }
+            return false;
+        };
+        bubbleView.setOnLongClickListener(longClick);
+        if (rootItemView != null) {
+            rootItemView.setOnLongClickListener(longClick);
+        }
     }
 
     private void bindBlinkCard(Message message, boolean isMine, View blinkContainer,

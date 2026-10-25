@@ -176,6 +176,14 @@ public class MainActivity extends AppCompatActivity {
             } else if (bottomNavigation != null) {
                 bottomNavigation.setPadding(0, 0, 0, systemBars.bottom);
             }
+            if (fabNewMessage != null && fabNewMessage.getLayoutParams() instanceof androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams) {
+                androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams lp =
+                        (androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams) fabNewMessage.getLayoutParams();
+                int navHeight = (int) (56 * getResources().getDisplayMetrics().density);
+                int fabSpacing = (int) (16 * getResources().getDisplayMetrics().density);
+                lp.bottomMargin = navHeight + fabSpacing + systemBars.bottom;
+                fabNewMessage.setLayoutParams(lp);
+            }
             return insets;
         });
     }
