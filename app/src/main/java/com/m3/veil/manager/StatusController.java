@@ -726,6 +726,26 @@ public class StatusController {
         return stealthViewMode.get();
     }
 
+    public PrivacyAcl getDefaultPrivacyAcl() {
+        try {
+            int code = appContext.getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                    .getInt("status_default_privacy_acl", PrivacyAcl.ALL_CONTACTS.code);
+            return PrivacyAcl.fromCode(code);
+        } catch (Throwable ignored) {
+            return PrivacyAcl.ALL_CONTACTS;
+        }
+    }
+
+    public void setDefaultPrivacyAcl(PrivacyAcl acl) {
+        if (acl == null) return;
+        try {
+            appContext.getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt("status_default_privacy_acl", acl.code)
+                    .apply();
+        } catch (Throwable ignored) {}
+    }
+
     /**
      * Marks a specific story in a peer's chain as read, updating maxReadStoryId.
      */
@@ -919,10 +939,10 @@ public class StatusController {
     // =========================================================================
 
     /**
-     * Post a pure text status with customizable background color and typography (default privacy: ALL_CONTACTS).
+     * Post a pure text status with customizable background color and typography (uses configured default privacy ACL).
      */
     public void postTextStatus(String contentText, String bgColorHex, int fontIndex) {
-        postTextStatus(contentText, bgColorHex, fontIndex, PrivacyAcl.ALL_CONTACTS, null);
+        postTextStatus(contentText, bgColorHex, fontIndex, getDefaultPrivacyAcl(), null);
     }
 
     /**
@@ -992,10 +1012,10 @@ public class StatusController {
     }
 
     /**
-     * Post a photo status with caption (default privacy: ALL_CONTACTS).
+     * Post a photo status with caption (uses configured default privacy ACL).
      */
     public void postPhotoStatus(String localImagePath, String caption) {
-        postPhotoStatus(localImagePath, caption, PrivacyAcl.ALL_CONTACTS, null);
+        postPhotoStatus(localImagePath, caption, getDefaultPrivacyAcl(), null);
     }
 
     /**
@@ -1006,6 +1026,13 @@ public class StatusController {
                                 List<String> targetPeers) {
         if (localImagePath == null) return;
         executeMediaUploadPipeline(localImagePath, MediaType.IMAGE, caption, null, 0, privacyAcl, targetPeers);
+    }
+
+    /**
+     * Post a video status with caption (uses configured default privacy ACL).
+     */
+    public void postVideoStatus(String localVideoPath, String caption) {
+        postVideoStatus(localVideoPath, caption, getDefaultPrivacyAcl(), null);
     }
 
     /**

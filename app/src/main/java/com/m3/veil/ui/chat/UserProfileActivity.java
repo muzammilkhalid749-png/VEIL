@@ -136,7 +136,10 @@ public class UserProfileActivity extends AppCompatActivity {
         findViewById(R.id.btnMute).setOnClickListener(v -> toggleMuteChat());
         findViewById(R.id.btnVanishTimer).setOnClickListener(v -> showVanishTimerDialog());
         View vanishModeRow = findViewById(R.id.btnVanishMode);
-        if (vanishModeRow != null) vanishModeRow.setVisibility(View.GONE);
+        if (vanishModeRow != null) {
+            vanishModeRow.setVisibility(View.VISIBLE);
+            vanishModeRow.setOnClickListener(v -> showVanishModeDialog());
+        }
         findViewById(R.id.btnClearChat).setOnClickListener(v -> confirmClearChat());
         findViewById(R.id.btnBlockUser).setOnClickListener(v -> handleBlockOrLeave());
     }
@@ -671,8 +674,8 @@ public class UserProfileActivity extends AppCompatActivity {
                 String snippet = m.getContent() != null ? m.getContent() : "Media item";
                 int iconBg = R.drawable.bg_swatch_indigo;
 
-                if ("image".equals(m.getType()) || "doodle".equals(m.getType())) {
-                    tag = "🖼️ Image";
+                if ("image".equals(m.getType()) || "doodle".equals(m.getType()) || "video".equals(m.getType())) {
+                    tag = "video".equals(m.getType()) ? "🎬 Video" : "🖼️ Image";
                     iconBg = R.drawable.bg_swatch_emerald;
                     if ("all".equals(currentFilter[0]) || "images".equals(currentFilter[0])) match = true;
                 } else if ("voice".equals(m.getType())) {
@@ -696,6 +699,8 @@ public class UserProfileActivity extends AppCompatActivity {
                 itemRow.setOrientation(LinearLayout.HORIZONTAL);
                 itemRow.setGravity(Gravity.CENTER_VERTICAL);
                 itemRow.setPadding(0, (int) (10 * dp), 0, (int) (10 * dp));
+                itemRow.setClickable(true);
+                itemRow.setFocusable(true);
 
                 TextView iconView = new TextView(this);
                 iconView.setLayoutParams(new LinearLayout.LayoutParams((int) (40 * dp), (int) (40 * dp)));
@@ -726,6 +731,34 @@ public class UserProfileActivity extends AppCompatActivity {
                 col.addView(tvSnippet);
 
                 itemRow.addView(col);
+
+                final String finalSnippet = snippet;
+                itemRow.setOnClickListener(v -> {
+                    String localPath = m.getLocalFilePath();
+                    if (("image".equals(m.getType()) || "doodle".equals(m.getType()) || "video".equals(m.getType()))
+                            && localPath != null && new java.io.File(localPath).exists()) {
+                        Intent viewerIntent = new Intent(this, MediaViewerActivity.class);
+                        viewerIntent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, localPath);
+                        viewerIntent.putExtra(MediaViewerActivity.EXTRA_MEDIA_TYPE,
+                                "video".equals(m.getType()) ? "video" : "image");
+                        viewerIntent.putExtra(MediaViewerActivity.EXTRA_SENDER_NAME,
+                                m.getSenderName() != null ? m.getSenderName() : (peerUserName != null ? peerUserName : "Veil Contact"));
+                        viewerIntent.putExtra(MediaViewerActivity.EXTRA_CAPTION, finalSnippet);
+                        viewerIntent.putExtra(MediaViewerActivity.EXTRA_MESSAGE_ID, m.getId());
+                        viewerIntent.putExtra(MediaViewerActivity.EXTRA_CHAT_ID, chatId);
+                        startActivity(viewerIntent);
+                        sheet.dismiss();
+                    } else {
+                        android.content.ClipboardManager cb = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        if (cb != null) {
+                            cb.setPrimaryClip(android.content.ClipData.newPlainText("Veil Vault Item", finalSnippet));
+                        }
+                        Toast.makeText(this, "Copied item details • Returning to chat", Toast.LENGTH_SHORT).show();
+                        sheet.dismiss();
+                        finish();
+                    }
+                });
+
                 itemsContainer.addView(itemRow);
             }
 
@@ -983,22 +1016,228 @@ public class UserProfileActivity extends AppCompatActivity {
             showEditGroupInfoDialog();
         }), insertIdx);
 
+        parent.addView(createProfileOptionRow("🛡️ Group Permissions & Slow Mode", "Configure who can post, add members, and message cooldown", R.drawable.ic_shield, v -> {
+            showGroupPermissionsAndSlowModeDialog();
+        }), insertIdx + 1);
+
+        parent.addView(createProfileOptionRow("🔗 Invite Link & QR Code", "Share veil://join/" + (chatId != null ? chatId : "group") + " or revoke link", R.drawable.ic_share, v -> {
+            showGroupInviteLinkSheet();
+        }), insertIdx + 2);
+
         parent.addView(createProfileOptionRow("📅 Group Events & Calendar (#68)", "RSVP, countdowns, and synchronized mesh events", R.drawable.ic_timer, v -> {
             EventsCalendarBottomSheet sheet = EventsCalendarBottomSheet.newInstance(chatId, peerUserName != null ? peerUserName : "Group");
             sheet.show(getSupportFragmentManager(), "EventsCalendarBottomSheet");
-        }), insertIdx + 1);
+        }), insertIdx + 3);
 
         parent.addView(createProfileOptionRow("📁 Secret Sub-Groups & Topics (#71)", "Manage and join encrypted topic channels", R.drawable.ic_chat, v -> {
             showSubgroupsDialog();
-        }), insertIdx + 2);
+        }), insertIdx + 4);
 
         parent.addView(createProfileOptionRow("🎨 Group Themes & Wallpaper (#73)", "Customize theme and broadcast to group mesh", R.drawable.ic_appearance, v -> {
             showGroupThemesDialog();
-        }), insertIdx + 3);
+        }), insertIdx + 5);
 
         parent.addView(createProfileOptionRow("🏆 Group Achievements (#74)", "View cryptographic member reputation badges", R.drawable.ic_shield, v -> {
             showGroupAchievementsDialog();
-        }), insertIdx + 4);
+        }), insertIdx + 6);
+    }
+
+    private void showGroupPermissionsAndSlowModeDialog() {
+        if (chatId == null) return;
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        int pad = (int) (20 * dp);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText("🛡️ Group Permissions & Slow Mode");
+        title.setTextSize(18f);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        root.addView(title);
+
+        TextView sub = new TextView(this);
+        sub.setText("Control member capabilities and rate-limiting across the group mesh");
+        sub.setTextSize(12.5f);
+        sub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+        sub.setPadding(0, (int) (4 * dp), 0, (int) (14 * dp));
+        root.addView(sub);
+
+        android.content.SharedPreferences prefs = getSharedPreferences("VeilGroupPrefs", MODE_PRIVATE);
+        boolean adminsOnlySend = prefs.getBoolean("admins_only_send_" + chatId, false);
+        boolean membersCanInvite = prefs.getBoolean("members_can_invite_" + chatId, true);
+        boolean membersCanPin = prefs.getBoolean("members_can_pin_" + chatId, true);
+        int slowModeSec = prefs.getInt("slow_mode_sec_" + chatId, 0);
+
+        android.widget.CheckBox cbAdminsOnly = new android.widget.CheckBox(this);
+        cbAdminsOnly.setText("🔒 Only Admins Can Send Messages");
+        cbAdminsOnly.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        cbAdminsOnly.setChecked(adminsOnlySend);
+        root.addView(cbAdminsOnly);
+
+        android.widget.CheckBox cbInvite = new android.widget.CheckBox(this);
+        cbInvite.setText("👥 Allow Members to Add New Participants");
+        cbInvite.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        cbInvite.setChecked(membersCanInvite);
+        root.addView(cbInvite);
+
+        android.widget.CheckBox cbPin = new android.widget.CheckBox(this);
+        cbPin.setText("📌 Allow Members to Pin Messages & Create Polls");
+        cbPin.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        cbPin.setChecked(membersCanPin);
+        root.addView(cbPin);
+
+        TextView tvSlowHeader = new TextView(this);
+        tvSlowHeader.setText("⏱️ Slow Mode Cooldown");
+        tvSlowHeader.setTextSize(14.5f);
+        tvSlowHeader.setTypeface(null, Typeface.BOLD);
+        tvSlowHeader.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
+        tvSlowHeader.setPadding(0, (int) (12 * dp), 0, (int) (6 * dp));
+        root.addView(tvSlowHeader);
+
+        final int[] selectedSlow = {slowModeSec};
+        String[] slowLabels = {"Off", "10s", "30s", "1m", "5m", "15m"};
+        int[] slowValues = {0, 10, 30, 60, 300, 900};
+
+        LinearLayout slowStrip = new LinearLayout(this);
+        slowStrip.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < slowLabels.length; i++) {
+            final int val = slowValues[i];
+            TextView chip = new TextView(this);
+            chip.setText(slowLabels[i]);
+            chip.setTextSize(12.5f);
+            chip.setPadding((int) (10 * dp), (int) (6 * dp), (int) (10 * dp), (int) (6 * dp));
+            boolean sel = (val == selectedSlow[0]);
+            chip.setBackgroundResource(sel ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+            chip.setTextColor(sel ? Color.WHITE : ContextCompat.getColor(this, R.color.textPrimary));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.rightMargin = (int) (6 * dp);
+            chip.setLayoutParams(lp);
+            chip.setOnClickListener(v -> {
+                selectedSlow[0] = val;
+                for (int j = 0; j < slowStrip.getChildCount(); j++) {
+                    TextView c = (TextView) slowStrip.getChildAt(j);
+                    boolean isSel = (slowValues[j] == val);
+                    c.setBackgroundResource(isSel ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+                    c.setTextColor(isSel ? Color.WHITE : ContextCompat.getColor(this, R.color.textPrimary));
+                }
+            });
+            slowStrip.addView(chip);
+        }
+        root.addView(slowStrip);
+
+        MaterialButton btnSavePerms = new MaterialButton(this);
+        btnSavePerms.setText("Save Group Permissions");
+        btnSavePerms.setCornerRadius((int) (12 * dp));
+        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        btnLp.topMargin = (int) (16 * dp);
+        btnSavePerms.setLayoutParams(btnLp);
+        btnSavePerms.setOnClickListener(v -> {
+            prefs.edit()
+                    .putBoolean("admins_only_send_" + chatId, cbAdminsOnly.isChecked())
+                    .putBoolean("members_can_invite_" + chatId, cbInvite.isChecked())
+                    .putBoolean("members_can_pin_" + chatId, cbPin.isChecked())
+                    .putInt("slow_mode_sec_" + chatId, selectedSlow[0])
+                    .apply();
+            java.util.Map<String, Object> updates = new java.util.HashMap<>();
+            updates.put("adminsOnlySend", cbAdminsOnly.isChecked());
+            updates.put("slowModeSec", selectedSlow[0]);
+            FirebaseFirestore.getInstance().collection("groups").document(chatId).update(updates);
+            sheet.dismiss();
+            Toast.makeText(this, "🛡️ Group permissions & Slow Mode updated", Toast.LENGTH_SHORT).show();
+        });
+        root.addView(btnSavePerms);
+
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
+    private void showGroupInviteLinkSheet() {
+        if (chatId == null) return;
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        int pad = (int) (20 * dp);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText("🔗 Group Invite Link");
+        title.setTextSize(18f);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        root.addView(title);
+
+        android.content.SharedPreferences prefs = getSharedPreferences("VeilGroupPrefs", MODE_PRIVATE);
+        String token = prefs.getString("invite_token_" + chatId, chatId);
+        final String[] currentLink = {"veil://join/" + token};
+
+        TextView tvLinkBox = new TextView(this);
+        tvLinkBox.setText(currentLink[0]);
+        tvLinkBox.setTextSize(14f);
+        tvLinkBox.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        tvLinkBox.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
+        tvLinkBox.setBackgroundResource(R.drawable.bg_search_input);
+        int boxPad = (int) (14 * dp);
+        tvLinkBox.setPadding(boxPad, boxPad, boxPad, boxPad);
+        LinearLayout.LayoutParams boxLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        boxLp.topMargin = (int) (12 * dp);
+        boxLp.bottomMargin = (int) (14 * dp);
+        tvLinkBox.setLayoutParams(boxLp);
+        root.addView(tvLinkBox);
+
+        MaterialButton btnCopy = new MaterialButton(this);
+        btnCopy.setText("📋 Copy Invite Link");
+        btnCopy.setCornerRadius((int) (12 * dp));
+        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp1.bottomMargin = (int) (8 * dp);
+        btnCopy.setLayoutParams(lp1);
+        btnCopy.setOnClickListener(v -> {
+            android.content.ClipboardManager cb = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cb != null) {
+                cb.setPrimaryClip(android.content.ClipData.newPlainText("Veil Group Invite", currentLink[0]));
+            }
+            Toast.makeText(this, "Invite link copied to clipboard", Toast.LENGTH_SHORT).show();
+        });
+        root.addView(btnCopy);
+
+        MaterialButton btnShare = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnShare.setText("📤 Share Invite Link");
+        btnShare.setCornerRadius((int) (12 * dp));
+        btnShare.setLayoutParams(lp1);
+        btnShare.setOnClickListener(v -> {
+            sheet.dismiss();
+            Intent sendIntent = new Intent(Intent.ACTION_SEND);
+            sendIntent.setType("text/plain");
+            sendIntent.putExtra(Intent.EXTRA_TEXT, "Join \"" + (peerUserName != null ? peerUserName : "Encrypted Group") + "\" on VEIL P2P Mesh: " + currentLink[0]);
+            startActivity(Intent.createChooser(sendIntent, "Share Group Invite Link"));
+        });
+        root.addView(btnShare);
+
+        MaterialButton btnRevoke = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnRevoke.setText("🔄 Revoke & Generate New Link");
+        btnRevoke.setCornerRadius((int) (12 * dp));
+        btnRevoke.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        btnRevoke.setOnClickListener(v -> {
+            String newTok = chatId + "_" + UUID.randomUUID().toString().substring(0, 6);
+            prefs.edit().putString("invite_token_" + chatId, newTok).apply();
+            currentLink[0] = "veil://join/" + newTok;
+            tvLinkBox.setText(currentLink[0]);
+            Toast.makeText(this, "Previous invite link revoked; new link generated", Toast.LENGTH_SHORT).show();
+        });
+        root.addView(btnRevoke);
+
+        sheet.setContentView(root);
+        sheet.show();
     }
 
     private void showEditGroupInfoDialog() {

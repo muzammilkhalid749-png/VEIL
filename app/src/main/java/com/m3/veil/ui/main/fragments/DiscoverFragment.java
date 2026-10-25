@@ -49,6 +49,7 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
     private View emptyState;
     private ProgressBar loadingBar;
     private String activeCategoryFilter = "all";
+    private String activeSearchQuery = "";
 
     private final VeilBoardController.VeilBoardObserver boardObserver = new VeilBoardController.VeilBoardObserver() {
         @Override
@@ -219,6 +220,78 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
         loadLocalPosts();
     }
 
+    public void showSearchVeilBoardDialog() {
+        if (getContext() == null) return;
+        com.google.android.material.bottomsheet.BottomSheetDialog sheet =
+                new com.google.android.material.bottomsheet.BottomSheetDialog(requireContext());
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
+
+        android.widget.TextView tvTitle = new android.widget.TextView(requireContext());
+        tvTitle.setText("🔍 Search VeilBoard & #Hashtags");
+        tvTitle.setTextSize(18f);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvTitle.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
+        root.addView(tvTitle);
+
+        android.widget.EditText etQuery = new android.widget.EditText(requireContext());
+        etQuery.setHint("Search keyword, #hashtag, or @alias...");
+        etQuery.setText(activeSearchQuery);
+        etQuery.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
+        etQuery.setHintTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
+        etQuery.setPadding(0, (int) (12 * dp), 0, (int) (12 * dp));
+        root.addView(etQuery);
+
+        // Quick Trending Hashtags Row
+        LinearLayout tagsRow = new LinearLayout(requireContext());
+        tagsRow.setOrientation(LinearLayout.HORIZONTAL);
+        tagsRow.setPadding(0, 0, 0, (int) (14 * dp));
+        String[] quickTags = {"#confession", "#privacy", "#mesh", "#poll", "Clear Filter"};
+        for (String tag : quickTags) {
+            android.widget.TextView chip = new android.widget.TextView(requireContext());
+            chip.setText(tag);
+            chip.setTextSize(12f);
+            chip.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+            chip.setBackgroundResource(R.drawable.bg_filter_chip);
+            chip.setPadding((int) (10 * dp), (int) (6 * dp), (int) (10 * dp), (int) (6 * dp));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.rightMargin = (int) (6 * dp);
+            chip.setLayoutParams(lp);
+            chip.setOnClickListener(v -> {
+                if ("Clear Filter".equals(tag)) {
+                    activeSearchQuery = "";
+                    sheet.dismiss();
+                    loadLocalPosts();
+                } else {
+                    etQuery.setText(tag);
+                }
+            });
+            tagsRow.addView(chip);
+        }
+        root.addView(tagsRow);
+
+        com.google.android.material.button.MaterialButton btnApply =
+                new com.google.android.material.button.MaterialButton(requireContext());
+        btnApply.setText("Search VeilBoard");
+        btnApply.setCornerRadius((int) (12 * dp));
+        btnApply.setOnClickListener(v -> {
+            activeSearchQuery = etQuery.getText().toString().trim();
+            sheet.dismiss();
+            loadLocalPosts();
+            if (!activeSearchQuery.isEmpty()) {
+                Toast.makeText(getContext(), "Filtering VeilBoard by: " + activeSearchQuery, Toast.LENGTH_SHORT).show();
+            }
+        });
+        root.addView(btnApply);
+
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
     private void loadLocalPosts() {
         if (getContext() == null) return;
         loadingBar.setVisibility(View.GONE);
@@ -227,7 +300,19 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
         List<Post> local = VeilBoardController.getInstance(requireContext()).getFeed(activeCategoryFilter);
         postList.clear();
         if (local != null) {
-            postList.addAll(local);
+            if (activeSearchQuery == null || activeSearchQuery.trim().isEmpty()) {
+                postList.addAll(local);
+            } else {
+                String q = activeSearchQuery.trim().toLowerCase();
+                for (Post p : local) {
+                    String body = p.getContent() != null ? p.getContent().toLowerCase() : "";
+                    String author = p.getAuthorUsername() != null ? p.getAuthorUsername().toLowerCase() : "";
+                    String cat = p.getCategory() != null ? p.getCategory().toLowerCase() : "";
+                    if (body.contains(q) || author.contains(q) || cat.contains(q)) {
+                        postList.add(p);
+                    }
+                }
+            }
         }
         postsAdapter.notifyDataSetChanged();
         updateEmptyState();

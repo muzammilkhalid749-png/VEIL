@@ -105,6 +105,21 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     private String searchQuery = "";
     private boolean isSecretVaultUnlocked = false;
 
+    private final androidx.activity.result.ActivityResultLauncher<Intent> statusMediaLauncher =
+            registerForActivityResult(
+                    new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        if (result.getResultCode() == android.app.Activity.RESULT_OK && result.getData() != null && getContext() != null) {
+                            Intent data = result.getData();
+                            String editedPath = data.getStringExtra(com.m3.veil.ui.chat.MediaEditActivity.RESULT_EDITED_FILE_PATH);
+                            String mediaType = data.getStringExtra(com.m3.veil.ui.chat.MediaEditActivity.RESULT_MEDIA_TYPE);
+                            String caption = data.getStringExtra(com.m3.veil.ui.chat.MediaEditActivity.RESULT_CAPTION);
+                            if (editedPath != null && !editedPath.isEmpty()) {
+                                publishMediaStatus(editedPath, mediaType != null ? mediaType : "image", caption);
+                            }
+                        }
+                    });
+
     public String getActiveFilter() {
         return activeFilter;
     }
@@ -877,31 +892,73 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             @Override
             public void onMediaSelectedToSend(Uri mediaUri, String mediaType, String caption) {
                 if (getContext() == null || mediaUri == null) return;
-                com.m3.veil.manager.StatusController.getInstance(requireContext())
-                        .postPhotoStatus(mediaUri.toString(), caption);
-                VeilFeatureManager.getInstance(requireContext())
-                        .addMyMediaStatus(mediaUri.toString(), caption, "#1E293B");
-                Toast.makeText(requireContext(), "✅ Photo status posted · visible for 24h", Toast.LENGTH_SHORT).show();
-                renderStatusTray();
+                String localPath = resolveUriToLocalFile(mediaUri, mediaType);
+                if (localPath != null) {
+                    publishMediaStatus(localPath, mediaType != null ? mediaType : "image", caption);
+                } else {
+                    Toast.makeText(requireContext(), "Could not read selected media file", Toast.LENGTH_SHORT).show();
+                }
             }
 
             @Override
             public void onMediaSelectedToEdit(Uri mediaUri, String mediaType) {
                 if (getContext() == null || mediaUri == null) return;
                 Intent editIntent = new Intent(getContext(), com.m3.veil.ui.chat.MediaEditActivity.class);
-                editIntent.putExtra("mediaUri", mediaUri.toString());
-                editIntent.putExtra("mediaType", mediaType);
-                startActivity(editIntent);
+                editIntent.putExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_MEDIA_URI, mediaUri);
+                editIntent.putExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_MEDIA_TYPE, mediaType != null ? mediaType : "image");
+                statusMediaLauncher.launch(editIntent);
             }
 
             @Override
             public void onCameraRequested() {
                 if (getContext() == null) return;
                 Intent camIntent = new Intent(getContext(), com.m3.veil.ui.chat.CameraGalleryActivity.class);
-                startActivity(camIntent);
+                statusMediaLauncher.launch(camIntent);
             }
         });
         gallerySheet.show(getChildFragmentManager(), "StatusPhotoGallery");
+    }
+
+    private void publishMediaStatus(String localFilePath, String mediaType, String caption) {
+        if (getContext() == null || localFilePath == null) return;
+        String safeCaption = caption != null ? caption : "";
+        if ("video".equalsIgnoreCase(mediaType)) {
+            com.m3.veil.manager.StatusController.getInstance(requireContext())
+                    .postVideoStatus(localFilePath, safeCaption);
+        } else {
+            com.m3.veil.manager.StatusController.getInstance(requireContext())
+                    .postPhotoStatus(localFilePath, safeCaption);
+        }
+        VeilFeatureManager.getInstance(requireContext())
+                .addMyMediaStatus(localFilePath, safeCaption, "#1E293B");
+        Toast.makeText(requireContext(), "✅ Status posted · encrypted & visible for 24h", Toast.LENGTH_SHORT).show();
+        renderStatusTray();
+    }
+
+    private String resolveUriToLocalFile(Uri uri, String mediaType) {
+        if (uri == null || getContext() == null) return null;
+        try {
+            if ("file".equalsIgnoreCase(uri.getScheme()) && uri.getPath() != null) {
+                java.io.File f = new java.io.File(uri.getPath());
+                if (f.exists() && f.length() > 0) return f.getAbsolutePath();
+            }
+            String ext = "video".equalsIgnoreCase(mediaType) ? ".mp4" : ".jpg";
+            java.io.File statusCacheDir = new java.io.File(requireContext().getFilesDir(), "status_uploads");
+            if (!statusCacheDir.exists()) statusCacheDir.mkdirs();
+            java.io.File destFile = new java.io.File(statusCacheDir, "status_src_" + System.currentTimeMillis() + ext);
+            try (java.io.InputStream in = requireContext().getContentResolver().openInputStream(uri);
+                 java.io.FileOutputStream out = new java.io.FileOutputStream(destFile)) {
+                if (in == null) return null;
+                byte[] buf = new byte[8192];
+                int r;
+                while ((r = in.read(buf)) != -1) {
+                    out.write(buf, 0, r);
+                }
+            }
+            return destFile.exists() && destFile.length() > 0 ? destFile.getAbsolutePath() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void renderStatusTray() {
@@ -1464,8 +1521,253 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             }
         });
 
+        // Inject Stealth Peek & Multi-Select Batch Operations into the sheet
+        if (sheetView instanceof ViewGroup) {
+            ViewGroup rootGroup = (ViewGroup) sheetView;
+            float dp = getResources().getDisplayMetrics().density;
+
+            TextView actionStealthPeek = new TextView(requireContext());
+            actionStealthPeek.setText("👁️  Stealth Peek (Read Without Receipts)");
+            actionStealthPeek.setTextSize(15f);
+            actionStealthPeek.setTypeface(null, Typeface.BOLD);
+            actionStealthPeek.setTextColor(ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+            actionStealthPeek.setPadding((int) (24 * dp), (int) (14 * dp), (int) (24 * dp), (int) (14 * dp));
+            actionStealthPeek.setOnClickListener(v -> {
+                bottomSheetDialog.dismiss();
+                showStealthPeekDialog(chat);
+            });
+            rootGroup.addView(actionStealthPeek, Math.min(2, rootGroup.getChildCount()));
+
+            TextView actionBatchOps = new TextView(requireContext());
+            actionBatchOps.setText("☑️  Multi-Select Chats (Batch Pin / Mute / Archive / Delete)");
+            actionBatchOps.setTextSize(14.5f);
+            actionBatchOps.setTextColor(ContextCompat.getColor(requireContext(), R.color.textPrimary));
+            actionBatchOps.setPadding((int) (24 * dp), (int) (13 * dp), (int) (24 * dp), (int) (13 * dp));
+            actionBatchOps.setOnClickListener(v -> {
+                bottomSheetDialog.dismiss();
+                showBatchChatOperationsSheet(chat);
+            });
+            rootGroup.addView(actionBatchOps, Math.min(3, rootGroup.getChildCount()));
+        }
+
         bottomSheetDialog.setContentView(sheetView);
         bottomSheetDialog.show();
+    }
+
+    private void showStealthPeekDialog(Chat chat) {
+        if (getContext() == null || chat == null) return;
+        BottomSheetDialog peekSheet = new BottomSheetDialog(requireContext());
+        float dp = getResources().getDisplayMetrics().density;
+
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        int pad = (int) (20 * dp);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(requireContext());
+        title.setText("👁️ Stealth Peek • " + (chat.getName() != null ? chat.getName() : "Chat"));
+        title.setTextSize(17.5f);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(requireContext(), R.color.textPrimary));
+        root.addView(title);
+
+        TextView sub = new TextView(requireContext());
+        sub.setText("Reading from local SQLCipher vault without sending read receipts or clearing unread count.");
+        sub.setTextSize(12f);
+        sub.setTextColor(ContextCompat.getColor(requireContext(), R.color.textSecondary));
+        sub.setPadding(0, (int) (4 * dp), 0, (int) (12 * dp));
+        root.addView(sub);
+
+        List<Message> msgs = EncryptedChatDatabase.getInstance(requireContext()).getMessages(chat.getId());
+        LinearLayout msgBox = new LinearLayout(requireContext());
+        msgBox.setOrientation(LinearLayout.VERTICAL);
+        msgBox.setBackgroundResource(R.drawable.bg_search_input);
+        int boxPad = (int) (12 * dp);
+        msgBox.setPadding(boxPad, boxPad, boxPad, boxPad);
+
+        if (msgs == null || msgs.isEmpty()) {
+            TextView empty = new TextView(requireContext());
+            empty.setText("No messages in local encrypted vault yet.");
+            empty.setTextColor(ContextCompat.getColor(requireContext(), R.color.textSecondary));
+            empty.setTextSize(13.5f);
+            msgBox.addView(empty);
+        } else {
+            int start = Math.max(0, msgs.size() - 6);
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", Locale.getDefault());
+            for (int i = start; i < msgs.size(); i++) {
+                Message m = msgs.get(i);
+                if (m == null) continue;
+                boolean isMe = currentUserId != null && currentUserId.equals(m.getSenderId());
+                String senderLabel = isMe ? "You" : (chat.getName() != null ? chat.getName() : "Peer");
+                String timeStr = m.getTimestamp() != null ? sdf.format(m.getTimestamp().toDate()) : "";
+                String body = m.getText() != null && !m.getText().isEmpty() ? m.getText() : "[" + m.getType() + "]";
+
+                TextView line = new TextView(requireContext());
+                line.setText("[" + timeStr + "] " + senderLabel + ": " + body);
+                line.setTextSize(13.5f);
+                line.setTextColor(ContextCompat.getColor(requireContext(), isMe ? R.color.colorPrimary : R.color.textPrimary));
+                line.setPadding(0, (int) (4 * dp), 0, (int) (4 * dp));
+                msgBox.addView(line);
+            }
+        }
+        root.addView(msgBox);
+
+        MaterialButton btnOpenFull = new MaterialButton(requireContext());
+        btnOpenFull.setText("Open Full Conversation");
+        btnOpenFull.setCornerRadius((int) (12 * dp));
+        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        btnLp.topMargin = (int) (14 * dp);
+        btnOpenFull.setLayoutParams(btnLp);
+        btnOpenFull.setOnClickListener(v -> {
+            peekSheet.dismiss();
+            onChatClick(chat);
+        });
+        root.addView(btnOpenFull);
+
+        peekSheet.setContentView(root);
+        peekSheet.show();
+    }
+
+    private void showBatchChatOperationsSheet(Chat initialSelected) {
+        if (getContext() == null) return;
+        BottomSheetDialog sheet = new BottomSheetDialog(requireContext());
+        float dp = getResources().getDisplayMetrics().density;
+
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        int pad = (int) (20 * dp);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(requireContext());
+        title.setText("☑️ Multi-Select Chats");
+        title.setTextSize(18f);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(requireContext(), R.color.textPrimary));
+        root.addView(title);
+
+        TextView sub = new TextView(requireContext());
+        sub.setText("Select multiple conversations to pin, mute, mark read, archive, or delete in 1 tap:");
+        sub.setTextSize(12.5f);
+        sub.setTextColor(ContextCompat.getColor(requireContext(), R.color.textSecondary));
+        sub.setPadding(0, (int) (4 * dp), 0, (int) (12 * dp));
+        root.addView(sub);
+
+        final java.util.Set<String> selectedIds = new java.util.HashSet<>();
+        if (initialSelected != null && initialSelected.getId() != null) {
+            selectedIds.add(initialSelected.getId());
+        }
+
+        android.widget.ScrollView scroll = new android.widget.ScrollView(requireContext());
+        LinearLayout listContainer = new LinearLayout(requireContext());
+        listContainer.setOrientation(LinearLayout.VERTICAL);
+        for (Chat c : displayedChats) {
+            if (c == null || c.getId() == null) continue;
+            android.widget.CheckBox cb = new android.widget.CheckBox(requireContext());
+            cb.setText((c.getName() != null ? c.getName() : "Anonymous") + (c.getUnreadCount() > 0 ? " (" + c.getUnreadCount() + " unread)" : ""));
+            cb.setTextColor(ContextCompat.getColor(requireContext(), R.color.textPrimary));
+            cb.setChecked(selectedIds.contains(c.getId()));
+            cb.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (isChecked) selectedIds.add(c.getId());
+                else selectedIds.remove(c.getId());
+            });
+            listContainer.addView(cb);
+        }
+        scroll.addView(listContainer);
+        LinearLayout.LayoutParams scrollLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, (int) (200 * dp));
+        scrollLp.bottomMargin = (int) (12 * dp);
+        scroll.setLayoutParams(scrollLp);
+        root.addView(scroll);
+
+        LinearLayout row1 = new LinearLayout(requireContext());
+        row1.setOrientation(LinearLayout.HORIZONTAL);
+        MaterialButton btnBatchPin = new MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnBatchPin.setText("📌 Pin");
+        btnBatchPin.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        btnBatchPin.setOnClickListener(v -> {
+            for (String id : selectedIds) {
+                EncryptedChatDatabase.getInstance(requireContext()).updateChatPinStatus(id, true);
+            }
+            loadLocalEncryptedChats();
+            sheet.dismiss();
+            Toast.makeText(getContext(), "Pinned " + selectedIds.size() + " chats", Toast.LENGTH_SHORT).show();
+        });
+        row1.addView(btnBatchPin);
+
+        MaterialButton btnBatchMute = new MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnBatchMute.setText("🔕 Mute");
+        LinearLayout.LayoutParams mLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        mLp.leftMargin = (int) (8 * dp);
+        btnBatchMute.setLayoutParams(mLp);
+        btnBatchMute.setOnClickListener(v -> {
+            for (String id : selectedIds) {
+                EncryptedChatDatabase.getInstance(requireContext()).updateChatMuteStatus(id, true);
+            }
+            loadLocalEncryptedChats();
+            sheet.dismiss();
+            Toast.makeText(getContext(), "Muted " + selectedIds.size() + " chats", Toast.LENGTH_SHORT).show();
+        });
+        row1.addView(btnBatchMute);
+
+        MaterialButton btnBatchRead = new MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnBatchRead.setText("✓✓ Read");
+        LinearLayout.LayoutParams rLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        rLp.leftMargin = (int) (8 * dp);
+        btnBatchRead.setLayoutParams(rLp);
+        btnBatchRead.setOnClickListener(v -> {
+            for (String id : selectedIds) {
+                EncryptedChatDatabase.getInstance(requireContext()).updateChatUnreadCount(id, 0);
+            }
+            loadLocalEncryptedChats();
+            sheet.dismiss();
+            Toast.makeText(getContext(), "Marked " + selectedIds.size() + " chats as read", Toast.LENGTH_SHORT).show();
+        });
+        row1.addView(btnBatchRead);
+        root.addView(row1);
+
+        LinearLayout row2 = new LinearLayout(requireContext());
+        row2.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams row2Lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        row2Lp.topMargin = (int) (8 * dp);
+        row2.setLayoutParams(row2Lp);
+
+        MaterialButton btnBatchArchive = new MaterialButton(requireContext());
+        btnBatchArchive.setText("📥 Archive Selected");
+        btnBatchArchive.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        btnBatchArchive.setOnClickListener(v -> {
+            for (String id : selectedIds) {
+                EncryptedChatDatabase.getInstance(requireContext()).updateChatArchiveStatus(id, true);
+            }
+            loadLocalEncryptedChats();
+            sheet.dismiss();
+            Toast.makeText(getContext(), "Archived " + selectedIds.size() + " chats", Toast.LENGTH_SHORT).show();
+        });
+        row2.addView(btnBatchArchive);
+
+        MaterialButton btnBatchDelete = new MaterialButton(requireContext());
+        btnBatchDelete.setText("🗑️ Delete Selected");
+        btnBatchDelete.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFEF4444));
+        btnBatchDelete.setTextColor(Color.WHITE);
+        LinearLayout.LayoutParams dLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        dLp.leftMargin = (int) (8 * dp);
+        btnBatchDelete.setLayoutParams(dLp);
+        btnBatchDelete.setOnClickListener(v -> {
+            for (String id : selectedIds) {
+                EncryptedChatDatabase.getInstance(requireContext()).deleteChat(id);
+            }
+            loadLocalEncryptedChats();
+            sheet.dismiss();
+            Toast.makeText(getContext(), "Deleted " + selectedIds.size() + " chats from vault", Toast.LENGTH_SHORT).show();
+        });
+        row2.addView(btnBatchDelete);
+        root.addView(row2);
+
+        sheet.setContentView(root);
+        sheet.show();
     }
 
     private void toggleChatSecretStatus(Chat chat) {

@@ -140,6 +140,77 @@ public class PrivacySettingsActivity extends AppCompatActivity {
 
         rowBlockedUsers.setOnClickListener(v -> showBlockedUsersSheet());
         btnInstantSecureWipe.setOnClickListener(v -> showInstantSecureWipeDialog());
+
+        appendAutoLockAndDeadManSwitchControls();
+    }
+
+    private void appendAutoLockAndDeadManSwitchControls() {
+        if (rowSafeWord == null || !(rowSafeWord.getParent() instanceof LinearLayout)) return;
+        LinearLayout parent = (LinearLayout) rowSafeWord.getParent();
+        float dp = getResources().getDisplayMetrics().density;
+        android.content.SharedPreferences prefs = getSharedPreferences("veil_privacy_prefs", MODE_PRIVATE);
+
+        LinearLayout rowAutoLock = new LinearLayout(this);
+        rowAutoLock.setOrientation(LinearLayout.VERTICAL);
+        rowAutoLock.setPadding((int) (16 * dp), (int) (12 * dp), (int) (16 * dp), (int) (12 * dp));
+
+        TextView tvAutoLockTitle = new TextView(this);
+        tvAutoLockTitle.setText("⏱️ Biometric / PIN Auto-Lock Timeout");
+        tvAutoLockTitle.setTextSize(15f);
+        tvAutoLockTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvAutoLockTitle.setTextColor(getColor(R.color.textPrimary));
+        rowAutoLock.addView(tvAutoLockTitle);
+
+        TextView tvAutoLockSub = new TextView(this);
+        tvAutoLockSub.setText("Lock after: " + prefs.getString("auto_lock_timeout_label", "1 Minute"));
+        tvAutoLockSub.setTextSize(13f);
+        tvAutoLockSub.setTextColor(getColor(R.color.colorPrimary));
+        rowAutoLock.addView(tvAutoLockSub);
+
+        rowAutoLock.setOnClickListener(v -> {
+            String[] opts = {"Immediate", "1 Minute", "5 Minutes", "15 Minutes", "30 Minutes"};
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("⏱️ Auto-Lock Timeout")
+                    .setItems(opts, (d, which) -> {
+                        prefs.edit().putString("auto_lock_timeout_label", opts[which]).apply();
+                        tvAutoLockSub.setText("Lock after: " + opts[which]);
+                        Toast.makeText(this, "Auto-lock timeout set to " + opts[which], Toast.LENGTH_SHORT).show();
+                    })
+                    .show();
+        });
+
+        LinearLayout rowDeadMan = new LinearLayout(this);
+        rowDeadMan.setOrientation(LinearLayout.VERTICAL);
+        rowDeadMan.setPadding((int) (16 * dp), (int) (12 * dp), (int) (16 * dp), (int) (12 * dp));
+
+        TextView tvDeadManTitle = new TextView(this);
+        tvDeadManTitle.setText("💀 Dead-Man's Switch (Inactivity Auto-Shred)");
+        tvDeadManTitle.setTextSize(15f);
+        tvDeadManTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvDeadManTitle.setTextColor(getColor(R.color.textPrimary));
+        rowDeadMan.addView(tvDeadManTitle);
+
+        TextView tvDeadManSub = new TextView(this);
+        tvDeadManSub.setText("Auto-wipe local vault if app not unlocked for: " + prefs.getString("dead_man_switch_label", "Off"));
+        tvDeadManSub.setTextSize(13f);
+        tvDeadManSub.setTextColor(getColor(R.color.textSecondary));
+        rowDeadMan.addView(tvDeadManSub);
+
+        rowDeadMan.setOnClickListener(v -> {
+            String[] opts = {"Off", "7 Days of Inactivity", "30 Days of Inactivity", "90 Days of Inactivity"};
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("💀 Dead-Man's Switch")
+                    .setItems(opts, (d, which) -> {
+                        prefs.edit().putString("dead_man_switch_label", opts[which]).apply();
+                        tvDeadManSub.setText("Auto-wipe local vault if app not unlocked for: " + opts[which]);
+                        Toast.makeText(this, "Dead-Man's Switch: " + opts[which], Toast.LENGTH_SHORT).show();
+                    })
+                    .show();
+        });
+
+        int idx = parent.indexOfChild(rowSafeWord);
+        parent.addView(rowAutoLock, idx + 1);
+        parent.addView(rowDeadMan, idx + 2);
     }
 
     private void refreshUi() {

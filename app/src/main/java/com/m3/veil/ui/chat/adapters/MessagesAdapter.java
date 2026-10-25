@@ -175,6 +175,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         notifyDataSetChanged();
     }
 
+    private final java.util.Set<String> revealedSpoilers = new java.util.HashSet<>();
+
     private CharSequence formatRichTextAndPoll(android.content.Context context, Message message) {
         if (message == null) return "";
         if (message.isBlink()) {
@@ -202,7 +204,17 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             } catch (Exception ignored) {}
         }
         String raw = message.getText() != null ? message.getText() : "";
-        String html = raw
+        boolean hasSpoiler = raw.contains("||") && raw.indexOf("||") != raw.lastIndexOf("||");
+        boolean isRevealed = message.getId() != null && revealedSpoilers.contains(message.getId());
+
+        String processedRaw = raw;
+        if (hasSpoiler && !isRevealed) {
+            processedRaw = raw.replaceAll("\\|\\|([^|]+)\\|\\|", "▒▒▒▒▒▒ [🕵️ Spoiler • Tap to reveal]");
+        } else if (hasSpoiler) {
+            processedRaw = raw.replaceAll("\\|\\|([^|]+)\\|\\|", "$1");
+        }
+
+        String html = processedRaw
                 .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 .replaceAll("\\*([^*]+)\\*", "<b>$1</b>")
                 .replaceAll("_([^_]+)_", "<i>$1</i>")
@@ -222,10 +234,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             return androidx.core.text.HtmlCompat.fromHtml(html, androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT);
         }
 
-        if (raw.contains("*") || raw.contains("_") || raw.contains("`") || raw.contains("~")) {
+        if (processedRaw.contains("*") || processedRaw.contains("_") || processedRaw.contains("`") || processedRaw.contains("~")) {
             return androidx.core.text.HtmlCompat.fromHtml(html, androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT);
         }
-        return raw;
+        return processedRaw;
     }
 
     public MessagesAdapter(List<Message> messages, OnMessageLongClickListener longClickListener, OnReactionClickListener reactionClickListener) {
@@ -300,6 +312,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         String dateLabel = showDate ? formatDateHeader(message.getTimestamp()) : "";
 
         String displayTime = time;
+        if (message.isEdited()) {
+            displayTime = "edited • " + displayTime;
+        }
         if (message.getVoiceFilter() != null && !"normal".equals(message.getVoiceFilter()) && "voice".equals(message.getType())) {
             displayTime = "🎭 " + message.getVoiceFilter() + " • " + displayTime;
         }
@@ -1469,7 +1484,18 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageText.setVisibility(View.VISIBLE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
-                    messageText.setOnClickListener(null);
+                    if (message.getText() != null && message.getText().contains("||") && message.getId() != null) {
+                        messageText.setOnClickListener(v -> {
+                            if (revealedSpoilers.contains(message.getId())) {
+                                revealedSpoilers.remove(message.getId());
+                            } else {
+                                revealedSpoilers.add(message.getId());
+                            }
+                            messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
+                        });
+                    } else {
+                        messageText.setOnClickListener(null);
+                    }
                 }
                 
                 messageText.setTypeface(null, android.graphics.Typeface.NORMAL);
@@ -2244,7 +2270,18 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageText.setVisibility(View.VISIBLE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
-                    messageText.setOnClickListener(null);
+                    if (message.getText() != null && message.getText().contains("||") && message.getId() != null) {
+                        messageText.setOnClickListener(v -> {
+                            if (revealedSpoilers.contains(message.getId())) {
+                                revealedSpoilers.remove(message.getId());
+                            } else {
+                                revealedSpoilers.add(message.getId());
+                            }
+                            messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
+                        });
+                    } else {
+                        messageText.setOnClickListener(null);
+                    }
                 }
                 
                 messageText.setTypeface(null, android.graphics.Typeface.NORMAL);

@@ -1014,16 +1014,43 @@ public class ChatActivity extends AppCompatActivity {
         sendButton.setAlpha(1.0f);
         sendButton.setEnabled(true);
 
+        // Enforce Signal-style Incognito Keyboard (IME_FLAG_NO_PERSONALIZED_LEARNING)
+        android.content.SharedPreferences privPrefs = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE);
+        if (privPrefs.getBoolean("incognito_keyboard", true)) {
+            messageEditText.setImeOptions(messageEditText.getImeOptions() | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
+        }
+
+        // Restore per-chat draft if available
+        if (chatId != null) {
+            String savedDraft = getSharedPreferences("VeilChatDrafts", Context.MODE_PRIVATE).getString("draft_" + chatId, "");
+            if (savedDraft != null && !savedDraft.isEmpty()) {
+                messageEditText.setText(savedDraft);
+                messageEditText.setSelection(savedDraft.length());
+                sendButton.setImageResource(R.drawable.ic_send);
+                if (cameraButton != null) cameraButton.setVisibility(View.GONE);
+            }
+        }
+
         messageEditText.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                boolean hasText = !s.toString().trim().isEmpty();
+                String rawText = s != null ? s.toString() : "";
+                boolean hasText = !rawText.trim().isEmpty();
                 sendButton.setImageResource(hasText ? R.drawable.ic_send : R.drawable.ic_mic);
                 if (cameraButton != null) {
                     cameraButton.setVisibility(hasText ? View.GONE : View.VISIBLE);
+                }
+
+                if (chatId != null) {
+                    android.content.SharedPreferences.Editor draftEd = getSharedPreferences("VeilChatDrafts", Context.MODE_PRIVATE).edit();
+                    if (hasText) {
+                        draftEd.putString("draft_" + chatId, rawText).apply();
+                    } else {
+                        draftEd.remove("draft_" + chatId).apply();
+                    }
                 }
 
                 if (hasText && !isTyping && recipientId != null) {
@@ -1033,7 +1060,7 @@ public class ChatActivity extends AppCompatActivity {
 
                 // Safe Word Panic Wipe Check
                 String safeWord = com.m3.veil.manager.VeilFeatureManager.getInstance(ChatActivity.this).getSafeWord();
-                if (safeWord != null && !safeWord.isEmpty() && s.toString().trim().equalsIgnoreCase(safeWord)) {
+                if (safeWord != null && !safeWord.isEmpty() && rawText.trim().equalsIgnoreCase(safeWord)) {
                     com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).secureWipeAllData();
                     Toast.makeText(ChatActivity.this, "🛡️ Safe Word Triggered: Vault Wiped", Toast.LENGTH_LONG).show();
                     finish();
@@ -1484,6 +1511,20 @@ public class ChatActivity extends AppCompatActivity {
                 File editedFile = new File(editedPath);
                 uploadAndSendMedia(editedFile, mediaType != null ? mediaType : "image", caption);
             }
+            java.util.ArrayList<String> batchPaths = data.getStringArrayListExtra(CameraGalleryActivity.RESULT_BATCH_PATHS);
+            java.util.ArrayList<String> batchTypes = data.getStringArrayListExtra(CameraGalleryActivity.RESULT_BATCH_TYPES);
+            if (batchPaths != null && !batchPaths.isEmpty()) {
+                for (int i = 0; i < batchPaths.size(); i++) {
+                    String bPath = batchPaths.get(i);
+                    String bType = (batchTypes != null && i < batchTypes.size()) ? batchTypes.get(i) : "image";
+                    if (bPath != null) {
+                        File bFile = new File(bPath);
+                        if (bFile.exists()) {
+                            uploadAndSendMedia(bFile, bType, "");
+                        }
+                    }
+                }
+            }
         } else if (requestCode == REQ_VIEW_ONCE_MEDIA) {
             reloadMessagesFromLocalVault();
         }
@@ -1682,15 +1723,35 @@ public class ChatActivity extends AppCompatActivity {
         } else {
             try {
                 android.content.SharedPreferences appPrefs = getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
+                boolean amoled = appPrefs.getBoolean("amoled_pure_black", false);
                 String wpType = appPrefs.getString("wallpaper_type", "default");
                 String wpValue = appPrefs.getString("wallpaper_value", null);
+                int wpDim = appPrefs.getInt("wallpaper_dim", 0);
                 View chatRoot = findViewById(R.id.chat_root);
-                if (chatRoot != null && wpValue != null && !wpValue.isEmpty()) {
-                    if ("image".equals(wpType)) {
-                        android.graphics.drawable.Drawable d = android.graphics.drawable.Drawable.createFromPath(android.net.Uri.parse(wpValue).getPath());
-                        if (d != null) chatRoot.setBackground(d);
-                    } else if ("color".equals(wpType)) {
-                        chatRoot.setBackgroundColor(android.graphics.Color.parseColor(wpValue));
+                if (chatRoot != null) {
+                    if (amoled && ("default".equals(wpType) || wpValue == null || wpValue.isEmpty())) {
+                        chatRoot.setBackgroundColor(android.graphics.Color.BLACK);
+                    } else if (wpValue != null && !wpValue.isEmpty()) {
+                        if ("image".equals(wpType)) {
+                            android.graphics.drawable.Drawable d = android.graphics.drawable.Drawable.createFromPath(android.net.Uri.parse(wpValue).getPath());
+                            if (d != null) {
+                                if (wpDim > 0) {
+                                    int alpha = Math.max(0, Math.min(230, (int) (wpDim * 2.3f)));
+                                    d.setColorFilter(android.graphics.Color.argb(alpha, 0, 0, 0), android.graphics.PorterDuff.Mode.SRC_ATOP);
+                                }
+                                chatRoot.setBackground(d);
+                            }
+                        } else if ("color".equals(wpType)) {
+                            int baseColor = android.graphics.Color.parseColor(wpValue);
+                            if (wpDim > 0) {
+                                float factor = Math.max(0.1f, 1.0f - (wpDim / 120f));
+                                int r = (int) (android.graphics.Color.red(baseColor) * factor);
+                                int g = (int) (android.graphics.Color.green(baseColor) * factor);
+                                int b = (int) (android.graphics.Color.blue(baseColor) * factor);
+                                baseColor = android.graphics.Color.rgb(r, g, b);
+                            }
+                            chatRoot.setBackgroundColor(baseColor);
+                        }
                     }
                 }
             } catch (Exception ignored) {}
@@ -2719,6 +2780,17 @@ public class ChatActivity extends AppCompatActivity {
 
         if (forwardChatsContainer != null && forwardEmptyState != null) {
             forwardChatsContainer.removeAllViews();
+
+            // Telegram-style Anonymous Forward Toggle ("Hide Sender Name")
+            final boolean[] hideSenderTag = {true};
+            android.widget.CheckBox cbAnonForward = new android.widget.CheckBox(this);
+            cbAnonForward.setText("🕵️ Forward Anonymously (Hide Original Sender Tag)");
+            cbAnonForward.setChecked(true);
+            cbAnonForward.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+            cbAnonForward.setTextSize(13.5f);
+            cbAnonForward.setOnCheckedChangeListener((btn, checked) -> hideSenderTag[0] = checked);
+            forwardChatsContainer.addView(cbAnonForward);
+
             if (validChats.isEmpty()) {
                 forwardEmptyState.setVisibility(View.VISIBLE);
             } else {
@@ -2746,7 +2818,7 @@ public class ChatActivity extends AppCompatActivity {
 
                     row.setOnClickListener(vRow -> {
                         sheet.dismiss();
-                        forwardMessageToChat(message, targetChat);
+                        forwardMessageToChat(message, targetChat, hideSenderTag[0]);
                     });
 
                     forwardChatsContainer.addView(row);
@@ -2758,6 +2830,10 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void forwardMessageToChat(Message originalMessage, Chat targetChat) {
+        forwardMessageToChat(originalMessage, targetChat, true);
+    }
+
+    private void forwardMessageToChat(Message originalMessage, Chat targetChat, boolean anonymousForward) {
         if (originalMessage == null || targetChat == null) return;
         String newMsgId = UUID.randomUUID().toString();
         String targetRecipientId = "";
@@ -2774,6 +2850,10 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         String fwdText = originalMessage.getText() != null ? originalMessage.getText() : "";
+        if (!anonymousForward && !"image".equals(originalMessage.getType()) && !"video".equals(originalMessage.getType())) {
+            String origSender = originalMessage.getSenderName() != null ? originalMessage.getSenderName() : "Peer";
+            fwdText = "↪️ Forwarded from " + origSender + ":\n" + fwdText;
+        }
         Message fwdMessage = new Message(
                 newMsgId,
                 currentUserId,
@@ -2788,7 +2868,7 @@ public class ChatActivity extends AppCompatActivity {
         // Route through VeilMessagesController (optimistic UI + warm cache + outbox + direct P2P delivery)
         com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(targetChat, targetRecipientId, fwdMessage);
 
-        Toast.makeText(this, "Forwarded to " + targetChat.getName(), Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, (anonymousForward ? "🕵️ Anonymously forwarded to " : "Forwarded to ") + targetChat.getName(), Toast.LENGTH_SHORT).show();
     }
 
     private void confirmDeleteMessage(Message message) {
@@ -2835,12 +2915,104 @@ public class ChatActivity extends AppCompatActivity {
         Toast.makeText(this, "Message deleted for everyone via P2P", Toast.LENGTH_SHORT).show();
     }
 
+    private long sendButtonDownTimestamp = 0L;
+    private boolean sendLongPressTriggered = false;
+    private final Runnable sendLongPressRunnable = () -> {
+        String text = messageEditText != null && messageEditText.getText() != null
+                ? messageEditText.getText().toString().trim() : "";
+        if (!text.isEmpty()) {
+            sendLongPressTriggered = true;
+            if (sendButton != null) {
+                sendButton.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            }
+            showSendOptionsSheet(text);
+        }
+    };
+
+    private void showSendOptionsSheet(String textToSend) {
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        int pad = (int) (20 * dp);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText("🚀 Advanced Send Options");
+        title.setTextSize(18f);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        title.setPadding(0, 0, 0, (int) (14 * dp));
+        root.addView(title);
+
+        MaterialButton btnSilent = new MaterialButton(this);
+        btnSilent.setText("🔕 Send Without Sound (Silent Delivery)");
+        btnSilent.setCornerRadius((int) (12 * dp));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = (int) (8 * dp);
+        btnSilent.setLayoutParams(lp);
+        btnSilent.setOnClickListener(v -> {
+            sheet.dismiss();
+            messageEditText.setText("🔕 " + textToSend);
+            sendMessage();
+            Toast.makeText(this, "🔕 Sent silently without notification sound", Toast.LENGTH_SHORT).show();
+        });
+        root.addView(btnSilent);
+
+        MaterialButton btnSchedule = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnSchedule.setText("⏰ Schedule Message for Later");
+        btnSchedule.setCornerRadius((int) (12 * dp));
+        btnSchedule.setLayoutParams(lp);
+        btnSchedule.setOnClickListener(v -> {
+            sheet.dismiss();
+            showScheduleMessageDialog();
+        });
+        root.addView(btnSchedule);
+
+        MaterialButton btnBlinkOnce = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnBlinkOnce.setText("⚡ Send as 1x View-Once Blink");
+        btnBlinkOnce.setCornerRadius((int) (12 * dp));
+        btnBlinkOnce.setLayoutParams(lp);
+        btnBlinkOnce.setOnClickListener(v -> {
+            sheet.dismiss();
+            isBlinkModeActive = true;
+            sendMessage();
+        });
+        root.addView(btnBlinkOnce);
+
+        MaterialButton btnSpoiler = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnSpoiler.setText("🕵️ Send Hidden Behind Spoiler (||...||)");
+        btnSpoiler.setCornerRadius((int) (12 * dp));
+        btnSpoiler.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        btnSpoiler.setOnClickListener(v -> {
+            sheet.dismiss();
+            messageEditText.setText("||" + textToSend + "||");
+            sendMessage();
+        });
+        root.addView(btnSpoiler);
+
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
     private void setupClickListeners() {
         sendButton.setOnTouchListener((v, event) -> {
             String text = messageEditText.getText().toString().trim();
             if (!text.isEmpty()) {
-                if (event.getAction() == MotionEvent.ACTION_UP) {
-                    sendMessage();
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    sendButtonDownTimestamp = System.currentTimeMillis();
+                    sendLongPressTriggered = false;
+                    typingHandler.postDelayed(sendLongPressRunnable, 480);
+                } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                    typingHandler.removeCallbacks(sendLongPressRunnable);
+                    if (!sendLongPressTriggered) {
+                        sendMessage();
+                    }
+                } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+                    typingHandler.removeCallbacks(sendLongPressRunnable);
                 }
                 return true;
             }
@@ -3244,7 +3416,28 @@ public class ChatActivity extends AppCompatActivity {
         }
         if (messagesAdapter != null) {
             messagesAdapter.notifyDataSetChanged();
-            if (!messageList.isEmpty()) {
+            String targetScrollMsgId = getIntent().getStringExtra("scrollToMessageId");
+            if (targetScrollMsgId != null && !targetScrollMsgId.isEmpty() && !messageList.isEmpty()) {
+                getIntent().removeExtra("scrollToMessageId");
+                int targetAdapterPos = -1;
+                for (int i = 0; i < messageList.size(); i++) {
+                    if (targetScrollMsgId.equals(messageList.get(i).getId())) {
+                        targetAdapterPos = i + 1;
+                        break;
+                    }
+                }
+                if (targetAdapterPos != -1) {
+                    final int finalPos = targetAdapterPos;
+                    highlightPosition = finalPos;
+                    messagesRecyclerView.scrollToPosition(finalPos);
+                    messagesRecyclerView.postDelayed(() -> {
+                        RecyclerView.ViewHolder vh = messagesRecyclerView.findViewHolderForAdapterPosition(finalPos);
+                        if (vh != null) blinkView(vh);
+                    }, 220);
+                } else {
+                    messagesRecyclerView.scrollToPosition(messagesAdapter.getItemCount() - 1);
+                }
+            } else if (!messageList.isEmpty()) {
                 messagesRecyclerView.scrollToPosition(messagesAdapter.getItemCount() - 1);
             }
         }

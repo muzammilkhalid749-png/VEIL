@@ -300,6 +300,8 @@ public class PinSetupActivity extends AppCompatActivity {
         editor.putInt("pin_length", initialPin.length() > 0 ? initialPin.length() : 6);
         editor.putBoolean("pin_set", true);
         editor.apply();
+
+        com.m3.veil.manager.VeilFeatureManager.getInstance(this).setMasterPin(initialPin);
     }
 
     private void storeMEKInKeystore(SecretKey mek) throws Exception {
@@ -320,9 +322,23 @@ public class PinSetupActivity extends AppCompatActivity {
         keyGenerator.init(keyGenParameterSpec);
         keyGenerator.generateKey();
 
-        // Store encrypted MEK in regular SharedPreferences (protected by Keystore)
+        // Store pin_set = false in both encrypted prefs and feature manager
+        try {
+            String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
+            SharedPreferences encPrefs = EncryptedSharedPreferences.create(
+                    PREFS_NAME,
+                    masterKeyAlias,
+                    this,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
+            encPrefs.edit().putBoolean("pin_set", false).apply();
+        } catch (Exception ignored) {
+            getSharedPreferences(PREFS_NAME + "_fallback", MODE_PRIVATE).edit().putBoolean("pin_set", false).apply();
+        }
         SharedPreferences prefs = getSharedPreferences("veil_secure", MODE_PRIVATE);
         prefs.edit().putBoolean("pin_set", false).apply();
+        com.m3.veil.manager.VeilFeatureManager.getInstance(this).setMasterPin(null);
     }
 
     private void storePINHash(String pin) {
@@ -429,6 +445,11 @@ public class PinSetupActivity extends AppCompatActivity {
     }
 
     private void navigateToMain() {
+        if (getIntent().getBooleanExtra("is_change_pin", false)) {
+            android.widget.Toast.makeText(this, "Security PIN updated successfully", android.widget.Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
         Intent intent = new Intent(this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);

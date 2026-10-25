@@ -81,19 +81,24 @@ public class PinUnlockActivity extends AppCompatActivity {
             updatePinDots();
             errorText.setVisibility(View.GONE);
 
-            // Read target PIN length from preferences (default 6 if not specified)
+            // Read target PIN length from preferences or Master PIN (default 4 if Master PIN is 4 digits, else 6)
             int targetLength = 6;
-            try {
-                String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
-                SharedPreferences sharedPreferences = EncryptedSharedPreferences.create(
-                        PREFS_NAME,
-                        masterKeyAlias,
-                        this,
-                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                );
-                targetLength = sharedPreferences.getInt("pin_length", 6);
-            } catch (Exception ignored) {}
+            String masterPin = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getMasterPin();
+            if (masterPin != null && !masterPin.isEmpty()) {
+                targetLength = masterPin.length();
+            } else {
+                try {
+                    String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
+                    SharedPreferences sharedPreferences = EncryptedSharedPreferences.create(
+                            PREFS_NAME,
+                            masterKeyAlias,
+                            this,
+                            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                    );
+                    targetLength = sharedPreferences.getInt("pin_length", 6);
+                } catch (Exception ignored) {}
+            }
 
             if (enteredPin.length() >= targetLength) {
                 verifyPin();
@@ -131,6 +136,14 @@ public class PinUnlockActivity extends AppCompatActivity {
             return;
         }
 
+        // Check if user entered the Master PIN configured in VeilFeatureManager / PrivacySettingsActivity
+        if (com.m3.veil.manager.VeilFeatureManager.getInstance(this).verifyMasterPin(pinAttempt)) {
+            isVerifying = false;
+            com.m3.veil.manager.VeilFeatureManager.getInstance(this).activateDecoyVault(false);
+            navigateToMain();
+            return;
+        }
+
         authExecutor.execute(() -> {
             try {
                 SharedPreferences sharedPreferences;
@@ -154,7 +167,9 @@ public class PinUnlockActivity extends AppCompatActivity {
                 if (encryptedMekStr == null || saltStr == null || ivStr == null) {
                     runOnUiThread(() -> {
                         isVerifying = false;
-                        showError("Security data missing. Please reinstall.");
+                        showError("Incorrect PIN");
+                        enteredPin.setLength(0);
+                        updatePinDots();
                     });
                     return;
                 }
@@ -180,6 +195,7 @@ public class PinUnlockActivity extends AppCompatActivity {
                 // PIN is correct, navigate to main (deactivate decoy mode and mount primary/persona vault)
                 runOnUiThread(() -> {
                     isVerifying = false;
+                    com.m3.veil.manager.VeilFeatureManager.getInstance(PinUnlockActivity.this).setMasterPin(pinAttempt);
                     com.m3.veil.manager.VeilFeatureManager.getInstance(PinUnlockActivity.this).activateDecoyVault(false);
                     navigateToMain();
                 });

@@ -140,6 +140,22 @@ public class MainActivity extends AppCompatActivity {
         if (viewPager != null) {
             updateToolbarForTab(viewPager.getCurrentItem());
         }
+        applyAppearancePreferences();
+    }
+
+    private void applyAppearancePreferences() {
+        try {
+            android.content.SharedPreferences appPrefs = getSharedPreferences("veil_appearance_prefs", MODE_PRIVATE);
+            boolean amoled = appPrefs.getBoolean("amoled_pure_black", false);
+            View mainContainer = findViewById(R.id.main_container);
+            if (mainContainer != null) {
+                if (amoled) {
+                    mainContainer.setBackgroundColor(android.graphics.Color.BLACK);
+                } else {
+                    mainContainer.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, R.color.colorBackground));
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 
     @Override
@@ -223,6 +239,19 @@ public class MainActivity extends AppCompatActivity {
             startActivity(new Intent(this, NewChatActivity.class));
         });
 
+        // Quick Persona Switcher on tapping app logo or toolbar title
+        View.OnClickListener personaSwitchClick = v -> {
+            HomeFragment hf = getHomeFragment();
+            if (hf != null) {
+                hf.showPersonaSwitcherDialog();
+            } else {
+                ProfileFragment pf = getProfileFragment();
+                if (pf != null) pf.openPersonaManager();
+            }
+        };
+        if (appLogo != null) appLogo.setOnClickListener(personaSwitchClick);
+        if (toolbarTitle != null) toolbarTitle.setOnClickListener(personaSwitchClick);
+
         // Feature #107: Secret Inbox Gesture — Long-press toolbar opens Hidden Secret Vault
         android.view.View toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
@@ -232,6 +261,12 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(intent);
                 return true;
             });
+        }
+    }
+
+    public void refreshActivePersonaToolbarBadge() {
+        if (viewPager != null && viewPager.getCurrentItem() == 0) {
+            updateToolbarForTab(0);
         }
     }
 
@@ -245,7 +280,13 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 if (appLogo != null) appLogo.setVisibility(android.view.View.VISIBLE);
-                toolbarTitle.setText(R.string.app_name);
+                com.m3.veil.model.Persona activePersona = VeilFeatureManager.getInstance(this).getActivePersona();
+                if (activePersona != null && !"primary".equalsIgnoreCase(activePersona.getPersonaId())) {
+                    String mood = activePersona.getMood() != null ? activePersona.getMood() + " " : "🎭 ";
+                    toolbarTitle.setText("VEIL • " + mood + activePersona.getDisplayName());
+                } else {
+                    toolbarTitle.setText(R.string.app_name);
+                }
                 if (searchButton != null) {
                     searchButton.setVisibility(android.view.View.GONE);
                 }
@@ -262,7 +303,11 @@ public class MainActivity extends AppCompatActivity {
                 if (appLogo != null) appLogo.setVisibility(android.view.View.GONE);
                 toolbarTitle.setText("Discover");
                 if (searchButton != null) {
-                    searchButton.setVisibility(android.view.View.GONE);
+                    searchButton.setVisibility(android.view.View.VISIBLE);
+                    searchButton.setOnClickListener(v -> {
+                        DiscoverFragment df = getDiscoverFragment();
+                        if (df != null) df.showSearchVeilBoardDialog();
+                    });
                 }
                 if (newChatButton != null) {
                     newChatButton.setVisibility(android.view.View.GONE);
@@ -298,7 +343,8 @@ public class MainActivity extends AppCompatActivity {
                     newChatButton.setVisibility(android.view.View.GONE);
                 }
                 if (moreButton != null) {
-                    moreButton.setVisibility(android.view.View.GONE);
+                    moreButton.setVisibility(android.view.View.VISIBLE);
+                    moreButton.setOnClickListener(this::showProfileTabMenu);
                 }
                 break;
         }
@@ -489,12 +535,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void showStatusTabMenu(android.view.View anchor) {
         androidx.appcompat.widget.PopupMenu popup = new androidx.appcompat.widget.PopupMenu(this, anchor);
-        popup.getMenu().add(0, 3, 0, "🛡️ Status Privacy");
+        popup.getMenu().add(0, 3, 0, "🛡️ Status Privacy & Stealth Mode");
         popup.getMenu().add(0, 4, 1, "⚙️ Settings");
         popup.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
                 case 3:
-                    Toast.makeText(this, "Status Privacy: End-to-End P2P Mesh (Contacts Only)", Toast.LENGTH_SHORT).show();
+                    showStatusPrivacySheet();
                     return true;
                 case 4:
                     viewPager.setCurrentItem(3, true);
@@ -503,6 +549,138 @@ public class MainActivity extends AppCompatActivity {
             return false;
         });
         popup.show();
+    }
+
+    private void showStatusPrivacySheet() {
+        com.google.android.material.bottomsheet.BottomSheetDialog sheet =
+                new com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.ModernBottomSheetDialogTheme);
+        float dp = getResources().getDisplayMetrics().density;
+
+        android.widget.LinearLayout root = new android.widget.LinearLayout(this);
+        root.setOrientation(android.widget.LinearLayout.VERTICAL);
+        root.setPadding((int) (24 * dp), (int) (20 * dp), (int) (24 * dp), (int) (28 * dp));
+        root.setBackgroundResource(R.drawable.bg_bottom_sheet_modern);
+
+        TextView title = new TextView(this);
+        title.setText("🛡️ P2P Status Privacy & ACL");
+        title.setTextSize(19f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.textPrimary));
+        root.addView(title);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("Control who receives your AES-256-GCM wrapped keys over the WebRTC mesh when you post a 24h status.");
+        subtitle.setTextSize(13f);
+        subtitle.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.textSecondary));
+        subtitle.setPadding(0, (int) (6 * dp), 0, (int) (16 * dp));
+        root.addView(subtitle);
+
+        com.m3.veil.manager.StatusController sc = com.m3.veil.manager.StatusController.getInstance(this);
+        com.m3.veil.manager.StatusController.PrivacyAcl currentAcl = sc.getDefaultPrivacyAcl();
+
+        com.m3.veil.manager.StatusController.PrivacyAcl[] acls = {
+                com.m3.veil.manager.StatusController.PrivacyAcl.ALL_CONTACTS,
+                com.m3.veil.manager.StatusController.PrivacyAcl.CLOSE_FRIENDS,
+                com.m3.veil.manager.StatusController.PrivacyAcl.PERSONA_ISOLATED,
+                com.m3.veil.manager.StatusController.PrivacyAcl.SELECTED_PEERS
+        };
+        String[] labels = {
+                "🌐 All P2P Contacts",
+                "💚 Close Friends Only",
+                "🎭 Active Persona Vault Only",
+                "🔒 Selected Peers (Strict)"
+        };
+        String[] descs = {
+                "Share status manifest with all verified contacts in your local database",
+                "Only wrap decryption keys for contacts marked as Close Friends",
+                "Isolate status updates strictly to the currently active Persona identity",
+                "Restrict key wrapping to explicitly whitelisted peer sessions"
+        };
+
+        for (int i = 0; i < acls.length; i++) {
+            final com.m3.veil.manager.StatusController.PrivacyAcl acl = acls[i];
+            final String label = labels[i];
+            boolean selected = (acl == currentAcl);
+
+            com.google.android.material.card.MaterialCardView card = new com.google.android.material.card.MaterialCardView(this);
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = (int) (8 * dp);
+            card.setLayoutParams(lp);
+            card.setRadius(12 * dp);
+            card.setCardElevation(0);
+            card.setStrokeWidth((int) (1.2f * dp));
+            card.setStrokeColor(androidx.core.content.ContextCompat.getColor(this,
+                    selected ? R.color.colorPrimary : R.color.colorOutline));
+            card.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(this,
+                    selected ? R.color.surfaceVariant : android.R.color.transparent));
+
+            android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+            row.setOrientation(android.widget.LinearLayout.VERTICAL);
+            row.setPadding((int) (14 * dp), (int) (12 * dp), (int) (14 * dp), (int) (12 * dp));
+
+            TextView tvLabel = new TextView(this);
+            tvLabel.setText(label + (selected ? "  ✓" : ""));
+            tvLabel.setTextSize(15f);
+            tvLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvLabel.setTextColor(androidx.core.content.ContextCompat.getColor(this,
+                    selected ? R.color.colorPrimary : R.color.textPrimary));
+            row.addView(tvLabel);
+
+            TextView tvDesc = new TextView(this);
+            tvDesc.setText(descs[i]);
+            tvDesc.setTextSize(12.5f);
+            tvDesc.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.textSecondary));
+            tvDesc.setPadding(0, (int) (2 * dp), 0, 0);
+            row.addView(tvDesc);
+
+            card.addView(row);
+            card.setOnClickListener(v -> {
+                sc.setDefaultPrivacyAcl(acl);
+                Toast.makeText(this, "Status privacy updated: " + label, Toast.LENGTH_SHORT).show();
+                sheet.dismiss();
+            });
+            root.addView(card);
+        }
+
+        // Stealth Status Viewing toggle
+        android.widget.LinearLayout stealthRow = new android.widget.LinearLayout(this);
+        stealthRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        stealthRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        stealthRow.setPadding(0, (int) (12 * dp), 0, (int) (4 * dp));
+
+        android.widget.LinearLayout stealthTextCol = new android.widget.LinearLayout(this);
+        stealthTextCol.setOrientation(android.widget.LinearLayout.VERTICAL);
+        stealthTextCol.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView tvStealthTitle = new TextView(this);
+        tvStealthTitle.setText("👻 Ghost / Stealth Status View");
+        tvStealthTitle.setTextSize(15f);
+        tvStealthTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvStealthTitle.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.textPrimary));
+        stealthTextCol.addView(tvStealthTitle);
+
+        TextView tvStealthSub = new TextView(this);
+        tvStealthSub.setText("View contact statuses without sending signed P2P view receipts");
+        tvStealthSub.setTextSize(12.5f);
+        tvStealthSub.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.textSecondary));
+        stealthTextCol.addView(tvStealthSub);
+
+        androidx.appcompat.widget.SwitchCompat switchStealth = new androidx.appcompat.widget.SwitchCompat(this);
+        switchStealth.setChecked(sc.isStealthViewMode());
+        switchStealth.setOnCheckedChangeListener((btn, isChecked) -> {
+            sc.setStealthViewMode(isChecked);
+            Toast.makeText(this, isChecked ? "Ghost Status View enabled" : "Ghost Status View disabled", Toast.LENGTH_SHORT).show();
+        });
+
+        stealthRow.addView(stealthTextCol);
+        stealthRow.addView(switchStealth);
+        root.addView(stealthRow);
+
+        sheet.setContentView(root);
+        sheet.show();
     }
 
     private DiscoverFragment getDiscoverFragment() {

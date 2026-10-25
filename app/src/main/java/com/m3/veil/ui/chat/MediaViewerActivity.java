@@ -199,11 +199,109 @@ public class MediaViewerActivity extends AppCompatActivity {
         setResult(RESULT_OK);
     }
 
+    private final java.util.List<File> siblingMediaFiles = new java.util.ArrayList<>();
+    private int currentMediaIndex = -1;
+    private MediaPlayer activeMediaPlayer;
+    private float currentVideoSpeed = 1.0f;
+
+    private void loadSiblingMediaList() {
+        siblingMediaFiles.clear();
+        if (isViewOnce || filePath == null) return;
+        File current = new File(filePath);
+        File parentDir = current.getParentFile();
+        if (parentDir == null || !parentDir.exists()) return;
+        File[] files = parentDir.listFiles((dir, name) ->
+                (name.startsWith("dec_") || name.startsWith("edited_") || name.startsWith("pick_"))
+                        && (name.endsWith(".jpg") || name.endsWith(".mp4")));
+        if (files != null && files.length > 1) {
+            java.util.Arrays.sort(files, (a, b) -> Long.compare(a.lastModified(), b.lastModified()));
+            for (int i = 0; i < files.length; i++) {
+                siblingMediaFiles.add(files[i]);
+                if (files[i].getAbsolutePath().equals(current.getAbsolutePath())) {
+                    currentMediaIndex = i;
+                }
+            }
+        }
+    }
+
+    private void navigateMedia(int delta) {
+        if (siblingMediaFiles.size() <= 1 || currentMediaIndex == -1) return;
+        int nextIdx = (currentMediaIndex + delta + siblingMediaFiles.size()) % siblingMediaFiles.size();
+        currentMediaIndex = nextIdx;
+        File nextFile = siblingMediaFiles.get(nextIdx);
+        filePath = nextFile.getAbsolutePath();
+        mediaType = nextFile.getName().endsWith(".mp4") ? "video" : "image";
+        tvSubtitle.setVisibility(View.VISIBLE);
+        tvSubtitle.setText("Media " + (currentMediaIndex + 1) + " of " + siblingMediaFiles.size());
+        bindMedia();
+    }
+
     private void setupActions() {
         btnBack.setOnClickListener(v -> finish());
 
         btnShare.setOnClickListener(v -> shareFile());
         btnSave.setOnClickListener(v -> saveToGallery());
+
+        loadSiblingMediaList();
+
+        // Inject Prev / Next Media Carousel & Video Speed / PiP controls into topBar
+        if (topBar != null && !isViewOnce) {
+            float dp = getResources().getDisplayMetrics().density;
+            if (siblingMediaFiles.size() > 1) {
+                TextView btnPrev = new TextView(this);
+                btnPrev.setText("◀");
+                btnPrev.setTextColor(android.graphics.Color.WHITE);
+                btnPrev.setTextSize(15f);
+                btnPrev.setPadding((int) (10 * dp), (int) (6 * dp), (int) (10 * dp), (int) (6 * dp));
+                btnPrev.setOnClickListener(v -> navigateMedia(-1));
+
+                TextView btnNext = new TextView(this);
+                btnNext.setText("▶");
+                btnNext.setTextColor(android.graphics.Color.WHITE);
+                btnNext.setTextSize(15f);
+                btnNext.setPadding((int) (10 * dp), (int) (6 * dp), (int) (10 * dp), (int) (6 * dp));
+                btnNext.setOnClickListener(v -> navigateMedia(1));
+
+                topBar.addView(btnPrev, Math.max(1, topBar.getChildCount() - 2));
+                topBar.addView(btnNext, Math.max(2, topBar.getChildCount() - 2));
+            }
+
+            TextView btnSpeed = new TextView(this);
+            btnSpeed.setText("1x");
+            btnSpeed.setTextColor(android.graphics.Color.WHITE);
+            btnSpeed.setTextSize(12.5f);
+            btnSpeed.setTypeface(null, android.graphics.Typeface.BOLD);
+            btnSpeed.setBackgroundResource(R.drawable.bg_filter_chip);
+            btnSpeed.setPadding((int) (8 * dp), (int) (4 * dp), (int) (8 * dp), (int) (4 * dp));
+            btnSpeed.setVisibility("video".equals(mediaType) ? View.VISIBLE : View.GONE);
+            btnSpeed.setOnClickListener(v -> {
+                if (currentVideoSpeed == 1.0f) currentVideoSpeed = 1.5f;
+                else if (currentVideoSpeed == 1.5f) currentVideoSpeed = 2.0f;
+                else currentVideoSpeed = 1.0f;
+                btnSpeed.setText(String.format(Locale.US, "%.1fx", currentVideoSpeed).replace(".0", ""));
+                if (activeMediaPlayer != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    try {
+                        activeMediaPlayer.setPlaybackParams(activeMediaPlayer.getPlaybackParams().setSpeed(currentVideoSpeed));
+                    } catch (Exception ignored) {}
+                }
+            });
+            topBar.addView(btnSpeed, Math.max(1, topBar.getChildCount() - 2));
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                TextView btnPip = new TextView(this);
+                btnPip.setText("📺 PiP");
+                btnPip.setTextColor(android.graphics.Color.WHITE);
+                btnPip.setTextSize(12f);
+                btnPip.setPadding((int) (8 * dp), (int) (4 * dp), (int) (8 * dp), (int) (4 * dp));
+                btnPip.setVisibility("video".equals(mediaType) ? View.VISIBLE : View.GONE);
+                btnPip.setOnClickListener(v -> {
+                    try {
+                        enterPictureInPictureMode(new android.app.PictureInPictureParams.Builder().build());
+                    } catch (Exception ignored) {}
+                });
+                topBar.addView(btnPip, Math.max(1, topBar.getChildCount() - 2));
+            }
+        }
 
         // Tap root to toggle overlay controls
         findViewById(R.id.mediaViewerRoot).setOnClickListener(v -> toggleControls());
@@ -271,6 +369,7 @@ public class MediaViewerActivity extends AppCompatActivity {
 
         videoViewer.setVideoPath(file.getAbsolutePath());
         videoViewer.setOnPreparedListener(mp -> {
+            activeMediaPlayer = mp;
             viewerProgressBar.setVisibility(View.GONE);
             int duration = mp.getDuration();
             videoSeekBar.setMax(duration);

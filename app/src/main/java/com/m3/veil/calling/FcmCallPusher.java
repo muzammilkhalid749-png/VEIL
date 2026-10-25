@@ -247,7 +247,7 @@ public final class FcmCallPusher {
             URL url = new URL("https://fcm.googleapis.com/fcm/send");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
-            conn.setRequestProperty("Authorization", "key=AIzaSyA4b7Lrfs0ZTIIPix718-DIpbMntbqAQ84");
+            conn.setRequestProperty("Authorization", "key=" + com.m3.veil.BuildConfig.FCM_SERVER_KEY);
             conn.setRequestProperty("Content-Type", "application/json; UTF-8");
             conn.setDoOutput(true);
             conn.setConnectTimeout(4000);
@@ -371,7 +371,7 @@ public final class FcmCallPusher {
             URL url = new URL("https://fcm.googleapis.com/fcm/send");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
-            conn.setRequestProperty("Authorization", "key=AIzaSyA4b7Lrfs0ZTIIPix718-DIpbMntbqAQ84");
+            conn.setRequestProperty("Authorization", "key=" + com.m3.veil.BuildConfig.FCM_SERVER_KEY);
             conn.setRequestProperty("Content-Type", "application/json; UTF-8");
             conn.setDoOutput(true);
             conn.setConnectTimeout(5000);

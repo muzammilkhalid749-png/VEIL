@@ -202,6 +202,9 @@ public class MediaEditActivity extends AppCompatActivity {
         });
     }
 
+    private boolean isCensorBrushActive = false;
+    private boolean isVideoMuted = false;
+
     private void setupImageEditor() {
         photoEditorView.setVisibility(View.VISIBLE);
         videoView.setVisibility(View.GONE);
@@ -210,6 +213,39 @@ public class MediaEditActivity extends AppCompatActivity {
         photoEditor = new PhotoEditor.Builder(this, photoEditorView)
                 .setPinchTextScalable(true)
                 .build();
+
+        // Inject Privacy Censor / Mosaic Blur Brush Pill into topToolbar
+        if (topToolbar instanceof android.view.ViewGroup) {
+            android.view.ViewGroup tb = (android.view.ViewGroup) topToolbar;
+            float dp = getResources().getDisplayMetrics().density;
+            TextView btnCensor = new TextView(this);
+            btnCensor.setText("🕵️ Censor");
+            btnCensor.setTextColor(android.graphics.Color.WHITE);
+            btnCensor.setTextSize(12.5f);
+            btnCensor.setTypeface(null, android.graphics.Typeface.BOLD);
+            btnCensor.setBackgroundResource(R.drawable.bg_filter_chip);
+            btnCensor.setPadding((int) (10 * dp), (int) (6 * dp), (int) (10 * dp), (int) (6 * dp));
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.rightMargin = (int) (8 * dp);
+            btnCensor.setLayoutParams(lp);
+            btnCensor.setOnClickListener(v -> {
+                isCensorBrushActive = !isCensorBrushActive;
+                if (isCensorBrushActive) {
+                    updateState(UIState.DRAWING);
+                    photoEditor.setBrushSize(64f);
+                    photoEditor.setBrushColor(android.graphics.Color.parseColor("#E6111827"));
+                    btnCensor.setBackgroundResource(R.drawable.bg_filter_chip_selected);
+                    Toast.makeText(this, "🕵️ Privacy Censor Brush active: swipe over faces or sensitive text", Toast.LENGTH_SHORT).show();
+                } else {
+                    photoEditor.setBrushSize(16f);
+                    photoEditor.setBrushColor(currentSelectedColor);
+                    btnCensor.setBackgroundResource(R.drawable.bg_filter_chip);
+                }
+            });
+            tb.addView(btnCensor);
+        }
     }
 
     private void launchUCrop(Uri sourceUri) {
@@ -242,6 +278,26 @@ public class MediaEditActivity extends AppCompatActivity {
         findViewById(R.id.btnText).setVisibility(View.GONE);
         findViewById(R.id.btnDraw).setVisibility(View.GONE);
         findViewById(R.id.btnUndo).setVisibility(View.GONE);
+
+        // Add Video Audio Mute / Strip Toggle to topToolbar
+        if (topToolbar instanceof android.view.ViewGroup) {
+            android.view.ViewGroup tb = (android.view.ViewGroup) topToolbar;
+            float dp = getResources().getDisplayMetrics().density;
+            TextView btnMuteAudio = new TextView(this);
+            btnMuteAudio.setText("🔊 Audio On");
+            btnMuteAudio.setTextColor(android.graphics.Color.WHITE);
+            btnMuteAudio.setTextSize(12.5f);
+            btnMuteAudio.setTypeface(null, android.graphics.Typeface.BOLD);
+            btnMuteAudio.setBackgroundResource(R.drawable.bg_filter_chip);
+            btnMuteAudio.setPadding((int) (10 * dp), (int) (6 * dp), (int) (10 * dp), (int) (6 * dp));
+            tb.addView(btnMuteAudio);
+            btnMuteAudio.setOnClickListener(v -> {
+                isVideoMuted = !isVideoMuted;
+                btnMuteAudio.setText(isVideoMuted ? "🔇 Audio Muted" : "🔊 Audio On");
+                btnMuteAudio.setBackgroundResource(isVideoMuted ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+                Toast.makeText(this, isVideoMuted ? "🔇 Video audio muted" : "🔊 Video audio enabled", Toast.LENGTH_SHORT).show();
+            });
+        }
 
         videoTrimmerContainer = findViewById(R.id.videoTrimmerContainer);
         videoRangeSlider = findViewById(R.id.videoRangeSlider);

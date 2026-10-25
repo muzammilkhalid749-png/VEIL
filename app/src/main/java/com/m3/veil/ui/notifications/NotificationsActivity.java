@@ -300,7 +300,26 @@ public class NotificationsActivity extends AppCompatActivity {
     private void onNotificationClick(NotificationItem item) {
         if (item.chatId != null && !item.chatId.isEmpty()) {
             Intent intent = new Intent(this, ChatActivity.class);
-            intent.putExtra("chatId", item.chatId);
+            if (item.type == NotificationType.MISSED_CALL && !item.isGroup && !item.isChannel) {
+                String peerId = item.chatId;
+                String resolvedChatId = peerId.contains("_")
+                        ? peerId
+                        : com.m3.veil.webrtc.WebRtcManager.getChatId(currentUserId, peerId);
+                intent.putExtra("chatId", resolvedChatId);
+                intent.putExtra("recipientId", peerId);
+                if (item.body != null && item.body.startsWith("From ")) {
+                    intent.putExtra("recipientName", item.body.substring(5).trim());
+                }
+            } else {
+                intent.putExtra("chatId", item.chatId);
+                if (!item.isGroup && !item.isChannel && item.chatId.contains("_")) {
+                    String[] parts = item.chatId.split("_");
+                    if (parts.length == 2) {
+                        String peerId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+                        intent.putExtra("recipientId", peerId);
+                    }
+                }
+            }
             intent.putExtra("isGroup", item.isGroup);
             intent.putExtra("isChannel", item.isChannel);
             startActivity(intent);

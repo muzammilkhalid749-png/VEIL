@@ -81,6 +81,51 @@ public class P2PGameDrawerBottomSheet extends BottomSheetDialogFragment {
     private TextView tvTriviaQuestion;
     private LinearLayout triviaOptionsContainer;
 
+    private final WebRtcManager.P2PEventListener gameEventListener = new WebRtcManager.P2PEventListener() {
+        @Override
+        public void onMessageReceived(String peerId, com.m3.veil.model.Message message) {
+            if (message != null && message.getText() != null && message.getText().startsWith("🎮 [TTT MOVE:")) {
+                try {
+                    String raw = message.getText();
+                    int idxStart = raw.indexOf("CELL=") + 5;
+                    if (idxStart >= 5 && idxStart < raw.length()) {
+                        int cell = Character.getNumericValue(raw.charAt(idxStart));
+                        if (cell >= 0 && cell < 9 && isAdded()) {
+                            requireActivity().runOnUiThread(() -> applyIncomingPeerTttMove(cell));
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+
+        @Override public void onMessageStatusChanged(String messageId, boolean delivered, boolean read) {}
+        @Override public void onPeerTyping(String peerId, boolean isTyping) {}
+        @Override public void onPeerConnected(String peerId) {}
+        @Override public void onPeerDisconnected(String peerId) {}
+        @Override public void onCallEstablished(String peerId) {}
+        @Override public void onCallEnded(String peerId) {}
+    };
+
+    private void applyIncomingPeerTttMove(int pick) {
+        if (tttGameOver || pick < 0 || pick >= 9 || tttBoard[pick] != ' ') return;
+        tttBoard[pick] = 'O';
+        if (tttButtons[pick] != null) {
+            tttButtons[pick].setText("O");
+            tttButtons[pick].setTextColor(Color.parseColor("#F43F5E"));
+        }
+        char winner = checkTttWinner();
+        if (winner == 'O') {
+            tttGameOver = true;
+            if (tvTttStatus != null) tvTttStatus.setText("Peer Won! Good match.");
+        } else if (isTttBoardFull()) {
+            tttGameOver = true;
+            if (tvTttStatus != null) tvTttStatus.setText("🤝 Stalemate / Draw!");
+        } else {
+            tttMyTurn = true;
+            if (tvTttStatus != null) tvTttStatus.setText("Your turn (You are X)");
+        }
+    }
+
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -89,6 +134,17 @@ public class P2PGameDrawerBottomSheet extends BottomSheetDialogFragment {
             chatId = getArguments().getString("chatId", "");
         }
         for (int i = 0; i < 9; i++) tttBoard[i] = ' ';
+        if (getContext() != null) {
+            WebRtcManager.getInstance(getContext()).addEventListener(gameEventListener);
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (getContext() != null) {
+            WebRtcManager.getInstance(getContext()).removeEventListener(gameEventListener);
+        }
     }
 
     @Override

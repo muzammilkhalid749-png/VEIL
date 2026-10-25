@@ -52,17 +52,15 @@ public class AttachmentBottomSheet extends BottomSheetDialogFragment {
         View btnDoodle = view.findViewById(R.id.btnAttachDoodle);
         View btnBlink = view.findViewById(R.id.btnAttachBlink);
 
-        // Hide options that are already 1-tap buttons on the composer or Quick Chips bar
-        if (btnCamera != null) btnCamera.setVisibility(View.GONE);
-        if (btnPoll != null) btnPoll.setVisibility(View.GONE);
-        if (btnDoodle != null) btnDoodle.setVisibility(View.GONE);
-        if (btnBlink != null) btnBlink.setVisibility(View.GONE);
-
         UiAnimator.attachSpringPress(btnImage);
         UiAnimator.attachSpringPress(btnVideo);
         UiAnimator.attachSpringPress(btnDocument);
         UiAnimator.attachSpringPress(btnLocation);
         UiAnimator.attachSpringPress(btnContact);
+        if (btnCamera != null) UiAnimator.attachSpringPress(btnCamera);
+        if (btnPoll != null) UiAnimator.attachSpringPress(btnPoll);
+        if (btnDoodle != null) UiAnimator.attachSpringPress(btnDoodle);
+        if (btnBlink != null) UiAnimator.attachSpringPress(btnBlink);
 
         btnImage.setOnClickListener(v -> {
             dismiss();

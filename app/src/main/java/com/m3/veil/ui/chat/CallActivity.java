@@ -173,6 +173,7 @@ public class CallActivity extends AppCompatActivity {
     private CallState lastState = CallState.NONE;
     private VideoTrack attachedRemoteTrack;
     private VideoTrack attachedLocalTrack;
+    private boolean isVideoFeedsSwapped = false;
 
     private long callStartedAtMs;
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
@@ -374,7 +375,19 @@ public class CallActivity extends AppCompatActivity {
         if (btnToggleMic != null) {
             btnToggleMic.setOnClickListener(v -> toggleMute());
         }
-        if (btnToggleSpeaker != null) btnToggleSpeaker.setOnClickListener(v -> toggleSpeaker());
+        if (btnToggleSpeaker != null) {
+            btnToggleSpeaker.setOnClickListener(v -> toggleSpeaker());
+            btnToggleSpeaker.setOnLongClickListener(v -> {
+                showAudioRoutePickerSheet();
+                return true;
+            });
+        }
+        if (cardLocalVideo != null) {
+            cardLocalVideo.setOnClickListener(v -> toggleSwapVideoFeeds());
+        }
+        if (localVideoView != null) {
+            localVideoView.setOnClickListener(v -> toggleSwapVideoFeeds());
+        }
         if (btnToggleVideo != null) {
             btnToggleVideo.setOnClickListener(v -> toggleVideo());
         }
@@ -1040,8 +1053,11 @@ public class CallActivity extends AppCompatActivity {
         }
         root.addView(reactionsRow);
 
-        String[] itemIcons = {"📶", "✋"};
+        String[] itemIcons = {"💬", "🔊", "🔄", "📶", "✋"};
         String[] itemTitles = {
+                "In-Call Encrypted Quick Chat",
+                "Select Audio Output (Speaker / Bluetooth / Earpiece)",
+                "Swap Local & Remote Video Feeds",
                 engine != null && engine.isLowDataMode() ? "Disable Low-Data Mode" : "Enable Low-Data Mode (Bandwidth Saver)",
                 "Raise / Lower Hand"
         };
@@ -1069,12 +1085,18 @@ public class CallActivity extends AppCompatActivity {
             row.setOnClickListener(v -> {
                 sheet.dismiss();
                 if (actionIndex == 0) {
+                    showInCallQuickChatSheet();
+                } else if (actionIndex == 1) {
+                    showAudioRoutePickerSheet();
+                } else if (actionIndex == 2) {
+                    toggleSwapVideoFeeds();
+                } else if (actionIndex == 3) {
                     if (engine != null) {
                         boolean next = !engine.isLowDataMode();
                         engine.setLowDataMode(next);
                         toast(next ? "Low-data mode enabled" : "Low-data mode disabled");
                     }
-                } else if (actionIndex == 1) {
+                } else if (actionIndex == 4) {
                     if (engine != null) {
                         CallParticipant self = engine.getParticipant(currentUserId);
                         boolean next = self == null || !self.handRaised;
@@ -1086,6 +1108,196 @@ public class CallActivity extends AppCompatActivity {
 
             root.addView(row);
         }
+
+        sheet.setContentView(root);
+        showSheetSafely(sheet);
+    }
+
+    private void toggleSwapVideoFeeds() {
+        if (remoteVideoView == null || localVideoView == null) return;
+        isVideoFeedsSwapped = !isVideoFeedsSwapped;
+        try {
+            if (attachedRemoteTrack != null) {
+                attachedRemoteTrack.removeSink(remoteVideoView);
+                attachedRemoteTrack.removeSink(localVideoView);
+            }
+            if (attachedLocalTrack != null) {
+                attachedLocalTrack.removeSink(localVideoView);
+                attachedLocalTrack.removeSink(remoteVideoView);
+            }
+            if (isVideoFeedsSwapped) {
+                if (attachedLocalTrack != null) {
+                    CallVideoDevice.attachRenderer(remoteVideoView, attachedLocalTrack, com.m3.veil.calling.CallMediaFactory.eglBase());
+                }
+                if (attachedRemoteTrack != null) {
+                    CallVideoDevice.attachRenderer(localVideoView, attachedRemoteTrack, com.m3.veil.calling.CallMediaFactory.eglBase());
+                }
+                toast("🔄 Swapped: Your camera is full-screen");
+            } else {
+                if (attachedRemoteTrack != null) {
+                    CallVideoDevice.attachRenderer(remoteVideoView, attachedRemoteTrack, com.m3.veil.calling.CallMediaFactory.eglBase());
+                }
+                if (attachedLocalTrack != null) {
+                    CallVideoDevice.attachRenderer(localVideoView, attachedLocalTrack, com.m3.veil.calling.CallMediaFactory.eglBase());
+                }
+                toast("🔄 Swapped: Peer camera is full-screen");
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void showAudioRoutePickerSheet() {
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
+
+        TextView title = new TextView(this);
+        title.setText("🔊 Audio Output Route");
+        title.setTextSize(18f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        title.setPadding(0, 0, 0, (int) (12 * dp));
+        root.addView(title);
+
+        String[] labels = {
+                "🔈 Speakerphone",
+                "📱 Handset Earpiece",
+                "🎧 Bluetooth Audio Device",
+                "🔌 Wired Headset"
+        };
+
+        AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+
+        for (int i = 0; i < labels.length; i++) {
+            final int routeIdx = i;
+            TextView row = new TextView(this);
+            row.setText(labels[i]);
+            row.setTextSize(15.5f);
+            row.setTypeface(null, android.graphics.Typeface.BOLD);
+            row.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+            row.setPadding((int) (12 * dp), (int) (14 * dp), (int) (12 * dp), (int) (14 * dp));
+            row.setOnClickListener(v -> {
+                sheet.dismiss();
+                if (engine == null) return;
+                if (routeIdx == 0) {
+                    engine.setSpeakerOn(true);
+                    isSpeakerOn = true;
+                    if (am != null) am.stopBluetoothSco();
+                    if (tvToggleSpeaker != null) tvToggleSpeaker.setText("Speaker");
+                } else if (routeIdx == 1) {
+                    engine.setSpeakerOn(false);
+                    isSpeakerOn = false;
+                    if (am != null) am.stopBluetoothSco();
+                    if (tvToggleSpeaker != null) tvToggleSpeaker.setText("Earpiece");
+                } else if (routeIdx == 2) {
+                    engine.setSpeakerOn(false);
+                    isSpeakerOn = false;
+                    if (am != null) {
+                        try {
+                            am.startBluetoothSco();
+                            am.setBluetoothScoOn(true);
+                        } catch (Throwable ignored) {}
+                    }
+                    if (tvToggleSpeaker != null) tvToggleSpeaker.setText("Bluetooth");
+                } else if (routeIdx == 3) {
+                    engine.setSpeakerOn(false);
+                    isSpeakerOn = false;
+                    if (am != null) am.stopBluetoothSco();
+                    if (tvToggleSpeaker != null) tvToggleSpeaker.setText("Headset");
+                }
+                updateToggle(btnToggleSpeaker, ivToggleSpeaker, tvToggleSpeaker, isSpeakerOn || routeIdx == 2,
+                        tvToggleSpeaker != null ? tvToggleSpeaker.getText().toString() : "Audio");
+                applyProximityPolicy();
+                toast("Audio routed to: " + labels[routeIdx]);
+            });
+            root.addView(row);
+        }
+
+        sheet.setContentView(root);
+        showSheetSafely(sheet);
+    }
+
+    private void showInCallQuickChatSheet() {
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
+
+        TextView title = new TextView(this);
+        title.setText("💬 In-Call Encrypted Chat (" + (contactName != null ? contactName : "Peer") + ")");
+        title.setTextSize(17.5f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        title.setPadding(0, 0, 0, (int) (10 * dp));
+        root.addView(title);
+
+        String peerId = contactId != null ? contactId : (engine != null ? engine.getPrimaryPeerId() : null);
+        String chatId = (peerId != null && !peerId.isEmpty())
+                ? com.m3.veil.webrtc.WebRtcManager.getChatId(currentUserId, peerId)
+                : ("call_chat_" + callId);
+
+        LinearLayout historyBox = new LinearLayout(this);
+        historyBox.setOrientation(LinearLayout.VERTICAL);
+        historyBox.setBackgroundResource(R.drawable.bg_search_input);
+        int pad = (int) (12 * dp);
+        historyBox.setPadding(pad, pad, pad, pad);
+        root.addView(historyBox);
+
+        List<com.m3.veil.model.Message> msgs = EncryptedChatDatabase.getInstance(this).getMessagesForChat(chatId);
+        if (msgs == null || msgs.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("Send a quick encrypted note or link without leaving the call.");
+            empty.setTextSize(13f);
+            empty.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+            historyBox.addView(empty);
+        } else {
+            int start = Math.max(0, msgs.size() - 4);
+            for (int i = start; i < msgs.size(); i++) {
+                com.m3.veil.model.Message m = msgs.get(i);
+                TextView row = new TextView(this);
+                boolean mine = currentUserId.equals(m.getSenderId());
+                row.setText((mine ? "You: " : (contactName + ": ")) + m.getContent());
+                row.setTextSize(13.5f);
+                row.setTextColor(ContextCompat.getColor(this, mine ? R.color.colorPrimary : R.color.textPrimary));
+                row.setPadding(0, (int) (3 * dp), 0, (int) (3 * dp));
+                historyBox.addView(row);
+            }
+        }
+
+        android.widget.EditText etMsg = new android.widget.EditText(this);
+        etMsg.setHint("Type encrypted in-call message...");
+        etMsg.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        etMsg.setHintTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+        etMsg.setPadding(0, (int) (12 * dp), 0, (int) (12 * dp));
+        root.addView(etMsg);
+
+        MaterialButton btnSend = new MaterialButton(this);
+        btnSend.setText("Send Over P2P DataChannel");
+        btnSend.setCornerRadius((int) (12 * dp));
+        btnSend.setOnClickListener(v -> {
+            String text = etMsg.getText().toString().trim();
+            if (text.isEmpty()) return;
+            com.m3.veil.model.Message msg = new com.m3.veil.model.Message(
+                    UUID.randomUUID().toString(),
+                    currentUserId,
+                    peerId != null ? peerId : "",
+                    text,
+                    Timestamp.now(),
+                    "text"
+            );
+            msg.setChatId(chatId);
+            msg.setSenderName(currentUsername != null ? currentUsername : "You");
+            EncryptedChatDatabase.getInstance(this).saveMessage(chatId, msg);
+            if (peerId != null) {
+                com.m3.veil.model.Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
+                com.m3.veil.webrtc.WebRtcManager.getInstance(this).sendChatMessageToChat(chat, peerId, msg);
+            }
+            sheet.dismiss();
+            toast("💬 Sent encrypted in-call message");
+        });
+        root.addView(btnSend);
 
         sheet.setContentView(root);
         showSheetSafely(sheet);

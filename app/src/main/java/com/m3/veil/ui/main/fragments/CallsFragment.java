@@ -90,11 +90,12 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
 
     public void showCallHubMenu() {
         BottomSheetDialog sheet = new BottomSheetDialog(requireContext());
-        sheet.setContentView(R.layout.dialog_call_hub_sheet);
+        View sheetView = getLayoutInflater().inflate(R.layout.dialog_call_hub_sheet, null);
+        sheet.setContentView(sheetView);
 
-        View cardDirect = sheet.findViewById(R.id.cardCallHubDirect);
-        View cardRoulette = sheet.findViewById(R.id.cardCallHubRoulette);
-        View cardClear = sheet.findViewById(R.id.cardCallHubClear);
+        View cardDirect = sheetView.findViewById(R.id.cardCallHubDirect);
+        View cardRoulette = sheetView.findViewById(R.id.cardCallHubRoulette);
+        View cardClear = sheetView.findViewById(R.id.cardCallHubClear);
 
         if (cardDirect != null) {
             cardDirect.setOnClickListener(v -> {
@@ -114,7 +115,217 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
                 confirmClearAllCalls();
             });
         }
+
+        // Inject Create P2P Call Link & Group Call cards into the sheet container
+        if (cardDirect != null && cardDirect.getParent() instanceof android.widget.LinearLayout) {
+            android.widget.LinearLayout container = (android.widget.LinearLayout) cardDirect.getParent();
+            float dp = getResources().getDisplayMetrics().density;
+            int insertIdx = container.indexOfChild(cardDirect) + 1;
+
+            android.widget.LinearLayout btnCallLink = new android.widget.LinearLayout(requireContext());
+            btnCallLink.setOrientation(android.widget.LinearLayout.VERTICAL);
+            btnCallLink.setBackgroundResource(R.drawable.bg_search_input);
+            int pad = (int) (14 * dp);
+            btnCallLink.setPadding(pad, pad, pad, pad);
+            android.widget.LinearLayout.LayoutParams linkLp = new android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            linkLp.bottomMargin = (int) (10 * dp);
+            btnCallLink.setLayoutParams(linkLp);
+
+            TextView tvLinkTitle = new TextView(requireContext());
+            tvLinkTitle.setText("🔗 Create Encrypted P2P Call Link");
+            tvLinkTitle.setTextSize(15f);
+            tvLinkTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvLinkTitle.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
+            btnCallLink.addView(tvLinkTitle);
+
+            TextView tvLinkSub = new TextView(requireContext());
+            tvLinkSub.setText("Generate a shareable veil://call/ link for instant E2EE voice or video calls");
+            tvLinkSub.setTextSize(12.5f);
+            tvLinkSub.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
+            btnCallLink.addView(tvLinkSub);
+
+            btnCallLink.setOnClickListener(v -> {
+                sheet.dismiss();
+                showCreateCallLinkSheet();
+            });
+            container.addView(btnCallLink, insertIdx);
+
+            android.widget.LinearLayout btnGroupCall = new android.widget.LinearLayout(requireContext());
+            btnGroupCall.setOrientation(android.widget.LinearLayout.VERTICAL);
+            btnGroupCall.setBackgroundResource(R.drawable.bg_search_input);
+            btnGroupCall.setPadding(pad, pad, pad, pad);
+            android.widget.LinearLayout.LayoutParams grpLp = new android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            grpLp.bottomMargin = (int) (10 * dp);
+            btnGroupCall.setLayoutParams(grpLp);
+
+            TextView tvGrpTitle = new TextView(requireContext());
+            tvGrpTitle.setText("👥 Start E2EE Group Mesh Call");
+            tvGrpTitle.setTextSize(15f);
+            tvGrpTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvGrpTitle.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
+            btnGroupCall.addView(tvGrpTitle);
+
+            TextView tvGrpSub = new TextView(requireContext());
+            tvGrpSub.setText("Select multiple contacts for a multi-peer SFrame encrypted voice or video call");
+            tvGrpSub.setTextSize(12.5f);
+            tvGrpSub.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
+            btnGroupCall.addView(tvGrpSub);
+
+            btnGroupCall.setOnClickListener(v -> {
+                sheet.dismiss();
+                showGroupCallPickerDialog();
+            });
+            container.addView(btnGroupCall, insertIdx + 1);
+        }
+
         sheet.show();
+    }
+
+    private void showCreateCallLinkSheet() {
+        if (getContext() == null) return;
+        String token = UUID.randomUUID().toString().substring(0, 8);
+        String callLink = "veil://call/" + token;
+
+        BottomSheetDialog sheet = new BottomSheetDialog(requireContext());
+        float dp = getResources().getDisplayMetrics().density;
+        android.widget.LinearLayout root = new android.widget.LinearLayout(requireContext());
+        root.setOrientation(android.widget.LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        root.setPadding((int) (24 * dp), (int) (20 * dp), (int) (24 * dp), (int) (28 * dp));
+
+        TextView title = new TextView(requireContext());
+        title.setText("🔗 Encrypted P2P Call Link");
+        title.setTextSize(18.5f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
+        root.addView(title);
+
+        TextView sub = new TextView(requireContext());
+        sub.setText("Anyone with this VEIL link can join your direct WebRTC call room with end-to-end key verification.");
+        sub.setTextSize(13f);
+        sub.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
+        sub.setPadding(0, (int) (6 * dp), 0, (int) (14 * dp));
+        root.addView(sub);
+
+        TextView linkBox = new TextView(requireContext());
+        linkBox.setText(callLink);
+        linkBox.setTextSize(15f);
+        linkBox.setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD);
+        linkBox.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+        linkBox.setBackgroundResource(R.drawable.bg_search_input);
+        int pad = (int) (14 * dp);
+        linkBox.setPadding(pad, pad, pad, pad);
+        root.addView(linkBox);
+
+        com.google.android.material.button.MaterialButton btnCopy = new com.google.android.material.button.MaterialButton(requireContext());
+        btnCopy.setText("📋 Copy Call Link");
+        btnCopy.setCornerRadius((int) (12 * dp));
+        btnCopy.setOnClickListener(v -> {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+            if (cm != null) {
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("Veil Call Link", callLink));
+                Toast.makeText(getContext(), "Call link copied to clipboard", Toast.LENGTH_SHORT).show();
+            }
+        });
+        root.addView(btnCopy);
+
+        com.google.android.material.button.MaterialButton btnShare = new com.google.android.material.button.MaterialButton(requireContext());
+        btnShare.setText("📤 Share Call Link");
+        btnShare.setCornerRadius((int) (12 * dp));
+        btnShare.setOnClickListener(v -> {
+            sheet.dismiss();
+            Intent share = new Intent(Intent.ACTION_SEND);
+            share.setType("text/plain");
+            share.putExtra(Intent.EXTRA_TEXT, "Join my encrypted VEIL P2P call: " + callLink);
+            startActivity(Intent.createChooser(share, "Share Call Link"));
+        });
+        root.addView(btnShare);
+
+        com.google.android.material.button.MaterialButton btnJoinNow = new com.google.android.material.button.MaterialButton(requireContext());
+        btnJoinNow.setText("📞 Start Call Room Now");
+        btnJoinNow.setCornerRadius((int) (12 * dp));
+        btnJoinNow.setOnClickListener(v -> {
+            sheet.dismiss();
+            Intent intent = new Intent(getContext(), CallActivity.class);
+            intent.putExtra(CallActivity.EXTRA_CALL_ID, "room_" + token);
+            intent.putExtra(CallActivity.EXTRA_GROUP_ID, "room_" + token);
+            intent.putExtra(CallActivity.EXTRA_GROUP_NAME, "Call Room #" + token);
+            intent.putExtra(CallActivity.EXTRA_CALL_TYPE, "video");
+            intent.putExtra(CallActivity.EXTRA_IS_INCOMING, false);
+            startActivity(intent);
+        });
+        root.addView(btnJoinNow);
+
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
+    private void showGroupCallPickerDialog() {
+        if (getContext() == null) return;
+        List<com.m3.veil.model.Chat> allChats = EncryptedChatDatabase.getInstance(requireContext()).getAllChats();
+        List<com.m3.veil.model.Chat> candidates = new ArrayList<>();
+        if (allChats != null) {
+            for (com.m3.veil.model.Chat c : allChats) {
+                if (c != null && !c.isBlocked() && c.getName() != null && !c.getName().trim().isEmpty()) {
+                    candidates.add(c);
+                }
+            }
+        }
+        if (candidates.isEmpty()) {
+            Toast.makeText(getContext(), "Start a chat with contacts first to launch a group call", Toast.LENGTH_SHORT).show();
+            startActivity(new Intent(getContext(), NewChatActivity.class));
+            return;
+        }
+
+        String[] names = new String[candidates.size()];
+        boolean[] checked = new boolean[candidates.size()];
+        for (int i = 0; i < candidates.size(); i++) {
+            names[i] = candidates.get(i).getName();
+        }
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle("👥 Select Peers for Group Call")
+                .setMultiChoiceItems(names, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton("📹 Video Call", (dialog, which) -> launchSelectedGroupCall(candidates, checked, "video"))
+                .setNeutralButton("📞 Voice Call", (dialog, which) -> launchSelectedGroupCall(candidates, checked, "audio"))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void launchSelectedGroupCall(List<com.m3.veil.model.Chat> candidates, boolean[] checked, String type) {
+        List<String> selectedIds = new ArrayList<>();
+        List<String> selectedNames = new ArrayList<>();
+        for (int i = 0; i < candidates.size(); i++) {
+            if (checked[i]) {
+                com.m3.veil.model.Chat c = candidates.get(i);
+                String peerId = c.getId();
+                if (c.getParticipants() != null) {
+                    for (String p : c.getParticipants()) {
+                        if (p != null && !p.equals(currentUserId)) {
+                            peerId = p;
+                            break;
+                        }
+                    }
+                }
+                selectedIds.add(peerId);
+                selectedNames.add(c.getName());
+            }
+        }
+        if (selectedIds.isEmpty()) {
+            Toast.makeText(getContext(), "Select at least 1 contact", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent intent = new Intent(getContext(), CallActivity.class);
+        intent.putExtra(CallActivity.EXTRA_CONTACT_ID, selectedIds.get(0));
+        intent.putExtra(CallActivity.EXTRA_CONTACT_NAME, selectedNames.get(0));
+        intent.putExtra(CallActivity.EXTRA_GROUP_ID, "grp_call_" + UUID.randomUUID().toString().substring(0, 6));
+        intent.putExtra(CallActivity.EXTRA_GROUP_NAME, "Group Call (" + (selectedIds.size() + 1) + " peers)");
+        intent.putExtra(CallActivity.EXTRA_PARTICIPANT_IDS, selectedIds.toArray(new String[0]));
+        intent.putExtra(CallActivity.EXTRA_CALL_TYPE, type);
+        intent.putExtra(CallActivity.EXTRA_IS_INCOMING, false);
+        startActivity(intent);
     }
 
     private void startRandomPeerVoiceCall() {

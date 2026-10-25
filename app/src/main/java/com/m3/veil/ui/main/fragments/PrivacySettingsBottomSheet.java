@@ -117,6 +117,25 @@ public class PrivacySettingsBottomSheet extends BottomSheetDialogFragment {
         });
 
         view.findViewById(R.id.btnTorProxyBridge).setOnClickListener(v -> showTorProxyConfigDialog(bridge));
+
+        if (view instanceof ViewGroup) {
+            ViewGroup rootLayout = (ViewGroup) view;
+            float dp = getResources().getDisplayMetrics().density;
+            com.google.android.material.button.MaterialButton btnAdvancedVault =
+                    new com.google.android.material.button.MaterialButton(requireContext());
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = (int) (12 * dp);
+            btnAdvancedVault.setLayoutParams(lp);
+            btnAdvancedVault.setText("🔐 Cryptographic Vault & Duress PIN");
+            btnAdvancedVault.setAllCaps(false);
+            btnAdvancedVault.setCornerRadius((int) (14 * dp));
+            btnAdvancedVault.setOnClickListener(v -> {
+                dismiss();
+                startActivity(new android.content.Intent(requireContext(), com.m3.veil.ui.settings.PrivacySettingsActivity.class));
+            });
+            rootLayout.addView(btnAdvancedVault);
+        }
     }
 
     private void updateTorStatusLabel(com.m3.veil.utils.VeilTorProxyBridge bridge) {

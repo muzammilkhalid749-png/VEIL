@@ -294,63 +294,89 @@ public class UsernameActivity extends AppCompatActivity {
     }
 
     private void showPremiumUpsellDialog(String premiumUsername) {
-        // For now, show a snackbar and suggest using a free username
-        // In the future, this will open a premium purchase flow
+        com.google.android.material.bottomsheet.BottomSheetDialog sheet =
+                new com.google.android.material.bottomsheet.BottomSheetDialog(UsernameActivity.this);
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(UsernameActivity.this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setBackgroundResource(R.drawable.bottom_sheet_background);
+        float dp = getResources().getDisplayMetrics().density;
+        int padH = (int) (24 * dp);
+        int padV = (int) (16 * dp);
+        layout.setPadding(padH, padV, padH, padV * 2);
 
-        Snackbar.make(findViewById(android.R.id.content),
-                        "⭐ \"" + premiumUsername + "\" is a premium username. You can claim it later in Settings → Premium",
-                        Snackbar.LENGTH_LONG)
-                .setAction("Learn More", v -> {
-                    com.google.android.material.bottomsheet.BottomSheetDialog sheet =
-                            new com.google.android.material.bottomsheet.BottomSheetDialog(UsernameActivity.this);
-                    android.widget.LinearLayout layout = new android.widget.LinearLayout(UsernameActivity.this);
-                    layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-                    layout.setBackgroundResource(R.drawable.bottom_sheet_background);
-                    int padH = (int) (24 * getResources().getDisplayMetrics().density);
-                    int padV = (int) (16 * getResources().getDisplayMetrics().density);
-                    layout.setPadding(padH, padV, padH, padV * 2);
+        View handle = new View(UsernameActivity.this);
+        int handleW = (int) (36 * dp);
+        int handleH = (int) (4 * dp);
+        android.widget.LinearLayout.LayoutParams handleLp = new android.widget.LinearLayout.LayoutParams(handleW, handleH);
+        handleLp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        handleLp.bottomMargin = (int) (16 * dp);
+        handle.setLayoutParams(handleLp);
+        handle.setBackgroundResource(R.drawable.bg_voice_circle_incoming);
+        layout.addView(handle);
 
-                    View handle = new View(UsernameActivity.this);
-                    int handleW = (int) (36 * getResources().getDisplayMetrics().density);
-                    int handleH = (int) (4 * getResources().getDisplayMetrics().density);
-                    android.widget.LinearLayout.LayoutParams handleLp = new android.widget.LinearLayout.LayoutParams(handleW, handleH);
-                    handleLp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-                    handleLp.bottomMargin = (int) (16 * getResources().getDisplayMetrics().density);
-                    handle.setLayoutParams(handleLp);
-                    handle.setBackgroundResource(R.drawable.bg_voice_circle_incoming);
-                    layout.addView(handle);
+        TextView tvTitle = new TextView(UsernameActivity.this);
+        tvTitle.setText("⭐ Unlock @" + premiumUsername);
+        tvTitle.setTextColor(androidx.core.content.ContextCompat.getColor(UsernameActivity.this, R.color.textPrimary));
+        tvTitle.setTextSize(19);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        layout.addView(tvTitle);
 
-                    TextView tvTitle = new TextView(UsernameActivity.this);
-                    tvTitle.setText("⭐ VEIL Premium Handles");
-                    tvTitle.setTextColor(androidx.core.content.ContextCompat.getColor(UsernameActivity.this, R.color.textPrimary));
-                    tvTitle.setTextSize(19);
-                    tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-                    layout.addView(tvTitle);
+        com.m3.veil.manager.VeilFeatureManager fm = com.m3.veil.manager.VeilFeatureManager.getInstance(UsernameActivity.this);
+        int balance = fm.getVeilCoins();
+        int cost = 100;
 
-                    TextView tvSub = new TextView(UsernameActivity.this);
-                    tvSub.setText("Premium usernames allow you to reserve rare short words, numbers, and privacy badges.\n\n• Verified Cryptographic Privacy Badge\n• High-priority WebRTC P2P signaling relay\n• Anonymous multi-persona reservation\n\nYou can claim or manage handles anytime in Profile → Settings.");
-                    tvSub.setTextColor(androidx.core.content.ContextCompat.getColor(UsernameActivity.this, R.color.textSecondary));
-                    tvSub.setTextSize(13.5f);
-                    tvSub.setLineSpacing(4, 1.25f);
-                    tvSub.setPadding(0, (int) (8 * getResources().getDisplayMetrics().density), 0, (int) (20 * getResources().getDisplayMetrics().density));
-                    layout.addView(tvSub);
+        TextView tvSub = new TextView(UsernameActivity.this);
+        tvSub.setText("\"" + premiumUsername + "\" is a rare Premium VEIL handle.\n\n"
+                + "• Verified Cryptographic Privacy Badge\n"
+                + "• High-priority WebRTC P2P signaling relay\n"
+                + "• Your Wallet Balance: " + balance + " VeilCoins (Cost: " + cost + " VC)");
+        tvSub.setTextColor(androidx.core.content.ContextCompat.getColor(UsernameActivity.this, R.color.textSecondary));
+        tvSub.setTextSize(13.5f);
+        tvSub.setLineSpacing(4, 1.25f);
+        tvSub.setPadding(0, (int) (8 * dp), 0, (int) (20 * dp));
+        layout.addView(tvSub);
 
-                    com.google.android.material.button.MaterialButton btnGotIt =
-                            new com.google.android.material.button.MaterialButton(UsernameActivity.this);
-                    btnGotIt.setText("Got It");
-                    btnGotIt.setCornerRadius((int) (12 * getResources().getDisplayMetrics().density));
-                    btnGotIt.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF6366F1));
-                    btnGotIt.setTextColor(0xFFFFFFFF);
-                    btnGotIt.setOnClickListener(bv -> sheet.dismiss());
-                    layout.addView(btnGotIt);
+        com.google.android.material.button.MaterialButton btnClaim =
+                new com.google.android.material.button.MaterialButton(UsernameActivity.this);
+        btnClaim.setText("🪙 Unlock @" + premiumUsername + " (" + cost + " VC)");
+        btnClaim.setCornerRadius((int) (12 * dp));
+        btnClaim.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF6366F1));
+        btnClaim.setTextColor(0xFFFFFFFF);
+        android.widget.LinearLayout.LayoutParams claimLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        claimLp.bottomMargin = (int) (10 * dp);
+        btnClaim.setLayoutParams(claimLp);
+        btnClaim.setOnClickListener(bv -> {
+            if (!fm.spendCoins(cost)) {
+                showSnackbar("Insufficient VeilCoins (" + balance + " VC). Using free handle instead.");
+                sheet.dismiss();
+                suggestFreeAlternative(premiumUsername);
+                return;
+            }
+            fm.unlockBadge("⭐ Premium Handle Owner");
+            sheet.dismiss();
+            isPremiumUsernameSelected = false;
+            saveUsernameAndContinue();
+        });
+        layout.addView(btnClaim);
 
-                    sheet.setContentView(layout);
-                    sheet.show();
-                })
-                .show();
+        com.google.android.material.button.MaterialButton btnFree =
+                new com.google.android.material.button.MaterialButton(
+                        UsernameActivity.this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnFree.setText("✨ Use Free Alternative Instead");
+        btnFree.setCornerRadius((int) (12 * dp));
+        btnFree.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+        btnFree.setOnClickListener(bv -> {
+            sheet.dismiss();
+            suggestFreeAlternative(premiumUsername);
+        });
+        layout.addView(btnFree);
 
-        // Auto-generate a free alternative suggestion
-        suggestFreeAlternative(premiumUsername);
+        sheet.setContentView(layout);
+        sheet.show();
     }
 
     private void suggestFreeAlternative(String premiumUsername) {

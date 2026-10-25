@@ -103,8 +103,12 @@ public class CameraGalleryActivity extends AppCompatActivity {
     public static final String RESULT_MEDIA_PATH = "result_media_path";
     public static final String RESULT_MEDIA_TYPE = "result_media_type";
     public static final String RESULT_MEDIA_CAPTION = "result_media_caption";
+    public static final String RESULT_BATCH_PATHS = "result_batch_paths";
+    public static final String RESULT_BATCH_TYPES = "result_batch_types";
     public static final String EXTRA_START_IN_GALLERY = "extra_start_in_gallery";
     private boolean startedDirectlyInGallery = false;
+    private final ArrayList<String> pendingBatchPaths = new ArrayList<>();
+    private final ArrayList<String> pendingBatchTypes = new ArrayList<>();
 
     // Camera Views
     private PreviewView cameraPreviewView;
@@ -335,15 +339,45 @@ public class CameraGalleryActivity extends AppCompatActivity {
         fabSendSelected.setOnClickListener(v -> {
             List<GalleryMediaItem> selected = fullGalleryAdapter.getSelectedItems();
             if (selected.isEmpty()) return;
-            if (selected.size() == 1) {
-                GalleryMediaItem item = selected.get(0);
-                openMediaEditor(item.getUri(), item.isVideo() ? "video" : "image");
-            } else {
-                // Return first selected as primary or trigger batch send
-                GalleryMediaItem item = selected.get(0);
-                openMediaEditor(item.getUri(), item.isVideo() ? "video" : "image");
+            pendingBatchPaths.clear();
+            pendingBatchTypes.clear();
+            if (selected.size() > 1) {
+                for (int i = 1; i < selected.size(); i++) {
+                    GalleryMediaItem extra = selected.get(i);
+                    String resolvedPath = resolveGalleryItemPath(extra);
+                    if (resolvedPath != null) {
+                        pendingBatchPaths.add(resolvedPath);
+                        pendingBatchTypes.add(extra.isVideo() ? "video" : "image");
+                    }
+                }
             }
+            GalleryMediaItem item = selected.get(0);
+            openMediaEditor(item.getUri(), item.isVideo() ? "video" : "image");
         });
+    }
+
+    private String resolveGalleryItemPath(GalleryMediaItem item) {
+        if (item == null) return null;
+        if (item.getPath() != null && new File(item.getPath()).exists()) {
+            return item.getPath();
+        }
+        if (item.getUri() == null) return null;
+        try {
+            String ext = item.isVideo() ? ".mp4" : ".jpg";
+            File outFile = new File(getCacheDir(), "batch_" + System.currentTimeMillis() + "_" + item.getId() + ext);
+            try (java.io.InputStream in = getContentResolver().openInputStream(item.getUri());
+                 FileOutputStream out = new FileOutputStream(outFile)) {
+                if (in == null) return null;
+                byte[] buf = new byte[8192];
+                int r;
+                while ((r = in.read(buf)) != -1) {
+                    out.write(buf, 0, r);
+                }
+            }
+            return outFile.exists() ? outFile.getAbsolutePath() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void animateShutterPress(boolean pressed) {
@@ -649,7 +683,13 @@ public class CameraGalleryActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_EDIT_MEDIA && resultCode == RESULT_OK && data != null) {
-            // Forward result back to ChatActivity
+            if (!pendingBatchPaths.isEmpty()) {
+                data.putStringArrayListExtra(RESULT_BATCH_PATHS, new ArrayList<>(pendingBatchPaths));
+                data.putStringArrayListExtra(RESULT_BATCH_TYPES, new ArrayList<>(pendingBatchTypes));
+                pendingBatchPaths.clear();
+                pendingBatchTypes.clear();
+            }
+            // Forward result back to ChatActivity / HomeFragment
             setResult(RESULT_OK, data);
             finish();
         }

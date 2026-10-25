@@ -1,0 +1,10 @@
+{
+  "name": "Veil",
+  "description": "100% Privacy-First P2P WebRTC Mesh Messenger, Multi-Persona Vault, and Anonymous Community for Android.",
+  "package_name": "com.m3.veil",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

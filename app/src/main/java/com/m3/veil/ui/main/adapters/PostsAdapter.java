@@ -425,6 +425,13 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
                         });
                     } else {
                         iv.setImageBitmap(bmp);
+                        iv.setOnClickListener(v -> {
+                            android.content.Intent intent = new android.content.Intent(context, com.m3.veil.ui.chat.MediaViewerActivity.class);
+                            intent.putExtra(com.m3.veil.ui.chat.MediaViewerActivity.EXTRA_FILE_PATH, post.getImageUrl());
+                            intent.putExtra(com.m3.veil.ui.chat.MediaViewerActivity.EXTRA_MEDIA_TYPE, "image");
+                            intent.putExtra(com.m3.veil.ui.chat.MediaViewerActivity.EXTRA_SENDER_NAME, "@" + post.getAuthorUsername());
+                            context.startActivity(intent);
+                        });
                     }
                     dynamicAttachmentContainer.addView(iv);
                 }

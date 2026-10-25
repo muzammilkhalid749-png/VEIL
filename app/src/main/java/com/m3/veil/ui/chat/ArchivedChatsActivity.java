@@ -88,18 +88,132 @@ public class ArchivedChatsActivity extends AppCompatActivity implements ChatsAda
                 || "secret".equals(getIntent().getStringExtra("mode"));
 
         if (isSecretMode) {
-            if (tvTitle != null) tvTitle.setText("Secret Vault");
+            if (tvTitle != null) tvTitle.setText("Secret Vault ⚙️");
             if (ivNoticeIcon != null) ivNoticeIcon.setImageResource(R.drawable.ic_lock);
-            if (tvNoticeText != null) tvNoticeText.setText("Conversations in your Secret Vault are end-to-end encrypted with SQLCipher and hidden from your main chats.");
+            if (tvNoticeText != null) tvNoticeText.setText("Conversations in your Secret Vault are end-to-end encrypted with SQLCipher and hidden from your main chats. Tap header to manage or add chats.");
             if (ivEmptyIcon != null) ivEmptyIcon.setImageResource(R.drawable.ic_lock);
             if (tvEmptyTitle != null) tvEmptyTitle.setText("Secret Vault is empty");
-            if (tvEmptySubtitle != null) tvEmptySubtitle.setText("Long-press any chat in your main list to move it to your hidden Secret Vault.");
+            if (tvEmptySubtitle != null) tvEmptySubtitle.setText("Tap the header above or long-press any chat in your main list to move it to your hidden Secret Vault.");
             promptSecretVaultUnlock();
         } else {
+            if (tvTitle != null) {
+                tvTitle.setText("Archived Chats ⚙️");
+                tvTitle.setOnClickListener(v -> showArchiveSettingsSheet());
+            }
+            if (tvNoticeText != null) {
+                boolean keepArchived = getSharedPreferences("VeilPrefs", MODE_PRIVATE).getBoolean("keep_chats_archived", true);
+                tvNoticeText.setText(keepArchived
+                        ? "Archived chats stay archived when new messages arrive. Swipe left/right to unarchive, or tap header for settings."
+                        : "Archived chats will pop back to main inbox when new messages arrive. Tap header to change.");
+                tvNoticeText.setOnClickListener(v -> showArchiveSettingsSheet());
+            }
             loadArchivedChats();
         }
 
+        setupSwipeToUnarchive();
         encryptedDb.addListener(dbListener);
+    }
+
+    private void setupSwipeToUnarchive() {
+        androidx.recyclerview.widget.ItemTouchHelper.SimpleCallback swipeCallback =
+                new androidx.recyclerview.widget.ItemTouchHelper.SimpleCallback(
+                        0, androidx.recyclerview.widget.ItemTouchHelper.LEFT | androidx.recyclerview.widget.ItemTouchHelper.RIGHT) {
+                    @Override
+                    public boolean onMove(@androidx.annotation.NonNull RecyclerView recyclerView,
+                                          @androidx.annotation.NonNull RecyclerView.ViewHolder viewHolder,
+                                          @androidx.annotation.NonNull RecyclerView.ViewHolder target) {
+                        return false;
+                    }
+
+                    @Override
+                    public void onSwiped(@androidx.annotation.NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                        int pos = viewHolder.getAdapterPosition();
+                        Chat chat = chatsAdapter.getChatAt(pos);
+                        if (chat == null) {
+                            chatsAdapter.notifyItemChanged(pos);
+                            return;
+                        }
+                        if (isSecretMode) {
+                            chat.setSecret(false);
+                            encryptedDb.updateChatSecretStatus(chat.getId(), false);
+                            loadArchivedChats();
+                            com.google.android.material.snackbar.Snackbar.make(archivedRecyclerView, "Moved out of Secret Vault", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                                    .setAction("Undo", v -> {
+                                        chat.setSecret(true);
+                                        encryptedDb.updateChatSecretStatus(chat.getId(), true);
+                                        loadArchivedChats();
+                                    }).show();
+                        } else {
+                            chat.setArchived(false);
+                            encryptedDb.updateChatArchiveStatus(chat.getId(), false);
+                            loadArchivedChats();
+                            com.google.android.material.snackbar.Snackbar.make(archivedRecyclerView, "Chat unarchived", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                                    .setAction("Undo", v -> {
+                                        chat.setArchived(true);
+                                        encryptedDb.updateChatArchiveStatus(chat.getId(), true);
+                                        loadArchivedChats();
+                                    }).show();
+                        }
+                    }
+                };
+        new androidx.recyclerview.widget.ItemTouchHelper(swipeCallback).attachToRecyclerView(archivedRecyclerView);
+    }
+
+    private void showArchiveSettingsSheet() {
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
+
+        TextView title = new TextView(this);
+        title.setText("📥 Archive Settings");
+        title.setTextSize(18f);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        title.setPadding(0, 0, 0, (int) (12 * dp));
+        root.addView(title);
+
+        android.content.SharedPreferences prefs = getSharedPreferences("VeilPrefs", MODE_PRIVATE);
+        boolean keepArchived = prefs.getBoolean("keep_chats_archived", true);
+
+        MaterialButton btnToggleKeep = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnToggleKeep.setText(keepArchived ? "✅ Keep Chats Archived (Enabled)" : "⬜ Keep Chats Archived (Disabled)");
+        btnToggleKeep.setCornerRadius((int) (12 * dp));
+        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp1.bottomMargin = (int) (10 * dp);
+        btnToggleKeep.setLayoutParams(lp1);
+        btnToggleKeep.setOnClickListener(v -> {
+            boolean next = !prefs.getBoolean("keep_chats_archived", true);
+            prefs.edit().putBoolean("keep_chats_archived", next).apply();
+            if (tvNoticeText != null) {
+                tvNoticeText.setText(next
+                        ? "Archived chats stay archived when new messages arrive. Swipe left/right to unarchive, or tap header for settings."
+                        : "Archived chats will pop back to main inbox when new messages arrive. Tap header to change.");
+            }
+            sheet.dismiss();
+            Toast.makeText(this, next ? "Chats will stay archived on new messages" : "Chats will unarchive on new messages", Toast.LENGTH_SHORT).show();
+        });
+        root.addView(btnToggleKeep);
+
+        MaterialButton btnUnarchiveAll = new MaterialButton(this);
+        btnUnarchiveAll.setText("📤 Unarchive All Chats (" + archivedChats.size() + ")");
+        btnUnarchiveAll.setCornerRadius((int) (12 * dp));
+        btnUnarchiveAll.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        btnUnarchiveAll.setOnClickListener(v -> {
+            for (Chat c : new ArrayList<>(archivedChats)) {
+                c.setArchived(false);
+                encryptedDb.updateChatArchiveStatus(c.getId(), false);
+            }
+            loadArchivedChats();
+            sheet.dismiss();
+            Toast.makeText(this, "All chats unarchived", Toast.LENGTH_SHORT).show();
+        });
+        root.addView(btnUnarchiveAll);
+
+        sheet.setContentView(root);
+        sheet.show();
     }
 
     private void promptSecretVaultUnlock() {

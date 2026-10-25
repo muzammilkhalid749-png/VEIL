@@ -93,7 +93,11 @@ public class EmojiStickerBottomSheet extends BottomSheetDialogFragment {
             packStrip.addView(pTab);
         }
 
-        // 3. Store / Marketplace Button
+        // 3. Custom Sticker Creator Chip
+        TextView btnCustom = createTabChip(context, "➕ Custom", false, v -> showCreateCustomStickerDialog(context));
+        packStrip.addView(btnCustom);
+
+        // 4. Store / Marketplace Button
         TextView btnStore = createTabChip(context, "🛍️ Store", false, v -> {
             dismiss();
             StickerMarketplaceBottomSheet store = new StickerMarketplaceBottomSheet();
@@ -120,7 +124,8 @@ public class EmojiStickerBottomSheet extends BottomSheetDialogFragment {
             @Override
             public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
                 TextView textView = (TextView) super.getView(position, convertView, parent);
-                textView.setTextSize(28);
+                String val = getItem(position);
+                textView.setTextSize(val != null && val.length() > 4 ? 14 : 26);
                 textView.setGravity(Gravity.CENTER);
                 return textView;
             }
@@ -129,7 +134,9 @@ public class EmojiStickerBottomSheet extends BottomSheetDialogFragment {
 
         gridView.setOnItemClickListener((parent, view1, position, id) -> {
             if (listener != null && position < currentItems.size()) {
-                listener.onEmojiSelected(currentItems.get(position));
+                String chosen = currentItems.get(position);
+                saveRecentEmoji(context, chosen);
+                listener.onEmojiSelected(chosen);
             }
             dismiss();
         });
@@ -137,6 +144,71 @@ public class EmojiStickerBottomSheet extends BottomSheetDialogFragment {
         root.addView(gridView);
         loadStandardEmojis();
         return root;
+    }
+
+    private void saveRecentEmoji(Context context, String item) {
+        if (context == null || item == null) return;
+        android.content.SharedPreferences prefs = context.getSharedPreferences("VeilEmojiPrefs", Context.MODE_PRIVATE);
+        String existing = prefs.getString("recent_emojis", "");
+        java.util.List<String> list = new ArrayList<>();
+        list.add(item);
+        if (existing != null && !existing.isEmpty()) {
+            for (String s : existing.split(";;")) {
+                if (!s.isEmpty() && !list.contains(s) && list.size() < 15) {
+                    list.add(s);
+                }
+            }
+        }
+        prefs.edit().putString("recent_emojis", android.text.TextUtils.join(";;", list)).apply();
+    }
+
+    private void showCreateCustomStickerDialog(Context context) {
+        com.google.android.material.bottomsheet.BottomSheetDialog sheet =
+                new com.google.android.material.bottomsheet.BottomSheetDialog(context);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        int pad = (int) (20 * dp);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(context);
+        title.setText("➕ Create Custom Sticker");
+        title.setTextSize(18f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(context, R.color.textPrimary));
+        title.setPadding(0, 0, 0, (int) (10 * dp));
+        root.addView(title);
+
+        android.widget.EditText etSticker = new android.widget.EditText(context);
+        etSticker.setHint("e.g. 🔥 ZERO TRACE 🔥 or 🕵️‍♂️");
+        etSticker.setTextColor(ContextCompat.getColor(context, R.color.textPrimary));
+        etSticker.setHintTextColor(ContextCompat.getColor(context, R.color.textSecondary));
+        etSticker.setBackgroundResource(R.drawable.bg_search_input);
+        int inPad = (int) (12 * dp);
+        etSticker.setPadding(inPad, inPad, inPad, inPad);
+        root.addView(etSticker);
+
+        com.google.android.material.button.MaterialButton btnSave = new com.google.android.material.button.MaterialButton(context);
+        btnSave.setText("Save & Send Custom Sticker");
+        btnSave.setCornerRadius((int) (12 * dp));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = (int) (14 * dp);
+        btnSave.setLayoutParams(lp);
+        btnSave.setOnClickListener(v -> {
+            String custom = etSticker.getText().toString().trim();
+            if (!custom.isEmpty()) {
+                saveRecentEmoji(context, custom);
+                sheet.dismiss();
+                if (listener != null) listener.onEmojiSelected(custom);
+                dismiss();
+            }
+        });
+        root.addView(btnSave);
+
+        sheet.setContentView(root);
+        sheet.show();
     }
 
     private TextView createTabChip(Context context, String label, boolean selected, View.OnClickListener onClick) {
@@ -159,7 +231,7 @@ public class EmojiStickerBottomSheet extends BottomSheetDialogFragment {
 
     private void refreshTabs(LinearLayout strip, List<VeilFeatureManager.StickerPack> packs) {
         Context context = requireContext();
-        for (int i = 0; i < strip.getChildCount() - 1; i++) {
+        for (int i = 0; i < strip.getChildCount() - 2; i++) {
             View child = strip.getChildAt(i);
             if (child instanceof TextView) {
                 boolean isSelected = (i == selectedPackIndex);
@@ -171,6 +243,16 @@ public class EmojiStickerBottomSheet extends BottomSheetDialogFragment {
 
     private void loadStandardEmojis() {
         currentItems.clear();
+        if (getContext() != null) {
+            String rec = getContext().getSharedPreferences("VeilEmojiPrefs", Context.MODE_PRIVATE).getString("recent_emojis", "");
+            if (rec != null && !rec.isEmpty()) {
+                for (String s : rec.split(";;")) {
+                    if (!s.isEmpty() && !currentItems.contains(s)) {
+                        currentItems.add(s);
+                    }
+                }
+            }
+        }
         int[] unicodeEmojis = {
                 0x1F600, 0x1F603, 0x1F604, 0x1F601, 0x1F606,
                 0x1F605, 0x1F602, 0x1F923, 0x1F60A, 0x1F609,
@@ -178,11 +260,14 @@ public class EmojiStickerBottomSheet extends BottomSheetDialogFragment {
                 0x1F617, 0x1F619, 0x1F61A, 0x1F60B, 0x1F914,
                 0x1F910, 0x1F928, 0x1F610, 0x1F611, 0x1F929,
                 0x1F973, 0x1F970, 0x1F92A, 0x1F974, 0x1F60E,
-                0x2B62, 0x2B60, 0x2B06, 0x2B07, 0x25B6,
-                0x25C0, 0x25B2, 0x25BC, 0x25A0, 0x25A1
+                0x1F525, 0x2764, 0x1F44D, 0x1F44F, 0x1F64F,
+                0x1F512, 0x1F6E1, 0x26A1, 0x1F575, 0x1F47B
         };
         for (int codePoint : unicodeEmojis) {
-            currentItems.add(new String(Character.toChars(codePoint)));
+            String em = new String(Character.toChars(codePoint));
+            if (!currentItems.contains(em)) {
+                currentItems.add(em);
+            }
         }
         if (adapter != null) adapter.notifyDataSetChanged();
     }

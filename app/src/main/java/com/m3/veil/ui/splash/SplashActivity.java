@@ -275,7 +275,8 @@ public class SplashActivity extends AppCompatActivity {
                 sharedPreferences = getSharedPreferences("veil_encrypted_prefs_fallback", MODE_PRIVATE);
             }
 
-            boolean isPinSet = sharedPreferences.getBoolean("pin_set", false);
+            boolean isPinSet = sharedPreferences.getBoolean("pin_set", false)
+                    || com.m3.veil.manager.VeilFeatureManager.getInstance(this).hasMasterPin();
             
             if (isPinSet) {
                 Intent intent = new Intent(SplashActivity.this, com.m3.veil.ui.auth.PinUnlockActivity.class);
@@ -312,7 +313,8 @@ public class SplashActivity extends AppCompatActivity {
     private void createUserDocumentAndGoToUsername() {
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
         String phoneNumber = FirebaseAuth.getInstance().getCurrentUser().getPhoneNumber();
-        String countryCode = "PK"; // Extract from phone number
+        String localeCountry = java.util.Locale.getDefault().getCountry();
+        String countryCode = (localeCountry != null && !localeCountry.isEmpty()) ? localeCountry : "US";
 
         User newUser = new User(userId, phoneNumber, countryCode);
 

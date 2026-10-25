@@ -44,11 +44,13 @@ public class RecoveryPhraseActivity extends AppCompatActivity {
                         androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 );
                 recoveryPhrase = securePrefs.getString("recovery_phrase", null);
-            } catch (Exception ignored) {}
-        }
-
-        if (recoveryPhrase == null || recoveryPhrase.isEmpty()) {
-            recoveryPhrase = "No offline recovery phrase stored on this device. (Phone authenticated account)";
+                if (recoveryPhrase == null || recoveryPhrase.isEmpty()) {
+                    recoveryPhrase = com.m3.veil.utils.AnonymousAuthManager.generateRecoveryPhrase();
+                    securePrefs.edit().putString("recovery_phrase", recoveryPhrase).apply();
+                }
+            } catch (Exception ignored) {
+                recoveryPhrase = com.m3.veil.utils.AnonymousAuthManager.generateRecoveryPhrase();
+            }
         }
 
         initializeViews(isViewOnly);
