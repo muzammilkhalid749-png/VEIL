@@ -97,28 +97,34 @@
 
             </LinearLayout>
 
-            <!-- Restore Action Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/restoreButton"
-                style="@style/Widget.Material3.Button.UnelevatedButton"
+            <!-- Restore Action Button with Centered In-Button Spinner -->
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:letterSpacing="0.01"
-                android:text="Restore"
-                android:textAllCaps="false"
-                android:textColor="@android:color/white"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                app:backgroundTint="@color/veil_accent"
-                app:cornerRadius="14dp" />
+                android:layout_height="52dp">
 
-            <!-- Progress Spinner -->
-            <ProgressBar
-                android:id="@+id/progressBar"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginTop="20dp"
-                android:visibility="gone" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/restoreButton"
+                    style="@style/Widget.Material3.Button.UnelevatedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:letterSpacing="0.01"
+                    android:text="Restore"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/veil_accent"
+                    app:cornerRadius="14dp" />
+
+                <ProgressBar
+                    android:id="@+id/progressBar"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_gravity="center"
+                    android:indeterminate="true"
+                    android:indeterminateTint="@android:color/white"
+                    android:visibility="gone" />
+            </FrameLayout>
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

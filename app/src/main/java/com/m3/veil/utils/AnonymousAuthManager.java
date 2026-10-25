@@ -5,6 +5,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class AnonymousAuthManager {
 
@@ -41,13 +42,34 @@ public class AnonymousAuthManager {
         return phrase.toString();
     }
 
+    public static String normalizePhrase(String phrase) {
+        if (phrase == null) return "";
+        // Clean line breaks, tabs, numbers, commas, and punctuation to spaces
+        String cleaned = phrase.replaceAll("(?m)^\\s*\\d+[.)\\-\\s]+", " ")
+                               .replaceAll("\\b\\d+[.)\\-\\s]+", " ")
+                               .replaceAll("[^a-zA-Z]+", " ")
+                               .trim()
+                               .toLowerCase(Locale.US);
+        String[] words = cleaned.split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (String w : words) {
+            if (!w.isEmpty()) {
+                if (sb.length() > 0) sb.append(" ");
+                sb.append(w);
+            }
+        }
+        return sb.toString();
+    }
+
     public static String getEmailFromPhrase(String phrase) {
-        String hash = sha256(phrase.trim().toLowerCase());
+        String clean = normalizePhrase(phrase);
+        String hash = sha256(clean);
         return hash.substring(0, 20) + "@veil.local";
     }
 
     public static String getPasswordFromPhrase(String phrase) {
-        return sha256(phrase.trim().toLowerCase() + "_password_salt").substring(0, 20);
+        String clean = normalizePhrase(phrase);
+        return sha256(clean + "_password_salt").substring(0, 20);
     }
 
     private static String sha256(String input) {

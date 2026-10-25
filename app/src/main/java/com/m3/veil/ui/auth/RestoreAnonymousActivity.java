@@ -52,9 +52,12 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
         findViewById(R.id.backButton).setOnClickListener(v -> onBackPressed());
 
         restoreButton.setOnClickListener(v -> {
-            String phrase = phraseEditText.getText().toString().trim();
-            if (phrase.isEmpty()) {
-                showSnackbar("Please enter your recovery phrase");
+            String raw = phraseEditText.getText().toString();
+            String phrase = com.m3.veil.utils.AnonymousAuthManager.normalizePhrase(raw);
+            String[] words = phrase.split("\\s+");
+            if (phrase.isEmpty() || words.length < 12) {
+                int count = phrase.isEmpty() ? 0 : words.length;
+                showSnackbar("Please enter all 12 words of your recovery phrase (found " + count + ")");
             } else {
                 restoreAnonymousAccount(phrase);
             }
@@ -68,24 +71,67 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
 
         mAuth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this, task -> {
-                    showLoading(false);
-                    if (task.isSuccessful()) {
-                        try {
-                            String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
-                            android.content.SharedPreferences securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
-                                    "veil_encrypted_prefs",
-                                    masterKeyAlias,
-                                    RestoreAnonymousActivity.this,
-                                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                            );
-                            securePrefs.edit().putString("recovery_phrase", phrase).apply();
-                        } catch (Exception ignored) {}
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        showLoading(false);
+                        com.google.firebase.auth.FirebaseUser user = task.getResult().getUser();
+                        com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(RestoreAnonymousActivity.this, user);
+                        saveRecoveryPhrase(phrase);
                         navigateToSplash();
                     } else {
-                        showSnackbar("Invalid recovery phrase. Account not found.");
+                        Exception signInEx = task.getException();
+                        android.util.Log.w("RestoreAnonymous", "Sign in attempt failed for email: " + email, signInEx);
+
+                        // If network error, stop and report immediately
+                        if (signInEx instanceof com.google.firebase.FirebaseNetworkException) {
+                            showLoading(false);
+                            showSnackbar("Network error. Please check your internet connection.");
+                            return;
+                        }
+
+                        // If user record is not yet in Firebase Auth, restore credential deterministically
+                        mAuth.createUserWithEmailAndPassword(email, password)
+                                .addOnCompleteListener(this, createTask -> {
+                                    showLoading(false);
+                                    if (createTask.isSuccessful() && createTask.getResult() != null) {
+                                        com.google.firebase.auth.FirebaseUser newUser = createTask.getResult().getUser();
+                                        com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(RestoreAnonymousActivity.this, newUser);
+                                        saveRecoveryPhrase(phrase);
+                                        navigateToSplash();
+                                    } else {
+                                        Exception createEx = createTask.getException();
+                                        android.util.Log.e("RestoreAnonymous", "Failed to restore anonymous account", createEx);
+                                        if (createEx instanceof com.google.firebase.FirebaseNetworkException) {
+                                            showSnackbar("Network error. Please check your internet connection.");
+                                        } else if (createEx instanceof com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+                                            showSnackbar("Recovery phrase password mismatch. Please verify your words.");
+                                        } else if (createEx != null && createEx.getMessage() != null) {
+                                            showSnackbar("Restore failed: " + createEx.getMessage());
+                                        } else {
+                                            showSnackbar("Invalid recovery phrase. Account not found.");
+                                        }
+                                    }
+                                });
                     }
                 });
+    }
+
+    private void saveRecoveryPhrase(String phrase) {
+        try {
+            String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
+            android.content.SharedPreferences securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
+                    "veil_encrypted_prefs",
+                    masterKeyAlias,
+                    RestoreAnonymousActivity.this,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
+            securePrefs.edit().putString("recovery_phrase", phrase).apply();
+        } catch (Exception ignored) {
+            try {
+                getSharedPreferences("veil_encrypted_prefs_fallback", MODE_PRIVATE)
+                        .edit().putString("recovery_phrase", phrase).apply();
+            } catch (Exception ignored2) {}
+        }
     }
 
     private void navigateToSplash() {
@@ -97,9 +143,17 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
     }
 
     private void showLoading(boolean show) {
-        progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
-        restoreButton.setVisibility(show ? View.INVISIBLE : View.VISIBLE);
-        phraseEditText.setEnabled(!show);
+        if (progressBar != null) {
+            progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        if (restoreButton != null) {
+            restoreButton.setEnabled(!show);
+            restoreButton.setText(show ? "" : "Restore");
+            restoreButton.setAlpha(show ? 0.85f : 1.0f);
+        }
+        if (phraseEditText != null) {
+            phraseEditText.setEnabled(!show);
+        }
     }
 
     private void showSnackbar(String message) {
