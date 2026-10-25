@@ -1341,7 +1341,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             showPinAuthModal("🔒 Unlock " + chat.getName(), "This conversation is encrypted & PIN protected", "Enter Chat PIN", (pin, dialog, layout) -> {
                 if (chat.getChatLockPin().equals(pin)) {
                     dialog.dismiss();
-                    openChatScreen(chat);
+                    openChatScreen(chat, true);
                 } else {
                     layout.setError("Incorrect Chat PIN");
                 }
@@ -1349,10 +1349,10 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             return;
         }
 
-        openChatScreen(chat);
+        openChatScreen(chat, false);
     }
 
-    private void openChatScreen(Chat chat) {
+    private void openChatScreen(Chat chat, boolean isPinVerified) {
         chat.setUnreadCount(0);
         EncryptedChatDatabase.getInstance(requireContext()).updateChatUnreadCount(chat.getId(), 0);
         chatsAdapter.notifyDataSetChanged();
@@ -1360,6 +1360,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         Intent intent = new Intent(getContext(), ChatActivity.class);
         intent.putExtra("chatId", chat.getId());
         intent.putExtra("recipientName", chat.getName());
+        intent.putExtra("isPinVerified", isPinVerified);
 
         String recipientId = "";
         if (chat.getParticipants() != null) {

@@ -24,6 +24,9 @@ import android.widget.VideoView;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.core.content.FileProvider;
 
 import com.m3.veil.R;
@@ -104,9 +107,43 @@ public class MediaViewerActivity extends AppCompatActivity {
                         | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
 
         initViews();
+        handleWindowInsets();
         extractExtras();
         setupActions();
         bindMedia();
+    }
+
+    private void handleWindowInsets() {
+        View root = findViewById(R.id.mediaViewerRoot);
+        if (root == null) return;
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            if (topBar != null) {
+                topBar.setPadding(
+                        topBar.getPaddingStart(),
+                        systemBars.top + (int) (4 * getResources().getDisplayMetrics().density),
+                        topBar.getPaddingEnd(),
+                        topBar.getPaddingBottom()
+                );
+            }
+            if (bottomCaptionBar != null) {
+                bottomCaptionBar.setPadding(
+                        bottomCaptionBar.getPaddingStart(),
+                        bottomCaptionBar.getPaddingTop(),
+                        bottomCaptionBar.getPaddingEnd(),
+                        systemBars.bottom + (int) (12 * getResources().getDisplayMetrics().density)
+                );
+            }
+            if (videoControlsBar != null) {
+                videoControlsBar.setPadding(
+                        videoControlsBar.getPaddingStart(),
+                        videoControlsBar.getPaddingTop(),
+                        videoControlsBar.getPaddingEnd(),
+                        systemBars.bottom + (int) (12 * getResources().getDisplayMetrics().density)
+                );
+            }
+            return insets;
+        });
     }
 
     private void initViews() {

@@ -110,6 +110,7 @@
 
         <activity
             android:name=".ui.chat.SearchActivity"
+            android:windowSoftInputMode="adjustResize"
             android:exported="false" />
 
         <activity

@@ -438,9 +438,52 @@ public class ArchivedChatsActivity extends AppCompatActivity implements ChatsAda
 
     @Override
     public void onChatClick(Chat chat) {
+        if (chat == null) return;
+        if (chat.getChatLockPin() != null && !chat.getChatLockPin().isEmpty()) {
+            promptChatLockPin(chat);
+            return;
+        }
+        openChat(chat, false);
+    }
+
+    private void promptChatLockPin(Chat chat) {
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        sheet.setContentView(R.layout.dialog_pin_auth);
+        sheet.setCancelable(false);
+
+        TextView tvTitle = sheet.findViewById(R.id.tvPinDialogTitle);
+        TextView tvSubtitle = sheet.findViewById(R.id.tvPinDialogSubtitle);
+        com.google.android.material.textfield.TextInputEditText etPin = sheet.findViewById(R.id.etPin);
+        MaterialButton btnCancel = sheet.findViewById(R.id.btnCancelPin);
+        MaterialButton btnUnlock = sheet.findViewById(R.id.btnConfirmPin);
+
+        if (tvTitle != null) tvTitle.setText("🔒 Unlock " + (chat.getName() != null ? chat.getName() : "Chat"));
+        if (tvSubtitle != null) tvSubtitle.setText("This conversation is encrypted & PIN protected");
+
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> sheet.dismiss());
+        }
+
+        if (btnUnlock != null && etPin != null) {
+            btnUnlock.setOnClickListener(v -> {
+                String entered = etPin.getText() != null ? etPin.getText().toString().trim() : "";
+                if (chat.getChatLockPin().equals(entered)) {
+                    sheet.dismiss();
+                    openChat(chat, true);
+                } else {
+                    Toast.makeText(this, "Incorrect Chat PIN", Toast.LENGTH_SHORT).show();
+                    etPin.setText("");
+                }
+            });
+        }
+        sheet.show();
+    }
+
+    private void openChat(Chat chat, boolean isPinVerified) {
         Intent intent = new Intent(this, ChatActivity.class);
         intent.putExtra("chatId", chat.getId());
         intent.putExtra("recipientName", chat.getName());
+        intent.putExtra("isPinVerified", isPinVerified);
 
         String recipientId = "";
         if (chat.getParticipants() != null) {

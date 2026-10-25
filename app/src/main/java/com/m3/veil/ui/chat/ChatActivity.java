@@ -276,6 +276,7 @@ public class ChatActivity extends AppCompatActivity {
     private ListenerRegistration groupMessagesListener;
     private LinearLayout channelSubscriberBar;
     private boolean isChatBlocked = false;
+    private boolean isChatPinUnlocked = false;
     private ConnectivityManager.NetworkCallback networkCallback;
     private boolean isP2PActive = false;
 
@@ -540,6 +541,13 @@ public class ChatActivity extends AppCompatActivity {
         db = FirebaseFirestore.getInstance();
         currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null
                 ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
+
+        if (savedInstanceState != null) {
+            isChatPinUnlocked = savedInstanceState.getBoolean("isChatPinUnlocked", false);
+        }
+        if (getIntent().getBooleanExtra("isPinVerified", false)) {
+            isChatPinUnlocked = true;
+        }
 
         chatId = getIntent().getStringExtra("chatId");
         recipientId = getIntent().getStringExtra("recipientId");
@@ -1855,6 +1863,9 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void checkChatLockIfEnabled() {
+        if (isChatPinUnlocked) {
+            return;
+        }
         if (currentLocalChat == null || currentLocalChat.getChatLockPin() == null || currentLocalChat.getChatLockPin().isEmpty()) {
             return;
         }
@@ -1924,6 +1935,7 @@ public class ChatActivity extends AppCompatActivity {
 
         btnUnlock.setOnClickListener(v -> {
             if (expectedPin.equals(pinInput.getText().toString().trim())) {
+                isChatPinUnlocked = true;
                 sheet.dismiss();
             } else {
                 Toast.makeText(this, "Incorrect Chat PIN", Toast.LENGTH_SHORT).show();
@@ -3510,6 +3522,12 @@ public class ChatActivity extends AppCompatActivity {
                 }
             }
         }
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean("isChatPinUnlocked", isChatPinUnlocked);
     }
 
     @Override

@@ -35,6 +35,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -186,6 +189,7 @@ public class CameraGalleryActivity extends AppCompatActivity {
         setContentView(R.layout.activity_camera_gallery);
 
         initViews();
+        handleWindowInsets();
         setupGestures();
         setupActions();
 
@@ -201,6 +205,50 @@ public class CameraGalleryActivity extends AppCompatActivity {
         } else {
             requestPermissions();
         }
+    }
+
+    private void handleWindowInsets() {
+        View root = findViewById(R.id.cameraGalleryRoot);
+        if (root == null) return;
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            View topControls = findViewById(R.id.topControlsBar);
+            if (topControls != null) {
+                topControls.setPadding(
+                        topControls.getPaddingStart(),
+                        systemBars.top + (int) (8 * getResources().getDisplayMetrics().density),
+                        topControls.getPaddingEnd(),
+                        topControls.getPaddingBottom()
+                );
+            }
+            View galleryHeader = findViewById(R.id.layoutGalleryHeader);
+            if (galleryHeader != null) {
+                galleryHeader.setPadding(
+                        galleryHeader.getPaddingStart(),
+                        systemBars.top + (int) (8 * getResources().getDisplayMetrics().density),
+                        galleryHeader.getPaddingEnd(),
+                        galleryHeader.getPaddingBottom()
+                );
+            }
+            View bottomBar = findViewById(R.id.bottomCameraControls);
+            if (bottomBar != null) {
+                bottomBar.setPadding(
+                        bottomBar.getPaddingStart(),
+                        bottomBar.getPaddingTop(),
+                        bottomBar.getPaddingEnd(),
+                        systemBars.bottom + (int) (16 * getResources().getDisplayMetrics().density)
+                );
+            }
+            if (layoutFloatingSend != null) {
+                layoutFloatingSend.setPadding(
+                        layoutFloatingSend.getPaddingStart(),
+                        layoutFloatingSend.getPaddingTop(),
+                        layoutFloatingSend.getPaddingEnd(),
+                        systemBars.bottom + (int) (16 * getResources().getDisplayMetrics().density)
+                );
+            }
+            return insets;
+        });
     }
 
     private void initViews() {
