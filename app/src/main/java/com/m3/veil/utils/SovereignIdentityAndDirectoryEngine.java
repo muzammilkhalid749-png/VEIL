@@ -1234,6 +1234,50 @@ public class SovereignIdentityAndDirectoryEngine {
         return prefs.getUserId();
     }
 
+    @Nullable
+    public SovereignProfileManifest getLocalManifest(String uid) {
+        if (uid == null || uid.isEmpty()) return null;
+        try {
+            SovereignProfileManifest manifest = EncryptedChatDatabase.getInstance(mContext).getSovereignProfileManifest(uid);
+            if (manifest != null) return manifest;
+            return loadSurvivingBackupFile(uid);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    public String getCurrentUsername() {
+        UserPreferences prefs = new UserPreferences(mContext);
+        String name = prefs.getUsername();
+        if (name != null && !name.isEmpty()) {
+            return name;
+        }
+        String uid = prefs.getUserId();
+        if (uid != null) {
+            SovereignProfileManifest manifest = getLocalManifest(uid);
+            if (manifest != null && manifest.username != null && !manifest.username.isEmpty()) {
+                return manifest.username;
+            }
+        }
+        return "anonymous";
+    }
+
+    public String getCurrentDisplayName() {
+        UserPreferences prefs = new UserPreferences(mContext);
+        String name = prefs.getDisplayName();
+        if (name != null && !name.isEmpty()) {
+            return name;
+        }
+        String uid = prefs.getUserId();
+        if (uid != null) {
+            SovereignProfileManifest manifest = getLocalManifest(uid);
+            if (manifest != null && manifest.displayName != null && !manifest.displayName.isEmpty()) {
+                return manifest.displayName;
+            }
+        }
+        return null;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────────
     // CRYPTOGRAPHIC HELPER FUNCTIONS
     // ─────────────────────────────────────────────────────────────────────────────

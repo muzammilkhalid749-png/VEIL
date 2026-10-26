@@ -43,6 +43,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.m3.veil.R;
 import com.m3.veil.calling.VoiceMaskingDsp;
+import com.m3.veil.utils.SovereignIdentityAndDirectoryEngine;
 import com.m3.veil.manager.VeilBoardController;
 import com.m3.veil.manager.VeilFeatureManager;
 import com.m3.veil.model.Persona;
@@ -113,11 +114,22 @@ public class CreatePostActivity extends AppCompatActivity {
     private AudioRecorderHelper voiceRecorder;
     private boolean isRecordingVoice = false;
 
+    private final java.util.List<String> attachedMediaPaths = new java.util.ArrayList<>();
+
     private final ActivityResultLauncher<Intent> mediaPickerLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
-                if (result.getResultCode() == RESULT_OK && result.getData() != null && result.getData().getData() != null) {
-                    processSelectedImageWithExifStrip(result.getData().getData(), false);
+                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                    Intent data = result.getData();
+                    if (data.getClipData() != null) {
+                        int count = data.getClipData().getItemCount();
+                        for (int i = 0; i < count; i++) {
+                            android.net.Uri u = data.getClipData().getItemAt(i).getUri();
+                            if (u != null) processSelectedImageWithExifStrip(u, false);
+                        }
+                    } else if (data.getData() != null) {
+                        processSelectedImageWithExifStrip(data.getData(), false);
+                    }
                 }
             }
     );
@@ -132,7 +144,7 @@ public class CreatePostActivity extends AppCompatActivity {
         if (FirebaseAuth.getInstance().getCurrentUser() != null) {
             currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
         } else {
-            currentUserId = "local_user";
+            currentUserId = SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
         }
 
         fetchCurrentUser();
@@ -489,7 +501,8 @@ public class CreatePostActivity extends AppCompatActivity {
     private void launchImageAttachmentPicker() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("image/*");
-        mediaPickerLauncher.launch(Intent.createChooser(intent, "Select Image (EXIF Auto-Stripped)"));
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        mediaPickerLauncher.launch(Intent.createChooser(intent, "Select Images (EXIF Auto-Stripped)"));
     }
 
     private void processSelectedImageWithExifStrip(Uri uri, boolean applyMosaicBlur) {
@@ -503,7 +516,14 @@ public class CreatePostActivity extends AppCompatActivity {
                 processed.compress(Bitmap.CompressFormat.JPEG, 88, fos);
             }
             attachedMediaPath = outFile.getAbsolutePath();
-            attachedMediaType = "image";
+            if (!attachedMediaPaths.contains(attachedMediaPath)) {
+                attachedMediaPaths.add(attachedMediaPath);
+            }
+            if (attachedMediaPaths.size() > 1) {
+                attachedMediaType = Post.TYPE_MOSAIC;
+            } else {
+                attachedMediaType = Post.TYPE_PHOTO;
+            }
             refreshStudioPreview();
             Toast.makeText(this, "🛡️ Image attached (EXIF/GPS stripped)", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
@@ -940,10 +960,17 @@ public class CreatePostActivity extends AppCompatActivity {
         } else if (currentUser != null && currentUser.getUsername() != null) {
             username = currentUser.getUsername();
         } else {
-            username = getString(R.string.anonymous);
+            String sovUser = SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUsername();
+            username = (sovUser != null && !sovUser.isEmpty()) ? sovUser : getString(R.string.anonymous);
         }
 
         String avatar = (currentUser != null) ? currentUser.getPhotoUrl() : null;
+        if (avatar == null || avatar.isEmpty()) {
+            java.io.File localAvatar = new java.io.File(getFilesDir(), "avatars/avatar_" + currentUserId + ".webp");
+            if (localAvatar.exists()) {
+                avatar = localAvatar.getAbsolutePath();
+            }
+        }
         String cleanContent = VeilFeatureManager.getInstance(this).sanitizeContent(content);
 
         String finalType = attachedPollJson != null ? "poll" : attachedMediaType;
@@ -959,6 +986,10 @@ public class CreatePostActivity extends AppCompatActivity {
         post.setCategory(selectedCategory);
         post.setMoodBadge(selectedMoodBadge);
         post.setImageUrl(attachedMediaPath);
+        post.setMediaUrls(attachedMediaPaths);
+        if (cleanContent.contains("||") || "spoiler".equalsIgnoreCase(selectedCategory)) {
+            post.setSpoiler(true);
+        }
 
         // Package rich studio metadata into pollJson / studio envelope so PostsAdapter renders all 10 capabilities
         try {

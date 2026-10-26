@@ -1,9 +1,23 @@
 package com.m3.veil.model;
 
 import com.google.firebase.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 
 public class Post {
+
+    // 10 Comprehensive Multi-Modal Post Types
+    public static final String TYPE_TEXT = "text";
+    public static final String TYPE_PHOTO = "photo";
+    public static final String TYPE_MOSAIC = "mosaic";
+    public static final String TYPE_SPOILER = "spoiler";
+    public static final String TYPE_VIDEO = "video";
+    public static final String TYPE_AUDIO = "audio";
+    public static final String TYPE_FILE = "file";
+    public static final String TYPE_POLL = "poll";
+    public static final String TYPE_MARKDOWN = "markdown";
+    public static final String TYPE_MOMENT = "moment";
+
     private String id;
     private String authorId;
     private String authorUsername;
@@ -13,14 +27,16 @@ public class Post {
     private int likesCount;
     private int commentsCount;
     private List<String> hashtags;
-    private String type; // "text", "image", "poll", "confession", "moment"
+    private String type; // one of the 10 post types above (also accepts "image", "voice", "confession")
     private String imageUrl;
-    private List<String> likedBy = new java.util.ArrayList<>();
+    private List<String> mediaUrls = new ArrayList<>();
+    private List<String> likedBy = new ArrayList<>();
     private String moodBadge; // e.g. "✨ Curious", "💭 Confession", "🔥 Hyped"
     private String category; // "feed", "confession", "poll", "moment", "jar"
-    private String pollJson; // JSON for poll posts
+    private String pollJson; // JSON for poll / rich metadata
     private long expiresAtMillis; // >0 for 24h Moments or timed Confession Jar reveal
     private String commentsJson; // JSON array of comments synced via P2P Gossip
+    private boolean isSpoiler = false;
 
     public Post() {
         // Default constructor
@@ -70,14 +86,39 @@ public class Post {
     public void setType(String type) { this.type = type; }
 
     public String getImageUrl() { return imageUrl; }
-    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+        if (imageUrl != null && !imageUrl.isEmpty() && (mediaUrls == null || mediaUrls.isEmpty())) {
+            mediaUrls = new ArrayList<>();
+            mediaUrls.add(imageUrl);
+        }
+    }
+
+    public List<String> getMediaUrls() {
+        if (mediaUrls == null || mediaUrls.isEmpty()) {
+            if (imageUrl != null && !imageUrl.isEmpty()) {
+                List<String> list = new ArrayList<>();
+                list.add(imageUrl);
+                return list;
+            }
+            return new ArrayList<>();
+        }
+        return mediaUrls;
+    }
+
+    public void setMediaUrls(List<String> mediaUrls) {
+        this.mediaUrls = mediaUrls != null ? mediaUrls : new ArrayList<>();
+        if (!this.mediaUrls.isEmpty() && (imageUrl == null || imageUrl.isEmpty())) {
+            this.imageUrl = this.mediaUrls.get(0);
+        }
+    }
 
     public List<String> getLikedBy() {
-        if (likedBy == null) likedBy = new java.util.ArrayList<>();
+        if (likedBy == null) likedBy = new ArrayList<>();
         return likedBy;
     }
     public void setLikedBy(List<String> likedBy) {
-        this.likedBy = likedBy != null ? likedBy : new java.util.ArrayList<>();
+        this.likedBy = likedBy != null ? likedBy : new ArrayList<>();
     }
 
     public String getMoodBadge() { return moodBadge; }
@@ -94,6 +135,14 @@ public class Post {
 
     public String getCommentsJson() { return commentsJson; }
     public void setCommentsJson(String commentsJson) { this.commentsJson = commentsJson; }
+
+    public boolean isSpoiler() {
+        return isSpoiler || TYPE_SPOILER.equalsIgnoreCase(type) || (content != null && content.contains("||"));
+    }
+
+    public void setSpoiler(boolean spoiler) {
+        this.isSpoiler = spoiler;
+    }
 
     public boolean isMomentActive() {
         return expiresAtMillis > System.currentTimeMillis();

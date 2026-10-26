@@ -41,6 +41,8 @@ import com.m3.veil.manager.VeilFeatureManager;
 import com.m3.veil.model.Post;
 import com.m3.veil.ui.main.CreatePostActivity;
 import com.m3.veil.ui.views.WaveformView;
+import com.m3.veil.ui.views.VeilCanvasSpoilerAndMosaicView;
+import com.m3.veil.utils.SovereignIdentityAndDirectoryEngine;
 import com.m3.veil.utils.BlurUtils;
 import com.m3.veil.webrtc.WebRtcManager;
 
@@ -151,6 +153,28 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
                     ? "  •  " + post.getMoodBadge() : "";
             username.setText("@" + (post.getAuthorUsername() != null ? post.getAuthorUsername() : "anonymous") + badge);
 
+            if (avatar != null) {
+                String authorId = post.getAuthorId();
+                java.io.File localAvatar = authorId != null ? new java.io.File(context.getFilesDir(), "avatars/avatar_" + authorId + ".webp") : null;
+                if (localAvatar != null && localAvatar.exists()) {
+                    Bitmap bmp = BitmapFactory.decodeFile(localAvatar.getAbsolutePath());
+                    if (bmp != null) {
+                        avatar.setImageBitmap(bmp);
+                    } else {
+                        avatar.setImageResource(R.drawable.ic_profile_placeholder);
+                    }
+                } else if (post.getAuthorAvatar() != null && new java.io.File(post.getAuthorAvatar()).exists()) {
+                    Bitmap bmp = BitmapFactory.decodeFile(post.getAuthorAvatar());
+                    if (bmp != null) {
+                        avatar.setImageBitmap(bmp);
+                    } else {
+                        avatar.setImageResource(R.drawable.ic_profile_placeholder);
+                    }
+                } else {
+                    avatar.setImageResource(R.drawable.ic_profile_placeholder);
+                }
+            }
+
             // Parse rich studio metadata from pollJson if present
             JSONObject meta = null;
             int gradientIndex = 0;
@@ -258,7 +282,8 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
             }
 
             String currentUid = FirebaseAuth.getInstance().getCurrentUser() != null
-                    ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "local";
+                    ? FirebaseAuth.getInstance().getCurrentUser().getUid()
+                    : SovereignIdentityAndDirectoryEngine.getInstance(context).getCurrentUserId();
 
             boolean isLiked = post.getLikedBy() != null && post.getLikedBy().contains(currentUid);
             if (isLiked) {
@@ -405,36 +430,48 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
                 dynamicAttachmentContainer.addView(voiceRow);
             }
 
-            // B. Image / Doodle (#207) with Privacy Mosaic Blur Toggle
-            if (post.getImageUrl() != null && !post.getImageUrl().isEmpty()
-                    && !post.getImageUrl().endsWith(".m4a") && !post.getImageUrl().endsWith(".pcm") && !post.getImageUrl().endsWith(".wav")) {
-                Bitmap bmp = BitmapFactory.decodeFile(post.getImageUrl());
-                if (bmp != null) {
-                    boolean unblurred = post.getId() != null && unblurredMediaPosts.contains(post.getId());
-                    ImageView iv = new ImageView(context);
-                    LinearLayout.LayoutParams ivLp = new LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT, (int) (190 * dp));
-                    ivLp.bottomMargin = (int) (10 * dp);
-                    iv.setLayoutParams(ivLp);
-                    iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                    if (!unblurred && "confession".equalsIgnoreCase(post.getCategory())) {
-                        iv.setImageBitmap(BlurUtils.fastStackBlur(bmp, 14));
-                        iv.setOnClickListener(v -> {
-                            unblurredMediaPosts.add(post.getId());
-                            if (onRefreshItem != null) onRefreshItem.run();
-                        });
-                    } else {
-                        iv.setImageBitmap(bmp);
-                        iv.setOnClickListener(v -> {
-                            android.content.Intent intent = new android.content.Intent(context, com.m3.veil.ui.chat.MediaViewerActivity.class);
-                            intent.putExtra(com.m3.veil.ui.chat.MediaViewerActivity.EXTRA_FILE_PATH, post.getImageUrl());
-                            intent.putExtra(com.m3.veil.ui.chat.MediaViewerActivity.EXTRA_MEDIA_TYPE, "image");
-                            intent.putExtra(com.m3.veil.ui.chat.MediaViewerActivity.EXTRA_SENDER_NAME, "@" + post.getAuthorUsername());
-                            context.startActivity(intent);
-                        });
+            // B. Multi-Photo Mosaic & Spoiler Canvas Rendering (Telegram Parity)
+            List<String> mediaList = post.getMediaUrls();
+            List<String> validImages = new java.util.ArrayList<>();
+            if (mediaList != null && !mediaList.isEmpty()) {
+                for (String url : mediaList) {
+                    if (url != null && !url.endsWith(".m4a") && !url.endsWith(".pcm") && !url.endsWith(".wav")) {
+                        validImages.add(url);
                     }
-                    dynamicAttachmentContainer.addView(iv);
                 }
+            } else if (post.getImageUrl() != null && !post.getImageUrl().isEmpty()
+                    && !post.getImageUrl().endsWith(".m4a") && !post.getImageUrl().endsWith(".pcm") && !post.getImageUrl().endsWith(".wav")) {
+                validImages.add(post.getImageUrl());
+            }
+
+            if (!validImages.isEmpty()) {
+                VeilCanvasSpoilerAndMosaicView mosaicView = new VeilCanvasSpoilerAndMosaicView(context);
+                int heightDp = validImages.size() == 1 ? 220 : 260;
+                LinearLayout.LayoutParams mLp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, (int) (heightDp * dp));
+                mLp.bottomMargin = (int) (10 * dp);
+                mosaicView.setLayoutParams(mLp);
+
+                mosaicView.setImages(validImages);
+                boolean isSpoiler = post.isSpoiler() || "confession".equalsIgnoreCase(post.getCategory());
+                boolean alreadyRevealed = post.getId() != null && revealedSpoilers.contains(post.getId());
+                mosaicView.setSpoiler(isSpoiler && !alreadyRevealed);
+
+                mosaicView.setOnSpoilerStateChangeListener(revealed -> {
+                    if (revealed && post.getId() != null) {
+                        revealedSpoilers.add(post.getId());
+                    }
+                });
+
+                mosaicView.setOnTileClickListener((index, url) -> {
+                    android.content.Intent intent = new android.content.Intent(context, com.m3.veil.ui.chat.MediaViewerActivity.class);
+                    intent.putExtra(com.m3.veil.ui.chat.MediaViewerActivity.EXTRA_FILE_PATH, url);
+                    intent.putExtra(com.m3.veil.ui.chat.MediaViewerActivity.EXTRA_MEDIA_TYPE, "image");
+                    intent.putExtra(com.m3.veil.ui.chat.MediaViewerActivity.EXTRA_SENDER_NAME, "@" + post.getAuthorUsername());
+                    context.startActivity(intent);
+                });
+
+                dynamicAttachmentContainer.addView(mosaicView);
             }
 
             // C. Interactive Poll & Quiz Mode Bars (#85, #89)
