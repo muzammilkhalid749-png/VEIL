@@ -82,6 +82,10 @@ public class PinSetupActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progressBar);
         pinDotsContainer = findViewById(R.id.pinDotsContainer);
 
+        if (getIntent().getBooleanExtra("is_change_pin", false) && skipButton != null) {
+            skipButton.setVisibility(View.GONE);
+        }
+
         findViewById(R.id.backButton).setOnClickListener(v -> onBackPressed());
     }
 

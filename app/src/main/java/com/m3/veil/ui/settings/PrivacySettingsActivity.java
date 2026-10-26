@@ -473,9 +473,21 @@ public class PrivacySettingsActivity extends AppCompatActivity {
     }
 
     private void executeTotalWipe() {
+        try {
+            com.m3.veil.manager.AuthManager.getInstance().signOut(this);
+        } catch (Throwable ignored) {}
         chatDb.secureWipeAllData();
         getSharedPreferences("VeilFeaturePrefs", Context.MODE_PRIVATE).edit().clear().apply();
         getSharedPreferences("VeilPrefs", Context.MODE_PRIVATE).edit().clear().apply();
+        getSharedPreferences("VeilUserPrefs", Context.MODE_PRIVATE).edit().clear().apply();
+        getSharedPreferences("VeilPreferences", Context.MODE_PRIVATE).edit().clear().apply();
+        getSharedPreferences("veil_sovereign_identity_prefs", Context.MODE_PRIVATE).edit().clear().apply();
+        getSharedPreferences("veil_encrypted_prefs_fallback", Context.MODE_PRIVATE).edit().clear().apply();
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                deleteSharedPreferences("veil_encrypted_prefs");
+            }
+        } catch (Throwable ignored) {}
 
         Toast.makeText(this, "All cryptographic local data has been shredded.", Toast.LENGTH_LONG).show();
 

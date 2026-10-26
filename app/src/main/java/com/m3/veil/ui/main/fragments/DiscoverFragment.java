@@ -50,6 +50,7 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
     private ProgressBar loadingBar;
     private String activeCategoryFilter = "all";
     private String activeSearchQuery = "";
+    private String activeFeedSort = "hot"; // hot, new, top, discussed
 
     private final VeilBoardController.VeilBoardObserver boardObserver = new VeilBoardController.VeilBoardObserver() {
         @Override
@@ -312,6 +313,23 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
                 }
             }
         }
+        postList.sort((a, b) -> {
+            long tsA = a.getTimestamp() != null ? a.getTimestamp().toDate().getTime() : 0L;
+            long tsB = b.getTimestamp() != null ? b.getTimestamp().toDate().getTime() : 0L;
+            if ("new".equals(activeFeedSort)) {
+                return Long.compare(tsB, tsA);
+            } else if ("top".equals(activeFeedSort)) {
+                int cmp = Integer.compare(b.getLikesCount(), a.getLikesCount());
+                return cmp != 0 ? cmp : Long.compare(tsB, tsA);
+            } else if ("discussed".equals(activeFeedSort)) {
+                int cmp = Integer.compare(b.getCommentsCount(), a.getCommentsCount());
+                return cmp != 0 ? cmp : Long.compare(tsB, tsA);
+            } else {
+                double scoreA = a.getLikesCount() * 2.0 + a.getCommentsCount() * 3.0 + (tsA / 3600000.0);
+                double scoreB = b.getLikesCount() * 2.0 + b.getCommentsCount() * 3.0 + (tsB / 3600000.0);
+                return Double.compare(scoreB, scoreA);
+            }
+        });
         postsAdapter.notifyDataSetChanged();
         updateEmptyState();
     }
@@ -348,14 +366,19 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
     }
 
     @Override
+    public void onPostClick(Post post) {
+        if (post == null || post.getId() == null || getContext() == null) return;
+        Intent intent = new Intent(requireContext(), com.m3.veil.ui.main.PostDetailActivity.class);
+        intent.putExtra(com.m3.veil.ui.main.PostDetailActivity.EXTRA_POST_ID, post.getId());
+        startActivity(intent);
+    }
+
+    @Override
     public void onCommentClick(Post post) {
-        if (post == null || post.getId() == null) return;
-        if (post.getPollJson() != null && !post.getPollJson().isEmpty()) {
-            showPostPollVoteOrCommentChoice(post);
-        } else {
-            CommentsBottomSheet bottomSheet = CommentsBottomSheet.newInstance(post.getId(), post.getAuthorUsername());
-            bottomSheet.show(getChildFragmentManager(), "CommentsBottomSheet");
-        }
+        if (post == null || post.getId() == null || getContext() == null) return;
+        Intent intent = new Intent(requireContext(), com.m3.veil.ui.main.PostDetailActivity.class);
+        intent.putExtra(com.m3.veil.ui.main.PostDetailActivity.EXTRA_POST_ID, post.getId());
+        startActivity(intent);
     }
 
     private void showPostPollVoteOrCommentChoice(Post post) {

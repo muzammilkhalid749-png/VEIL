@@ -178,6 +178,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".ui.main.PostDetailActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".ui.main.MainActivity"
             android:launchMode="singleTop"
             android:exported="true" />
@@ -186,6 +191,16 @@
             android:name=".ui.chat.UserProfileActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".ui.chat.GroupSettingsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.chat.ChatSettingsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <service
             android:name=".calling.VeilCallService"

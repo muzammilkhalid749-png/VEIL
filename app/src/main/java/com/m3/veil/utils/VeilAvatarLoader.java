@@ -244,7 +244,7 @@ public final class VeilAvatarLoader {
 
     private static boolean isLikelyBase64(String str) {
         if (str.length() < 30) return false;
-        return str.startsWith("/9j/") || str.startsWith("iVBOR") || str.startsWith("R0lGOD");
+        return str.startsWith("/9j/") || str.startsWith("iVBOR") || str.startsWith("R0lGOD") || str.startsWith("UklGR");
     }
 
     private static int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {

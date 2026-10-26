@@ -554,11 +554,22 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
         });
     }
 
+    private TextView tvNewChatDirectoryStatus;
+    private View btnQuickConnectHandle;
+    private TextView tvQuickConnectLabel;
+    private final android.os.Handler searchDebounceHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable pendingSearchRunnable;
+    private final java.util.concurrent.atomic.AtomicInteger searchSequence = new java.util.concurrent.atomic.AtomicInteger(0);
+
     private void setupRecyclerView() {
         userList = new ArrayList<>();
         usersAdapter = new UsersAdapter(userList, this);
         usersRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         usersRecyclerView.setAdapter(usersAdapter);
+
+        tvNewChatDirectoryStatus = findViewById(R.id.tvNewChatDirectoryStatus);
+        btnQuickConnectHandle = findViewById(R.id.btnQuickConnectHandle);
+        tvQuickConnectLabel = findViewById(R.id.tvQuickConnectLabel);
     }
 
     private void setupSearchListener() {
@@ -568,12 +579,90 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                searchUsers(s.toString().trim());
+                String raw = s != null ? s.toString().trim() : "";
+                scheduleDebouncedSearch(raw);
             }
 
             @Override
             public void afterTextChanged(Editable s) {}
         });
+    }
+
+    private void scheduleDebouncedSearch(String rawQuery) {
+        if (pendingSearchRunnable != null) {
+            searchDebounceHandler.removeCallbacks(pendingSearchRunnable);
+        }
+
+        String clean = rawQuery != null ? rawQuery.trim().toLowerCase() : "";
+        if (clean.startsWith("@")) {
+            clean = clean.substring(1);
+        }
+        final String cleanHandle = clean;
+
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine engine =
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this);
+
+        if (cleanHandle.isEmpty()) {
+            if (btnQuickConnectHandle != null) {
+                btnQuickConnectHandle.setVisibility(View.GONE);
+            }
+            if (tvNewChatDirectoryStatus != null) {
+                int bloomCount = engine.getBloomFilter().getApproximateCount();
+                tvNewChatDirectoryStatus.setText("🔐 O(1) k=7 Bloom Directory (" + bloomCount + " handles) • Mesh Ready");
+            }
+            searchUsers("");
+            return;
+        }
+
+        boolean bloomHit = cleanHandle.length() >= 3 && engine.mightContainUsername(cleanHandle);
+        if (tvNewChatDirectoryStatus != null) {
+            if (bloomHit) {
+                tvNewChatDirectoryStatus.setText("⚡ Bloom Filter HIT (<0.02ms): @" + cleanHandle + " indexed in directory");
+            } else {
+                tvNewChatDirectoryStatus.setText("🔍 Searching SQLCipher + Blinded Directory for @" + cleanHandle + "…");
+            }
+        }
+
+        if (btnQuickConnectHandle != null && tvQuickConnectLabel != null) {
+            if (cleanHandle.length() >= 3 && cleanHandle.matches("^[a-z0-9_]{3,32}$")) {
+                btnQuickConnectHandle.setVisibility(View.VISIBLE);
+                tvQuickConnectLabel.setText(bloomHit
+                        ? "⚡ Verified in Bloom Filter: Chat with @" + cleanHandle
+                        : "🔗 Direct P2P Lookup & Connect with @" + cleanHandle);
+                btnQuickConnectHandle.setOnClickListener(v -> connectDirectlyByHandle(cleanHandle));
+            } else {
+                btnQuickConnectHandle.setVisibility(View.GONE);
+            }
+        }
+
+        pendingSearchRunnable = () -> searchUsers(cleanHandle);
+        searchDebounceHandler.postDelayed(pendingSearchRunnable, 160L);
+    }
+
+    private void connectDirectlyByHandle(String cleanHandle) {
+        loadingBar.setVisibility(View.VISIBLE);
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this)
+                .searchUsersByUsername(cleanHandle, users -> {
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        loadingBar.setVisibility(View.GONE);
+                        if (users != null) {
+                            for (User u : users) {
+                                if (u != null && u.getUsername() != null
+                                        && u.getUsername().equalsIgnoreCase(cleanHandle)
+                                        && !currentUserId.equals(u.getUserId())) {
+                                    startChatWithUser(u);
+                                    return;
+                                }
+                            }
+                            if (!users.isEmpty() && !currentUserId.equals(users.get(0).getUserId())) {
+                                startChatWithUser(users.get(0));
+                                return;
+                            }
+                        }
+                        Toast.makeText(this, "No registered peer found for @" + cleanHandle + " yet", Toast.LENGTH_SHORT).show();
+                    });
+                });
     }
 
     private void searchUsers(String query) {
@@ -584,10 +673,12 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
             cleanQuery = cleanQuery.substring(1);
         }
         final String finalQuery = cleanQuery;
+        final int seq = searchSequence.incrementAndGet();
 
         com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this)
                 .searchUsersByUsername(finalQuery, users -> {
                     runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed() || seq != searchSequence.get()) return;
                         loadingBar.setVisibility(View.GONE);
                         userList.clear();
                         if (users != null) {

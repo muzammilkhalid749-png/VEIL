@@ -75,12 +75,30 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:layout_marginBottom="32dp"
+                android:layout_marginBottom="16dp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
                 android:text="@string/enter_otp_hint"
                 android:textColor="@color/textSecondary"
                 android:textSize="14sp" />
+
+            <!-- Sovereign Local OTP Instant Auto-Fill Pill -->
+            <TextView
+                android:id="@+id/tvSovereignOtpHelper"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                android:background="@drawable/input_background"
+                android:clickable="true"
+                android:focusable="true"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="8dp"
+                android:text="🔐 Sovereign Code: 123456 (Tap to auto-fill)"
+                android:textColor="@color/veil_accent"
+                android:textSize="12sp"
+                android:textStyle="bold" />
 
             <!-- OTP Input Grid -->
             <com.mukeshsolanki.OtpView
@@ -103,7 +121,7 @@
                 app:OtpItemHeight="50dp"
                 app:OtpItemRadius="12dp"
                 app:OtpItemSpacing="8dp"
-                app:OtpItemWidth="34dp"
+                app:OtpItemWidth="38dp"
                 app:OtpLineColor="@color/veil_accent"
                 app:OtpLineWidth="1.5dp"
                 app:OtpViewType="rectangle" />

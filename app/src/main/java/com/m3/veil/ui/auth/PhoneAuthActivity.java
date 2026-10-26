@@ -50,6 +50,9 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
     private final android.os.Handler timeoutHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable timeoutRunnable;
 
+    private final java.util.concurrent.ExecutorService authWorker =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -62,9 +65,9 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
         initializeCountries();
         setupClickListeners();
         setupTextWatchers();
-        setupPhoneNumberFormatting();
 
         setSelectedCountry(CountryData.detectCountry(this));
+        setupPhoneNumberFormatting();
     }
 
     private void handleWindowInsets() {
@@ -104,36 +107,44 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
     }
 
     private void signInAnonymously() {
+        if (isLoading) return;
         showLoading(true, true);
-        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine engine =
-                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this);
-        String phrase = engine.createNewAnonymousAccount();
-        String uid = engine.getCurrentUid();
 
-        if (uid != null && !uid.isEmpty()) {
-            mAuth.setCurrentUserUid(uid);
-            com.m3.veil.manager.AuthManager.getInstance().onSovereignIdentityInitialized(this, uid, false);
-        }
+        authWorker.execute(() -> {
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine engine =
+                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(PhoneAuthActivity.this);
+            final String phrase = engine.createNewAnonymousAccount();
+            final String uid = engine.getCurrentUid();
 
-        try {
-            String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(
-                    androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
-            android.content.SharedPreferences securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
-                    "veil_encrypted_prefs",
-                    masterKeyAlias,
-                    PhoneAuthActivity.this,
-                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            );
-            securePrefs.edit().putString("recovery_phrase", phrase).apply();
-        } catch (Exception ignored) {}
+            if (uid != null && !uid.isEmpty()) {
+                mAuth.setCurrentUserUid(uid);
+                com.m3.veil.manager.AuthManager.getInstance()
+                        .onSovereignIdentityInitialized(PhoneAuthActivity.this, uid, false);
+            }
 
-        showLoading(false, true);
-        Intent intent = new Intent(this, RecoveryPhraseActivity.class);
-        intent.putExtra("recovery_phrase", phrase);
-        startActivity(intent);
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-        finish();
+            try {
+                String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(
+                        androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
+                android.content.SharedPreferences securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
+                        "veil_encrypted_prefs",
+                        masterKeyAlias,
+                        PhoneAuthActivity.this,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+                securePrefs.edit().putString("recovery_phrase", phrase).apply();
+            } catch (Exception ignored) {}
+
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                showLoading(false, true);
+                Intent intent = new Intent(PhoneAuthActivity.this, RecoveryPhraseActivity.class);
+                intent.putExtra("recovery_phrase", phrase);
+                startActivity(intent);
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+                finish();
+            });
+        });
     }
 
     private void setupTextWatchers() {
@@ -408,5 +419,6 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
         if (timeoutHandler != null && timeoutRunnable != null) {
             timeoutHandler.removeCallbacks(timeoutRunnable);
         }
+        authWorker.shutdown();
     }
 }

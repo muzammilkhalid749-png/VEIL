@@ -689,6 +689,20 @@ public class StatusController {
     }
 
     public String getCurrentUserName() {
+        try {
+            com.m3.veil.utils.UserPreferences up = new com.m3.veil.utils.UserPreferences(appContext);
+            String dn = up.getDisplayName();
+            if (dn != null && !dn.trim().isEmpty()) return dn.trim();
+            String un = up.getUsername();
+            if (un != null && !un.trim().isEmpty()) return "@" + un.trim();
+            String uid = getCurrentUserId();
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest m =
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(appContext).getSovereignProfileManifest(uid);
+            if (m != null) {
+                if (m.displayName != null && !m.displayName.trim().isEmpty()) return m.displayName.trim();
+                if (m.username != null && !m.username.trim().isEmpty()) return "@" + m.username.trim();
+            }
+        } catch (Exception ignored) {}
         FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
         if (u != null) {
             String name = u.getDisplayName();
@@ -1592,15 +1606,30 @@ public class StatusController {
 
     private void sendSignedViewReceipt(StatusSegment seg) {
         try {
+            String myUid = getCurrentUserId();
+            String myName = getCurrentUserName();
+            long now = System.currentTimeMillis();
+
             JSONObject receipt = new JSONObject();
             receipt.put("type", "status_viewed");
             receipt.put("statusId", seg.id);
-            receipt.put("viewerId", getCurrentUserId());
-            receipt.put("viewerName", getCurrentUserName());
-            receipt.put("viewedAtMs", System.currentTimeMillis());
+            receipt.put("viewerId", myUid);
+            receipt.put("viewerName", myName);
+            receipt.put("viewedAtMs", now);
 
             VeilPacket packet = new VeilPacket(VeilPacket.LANE_CTRL, VeilPacket.TYPE_READ_RECEIPT, receipt.toString());
             WebRtcManager.getInstance(appContext).sendPacket(seg.authorId, packet);
+            com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(seg.authorId, "p2p_action", receipt);
+
+            // Also record view in Firestore statuses/{id} so author sees view count even if offline when viewed
+            java.util.Map<String, Object> viewerEntry = new java.util.HashMap<>();
+            viewerEntry.put("viewerId", myUid);
+            viewerEntry.put("viewerName", myName);
+            viewerEntry.put("viewedAtMs", now);
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("statuses").document(seg.id)
+                    .update("viewers." + myUid, viewerEntry);
+
             Log.d(TAG, "Dispatched signed view receipt for status " + seg.id + " to author " + seg.authorId);
         } catch (Exception e) {
             Log.w(TAG, "Failed sending view receipt: " + e.getMessage());

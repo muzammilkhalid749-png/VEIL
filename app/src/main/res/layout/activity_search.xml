@@ -7,47 +7,98 @@
     android:background="@color/veil_primary_dark">
 
     <LinearLayout
+        android:id="@+id/searchContentColumn"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Custom Toolbar -->
+        <!-- Custom Search Toolbar -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="@color/veil_primary"
             android:gravity="center_vertical"
             android:paddingStart="8dp"
-            android:paddingEnd="16dp">
+            android:paddingEnd="12dp">
 
             <ImageView
                 android:id="@+id/backButton"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/app_name"
                 android:padding="8dp"
                 android:src="@drawable/ic_arrow_back"
-                app:tint="@color/text_primary"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/app_name" />
+                app:tint="@color/text_primary" />
 
             <EditText
                 android:id="@+id/searchEditText"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:autofillHints="search"
                 android:background="@null"
-                android:hint="@string/search_hint"
+                android:hint="Search chats, messages, or @username..."
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLines="1"
+                android:paddingStart="12dp"
+                android:paddingEnd="8dp"
                 android:textColor="@color/text_primary"
                 android:textColorHint="@color/text_secondary"
-                android:textSize="16sp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:maxLines="1"
-                android:inputType="text"
-                android:imeOptions="actionSearch"
-                android:autofillHints="search" />
+                android:textSize="15.5sp" />
+
+            <ImageView
+                android:id="@+id/btnClearSearch"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Clear search"
+                android:padding="8dp"
+                android:src="@drawable/ic_close"
+                android:visibility="gone"
+                app:tint="@color/text_secondary" />
 
         </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/colorOutline" />
+
+        <!-- Universal Category Filter Chips Bar -->
+        <HorizontalScrollView
+            android:id="@+id/searchFilterChipsScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/veil_primary"
+            android:overScrollMode="never"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/searchFilterChipsRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal" />
+
+        </HorizontalScrollView>
+
+        <!-- O(1) Bloom Filter & SQLCipher Full-Text Telemetry Bar -->
+        <TextView
+            android:id="@+id/tvSearchBloomTelemetry"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/veil_primary_dark"
+            android:fontFamily="monospace"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp"
+            android:text="🔐 SQLCipher FTS + O(1) k=7 Bloom Directory Ready"
+            android:textColor="@color/veil_accent"
+            android:textSize="11.5sp"
+            android:textStyle="bold" />
 
         <View
             android:layout_width="match_parent"
@@ -63,34 +114,35 @@
                 android:id="@+id/resultsRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="8dp"
-                android:clipToPadding="false" />
+                android:clipToPadding="false"
+                android:padding="8dp" />
 
             <!-- Empty State -->
             <LinearLayout
                 android:id="@+id/emptyState"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:orientation="vertical"
                 android:gravity="center"
-                android:visibility="gone"
-                android:padding="40dp">
+                android:orientation="vertical"
+                android:padding="40dp"
+                android:visibility="gone">
 
                 <ImageView
                     android:layout_width="64dp"
                     android:layout_height="64dp"
-                    android:src="@drawable/ic_search"
                     android:layout_marginBottom="16dp"
-                    app:tint="@color/text_secondary"
-                    android:contentDescription="@string/search" />
+                    android:contentDescription="@string/search"
+                    android:src="@drawable/ic_search"
+                    app:tint="@color/text_secondary" />
 
                 <TextView
+                    android:id="@+id/tvEmptySearchTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:gravity="center"
                     android:text="@string/search_desc"
                     android:textColor="@color/text_secondary"
-                    android:textSize="14sp"
-                    android:gravity="center" />
+                    android:textSize="14sp" />
 
             </LinearLayout>
 
@@ -101,9 +153,12 @@
     <!-- Loading State -->
     <ProgressBar
         android:id="@+id/loadingBar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="52dp"
         android:visibility="gone" />
 
 </RelativeLayout>

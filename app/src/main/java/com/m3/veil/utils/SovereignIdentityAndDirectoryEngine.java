@@ -2278,6 +2278,10 @@ public class SovereignIdentityAndDirectoryEngine {
             return Math.max(insertedCount, (int) Math.round(est));
         }
 
+        public synchronized int getApproximateCount() {
+            return getEstimatedCount();
+        }
+
         public synchronized void saveToPreferences(Context context) {
             if (context == null) return;
             try {
@@ -2378,6 +2382,39 @@ public class SovereignIdentityAndDirectoryEngine {
     public ClaimedUsernameBloomFilter getUsernameBloomFilter() {
         ensureBloomFilterHydrated();
         return mUsernameBloomFilter;
+    }
+
+    public ClaimedUsernameBloomFilter getBloomFilter() {
+        return getUsernameBloomFilter();
+    }
+
+    public boolean mightContainUsername(String username) {
+        return mightContainUsernameInBloom(username);
+    }
+
+    public interface NostrQueryCallback {
+        void onResult(SovereignProfileManifest manifest);
+    }
+
+    public void fetchManifestFromFirestore(String uid, NostrQueryCallback callback) {
+        if (uid == null || uid.trim().isEmpty()) {
+            if (callback != null) callback.onResult(null);
+            return;
+        }
+        mExecutor.execute(() -> {
+            SovereignProfileManifest m = fetchManifestFromFirestoreBlocking(uid.trim(), 2500L);
+            if (m != null) {
+                try {
+                    EncryptedChatDatabase.getInstance(mContext).saveSovereignProfileManifest(m);
+                } catch (Throwable ignored) {}
+                if (m.username != null && !m.username.isEmpty()) {
+                    mUsernameBloomFilter.add(m.username);
+                }
+            }
+            if (callback != null) {
+                mMainHandler.post(() -> callback.onResult(m));
+            }
+        });
     }
 
     public boolean mightContainUsernameInBloom(String username) {

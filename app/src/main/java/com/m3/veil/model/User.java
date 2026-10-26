@@ -94,8 +94,8 @@ public class User {
     public String getBio() { return bio; }
     public void setBio(String bio) { this.bio = bio; }
 
-    public String getPhotoUrl() { return photoUrl; }
-    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+    public String getPhotoUrl() { return (photoUrl != null && !photoUrl.isEmpty()) ? photoUrl : avatar; }
+    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; this.avatar = photoUrl; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

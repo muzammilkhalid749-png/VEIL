@@ -3716,6 +3716,8 @@ public class ChatActivity extends AppCompatActivity {
                                     if (statusChanged) {
                                         com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this)
                                                 .updateMessageStatus(mId, existing.isDelivered(), existing.isRead());
+                                        com.m3.veil.manager.VeilMessagesController.getInstance(ChatActivity.this)
+                                                .onMessageStatusChanged(mId, existing.isDelivered(), existing.isRead());
                                         for (int i = 0; i < messageList.size(); i++) {
                                             Message lm = messageList.get(i);
                                             if (lm.getId() != null && lm.getId().equals(mId)) {
@@ -3818,26 +3820,30 @@ public class ChatActivity extends AppCompatActivity {
         boolean sendReadReceipt = privacyPrefs.getBoolean("read_receipts_enabled", true);
         if (!sendReadReceipt) return;
 
-        // 1. Mark dialog read and broadcast bulk chat_read packet to recipient
-        com.m3.veil.manager.VeilMessagesController.getInstance(this).markDialogAsRead(chatId, recipientId);
-
-        // 2. Also send individual read receipts for any unread inbound messages in the list
-        if (messageList != null) {
-            for (Message m : messageList) {
+        // 1. Send individual read receipts for any unread inbound messages in SQLCipher before marking local DB read
+        List<Message> unreadCandidates = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getMessagesForChat(chatId);
+        if (unreadCandidates != null) {
+            for (Message m : unreadCandidates) {
                 if (m.getSenderId() != null && !m.getSenderId().equals(currentUserId) && !m.isRead()) {
                     com.m3.veil.webrtc.WebRtcManager.getInstance(this).sendReceipt(recipientId, m.getId(), true, true);
                     m.setRead(true);
                     if (chatId != null && !isGroupChatContext() && db != null) {
                         try {
+                            Map<String, Object> ack = new HashMap<>();
+                            ack.put("delivered", true);
+                            ack.put("read", true);
                             db.collection("groups").document(chatId).collection("messages").document(m.getId())
-                                    .update("delivered", true, "read", true);
+                                    .set(ack, com.google.firebase.firestore.SetOptions.merge());
                             db.collection("chats").document(chatId).collection("messages").document(m.getId())
-                                    .update("delivered", true, "read", true);
+                                    .set(ack, com.google.firebase.firestore.SetOptions.merge());
                         } catch (Exception ignored) {}
                     }
                 }
             }
         }
+
+        // 2. Mark dialog read and broadcast bulk chat_read packet to recipient
+        com.m3.veil.manager.VeilMessagesController.getInstance(this).markDialogAsRead(chatId, recipientId);
     }
 
     @Override
@@ -3856,10 +3862,9 @@ public class ChatActivity extends AppCompatActivity {
         }
         if (chatId != null) {
             com.m3.veil.manager.VeilMessagesController.getInstance(this).setActiveChatIdInForeground(chatId);
-            com.m3.veil.manager.VeilMessagesController.getInstance(this).markDialogAsRead(chatId, recipientId);
+            sendReadReceiptsForUnreadMessages();
             com.m3.veil.database.EncryptedChatDatabase.getInstance(this).markAllAsRead(chatId, currentUserId);
             reloadMessagesFromLocalVault();
-            sendReadReceiptsForUnreadMessages();
         }
     }
 

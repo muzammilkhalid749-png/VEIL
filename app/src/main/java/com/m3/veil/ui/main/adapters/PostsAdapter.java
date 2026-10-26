@@ -80,6 +80,9 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
         void onCommentClick(Post post);
         void onShareClick(Post post);
         void onAuthorClick(Post post);
+        default void onPostClick(Post post) {
+            onCommentClick(post);
+        }
     }
 
     public PostsAdapter(List<Post> postList, OnPostInteractionListener listener) {
@@ -301,6 +304,18 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
             commentButton.setOnClickListener(v -> {
                 if (listener != null) listener.onCommentClick(post);
             });
+
+            View.OnClickListener openPostDetailClick = v -> {
+                if (listener != null) {
+                    listener.onPostClick(post);
+                } else if (post.getId() != null) {
+                    android.content.Intent detailIntent = new android.content.Intent(context, com.m3.veil.ui.main.PostDetailActivity.class);
+                    detailIntent.putExtra(com.m3.veil.ui.main.PostDetailActivity.EXTRA_POST_ID, post.getId());
+                    context.startActivity(detailIntent);
+                }
+            };
+            itemView.setOnClickListener(openPostDetailClick);
+            content.setOnClickListener(openPostDetailClick);
 
             shareButton.setOnClickListener(v -> {
                 if (listener != null) listener.onShareClick(post);

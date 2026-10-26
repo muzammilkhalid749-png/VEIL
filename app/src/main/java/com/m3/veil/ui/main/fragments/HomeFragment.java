@@ -1418,19 +1418,27 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                         m.setRead(false);
                                                         EncryptedChatDatabase.getInstance(requireContext()).saveMessage(finalChatId, m);
 
-                                                        // Acknowledge delivery on Firestore so sender sees double ticks immediately!
+                                                        // Acknowledge delivery on Firestore (both chats & groups paths) + P2P so sender sees double ticks immediately!
                                                         if (sId != null && !sId.equals(uid)) {
                                                             mDoc.getReference().update("delivered", true);
+                                                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                                                    .collection("groups").document(finalChatId)
+                                                                    .collection("messages").document(mId)
+                                                                    .update("delivered", true);
+                                                            com.m3.veil.webrtc.WebRtcManager.getInstance(requireContext())
+                                                                    .sendReceipt(sId, mId, true, false);
                                                         }
                                                         anyNew = true;
                                                     } else {
-                                                        // Sync delivery/read status back to sender's local database
+                                                        // Sync delivery/read status back to sender's local database & VeilMessagesController
                                                         boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
                                                         boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
                                                         if (sId != null && sId.equals(uid)) {
                                                             if ((!existingMsg.isDelivered() && docDelivered) || (!existingMsg.isRead() && docRead)) {
                                                                 EncryptedChatDatabase.getInstance(requireContext())
                                                                         .updateMessageStatus(mId, docDelivered, docRead);
+                                                                com.m3.veil.manager.VeilMessagesController.getInstance(requireContext())
+                                                                        .onMessageStatusChanged(mId, docDelivered, docRead);
                                                                 anyNew = true;
                                                             }
                                                         }

@@ -94,39 +94,57 @@ public class UserProfileActivity extends AppCompatActivity {
         }
 
         TextView nameText = findViewById(R.id.profileNameText);
-        if (peerUserName != null) {
+        TextView profileSubtitle = findViewById(R.id.profileSubtitleText);
+        if (peerUserName != null && nameText != null) {
             nameText.setText(peerUserName);
         }
 
         de.hdodenhof.circleimageview.CircleImageView profileAvatarImage = findViewById(R.id.profileAvatarImage);
-        String avatarSrc = (chat != null && chat.getAvatar() != null && !chat.getAvatar().isEmpty())
-                ? chat.getAvatar() : null;
+        final String[] activeAvatarSource = {
+                (chat != null && chat.getAvatar() != null && !chat.getAvatar().isEmpty())
+                        ? chat.getAvatar() : null
+        };
         if (profileAvatarImage != null) {
-            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, avatarSrc, peerUserName, isGroup);
-            final String finalAvatarSrc = avatarSrc;
+            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, activeAvatarSource[0], peerUserName, isGroup);
             profileAvatarImage.setOnClickListener(v -> {
-                if (finalAvatarSrc != null && !finalAvatarSrc.isEmpty()) {
+                if (activeAvatarSource[0] != null && !activeAvatarSource[0].isEmpty()) {
                     Intent viewerIntent = new Intent(this, MediaViewerActivity.class);
-                    viewerIntent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, finalAvatarSrc);
+                    viewerIntent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, activeAvatarSource[0]);
                     viewerIntent.putExtra(MediaViewerActivity.EXTRA_MEDIA_TYPE, "image");
                     viewerIntent.putExtra(MediaViewerActivity.EXTRA_SENDER_NAME, peerUserName != null ? peerUserName : "Profile");
                     startActivity(viewerIntent);
                 }
             });
         }
-        if (avatarSrc == null && peerUserId != null && !peerUserId.trim().isEmpty()
+        if (!isGroup && peerUserId != null && !peerUserId.trim().isEmpty()
                 && !peerUserId.startsWith("group_") && !peerUserId.startsWith("channel_")) {
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine engine =
+                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this);
             com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest cachedM =
                     EncryptedChatDatabase.getInstance(this).getSovereignProfileManifest(peerUserId);
-            if (cachedM != null && cachedM.avatarBase64 != null && !cachedM.avatarBase64.isEmpty()) {
-                com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, cachedM.avatarBase64, peerUserName, isGroup);
-            } else {
-                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).queryNostrRelays(peerUserId, 3000, m -> {
-                    if (m != null && m.avatarBase64 != null && !m.avatarBase64.isEmpty() && profileAvatarImage != null) {
-                        runOnUiThread(() -> com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, m.avatarBase64, peerUserName, isGroup));
-                    }
-                });
+            if (cachedM != null) {
+                applyResolvedPeerManifest(cachedM, nameText, profileSubtitle, profileAvatarImage, activeAvatarSource, chat);
             }
+            // Also fetch latest manifest from Firestore (50ms) with Nostr relay fallback
+            engine.fetchManifestFromFirestore(peerUserId, firestoreManifest -> {
+                if (firestoreManifest != null) {
+                    runOnUiThread(() -> {
+                        if (!isFinishing() && !isDestroyed()) {
+                            applyResolvedPeerManifest(firestoreManifest, nameText, profileSubtitle, profileAvatarImage, activeAvatarSource, chat);
+                        }
+                    });
+                } else {
+                    engine.queryNostrRelays(peerUserId, 3000, nostrManifest -> {
+                        if (nostrManifest != null) {
+                            runOnUiThread(() -> {
+                                if (!isFinishing() && !isDestroyed()) {
+                                    applyResolvedPeerManifest(nostrManifest, nameText, profileSubtitle, profileAvatarImage, activeAvatarSource, chat);
+                                }
+                            });
+                        }
+                    });
+                }
+            });
         }
 
         tvBlockUser = findViewById(R.id.tvBlockUser);
@@ -147,7 +165,6 @@ public class UserProfileActivity extends AppCompatActivity {
 
         if (isGroup) {
             boolean isChan = (chat != null && chat.isChannel()) || (chatId != null && chatId.startsWith("channel_"));
-            TextView profileSubtitle = findViewById(R.id.profileSubtitleText);
             String descText = (chat != null && chat.getDescription() != null && !chat.getDescription().isEmpty())
                     ? chat.getDescription()
                     : (isChan ? "End-to-End Encrypted Broadcast Channel" : "End-to-End Encrypted Group");
@@ -163,6 +180,8 @@ public class UserProfileActivity extends AppCompatActivity {
             }
             loadAndRenderGroupMembers();
             setupGroupActionOptions();
+        } else {
+            setupDirectChatAdvancedOptions();
         }
 
         loadLocalChatMetadata();
@@ -178,6 +197,45 @@ public class UserProfileActivity extends AppCompatActivity {
         }
         findViewById(R.id.btnClearChat).setOnClickListener(v -> confirmClearChat());
         findViewById(R.id.btnBlockUser).setOnClickListener(v -> handleBlockOrLeave());
+    }
+
+    private void applyResolvedPeerManifest(
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest m,
+            TextView nameText,
+            TextView profileSubtitle,
+            de.hdodenhof.circleimageview.CircleImageView profileAvatarImage,
+            String[] activeAvatarSource,
+            Chat chat) {
+        if (m == null) return;
+        if (m.displayName != null && !m.displayName.trim().isEmpty()) {
+            peerUserName = m.displayName.trim();
+            if (nameText != null) {
+                nameText.setText(peerUserName);
+            }
+        }
+        if (profileSubtitle != null) {
+            StringBuilder sub = new StringBuilder();
+            if (m.username != null && !m.username.trim().isEmpty()) {
+                sub.append("@").append(m.username.trim());
+            }
+            if (m.bio != null && !m.bio.trim().isEmpty()) {
+                if (sub.length() > 0) sub.append("  •  ");
+                sub.append(m.bio.trim());
+            }
+            if (sub.length() > 0) {
+                profileSubtitle.setText(sub.toString());
+            }
+        }
+        if (m.avatarBase64 != null && !m.avatarBase64.trim().isEmpty()) {
+            activeAvatarSource[0] = m.avatarBase64.trim();
+            if (profileAvatarImage != null) {
+                com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, activeAvatarSource[0], peerUserName, false);
+            }
+            if (chat != null && (chat.getAvatar() == null || !chat.getAvatar().equals(activeAvatarSource[0]))) {
+                chat.setAvatar(activeAvatarSource[0]);
+                EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
+            }
+        }
     }
 
     private void startCall(String type) {
@@ -352,6 +410,13 @@ public class UserProfileActivity extends AppCompatActivity {
                                 tvName.setText(finalName);
                                 String handle = uDoc.getString("username");
                                 if (handle != null) tvSub.setText("@" + handle);
+                            }
+                            String av = uDoc.getString("avatarBase64");
+                            if (av == null || av.isEmpty()) av = uDoc.getString("avatarUrl");
+                            if (av != null && !av.isEmpty()) {
+                                avatar.setPadding(0, 0, 0, 0);
+                                avatar.clearColorFilter();
+                                com.m3.veil.utils.VeilAvatarLoader.loadAvatar(avatar, av, resolvedDisplayName[0], false);
                             }
                         }
                     });
@@ -1076,6 +1141,109 @@ public class UserProfileActivity extends AppCompatActivity {
         parent.addView(createProfileOptionRow("🏆 Group Achievements (#74)", "View cryptographic member reputation badges", R.drawable.ic_shield, v -> {
             showGroupAchievementsDialog();
         }), insertIdx + 6);
+
+        parent.addView(createProfileOptionRow("⚙️ Advanced Group & Channel Console", "Full administrative dashboard, slow mode, and member audit", R.drawable.ic_settings, v -> {
+            Intent intent = new Intent(this, GroupSettingsActivity.class);
+            intent.putExtra("chatId", chatId);
+            intent.putExtra("groupName", peerUserName);
+            startActivity(intent);
+        }), insertIdx + 7);
+    }
+
+    private void setupDirectChatAdvancedOptions() {
+        LinearLayout membersLayout = findViewById(R.id.layoutGroupMembers);
+        if (membersLayout == null) return;
+        ViewGroup parent = (ViewGroup) membersLayout.getParent();
+        if (parent == null) return;
+        int insertIdx = parent.indexOfChild(membersLayout);
+
+        parent.addView(createProfileOptionRow("🔐 Per-Chat Vault PIN Lock", "Protect this conversation with an isolated 4-digit PIN", R.drawable.ic_lock, v -> {
+            showPerChatPinLockDialog();
+        }), insertIdx);
+
+        parent.addView(createProfileOptionRow("🎨 Custom Chat Theme & Wallpaper", "Personalize background colors & sync chat theme", R.drawable.ic_appearance, v -> {
+            showGroupThemesDialog();
+        }), insertIdx + 1);
+
+        parent.addView(createProfileOptionRow("⚙️ Advanced Chat & Privacy Settings", "Read receipts, screenshot shield, auto-translate & export", R.drawable.ic_settings, v -> {
+            Intent intent = new Intent(this, ChatSettingsActivity.class);
+            intent.putExtra("chatId", chatId);
+            intent.putExtra("userId", peerUserId);
+            intent.putExtra("userName", peerUserName);
+            startActivity(intent);
+        }), insertIdx + 2);
+    }
+
+    private void showPerChatPinLockDialog() {
+        if (chatId == null) return;
+        Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
+        boolean currentlyLocked = chat != null && chat.getChatLockPin() != null && !chat.getChatLockPin().isEmpty();
+
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        int pad = (int) (20 * dp);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText(currentlyLocked ? "🔓 Manage Per-Chat PIN Lock" : "🔐 Lock Chat with 4-Digit PIN");
+        title.setTextSize(18f);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        root.addView(title);
+
+        EditText etPin = new EditText(this);
+        etPin.setHint("Enter 4-digit PIN...");
+        etPin.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        etPin.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        etPin.setHintTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+        etPin.setBackgroundResource(R.drawable.bg_search_input);
+        int boxPad = (int) (12 * dp);
+        etPin.setPadding(boxPad, boxPad, boxPad, boxPad);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = (int) (12 * dp);
+        lp.bottomMargin = (int) (12 * dp);
+        etPin.setLayoutParams(lp);
+        root.addView(etPin);
+
+        MaterialButton btnSave = new MaterialButton(this);
+        btnSave.setText(currentlyLocked ? "Update PIN Lock" : "Enable PIN Lock");
+        btnSave.setCornerRadius((int) (12 * dp));
+        btnSave.setOnClickListener(v -> {
+            String pin = etPin.getText().toString().trim();
+            if (pin.length() < 4) {
+                etPin.setError("Enter at least 4 digits");
+                return;
+            }
+            if (chat != null) {
+                chat.setChatLockPin(pin);
+                EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
+            }
+            sheet.dismiss();
+            Toast.makeText(this, "🔐 Chat locked with custom PIN", Toast.LENGTH_SHORT).show();
+        });
+        root.addView(btnSave);
+
+        if (currentlyLocked) {
+            MaterialButton btnUnlock = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+            btnUnlock.setText("Remove PIN Lock");
+            btnUnlock.setCornerRadius((int) (12 * dp));
+            btnUnlock.setOnClickListener(v -> {
+                if (chat != null) {
+                    chat.setChatLockPin(null);
+                    EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
+                }
+                sheet.dismiss();
+                Toast.makeText(this, "🔓 Per-chat PIN lock removed", Toast.LENGTH_SHORT).show();
+            });
+            root.addView(btnUnlock);
+        }
+
+        sheet.setContentView(root);
+        sheet.show();
     }
 
     private void showGroupPermissionsAndSlowModeDialog() {
@@ -1478,12 +1646,115 @@ public class UserProfileActivity extends AppCompatActivity {
                 }
 
                 card.addView(itemLayout);
+                card.setOnClickListener(v -> {
+                    sheet.dismiss();
+                    String subChatId = chatId + "_topic_" + sg.subgroupId;
+                    Chat existingTopic = EncryptedChatDatabase.getInstance(this).getChat(subChatId);
+                    if (existingTopic == null) {
+                        Chat parentChat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
+                        List<String> parts = parentChat != null && parentChat.getParticipants() != null
+                                ? new ArrayList<>(parentChat.getParticipants())
+                                : new ArrayList<>( java.util.Collections.singletonList(currentUserId));
+                        Chat topicChat = new Chat(
+                                subChatId,
+                                "#" + sg.title + " (" + (peerUserName != null ? peerUserName : "Group") + ")",
+                                sg.description != null ? sg.description : "Encrypted topic thread",
+                                com.google.firebase.Timestamp.now(),
+                                null,
+                                0,
+                                true,
+                                false,
+                                "group",
+                                parts
+                        );
+                        EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(topicChat);
+                    }
+                    Intent topicIntent = new Intent(this, ChatActivity.class);
+                    topicIntent.putExtra("chatId", subChatId);
+                    topicIntent.putExtra("isGroup", true);
+                    topicIntent.putExtra("recipientName", "#" + sg.title);
+                    startActivity(topicIntent);
+                });
                 listContainer.addView(card);
             }
         }
 
         scroll.addView(listContainer);
         root.addView(scroll);
+
+        MaterialButton btnCreateTopic = new MaterialButton(this);
+        btnCreateTopic.setText("➕ Create New Topic / Sub-Group");
+        btnCreateTopic.setCornerRadius((int) (12 * getResources().getDisplayMetrics().density));
+        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        btnLp.topMargin = (int) (12 * getResources().getDisplayMetrics().density);
+        btnCreateTopic.setLayoutParams(btnLp);
+        btnCreateTopic.setOnClickListener(v -> {
+            sheet.dismiss();
+            showCreateSubgroupDialog();
+        });
+        root.addView(btnCreateTopic);
+
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
+    private void showCreateSubgroupDialog() {
+        if (chatId == null) return;
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        int pad = (int) (20 * dp);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText("➕ Create Group Topic / Sub-Group");
+        title.setTextSize(18f);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(Color.WHITE);
+        root.addView(title);
+
+        EditText etTitle = new EditText(this);
+        etTitle.setHint("Topic title (e.g. general, announcements, dev)...");
+        etTitle.setTextColor(Color.WHITE);
+        etTitle.setHintTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+        root.addView(etTitle);
+
+        EditText etDesc = new EditText(this);
+        etDesc.setHint("Topic description...");
+        etDesc.setTextColor(Color.WHITE);
+        etDesc.setHintTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+        root.addView(etDesc);
+
+        android.widget.CheckBox cbSecret = new android.widget.CheckBox(this);
+        cbSecret.setText("🔒 Secret E2EE Sub-Group");
+        cbSecret.setTextColor(Color.WHITE);
+        cbSecret.setChecked(true);
+        root.addView(cbSecret);
+
+        MaterialButton btnCreate = new MaterialButton(this);
+        btnCreate.setText("Create Topic");
+        btnCreate.setCornerRadius((int) (12 * dp));
+        btnCreate.setOnClickListener(v -> {
+            String t = etTitle.getText().toString().trim();
+            if (t.isEmpty()) {
+                etTitle.setError("Required");
+                return;
+            }
+            String d = etDesc.getText().toString().trim();
+            String sgId = "sg_" + UUID.randomUUID().toString().substring(0, 8);
+            EncryptedChatDatabase.GroupSubgroup newSg = new EncryptedChatDatabase.GroupSubgroup(
+                    sgId, chatId, t, d, null, "MEMBER", cbSecret.isChecked()
+            );
+            EncryptedChatDatabase.getInstance(this).saveSubgroup(newSg);
+            sheet.dismiss();
+            Toast.makeText(this, "📁 Topic #" + t + " created!", Toast.LENGTH_SHORT).show();
+            showSubgroupsDialog();
+        });
+        root.addView(btnCreate);
+
         sheet.setContentView(root);
         sheet.show();
     }

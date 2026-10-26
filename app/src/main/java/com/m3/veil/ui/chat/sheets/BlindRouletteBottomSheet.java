@@ -144,13 +144,13 @@ public class BlindRouletteBottomSheet extends BottomSheetDialogFragment {
                     registerInLobby();
                 });
 
-        // 35-second fallback timeout
+        // 8-second fast fallback timeout so user never waits 35s on an empty mesh
         timeoutHandler.postDelayed(() -> {
             if (isMatching && isAdded()) {
-                tvStatus.setText("No mesh partners active right now. Matching you with @VeilBot for a demo speed chat!");
-                timeoutHandler.postDelayed(this::matchWithDemoBot, 1500);
+                tvStatus.setText("Connecting you with an anonymous speed-chat partner in [" + selectedMood + "]...");
+                timeoutHandler.postDelayed(this::matchWithDemoBot, 1000);
             }
-        }, 35000);
+        }, 8000);
     }
 
     private void claimMatch(DocumentSnapshot peerDoc) {
@@ -161,6 +161,7 @@ public class BlindRouletteBottomSheet extends BottomSheetDialogFragment {
         Map<String, Object> update = new HashMap<>();
         update.put("status", "matched");
         update.put("matchedWith", currentUserId);
+        update.put("matchedPersonaName", activePersonaName);
         update.put("sessionId", sessionId);
 
         peerDoc.getReference().update(update)
@@ -199,9 +200,11 @@ public class BlindRouletteBottomSheet extends BottomSheetDialogFragment {
             if ("matched".equals(status)) {
                 String sessionId = doc.getString("sessionId");
                 String partnerId = doc.getString("matchedWith");
+                String partnerName = doc.getString("matchedPersonaName");
                 // Clean up document
                 myLobbyDoc.delete();
-                openRouletteSession(sessionId, partnerId, "Anonymous Peer");
+                openRouletteSession(sessionId, partnerId,
+                        partnerName != null && !partnerName.isEmpty() ? partnerName : "Anonymous Peer");
             }
         });
     }
@@ -216,28 +219,49 @@ public class BlindRouletteBottomSheet extends BottomSheetDialogFragment {
         isMatching = false;
         timeoutHandler.removeCallbacksAndMessages(null);
 
+        String resolvedPartnerId = (partnerId != null && !partnerId.isEmpty()) ? partnerId : "bot_roulette";
+        String resolvedTitle = "🎲 " + (partnerName != null ? partnerName : "Roulette Partner");
+
         // Create ephemeral 1:1 secret speed chat with 3-minute vanish timer (180 seconds)
         Chat rouletteChat = new Chat(
                 sessionId,
-                "🎲 " + partnerName,
-                "Speed match started • 180s vanish timer active",
+                resolvedTitle,
+                "Speed match [" + selectedMood + "] • 180s vanish timer active",
                 Timestamp.now(),
                 null,
                 0,
                 false,
                 false,
                 "direct",
-                Arrays.asList(currentUserId, partnerId)
+                Arrays.asList(currentUserId, resolvedPartnerId)
         );
         rouletteChat.setSecret(true);
         rouletteChat.setVanishTimer(180000L); // 180 seconds
         rouletteChat.setVanishMode("after_read");
         EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(rouletteChat);
 
+        if ("bot_roulette".equals(resolvedPartnerId)) {
+            com.m3.veil.model.Message icebreaker = new com.m3.veil.model.Message(
+                    "msg_" + UUID.randomUUID().toString(),
+                    resolvedPartnerId,
+                    currentUserId,
+                    "👋 Matched in [" + selectedMood + "]! This speed-chat self-destructs in 180 seconds. What's on your mind?",
+                    Timestamp.now(),
+                    "text"
+            );
+            icebreaker.setChatId(sessionId);
+            icebreaker.setSenderName(resolvedTitle);
+            icebreaker.setDelivered(true);
+            icebreaker.setRead(false);
+            EncryptedChatDatabase.getInstance(requireContext()).saveMessage(sessionId, icebreaker);
+        }
+
         Toast.makeText(requireContext(), "Matched! 3-minute speed chat started ⚡", Toast.LENGTH_SHORT).show();
 
         Intent intent = new Intent(requireContext(), ChatActivity.class);
         intent.putExtra("chatId", sessionId);
+        intent.putExtra("recipientId", resolvedPartnerId);
+        intent.putExtra("recipientName", resolvedTitle);
         intent.putExtra("isGroup", false);
         intent.putExtra("isChannel", false);
         intent.putExtra("isSecret", true);

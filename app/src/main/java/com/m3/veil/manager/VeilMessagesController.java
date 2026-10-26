@@ -912,10 +912,9 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     }
                 }
 
-                final boolean finalTransmitted = anyTransmitted;
-                if (anyTransmitted || isGroup) {
-                    mStorageQueue.execute(() -> mDatabase.updateMessageStatus(msg.getId(), false, false));
-                }
+                // Dual-path Firestore + WebRTC dispatch completed: clear pending flag so Single Tick (Sent) displays immediately
+                msg.setPending(false);
+                mStorageQueue.execute(() -> mDatabase.updateMessageStatus(msg.getId(), msg.isDelivered(), msg.isRead()));
             } catch (Exception e) {
                 Log.e(TAG, "Error encoding and dispatching message packet", e);
             }
@@ -1899,12 +1898,21 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 }
             }
 
+            boolean isChatOpenInForeground = dialogId != null && dialogId.equals(mActiveChatIdInForeground);
+            message.setDelivered(true);
+            if (isChatOpenInForeground) {
+                message.setRead(true);
+            }
+
             // Put in memory cache
             putMessageInCache(dialogId, message);
 
-            // Persist to SQLCipher database (WebRtcManager already saved message and incremented unread count on inbound chat, so sync cache without double-incrementing)
+            // Persist to SQLCipher database
             mStorageQueue.execute(() -> {
                 mDatabase.saveMessage(dialogId, message);
+                if (isChatOpenInForeground) {
+                    mDatabase.markMessagesAsRead(dialogId);
+                }
                 refreshDialogInCache(dialogId);
                 updateDialogLastMessage(dialogId, message);
 
@@ -1916,9 +1924,9 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 }
             });
 
-            // Send DELIVERED_ACK back to sender over WebRTC
+            // Send DELIVERED_ACK (or READ_ACK if chat is currently open) back to sender over WebRTC + Firestore
             mCryptoQueue.execute(() -> {
-                WebRtcManager.getInstance(mContext).sendReceipt(peerId, message.getId(), true, false);
+                WebRtcManager.getInstance(mContext).sendReceipt(peerId, message.getId(), true, isChatOpenInForeground);
             });
 
             // Notify UI
@@ -1938,17 +1946,25 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             Message msg = getMessage(messageId);
             if (msg == null) return;
 
-            msg.setDelivered(delivered);
+            msg.setPending(false);
+            msg.setDelivered(delivered || read);
             msg.setRead(read);
 
-            String dialogId = msg.getReceiverId() != null
-                    ? WebRtcManager.getChatId(getCurrentUserId(), msg.getReceiverId()) : null;
+            String dialogId = (msg.getChatId() != null && !msg.getChatId().isEmpty())
+                    ? msg.getChatId()
+                    : (msg.getReceiverId() != null
+                        ? WebRtcManager.getChatId(getCurrentUserId(), msg.getReceiverId()) : null);
 
-            mStorageQueue.execute(() -> mDatabase.updateMessageStatus(messageId, delivered, read));
+            mStorageQueue.execute(() -> {
+                mDatabase.updateMessageStatus(messageId, delivered || read, read);
+                if (dialogId != null) {
+                    refreshDialogInCache(dialogId);
+                }
+            });
 
             runOnUI(() -> {
                 for (MessagesObserver obs : mObservers) {
-                    obs.onMessageStatusChanged(dialogId, messageId, delivered, read);
+                    obs.onMessageStatusChanged(dialogId, messageId, delivered || read, read);
                 }
             });
 
@@ -1956,6 +1972,41 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             if (read && msg.getVanishTimer() > 0 && "after_read".equalsIgnoreCase(msg.getVanishMode())) {
                 onRemoteMessageReadAck(dialogId, messageId, System.currentTimeMillis());
             }
+        });
+    }
+
+    @Override
+    public void onAllMessagesRead(String chatId) {
+        if (chatId == null) return;
+        mStageQueue.post(() -> {
+            String myId = getCurrentUserId();
+            CopyOnWriteArrayList<Message> list = mDialogMessages.get(chatId);
+            List<String> updatedIds = new ArrayList<>();
+            if (list != null) {
+                for (Message m : list) {
+                    if (m != null && m.getSenderId() != null && m.getSenderId().equals(myId) && !m.isRead()) {
+                        m.setPending(false);
+                        m.setDelivered(true);
+                        m.setRead(true);
+                        updatedIds.add(m.getId());
+                    }
+                }
+            }
+            mStorageQueue.execute(() -> {
+                mDatabase.markOutboundMessagesAsRead(chatId, System.currentTimeMillis());
+                refreshDialogInCache(chatId);
+            });
+            runOnUI(() -> {
+                for (MessagesObserver obs : mObservers) {
+                    if (updatedIds.isEmpty()) {
+                        obs.onMessageStatusChanged(chatId, null, true, true);
+                    } else {
+                        for (String mId : updatedIds) {
+                            obs.onMessageStatusChanged(chatId, mId, true, true);
+                        }
+                    }
+                }
+            });
         });
     }
 

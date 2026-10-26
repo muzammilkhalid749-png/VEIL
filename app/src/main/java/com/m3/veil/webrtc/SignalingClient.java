@@ -422,6 +422,13 @@ public class SignalingClient {
                 target.onCallEndReceived(from, callId);
                 break;
             }
+            case "p2p_action": {
+                String payloadStr = data.optString("payload", data.toString());
+                if (this.webRtcManager != null && payloadStr != null && !payloadStr.isEmpty()) {
+                    this.webRtcManager.processInboundPayload(from, payloadStr);
+                }
+                break;
+            }
         }
     }
 
@@ -591,6 +598,13 @@ public class SignalingClient {
         Map<String, Object> fields = new HashMap<>();
         fields.put("chatId", chatId != null ? chatId : WebRtcManager.getChatId(this.currentUserId, toUserId));
         sendDualPathSignal(toUserId, "wake_up", fields, true);
+    }
+
+    public void sendP2PSignal(String toUserId, String type, JSONObject data) {
+        if (toUserId == null || data == null || this.currentUserId == null) return;
+        Map<String, Object> fields = new HashMap<>();
+        fields.put("payload", data.toString());
+        sendDualPathSignal(toUserId, type != null ? type : "p2p_action", fields, false);
     }
 
     public void disconnect() {

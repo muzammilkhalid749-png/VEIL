@@ -4,32 +4,45 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Base64;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.security.crypto.EncryptedSharedPreferences;
 import androidx.security.crypto.MasterKeys;
 
 import com.m3.veil.R;
+import com.m3.veil.manager.VeilFeatureManager;
 import com.m3.veil.ui.main.MainActivity;
 
-import javax.crypto.SecretKey;
-import java.security.SecureRandom;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+import javax.crypto.SecretKey;
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════════════════════════
+ * PIN UNLOCK ACTIVITY (HARDWARE-BACKED VAULT & DURESS DECOY PIN GATE)
+ * ═════════════════════════════════════════════════════════════════════════════════════════════════
+ * - Pre-caches target PIN length off the main UI thread so digit presses are 0ms zero-jank.
+ * - Supports both Primary Master PIN (mounts primary/persona SQLCipher vault) and Duress Decoy PIN
+ *   (seamlessly mounts isolated `veil_vault_decoy.db`).
+ * - Dynamic 4-dot or 6-dot indicator with tactile haptics and error shake animation.
+ */
 public class PinUnlockActivity extends AppCompatActivity {
 
-    private StringBuilder enteredPin = new StringBuilder();
+    private final StringBuilder enteredPin = new StringBuilder();
     private static final String PREFS_NAME = "veil_encrypted_prefs";
 
     private TextView errorText;
     private LinearLayout pinDotsContainer;
+    private volatile int cachedTargetPinLength = 6;
+    private final ExecutorService authExecutor = Executors.newSingleThreadExecutor();
+    private boolean isVerifying = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,14 +52,45 @@ public class PinUnlockActivity extends AppCompatActivity {
 
         initializeViews();
         handleWindowInsets();
+        resolveTargetPinLengthAsync();
         setupClickListeners();
         updateUI();
     }
 
+    private void resolveTargetPinLengthAsync() {
+        String masterPin = VeilFeatureManager.getInstance(this).getMasterPin();
+        if (masterPin != null && !masterPin.isEmpty()) {
+            cachedTargetPinLength = masterPin.length();
+            updatePinDots();
+            return;
+        }
+        authExecutor.execute(() -> {
+            int resolved = 6;
+            try {
+                String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
+                SharedPreferences sharedPreferences = EncryptedSharedPreferences.create(
+                        PREFS_NAME,
+                        masterKeyAlias,
+                        PinUnlockActivity.this,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+                resolved = sharedPreferences.getInt("pin_length", 6);
+            } catch (Exception ignored) {
+                SharedPreferences fallback = getSharedPreferences(PREFS_NAME + "_fallback", MODE_PRIVATE);
+                resolved = fallback.getInt("pin_length", 6);
+            }
+            final int finalLen = Math.max(4, Math.min(6, resolved));
+            cachedTargetPinLength = finalLen;
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    updatePinDots();
+                }
+            });
+        });
+    }
+
     private void handleWindowInsets() {
-        // Adds the system-bar insets on top of the layout's own padding. The previous
-        // implementation replaced the padding outright, silently erasing the horizontal
-        // padding these screens declare in XML.
         com.m3.veil.utils.WindowInsetsHelper.applySystemBarsPadding(findViewById(R.id.unlock_root));
     }
 
@@ -56,51 +100,52 @@ public class PinUnlockActivity extends AppCompatActivity {
     }
 
     private void setupClickListeners() {
-        findViewById(R.id.button0).setOnClickListener(v -> handleNumberInput("0"));
-        findViewById(R.id.button1).setOnClickListener(v -> handleNumberInput("1"));
-        findViewById(R.id.button2).setOnClickListener(v -> handleNumberInput("2"));
-        findViewById(R.id.button3).setOnClickListener(v -> handleNumberInput("3"));
-        findViewById(R.id.button4).setOnClickListener(v -> handleNumberInput("4"));
-        findViewById(R.id.button5).setOnClickListener(v -> handleNumberInput("5"));
-        findViewById(R.id.button6).setOnClickListener(v -> handleNumberInput("6"));
-        findViewById(R.id.button7).setOnClickListener(v -> handleNumberInput("7"));
-        findViewById(R.id.button8).setOnClickListener(v -> handleNumberInput("8"));
-        findViewById(R.id.button9).setOnClickListener(v -> handleNumberInput("9"));
+        int[] btnIds = {
+                R.id.button0, R.id.button1, R.id.button2, R.id.button3, R.id.button4,
+                R.id.button5, R.id.button6, R.id.button7, R.id.button8, R.id.button9
+        };
+        for (int i = 0; i < btnIds.length; i++) {
+            final String digit = String.valueOf(i);
+            View btn = findViewById(btnIds[i]);
+            if (btn != null) {
+                btn.setOnClickListener(v -> {
+                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                    handleNumberInput(digit);
+                });
+            }
+        }
 
-        findViewById(R.id.buttonDelete).setOnClickListener(v -> handleDelete());
-        findViewById(R.id.buttonClear).setOnClickListener(v -> handleClear());
+        View btnDelete = findViewById(R.id.buttonDelete);
+        if (btnDelete != null) {
+            btnDelete.setOnClickListener(v -> {
+                v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                handleDelete();
+            });
+        }
+        View btnClear = findViewById(R.id.buttonClear);
+        if (btnClear != null) {
+            btnClear.setOnClickListener(v -> {
+                v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                handleClear();
+            });
+        }
     }
-
-    private java.util.concurrent.ExecutorService authExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
-    private boolean isVerifying = false;
 
     private void handleNumberInput(String number) {
         if (isVerifying) return;
-        if (enteredPin.length() < 6) {
+        int maxDigits = Math.max(4, Math.min(6, cachedTargetPinLength));
+        if (enteredPin.length() < maxDigits) {
             enteredPin.append(number);
             updatePinDots();
             errorText.setVisibility(View.GONE);
 
-            // Read target PIN length from preferences or Master PIN (default 4 if Master PIN is 4 digits, else 6)
-            int targetLength = 6;
-            String masterPin = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getMasterPin();
-            if (masterPin != null && !masterPin.isEmpty()) {
-                targetLength = masterPin.length();
-            } else {
-                try {
-                    String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
-                    SharedPreferences sharedPreferences = EncryptedSharedPreferences.create(
-                            PREFS_NAME,
-                            masterKeyAlias,
-                            this,
-                            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                    );
-                    targetLength = sharedPreferences.getInt("pin_length", 6);
-                } catch (Exception ignored) {}
+            String decoyPin = VeilFeatureManager.getInstance(this).getDecoyPin();
+            if (decoyPin != null && !decoyPin.isEmpty() && decoyPin.equals(enteredPin.toString())) {
+                verifyPin();
+                return;
             }
 
-            if (enteredPin.length() >= targetLength) {
+            if (enteredPin.length() >= maxDigits) {
                 verifyPin();
             }
         }
@@ -126,24 +171,25 @@ public class PinUnlockActivity extends AppCompatActivity {
         isVerifying = true;
         final String pinAttempt = enteredPin.toString();
 
-        // Check if user entered the configured Decoy PIN (Feature #104, #106)
-        String decoyPin = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getDecoyPin();
+        // 1. Check Duress / Decoy Vault PIN
+        String decoyPin = VeilFeatureManager.getInstance(this).getDecoyPin();
         if (decoyPin != null && !decoyPin.isEmpty() && decoyPin.equals(pinAttempt)) {
             isVerifying = false;
-            com.m3.veil.manager.VeilFeatureManager.getInstance(this).activateDecoyVault(true);
-            android.widget.Toast.makeText(this, "Welcome back", android.widget.Toast.LENGTH_SHORT).show();
+            VeilFeatureManager.getInstance(this).activateDecoyVault(true);
+            Toast.makeText(this, "Welcome back", Toast.LENGTH_SHORT).show();
             navigateToMain();
             return;
         }
 
-        // Check if user entered the Master PIN configured in VeilFeatureManager / PrivacySettingsActivity
-        if (com.m3.veil.manager.VeilFeatureManager.getInstance(this).verifyMasterPin(pinAttempt)) {
+        // 2. Check Master PIN in VeilFeatureManager
+        if (VeilFeatureManager.getInstance(this).verifyMasterPin(pinAttempt)) {
             isVerifying = false;
-            com.m3.veil.manager.VeilFeatureManager.getInstance(this).activateDecoyVault(false);
+            VeilFeatureManager.getInstance(this).activateDecoyVault(false);
             navigateToMain();
             return;
         }
 
+        // 3. Verify against PBKDF2-HMAC-SHA256 KEK + AES-256-GCM MEK in EncryptedSharedPreferences
         authExecutor.execute(() -> {
             try {
                 SharedPreferences sharedPreferences;
@@ -165,12 +211,7 @@ public class PinUnlockActivity extends AppCompatActivity {
                 String ivStr = sharedPreferences.getString("iv", null);
 
                 if (encryptedMekStr == null || saltStr == null || ivStr == null) {
-                    runOnUiThread(() -> {
-                        isVerifying = false;
-                        showError("Incorrect PIN");
-                        enteredPin.setLength(0);
-                        updatePinDots();
-                    });
+                    runOnUiThread(this::onIncorrectPin);
                     return;
                 }
 
@@ -178,37 +219,53 @@ public class PinUnlockActivity extends AppCompatActivity {
                 byte[] iv = Base64.decode(ivStr, Base64.DEFAULT);
                 byte[] encryptedMek = Base64.decode(encryptedMekStr, Base64.DEFAULT);
 
-                // Derive KEK on worker thread
                 javax.crypto.SecretKeyFactory factory = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
                 javax.crypto.spec.PBEKeySpec spec = new javax.crypto.spec.PBEKeySpec(
                         pinAttempt.toCharArray(), salt, 100000, 256
                 );
                 SecretKey kek = factory.generateSecret(spec);
 
-                // Try to decrypt
                 javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
                 javax.crypto.spec.GCMParameterSpec gcmSpec = new javax.crypto.spec.GCMParameterSpec(128, iv);
                 cipher.init(javax.crypto.Cipher.DECRYPT_MODE, kek, gcmSpec);
 
-                cipher.doFinal(encryptedMek); // If this succeeds, PIN is correct
+                cipher.doFinal(encryptedMek);
 
-                // PIN is correct, navigate to main (deactivate decoy mode and mount primary/persona vault)
                 runOnUiThread(() -> {
                     isVerifying = false;
-                    com.m3.veil.manager.VeilFeatureManager.getInstance(PinUnlockActivity.this).setMasterPin(pinAttempt);
-                    com.m3.veil.manager.VeilFeatureManager.getInstance(PinUnlockActivity.this).activateDecoyVault(false);
+                    VeilFeatureManager.getInstance(PinUnlockActivity.this).setMasterPin(pinAttempt);
+                    VeilFeatureManager.getInstance(PinUnlockActivity.this).activateDecoyVault(false);
                     navigateToMain();
                 });
             } catch (Exception e) {
-                // Decryption failed, PIN is incorrect
-                runOnUiThread(() -> {
-                    isVerifying = false;
-                    showError("Incorrect PIN");
-                    enteredPin.setLength(0);
-                    updatePinDots();
-                });
+                runOnUiThread(this::onIncorrectPin);
             }
         });
+    }
+
+    private void onIncorrectPin() {
+        isVerifying = false;
+        showError("Incorrect PIN");
+        shakePinDots();
+        enteredPin.setLength(0);
+        updatePinDots();
+    }
+
+    private void shakePinDots() {
+        if (pinDotsContainer == null) return;
+        pinDotsContainer.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+        pinDotsContainer.animate()
+                .translationXBy(18f)
+                .setDuration(45)
+                .withEndAction(() -> pinDotsContainer.animate()
+                        .translationXBy(-36f)
+                        .setDuration(45)
+                        .withEndAction(() -> pinDotsContainer.animate()
+                                .translationXBy(18f)
+                                .setDuration(45)
+                                .start())
+                        .start())
+                .start();
     }
 
     private void navigateToMain() {
@@ -224,10 +281,12 @@ public class PinUnlockActivity extends AppCompatActivity {
     }
 
     private void updatePinDots() {
+        if (pinDotsContainer == null) return;
         pinDotsContainer.removeAllViews();
 
+        int totalDots = Math.max(4, Math.min(6, cachedTargetPinLength));
         int pinLength = enteredPin.length();
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < totalDots; i++) {
             View dot = new View(this);
             int dotSize = getResources().getDimensionPixelSize(R.dimen.pin_dot_size);
             int dotMargin = getResources().getDimensionPixelSize(R.dimen.pin_dot_margin);
@@ -250,7 +309,7 @@ public class PinUnlockActivity extends AppCompatActivity {
         errorText.setText(message);
         errorText.setVisibility(View.VISIBLE);
     }
-    
+
     @Override
     public void onBackPressed() {
         moveTaskToBack(true);
@@ -259,8 +318,6 @@ public class PinUnlockActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (authExecutor != null) {
-            authExecutor.shutdown();
-        }
+        authExecutor.shutdown();
     }
 }
