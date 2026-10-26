@@ -10,8 +10,6 @@ import android.util.Log;
 import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
-
-import com.google.firebase.auth.FirebaseAuth;
 import com.m3.veil.model.Message;
 
 import java.io.File;

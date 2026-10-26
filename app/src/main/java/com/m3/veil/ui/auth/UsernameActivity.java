@@ -42,8 +42,6 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import com.google.android.material.textfield.TextInputLayout;
 
-import com.google.firebase.auth.FirebaseAuth;
-
 import com.google.firebase.firestore.FieldValue;
 
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -96,7 +94,6 @@ public class UsernameActivity extends AppCompatActivity {
 
 
 
-    private FirebaseAuth mAuth;
 
     private FirebaseFirestore db;
 
@@ -168,7 +165,6 @@ public class UsernameActivity extends AppCompatActivity {
 
 
 
-        mAuth = FirebaseAuth.getInstance();
 
         db = FirebaseFirestore.getInstance();
 
@@ -238,9 +234,9 @@ public class UsernameActivity extends AppCompatActivity {
 
     private void prefillDisplayName() {
 
-        if (mAuth != null && mAuth.getCurrentUser() != null) {
-
-            String phoneNumber = mAuth.getCurrentUser().getPhoneNumber();
+        com.m3.veil.manager.AuthManager.SessionUser sUser = com.m3.veil.manager.AuthManager.getInstance().getCurrentUser(this);
+        if (sUser != null) {
+            String phoneNumber = sUser.getPhoneNumber();
 
             if (phoneNumber != null && !phoneNumber.isEmpty()) {
 
@@ -1015,9 +1011,9 @@ public class UsernameActivity extends AppCompatActivity {
 
             userId = engine.deriveUid(masterSeed);
 
-        } else if (mAuth != null && mAuth.getCurrentUser() != null) {
+        } else if (com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this) != null) {
 
-            userId = mAuth.getCurrentUser().getUid();
+            userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
 
         } else {
 
@@ -1039,7 +1035,8 @@ public class UsernameActivity extends AppCompatActivity {
 
 
 
-        String phoneNumber = (mAuth != null && mAuth.getCurrentUser() != null) ? mAuth.getCurrentUser().getPhoneNumber() : "";
+        com.m3.veil.manager.AuthManager.SessionUser sUser = com.m3.veil.manager.AuthManager.getInstance().getCurrentUser(this);
+        String phoneNumber = (sUser != null) ? sUser.getPhoneNumber() : "";
 
         String finalDisplayName = (displayName != null && !displayName.trim().isEmpty()) ? displayName.trim() : "VEIL User";
 

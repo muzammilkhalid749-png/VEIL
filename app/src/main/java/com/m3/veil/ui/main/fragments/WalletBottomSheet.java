@@ -19,7 +19,6 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -106,7 +105,7 @@ public class WalletBottomSheet extends BottomSheetDialogFragment {
         btnCopyAddress.setOnClickListener(v -> copyAddress());
 
         // Sync coin balance with remote Firestore user profile
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(getContext())) {
             db.collection("users").document(currentUserId).get().addOnSuccessListener(doc -> {
                 if (getContext() == null || !isAdded()) return;
                 if (doc.exists() && doc.contains("veilCoins")) {
@@ -158,7 +157,7 @@ public class WalletBottomSheet extends BottomSheetDialogFragment {
         featureManager.addXp(15);
         featureManager.addKarma(1);
 
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(getContext())) {
             db.collection("users").document(currentUserId)
                     .update("veilCoins", FieldValue.increment(25));
         }
@@ -235,7 +234,7 @@ public class WalletBottomSheet extends BottomSheetDialogFragment {
                     updateBalanceDisplay();
 
                     // Atomically update sender and recipient balances in Firestore
-                    if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+                    if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(getContext())) {
                         db.collection("users").document(currentUserId)
                                 .update("veilCoins", FieldValue.increment(-transferAmount));
                     }

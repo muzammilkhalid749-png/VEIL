@@ -3,8 +3,6 @@ package com.m3.veil.manager;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
-
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -1168,8 +1166,8 @@ public class VeilFeatureManager {
                                            String contentText, String mediaUri, String bgColorHex,
                                            int fontStyleIndex, long timestamp) {
         if (id == null || authorId == null) return;
-        String myUid = FirebaseAuth.getInstance().getCurrentUser() != null
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "me";
+        String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(appContext);
+        if (myUid == null || myUid.isEmpty()) myUid = "me";
         if (authorId.equals(myUid)) return;
 
         try {

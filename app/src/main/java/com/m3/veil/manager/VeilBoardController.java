@@ -13,8 +13,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.google.firebase.Timestamp;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.model.Persona;
 import com.m3.veil.model.Post;
@@ -1444,9 +1442,7 @@ public class VeilBoardController implements EncryptedChatDatabase.DatabaseChange
 
     private String getCurrentUserId() {
         String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(mContext);
-        if (uid != null && !uid.isEmpty()) return uid;
-        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
-        return u != null ? u.getUid() : "local_user";
+        return (uid != null && !uid.isEmpty()) ? uid : "local_user";
     }
 
     private String getAuthorDisplayName() {

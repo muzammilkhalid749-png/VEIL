@@ -36,7 +36,6 @@ import androidx.recyclerview.widget.SimpleItemAnimator;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.snackbar.Snackbar;
-import com.google.firebase.auth.FirebaseAuth;
 import com.m3.veil.R;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.manager.VeilFeatureManager;

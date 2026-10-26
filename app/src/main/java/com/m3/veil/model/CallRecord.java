@@ -63,9 +63,7 @@ public class CallRecord {
     private void resolvePeerInfo() {
         String currentUid = null;
         try {
-            if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
-                currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid();
-            }
+            currentUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId();
         } catch (Throwable ignored) {}
 
         boolean isOut = "outgoing".equalsIgnoreCase(status);

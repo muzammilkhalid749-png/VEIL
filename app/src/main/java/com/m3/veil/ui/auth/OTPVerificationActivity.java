@@ -36,14 +36,6 @@ import com.google.android.material.snackbar.Snackbar;
 
 import com.google.firebase.FirebaseException;
 
-import com.google.firebase.auth.FirebaseAuth;
-
-import com.google.firebase.auth.PhoneAuthCredential;
-
-import com.google.firebase.auth.PhoneAuthOptions;
-
-import com.google.firebase.auth.PhoneAuthProvider;
-
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import com.google.firebase.firestore.WriteBatch;
@@ -82,13 +74,11 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
 
 
-    private FirebaseAuth mAuth;
 
     private String verificationId;
 
     private String phoneNumber;
 
-    private PhoneAuthProvider.ForceResendingToken resendToken;
 
 
 
@@ -112,7 +102,6 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
 
 
-        mAuth = FirebaseAuth.getInstance();
 
         initializeViews();
 
@@ -184,7 +173,6 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
         phoneNumber = intent.getStringExtra("phone_number");
 
-        resendToken = intent.getParcelableExtra("resend_token");
 
     }
 
@@ -380,13 +368,7 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
 
 
-    private void signInWithPhoneAuthCredential(PhoneAuthCredential credential) {
 
-        // Fallback backward compatibility
-
-        navigateAfterVerification();
-
-    }
 
 
 
@@ -492,7 +474,7 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
     private void navigateAfterVerification() {
         // Check if user has username in Firestore
-        String currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null ? FirebaseAuth.getInstance().getCurrentUser().getUid() : com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
         if (currentUserId == null) {
             navigateToUsername();
             return;
@@ -543,13 +525,12 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
 
     private void createUserDocumentAndNavigate() {
-        com.google.firebase.auth.FirebaseUser fUser = FirebaseAuth.getInstance().getCurrentUser();
-        String userId = fUser != null ? fUser.getUid() : com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        String userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
         if (userId == null) {
             navigateToUsername();
             return;
         }
-        String phoneNumber = fUser != null && fUser.getPhoneNumber() != null ? fUser.getPhoneNumber() : (this.phoneNumber != null ? this.phoneNumber : "");
+        String phoneNumber = this.phoneNumber != null ? this.phoneNumber : "";
 
 
 

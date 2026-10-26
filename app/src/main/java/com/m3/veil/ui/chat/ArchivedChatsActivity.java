@@ -22,7 +22,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
-import com.google.firebase.auth.FirebaseAuth;
 import com.m3.veil.R;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.model.Chat;

@@ -23,7 +23,6 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.Timestamp;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -75,8 +74,8 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
         if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = "veil_anonymous";
         }
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this, FirebaseAuth.getInstance().getCurrentUser());
+        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
+            com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this, currentUserId);
         }
 
         initializeViews();

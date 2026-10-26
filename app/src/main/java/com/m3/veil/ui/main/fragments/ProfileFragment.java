@@ -62,8 +62,6 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import com.google.android.material.button.MaterialButton;
 
-import com.google.firebase.auth.FirebaseAuth;
-
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import com.m3.veil.R;
@@ -124,7 +122,6 @@ public class ProfileFragment extends Fragment {
 
 
 
-    private FirebaseAuth mAuth;
 
     private FirebaseFirestore db;
 
@@ -142,7 +139,6 @@ public class ProfileFragment extends Fragment {
 
 
 
-        mAuth = FirebaseAuth.getInstance();
 
         db = FirebaseFirestore.getInstance();
 
@@ -2243,8 +2239,8 @@ public class ProfileFragment extends Fragment {
     private void loadUserData() {
 
         String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
-        if (currentUserId == null && mAuth != null && mAuth.getCurrentUser() != null) {
-            currentUserId = mAuth.getCurrentUser().getUid();
+        if (currentUserId == null) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
         }
 
 
@@ -2507,7 +2503,7 @@ public class ProfileFragment extends Fragment {
 
             sheet.dismiss();
             try {
-                if (mAuth != null) mAuth.signOut();
+                com.m3.veil.manager.AuthManager.getInstance().signOut(requireContext());
             } catch (Exception ignored) {}
             com.m3.veil.manager.AuthManager.getInstance().signOut(requireContext());
             Intent intent = new Intent(requireContext(), com.m3.veil.ui.auth.PhoneAuthActivity.class);

@@ -23,7 +23,6 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
-import com.google.firebase.auth.FirebaseAuth;
 import com.m3.veil.R;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.manager.VeilBoardController;

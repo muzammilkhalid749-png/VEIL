@@ -38,12 +38,6 @@ import androidx.core.view.ViewCompat;
 
 import androidx.core.view.WindowInsetsCompat;
 
-
-
-import com.google.firebase.auth.FirebaseAuth;
-
-import com.google.firebase.auth.FirebaseUser;
-
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import com.m3.veil.ui.main.MainActivity;
@@ -86,7 +80,6 @@ public class SplashActivity extends AppCompatActivity {
 
     private PreferenceManager preferenceManager;
 
-    private FirebaseAuth firebaseAuth;
 
 
 
@@ -106,7 +99,6 @@ public class SplashActivity extends AppCompatActivity {
 
         preferenceManager = new PreferenceManager(this);
 
-        firebaseAuth = FirebaseAuth.getInstance();
 
 
 
@@ -438,13 +430,9 @@ public class SplashActivity extends AppCompatActivity {
 
 
 
-        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
 
-
-
-        if (currentUser != null) {
-
-            Log.d("SplashActivity", "User is signed in with Firebase: " + currentUser.getEmail());
+            Log.d("SplashActivity", "User is signed in, navigating to main");
 
             navigateToMain();
 
@@ -482,9 +470,9 @@ public class SplashActivity extends AppCompatActivity {
 
 
 
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
 
-            String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+            String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
 
 
 
@@ -635,13 +623,13 @@ public class SplashActivity extends AppCompatActivity {
 
 
     private void createUserDocumentAndGoToUsername() {
-        com.google.firebase.auth.FirebaseUser fUser = FirebaseAuth.getInstance().getCurrentUser();
-        String userId = fUser != null ? fUser.getUid() : com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        String userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
         if (userId == null) {
             goToUsernameActivity();
             return;
         }
-        String phoneNumber = fUser != null ? fUser.getPhoneNumber() : "";
+        com.m3.veil.manager.AuthManager.SessionUser sUser = com.m3.veil.manager.AuthManager.getInstance().getCurrentUser(this);
+        String phoneNumber = sUser != null ? sUser.getPhoneNumber() : "";
 
         String localeCountry = java.util.Locale.getDefault().getCountry();
 

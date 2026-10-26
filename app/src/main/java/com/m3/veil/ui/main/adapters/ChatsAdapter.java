@@ -5,8 +5,6 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-
-import com.google.firebase.auth.FirebaseAuth;
 import com.m3.veil.model.Chat;
 import com.m3.veil.ui.views.VeilDialogCell;
 

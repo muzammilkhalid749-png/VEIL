@@ -14,8 +14,6 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.viewpager2.widget.ViewPager2;
 import com.google.android.material.button.MaterialButton;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.m3.veil.ui.main.MainActivity;
 import com.m3.veil.R;
 import com.m3.veil.ui.auth.PhoneAuthActivity;
@@ -32,7 +30,6 @@ public class OnboardingActivity extends AppCompatActivity {
     private TextView skipText;
     private OnboardingAdapter onboardingAdapter;
     private PreferenceManager preferenceManager;
-    private FirebaseAuth firebaseAuth;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,7 +39,6 @@ public class OnboardingActivity extends AppCompatActivity {
 
 
         preferenceManager = new PreferenceManager(this);
-        firebaseAuth = FirebaseAuth.getInstance();
 
         initializeViews();
         handleWindowInsets();

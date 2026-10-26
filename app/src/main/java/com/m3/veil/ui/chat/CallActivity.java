@@ -39,7 +39,6 @@ import android.widget.LinearLayout;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.firebase.Timestamp;
-import com.google.firebase.auth.FirebaseAuth;
 import com.m3.veil.R;
 import com.m3.veil.calling.CallAudioRoute;
 import com.m3.veil.calling.CallConfig;
@@ -117,12 +116,10 @@ public class CallActivity extends AppCompatActivity {
             }
         } catch (Throwable ignored) {}
         try {
-            if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-                String fName = FirebaseAuth.getInstance().getCurrentUser().getDisplayName();
-                if (fName != null && !fName.trim().isEmpty() && !isSelfName(fName)) {
-                    currentUsername = fName.trim();
-                    return currentUsername;
-                }
+            String fName = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserName(this);
+            if (fName != null && !fName.trim().isEmpty() && !isSelfName(fName)) {
+                currentUsername = fName.trim();
+                return currentUsername;
             }
         } catch (Throwable ignored) {}
         return "Veil User";

@@ -450,12 +450,10 @@ public class CallEngine implements CallSignaling.Listener {
                 this.displayName = manifest.displayName.trim();
                 return this.displayName;
             }
-            if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
-                String fName = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getDisplayName();
-                if (fName != null && !fName.trim().isEmpty() && !isSelfName(fName)) {
-                    this.displayName = fName.trim();
-                    return this.displayName;
-                }
+            String fName = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserName(context);
+            if (fName != null && !fName.trim().isEmpty() && !isSelfName(fName)) {
+                this.displayName = fName.trim();
+                return this.displayName;
             }
         } catch (Throwable ignored) {}
         return "Veil User";

@@ -3,7 +3,6 @@ package com.m3.veil.utils;
 import android.content.Context;
 
 import com.google.firebase.Timestamp;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.WriteBatch;
 import com.m3.veil.database.EncryptedChatDatabase;
@@ -42,8 +41,8 @@ public class SampleDataManager {
     public static void generateSampleData(Context context, OnDataGeneratedListener listener) {
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(context);
-        if (currentUserId == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
-            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        if (currentUserId == null) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(context);
         }
         if (currentUserId == null) {
             if (listener != null) listener.onFailure(new IllegalStateException("Not authenticated"));

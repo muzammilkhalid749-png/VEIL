@@ -19,7 +19,6 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.security.crypto.EncryptedSharedPreferences;
 import androidx.security.crypto.MasterKeys;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -356,8 +355,8 @@ public class PinSetupActivity extends AppCompatActivity {
 
             // Store in Firestore if available
             String userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
-            if (userId == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
-                userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+            if (userId == null) {
+                userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
             }
             if (userId != null) {
                 Map<String, Object> pinData = new HashMap<>();
@@ -385,8 +384,8 @@ public class PinSetupActivity extends AppCompatActivity {
         String publicKey = EncryptionManager.getPublicKeyString();
         
         String userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
-        if (userId == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
-            userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        if (userId == null) {
+            userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
         }
         if (userId != null) {
             Map<String, Object> keyData = new HashMap<>();

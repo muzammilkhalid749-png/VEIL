@@ -12,7 +12,6 @@ import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.snackbar.Snackbar;
-import com.google.firebase.auth.FirebaseAuth;
 import com.m3.veil.R;
 import com.m3.veil.ui.main.MainActivity;
 import com.m3.veil.utils.AnonymousAuthManager;
@@ -66,18 +65,7 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
             public void onSuccess(SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest, boolean hadExistingProfile) {
                 showLoading(false);
 
-                // Best-effort Firebase Auth background link if internet is present
-                try {
-                    String email = AnonymousAuthManager.getEmailFromPhrase(phrase);
-                    String password = AnonymousAuthManager.getPasswordFromPhrase(phrase);
-                    FirebaseAuth mAuth = FirebaseAuth.getInstance();
-                    mAuth.signInWithEmailAndPassword(email, password)
-                            .addOnFailureListener(e -> {
-                                try {
-                                    mAuth.createUserWithEmailAndPassword(email, password);
-                                } catch (Exception ignored) {}
-                            });
-                } catch (Exception ignored) {}
+
 
                 // Lossless restore: If user had an existing username, go directly to Main or PinUnlock
                 if (manifest != null && manifest.username != null && !manifest.username.trim().isEmpty()) {

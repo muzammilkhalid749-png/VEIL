@@ -16,9 +16,6 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.manager.VeilFeatureManager.StatusUpdate;
 import com.m3.veil.model.Chat;
@@ -683,18 +680,11 @@ public class StatusController {
 
     public String getCurrentUserId() {
         String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(appContext);
-        if (uid != null && !uid.isEmpty()) return uid;
-        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
-        return u != null ? u.getUid() : "local_user";
+        return (uid != null && !uid.isEmpty()) ? uid : "local_user";
     }
 
     public String getCurrentUserName() {
-        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
-        if (u != null) {
-            String name = u.getDisplayName();
-            if (name != null && !name.trim().isEmpty()) return name.trim();
-        }
-        return "Me";
+        return com.m3.veil.manager.AuthManager.getInstance().getCurrentUserName(appContext);
     }
 
     public boolean isCloseFriend(String peerId) {

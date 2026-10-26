@@ -11,9 +11,6 @@ import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
-
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.m3.veil.calling.CallEngine;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.model.Chat;

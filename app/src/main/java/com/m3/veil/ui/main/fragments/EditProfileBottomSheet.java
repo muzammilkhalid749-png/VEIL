@@ -64,8 +64,6 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
-import com.google.firebase.auth.FirebaseAuth;
-
 import com.google.firebase.firestore.DocumentSnapshot;
 
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -278,8 +276,8 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
             db = null;
         }
         currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
-        if (currentUserId == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
-            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        if (currentUserId == null) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(getContext());
         }
 
 
