@@ -12,7 +12,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.firebase.Timestamp;
+import com.m3.veil.model.Timestamp;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.model.Persona;
 import com.m3.veil.model.Post;
@@ -490,7 +490,7 @@ public class VeilBoardController implements EncryptedChatDatabase.DatabaseChange
             map.put("commentsCount", post.getCommentsCount());
             map.put("pollJson", post.getPollJson());
             map.put("expiresAtMillis", post.getExpiresAtMillis());
-            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                     .collection("veilboard_posts").document(post.getId())
                     .set(map);
         } catch (Throwable ignored) {}
@@ -498,15 +498,15 @@ public class VeilBoardController implements EncryptedChatDatabase.DatabaseChange
 
     private void syncRemotePostsFromFirestore() {
         try {
-            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                     .collection("veilboard_posts")
-                    .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .orderBy("timestamp", com.m3.veil.bridge.firestore.Query.Direction.DESCENDING)
                     .limit(50)
                     .get()
                     .addOnSuccessListener(snapshot -> {
                         if (snapshot == null || snapshot.isEmpty()) return;
                         boolean updated = false;
-                        for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
+                        for (com.m3.veil.bridge.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
                             String id = doc.getString("id");
                             if (id == null) id = doc.getId();
                             if (mPostsById.containsKey(id) || mHiddenPostIds.contains(id)) continue;
@@ -517,7 +517,7 @@ public class VeilBoardController implements EncryptedChatDatabase.DatabaseChange
                             String content = doc.getString("content");
                             String category = doc.getString("category");
                             String type = doc.getString("type");
-                            com.google.firebase.Timestamp ts = VeilFirestoreUtils.getSafeTimestamp(doc, "timestamp", com.google.firebase.Timestamp.now());
+                            com.m3.veil.model.Timestamp ts = VeilFirestoreUtils.getSafeTimestamp(doc, "timestamp", com.m3.veil.model.Timestamp.now());
                             String img = doc.getString("imageUrl");
                             long likes = VeilFirestoreUtils.getSafeLong(doc, "likesCount", 0);
                             long comments = VeilFirestoreUtils.getSafeLong(doc, "commentsCount", 0);
@@ -530,7 +530,7 @@ public class VeilBoardController implements EncryptedChatDatabase.DatabaseChange
                                     authorName != null ? authorName : "Anonymous",
                                     authorAvatar != null ? authorAvatar : "avatar_1",
                                     content != null ? content : "",
-                                    ts != null ? ts : com.google.firebase.Timestamp.now(),
+                                    ts != null ? ts : com.m3.veil.model.Timestamp.now(),
                                     type != null ? type : "text"
                             );
                             if (category != null) post.setCategory(category);
@@ -605,7 +605,7 @@ public class VeilBoardController implements EncryptedChatDatabase.DatabaseChange
                         personaName,
                         null,
                         fullText,
-                        new com.google.firebase.Timestamp(new java.util.Date()),
+                        new com.m3.veil.model.Timestamp(new java.util.Date()),
                         "feed"
                 );
                 quotePost.setMoodBadge("🔄 Repost");

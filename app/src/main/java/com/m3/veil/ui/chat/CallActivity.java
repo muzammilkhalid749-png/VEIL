@@ -38,7 +38,7 @@ import androidx.core.content.ContextCompat;
 import android.widget.LinearLayout;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
-import com.google.firebase.Timestamp;
+import com.m3.veil.model.Timestamp;
 import com.m3.veil.R;
 import com.m3.veil.calling.CallAudioRoute;
 import com.m3.veil.calling.CallConfig;

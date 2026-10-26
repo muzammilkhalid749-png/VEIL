@@ -844,7 +844,7 @@ public class StatusController {
     private void syncRemoteStatusesFromFirestore() {
         try {
             long now = System.currentTimeMillis();
-            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                     .collection("statuses")
                     .whereGreaterThan("expiresAtMs", now)
                     .limit(50)
@@ -853,7 +853,7 @@ public class StatusController {
                         if (snapshot == null || snapshot.isEmpty()) return;
                         boolean updated = false;
                         String myUid = getCurrentUserId();
-                        for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
+                        for (com.m3.veil.bridge.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
                             String sId = doc.getString("statusId");
                             if (sId == null) sId = doc.getId();
                             if (statusItemCache.containsKey(sId)) continue;
@@ -1326,7 +1326,7 @@ public class StatusController {
                     statusMap.put("fontStyleIndex", manifest.fontStyleIndex);
                     statusMap.put("timestampMs", manifest.timestampMs);
                     statusMap.put("expiresAtMs", manifest.expiresAtMs);
-                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                             .collection("statuses").document(manifest.statusId)
                             .set(statusMap);
                 } catch (Throwable ignored) {}

@@ -2,10 +2,10 @@ package com.m3.veil.calling;
 
 import android.util.Log;
 
-import com.google.firebase.firestore.DocumentChange;
-import com.google.firebase.firestore.FieldValue;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.ListenerRegistration;
+import com.m3.veil.bridge.firestore.DocumentChange;
+import com.m3.veil.bridge.firestore.FieldValue;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.firestore.ListenerRegistration;
 
 import java.util.Collections;
 import java.util.HashMap;

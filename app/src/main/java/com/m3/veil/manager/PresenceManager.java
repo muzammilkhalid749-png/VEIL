@@ -9,8 +9,8 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import com.google.firebase.firestore.FieldValue;
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.firestore.FieldValue;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
 
 import java.util.HashMap;
 import java.util.Map;

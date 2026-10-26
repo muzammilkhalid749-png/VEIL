@@ -10,9 +10,9 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.messaging.FirebaseMessagingService;
-import com.google.firebase.messaging.RemoteMessage;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.messaging.FirebaseMessagingService;
+import com.m3.veil.bridge.messaging.RemoteMessage;
 import com.m3.veil.R;
 import com.m3.veil.ui.main.MainActivity;
 import com.m3.veil.webrtc.WebRtcManager;

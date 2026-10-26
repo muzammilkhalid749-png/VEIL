@@ -5,11 +5,11 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-import com.google.firebase.Timestamp;
-import com.google.firebase.firestore.DocumentChange;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.ListenerRegistration;
+import com.m3.veil.model.Timestamp;
+import com.m3.veil.bridge.firestore.DocumentChange;
+import com.m3.veil.bridge.firestore.DocumentSnapshot;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.firestore.ListenerRegistration;
 
 import org.json.JSONException;
 import org.json.JSONObject;

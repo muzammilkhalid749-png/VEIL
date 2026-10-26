@@ -6,10 +6,10 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.messaging.FirebaseMessaging;
+import com.m3.veil.bridge.tasks.OnCompleteListener;
+import com.m3.veil.bridge.tasks.Task;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.messaging.FirebaseMessaging;
 import com.m3.veil.utils.AnonymousAuthManager;
 import com.m3.veil.utils.SovereignIdentityAndDirectoryEngine;
 import com.m3.veil.utils.UserPreferences;
@@ -222,7 +222,7 @@ public class AuthManager {
                     java.util.Map<String, Object> tokenMap = new java.util.HashMap<>();
                     tokenMap.put("userId", uid);
                     tokenMap.put("fcmToken", token);
-                    db.collection("users").document(uid).set(tokenMap, com.google.firebase.firestore.SetOptions.merge());
+                    db.collection("users").document(uid).set(tokenMap, com.m3.veil.bridge.firestore.SetOptions.merge());
                 }
             });
         } catch (Exception ignored) {}
@@ -235,7 +235,7 @@ public class AuthManager {
                 java.util.Map<String, Object> keyMap = new java.util.HashMap<>();
                 keyMap.put("userId", uid);
                 keyMap.put("publicKey", pubKey);
-                db.collection("users").document(uid).set(keyMap, com.google.firebase.firestore.SetOptions.merge());
+                db.collection("users").document(uid).set(keyMap, com.m3.veil.bridge.firestore.SetOptions.merge());
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to sync user public key", e);
@@ -275,7 +275,7 @@ public class AuthManager {
                     java.util.Map<String, Object> tokenMap = new java.util.HashMap<>();
                     tokenMap.put("userId", manifest.uid);
                     tokenMap.put("fcmToken", token);
-                    db.collection("users").document(manifest.uid).set(tokenMap, com.google.firebase.firestore.SetOptions.merge());
+                    db.collection("users").document(manifest.uid).set(tokenMap, com.m3.veil.bridge.firestore.SetOptions.merge());
                 }
             });
         } catch (Exception ignored) {}
@@ -315,7 +315,7 @@ public class AuthManager {
         if (sCurrentUserId != null && !sCurrentUserId.isEmpty()) {
             java.util.Map<String, Object> offlineMap = new java.util.HashMap<>();
             offlineMap.put("status", "offline");
-            offlineMap.put("lastSeen", com.google.firebase.firestore.FieldValue.serverTimestamp());
+            offlineMap.put("lastSeen", com.m3.veil.bridge.firestore.FieldValue.serverTimestamp());
             try {
                 db.collection("users").document(sCurrentUserId).update(offlineMap);
             } catch (Exception ignored) {}

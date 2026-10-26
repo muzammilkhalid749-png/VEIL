@@ -19,7 +19,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.security.crypto.EncryptedSharedPreferences;
 import androidx.security.crypto.MasterKeys;
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
@@ -362,7 +362,7 @@ public class PinSetupActivity extends AppCompatActivity {
                 Map<String, Object> pinData = new HashMap<>();
                 pinData.put("pin_hash", Base64.encodeToString(pinHash, Base64.DEFAULT));
                 pinData.put("server_salt", Base64.encodeToString(serverSalt, Base64.DEFAULT));
-                pinData.put("created_at", com.google.firebase.Timestamp.now());
+                pinData.put("created_at", com.m3.veil.model.Timestamp.now());
 
                 try {
                     FirebaseFirestore.getInstance()
@@ -390,13 +390,13 @@ public class PinSetupActivity extends AppCompatActivity {
         if (userId != null) {
             Map<String, Object> keyData = new HashMap<>();
             keyData.put("publicKey", publicKey);
-            keyData.put("uploaded_at", com.google.firebase.Timestamp.now());
+            keyData.put("uploaded_at", com.m3.veil.model.Timestamp.now());
 
             try {
                 FirebaseFirestore.getInstance()
                         .collection("users")
                         .document(userId)
-                        .set(keyData, com.google.firebase.firestore.SetOptions.merge());
+                        .set(keyData, com.m3.veil.bridge.firestore.SetOptions.merge());
             } catch (Exception ignored) {}
         }
     }

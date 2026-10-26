@@ -14,7 +14,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import com.google.firebase.Timestamp;
+import com.m3.veil.model.Timestamp;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.model.CallRecord;
 
@@ -389,7 +389,7 @@ public class CallEngine implements CallSignaling.Listener {
      */
     private void loadTurnConfig() {
         try {
-            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                     .collection("config").document("webrtc")
                     .get()
                     .addOnSuccessListener(doc -> {

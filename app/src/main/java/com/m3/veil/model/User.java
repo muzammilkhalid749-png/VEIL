@@ -1,7 +1,7 @@
 package com.m3.veil.model;
 
-import com.google.firebase.Timestamp;
-import com.google.firebase.firestore.IgnoreExtraProperties;
+import com.m3.veil.model.Timestamp;
+import com.m3.veil.bridge.firestore.IgnoreExtraProperties;
 import java.util.List;
 import java.util.ArrayList;
 

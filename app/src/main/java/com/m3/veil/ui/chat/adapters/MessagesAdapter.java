@@ -361,7 +361,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 || cal1.get(java.util.Calendar.DAY_OF_YEAR) != cal2.get(java.util.Calendar.DAY_OF_YEAR);
     }
 
-    private String formatDateHeader(com.google.firebase.Timestamp timestamp) {
+    private String formatDateHeader(com.m3.veil.model.Timestamp timestamp) {
         if (timestamp == null) return "";
         java.util.Calendar msgCal = java.util.Calendar.getInstance();
         msgCal.setTime(timestamp.toDate());

@@ -2,9 +2,9 @@ package com.m3.veil.utils;
 
 import android.content.Context;
 
-import com.google.firebase.Timestamp;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.WriteBatch;
+import com.m3.veil.model.Timestamp;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.firestore.WriteBatch;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.model.Chat;
 import com.m3.veil.model.Message;

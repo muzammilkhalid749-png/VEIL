@@ -34,11 +34,11 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.material.snackbar.Snackbar;
 
-import com.google.firebase.FirebaseException;
+import com.m3.veil.bridge.FirebaseException;
 
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
 
-import com.google.firebase.firestore.WriteBatch;
+import com.m3.veil.bridge.firestore.WriteBatch;
 
 import com.m3.veil.ui.main.MainActivity;
 

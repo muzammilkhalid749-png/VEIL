@@ -131,13 +131,13 @@ public class MainActivity extends AppCompatActivity {
         handleNotificationIntent(getIntent());
 
         // Fetch and save FCM Token for wake-up signaling only
-        com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken()
+        com.m3.veil.bridge.messaging.FirebaseMessaging.getInstance().getToken()
                 .addOnCompleteListener(task -> {
                     if (!task.isSuccessful()) return;
                     String token = task.getResult();
                     if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
                         String userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
-                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("users").document(userId)
+                        com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance().collection("users").document(userId)
                                 .update("fcmToken", token);
                     }
                 });

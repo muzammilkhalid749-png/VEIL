@@ -42,9 +42,9 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.gms.tasks.OnCompleteListener;
+import com.m3.veil.bridge.tasks.OnCompleteListener;
 
-import com.google.android.gms.tasks.Task;
+import com.m3.veil.bridge.tasks.Task;
 
 import com.google.android.material.snackbar.Snackbar;
 

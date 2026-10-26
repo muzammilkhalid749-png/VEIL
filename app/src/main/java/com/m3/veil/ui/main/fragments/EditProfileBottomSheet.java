@@ -64,9 +64,9 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
-import com.google.firebase.firestore.DocumentSnapshot;
+import com.m3.veil.bridge.firestore.DocumentSnapshot;
 
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
 
 import com.m3.veil.R;
 

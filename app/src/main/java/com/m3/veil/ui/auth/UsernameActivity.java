@@ -42,11 +42,11 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import com.google.android.material.textfield.TextInputLayout;
 
-import com.google.firebase.firestore.FieldValue;
+import com.m3.veil.bridge.firestore.FieldValue;
 
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
 
-import com.google.firebase.firestore.WriteBatch;
+import com.m3.veil.bridge.firestore.WriteBatch;
 
 import java.util.HashMap;
 
@@ -1108,7 +1108,7 @@ public class UsernameActivity extends AppCompatActivity {
 
 
 
-                batch.set(db.collection("users").document(userId), userUpdates, com.google.firebase.firestore.SetOptions.merge());
+                batch.set(db.collection("users").document(userId), userUpdates, com.m3.veil.bridge.firestore.SetOptions.merge());
 
                 UserPrivacy userPrivacy = new UserPrivacy(userId);
 

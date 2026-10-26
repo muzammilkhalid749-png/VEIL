@@ -827,7 +827,7 @@ public class NearbyMeshController {
                     "nearby_" + senderName.hashCode(),
                     NEARBY_CHAT_ID,
                     text,
-                    new com.google.firebase.Timestamp(new java.util.Date(time)),
+                    new com.m3.veil.model.Timestamp(new java.util.Date(time)),
                     "text"
             );
             msg.setSenderName(senderName);
@@ -844,7 +844,7 @@ public class NearbyMeshController {
                     NEARBY_CHAT_ID,
                     NEARBY_CHAT_NAME,
                     "Zero-Internet Off-Grid Proximity Radar",
-                    com.google.firebase.Timestamp.now(),
+                    com.m3.veil.model.Timestamp.now(),
                     null,
                     0,
                     true,

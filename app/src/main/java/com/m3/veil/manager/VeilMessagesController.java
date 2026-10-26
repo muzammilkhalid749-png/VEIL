@@ -14,7 +14,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.firebase.Timestamp;
+import com.m3.veil.model.Timestamp;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.model.Chat;
 import com.m3.veil.model.Message;
@@ -924,7 +924,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
     private void syncGroupOrChannelMessageToFirestore(@Nullable Chat chat, String groupId, Message msg) {
         try {
-            com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+            com.m3.veil.bridge.firestore.FirebaseFirestore fs = com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance();
             Map<String, Object> msgMap = new HashMap<>();
             msgMap.put("id", msg.getId());
             msgMap.put("chatId", groupId);
@@ -979,7 +979,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             groupSummary.put("isGroup", true);
 
             fs.collection("groups").document(groupId)
-                    .set(groupSummary, com.google.firebase.firestore.SetOptions.merge());
+                    .set(groupSummary, com.m3.veil.bridge.firestore.SetOptions.merge());
         } catch (Exception e) {
             Log.w(TAG, "Firestore group message sync notice: " + e.getMessage());
         }
@@ -987,7 +987,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
     private void syncDirectMessageToFirestore(@Nullable Chat chat, String dialogId, @Nullable String recipientId, Message msg) {
         try {
-            com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+            com.m3.veil.bridge.firestore.FirebaseFirestore fs = com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance();
             String myId = getCurrentUserId();
             String targetPeer = (recipientId != null && !recipientId.isEmpty()) ? recipientId : msg.getReceiverId();
             if (targetPeer == null || targetPeer.isEmpty()) {
@@ -1074,11 +1074,11 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             }
 
             fs.collection("groups").document(directChatId)
-                    .set(chatSummary, com.google.firebase.firestore.SetOptions.merge())
+                    .set(chatSummary, com.m3.veil.bridge.firestore.SetOptions.merge())
                     .addOnFailureListener(e -> Log.w(TAG, "Direct chat summary to groups notice: " + e.getMessage()));
 
             fs.collection("chats").document(directChatId)
-                    .set(chatSummary, com.google.firebase.firestore.SetOptions.merge())
+                    .set(chatSummary, com.m3.veil.bridge.firestore.SetOptions.merge())
                     .addOnFailureListener(e -> Log.w(TAG, "Direct chat summary to chats notice: " + e.getMessage()));
         } catch (Exception e) {
             Log.w(TAG, "Firestore direct message sync notice: " + e.getMessage());
@@ -1153,18 +1153,18 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         Map<String, Object> upd = new HashMap<>();
                         upd.put("text", newText.trim());
                         upd.put("edited", true);
-                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                                 .collection("groups").document(dialogId)
                                 .collection("messages").document(messageId)
-                                .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                                .set(upd, com.m3.veil.bridge.firestore.SetOptions.merge());
                     } else {
                         Map<String, Object> upd = new HashMap<>();
                         upd.put("text", EncryptionManager.encryptGroupPayload(dialogId, newText.trim()));
                         upd.put("edited", true);
-                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                                 .collection("chats").document(dialogId)
                                 .collection("messages").document(messageId)
-                                .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                                .set(upd, com.m3.veil.bridge.firestore.SetOptions.merge());
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Failed to broadcast edit message frame", e);
@@ -1214,18 +1214,18 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                             Map<String, Object> upd = new HashMap<>();
                             upd.put("type", "deleted");
                             upd.put("text", "🚫 This message was deleted");
-                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                                     .collection("groups").document(dialogId)
                                     .collection("messages").document(messageId)
-                                    .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                                    .set(upd, com.m3.veil.bridge.firestore.SetOptions.merge());
                         } else {
                             Map<String, Object> upd = new HashMap<>();
                             upd.put("type", "deleted");
                             upd.put("text", "🚫 This message was deleted");
-                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                                     .collection("chats").document(dialogId)
                                     .collection("messages").document(messageId)
-                                    .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                                    .set(upd, com.m3.veil.bridge.firestore.SetOptions.merge());
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Failed to dispatch delete for everyone frame", e);
@@ -1286,19 +1286,19 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     try {
                         Map<String, Object> upd = new HashMap<>();
                         upd.put("reactions", finalReactions);
-                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                                 .collection("groups").document(dialogId)
                                 .collection("messages").document(messageId)
-                                .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                                .set(upd, com.m3.veil.bridge.firestore.SetOptions.merge());
                     } catch (Exception ignored) {}
                 } else {
                     try {
                         Map<String, Object> upd = new HashMap<>();
                         upd.put("reactions", finalReactions);
-                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                                 .collection("chats").document(dialogId)
                                 .collection("messages").document(messageId)
-                                .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                                .set(upd, com.m3.veil.bridge.firestore.SetOptions.merge());
                     } catch (Exception ignored) {}
                 }
             });
@@ -1417,19 +1417,19 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         try {
                             Map<String, Object> upd = new HashMap<>();
                             upd.put("pollJson", updatedJson);
-                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                                     .collection("groups").document(dialogId)
                                     .collection("messages").document(messageId)
-                                    .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                                    .set(upd, com.m3.veil.bridge.firestore.SetOptions.merge());
                         } catch (Exception ignored) {}
                     } else {
                         try {
                             Map<String, Object> upd = new HashMap<>();
                             upd.put("pollJson", updatedJson);
-                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
                                     .collection("chats").document(dialogId)
                                     .collection("messages").document(messageId)
-                                    .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                                    .set(upd, com.m3.veil.bridge.firestore.SetOptions.merge());
                         } catch (Exception ignored) {}
                     }
                 });

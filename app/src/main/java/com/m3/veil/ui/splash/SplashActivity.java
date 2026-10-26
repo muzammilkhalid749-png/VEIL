@@ -38,7 +38,7 @@ import androidx.core.view.ViewCompat;
 
 import androidx.core.view.WindowInsetsCompat;
 
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
 
 import com.m3.veil.ui.main.MainActivity;
 

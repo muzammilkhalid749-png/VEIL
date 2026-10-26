@@ -4,7 +4,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.util.Log;
 
-import com.google.firebase.Timestamp;
+import com.m3.veil.model.Timestamp;
 import com.m3.veil.model.CallRecord;
 import com.m3.veil.model.Chat;
 import com.m3.veil.model.Message;
@@ -2674,7 +2674,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         msg.setText(callText);
         msg.setType("call");
         msg.setPollJson(callJson.toString());
-        msg.setTimestamp(record.getTimestamp() != null ? record.getTimestamp() : com.google.firebase.Timestamp.now());
+        msg.setTimestamp(record.getTimestamp() != null ? record.getTimestamp() : com.m3.veil.model.Timestamp.now());
         msg.setDelivered(false);
         msg.setRead(false);
 

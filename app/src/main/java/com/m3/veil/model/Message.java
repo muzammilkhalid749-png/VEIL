@@ -1,6 +1,6 @@
 package com.m3.veil.model;
 
-import com.google.firebase.Timestamp;
+import com.m3.veil.model.Timestamp;
 
 public class Message {
     private String id;
@@ -25,10 +25,10 @@ public class Message {
     private String aesKeyForRecipientMedia;
     private String thumbnail;
     
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     private String localFilePath;
     
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     private boolean pending;
 
     private boolean edited;
@@ -154,14 +154,14 @@ public class Message {
     public String getThumbnail() { return thumbnail; }
     public void setThumbnail(String thumbnail) { this.thumbnail = thumbnail; }
 
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     public String getLocalFilePath() { return localFilePath; }
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     public void setLocalFilePath(String localFilePath) { this.localFilePath = localFilePath; }
     
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     public boolean isPending() { return pending; }
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     public void setPending(boolean pending) { this.pending = pending; }
 
     public boolean isEdited() { return edited; }
@@ -194,18 +194,18 @@ public class Message {
     public String getVanishMode() { return vanishMode; }
     public void setVanishMode(String vanishMode) { this.vanishMode = vanishMode; }
 
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     private String translatedText;
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     private String translatedLang;
 
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     public String getTranslatedText() { return translatedText; }
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     public void setTranslatedText(String translatedText) { this.translatedText = translatedText; }
 
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     public String getTranslatedLang() { return translatedLang; }
-    @com.google.firebase.firestore.Exclude
+    @com.m3.veil.bridge.firestore.Exclude
     public void setTranslatedLang(String translatedLang) { this.translatedLang = translatedLang; }
 }

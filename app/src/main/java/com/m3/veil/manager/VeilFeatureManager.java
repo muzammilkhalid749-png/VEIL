@@ -3,10 +3,10 @@ package com.m3.veil.manager;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FieldValue;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.ListenerRegistration;
+import com.m3.veil.bridge.firestore.DocumentSnapshot;
+import com.m3.veil.bridge.firestore.FieldValue;
+import com.m3.veil.bridge.firestore.FirebaseFirestore;
+import com.m3.veil.bridge.firestore.ListenerRegistration;
 import com.m3.veil.model.Persona;
 
 import org.json.JSONArray;
