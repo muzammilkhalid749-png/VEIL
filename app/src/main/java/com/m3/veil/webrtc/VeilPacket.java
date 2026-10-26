@@ -9,6 +9,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.CRC32;
+import java.security.SecureRandom;
 
 /**
  * Deterministic binary ByteBuffer packet framing for VEIL WebRTC multi-lane transport.
@@ -188,11 +189,27 @@ public class VeilPacket {
         }
     }
 
+    public static final int PADDING_BLOCK_SIZE = 256;
+    private static final SecureRandom PADDING_RANDOM = new SecureRandom();
+
     public byte[] serialize() {
+        return serialize(true);
+    }
+
+    public byte[] serialize(boolean padToBlockSize) {
         boolean hasDhKey = (dhPublicKey != null && dhPublicKey.length > 0);
         byte ver = hasDhKey ? (byte) 0x02 : version;
         int dhHeaderSize = hasDhKey ? (1 + dhPublicKey.length) : 0;
-        int totalSize = HEADER_SIZE + dhHeaderSize + payload.length;
+        int unpaddedSize = HEADER_SIZE + dhHeaderSize + payload.length;
+        int totalSize = unpaddedSize;
+
+        if (padToBlockSize) {
+            int rem = unpaddedSize % PADDING_BLOCK_SIZE;
+            if (rem != 0) {
+                totalSize = unpaddedSize + (PADDING_BLOCK_SIZE - rem);
+            }
+        }
+
         ByteBuffer buffer = ByteBuffer.allocate(totalSize);
         buffer.order(ByteOrder.BIG_ENDIAN);
 
@@ -209,6 +226,11 @@ public class VeilPacket {
         }
         if (payload.length > 0) {
             buffer.put(payload);
+        }
+        if (totalSize > unpaddedSize) {
+            byte[] padding = new byte[totalSize - unpaddedSize];
+            PADDING_RANDOM.nextBytes(padding);
+            buffer.put(padding);
         }
 
         return buffer.array();
