@@ -5,24 +5,19 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 
 import com.m3.veil.R;
+import com.m3.veil.utils.SovereignIdentityAndDirectoryEngine;
 
 public class RecoveryPhraseActivity extends AppCompatActivity {
 
     private String recoveryPhrase;
-    private TextView phraseTextView;
-    private Button copyButton, continueButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,24 +28,16 @@ public class RecoveryPhraseActivity extends AppCompatActivity {
         recoveryPhrase = getIntent().getStringExtra("recovery_phrase");
         boolean isViewOnly = getIntent().getBooleanExtra("is_view_only", false);
 
+        SovereignIdentityAndDirectoryEngine engine = SovereignIdentityAndDirectoryEngine.getInstance(this);
+
         if (recoveryPhrase == null || recoveryPhrase.isEmpty()) {
-            try {
-                String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
-                android.content.SharedPreferences securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
-                        "veil_encrypted_prefs",
-                        masterKeyAlias,
-                        this,
-                        androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                        androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                );
-                recoveryPhrase = securePrefs.getString("recovery_phrase", null);
-                if (recoveryPhrase == null || recoveryPhrase.isEmpty()) {
-                    recoveryPhrase = com.m3.veil.utils.AnonymousAuthManager.generateRecoveryPhrase();
-                    securePrefs.edit().putString("recovery_phrase", recoveryPhrase).apply();
-                }
-            } catch (Exception ignored) {
-                recoveryPhrase = com.m3.veil.utils.AnonymousAuthManager.generateRecoveryPhrase();
+            recoveryPhrase = engine.loadRecoveryPhraseLocally(this);
+            if (recoveryPhrase == null || recoveryPhrase.isEmpty() || !engine.validatePhrase(recoveryPhrase)) {
+                recoveryPhrase = engine.generateMnemonic();
+                engine.saveRecoveryPhraseLocally(this, recoveryPhrase);
             }
+        } else {
+            engine.saveRecoveryPhraseLocally(this, recoveryPhrase);
         }
 
         initializeViews(isViewOnly);
@@ -58,9 +45,6 @@ public class RecoveryPhraseActivity extends AppCompatActivity {
     }
     
     private void handleWindowInsets() {
-        // Adds the system-bar insets on top of the layout's own padding. The previous
-        // implementation replaced the padding outright, silently erasing the horizontal
-        // padding these screens declare in XML.
         com.m3.veil.utils.WindowInsetsHelper.applySystemBarsPadding(findViewById(R.id.recovery_root));
     }
 

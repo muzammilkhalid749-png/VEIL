@@ -1,29 +1,28 @@
 package com.m3.veil.ui.auth;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
-import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.material.snackbar.Snackbar;
 import com.google.firebase.auth.FirebaseAuth;
 import com.m3.veil.R;
+import com.m3.veil.ui.main.MainActivity;
+import com.m3.veil.utils.AnonymousAuthManager;
+import com.m3.veil.utils.SovereignIdentityAndDirectoryEngine;
 
 public class RestoreAnonymousActivity extends AppCompatActivity {
 
     private EditText phraseEditText;
     private Button restoreButton;
     private ProgressBar progressBar;
-    private FirebaseAuth mAuth;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,16 +30,11 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_restore_anonymous);
 
-        mAuth = FirebaseAuth.getInstance();
-
         initializeViews();
         handleWindowInsets();
     }
 
     private void handleWindowInsets() {
-        // Adds the system-bar insets on top of the layout's own padding. The previous
-        // implementation replaced the padding outright, silently erasing the horizontal
-        // padding these screens declare in XML.
         com.m3.veil.utils.WindowInsetsHelper.applySystemBarsPadding(findViewById(R.id.restore_root));
     }
 
@@ -53,89 +47,95 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
 
         restoreButton.setOnClickListener(v -> {
             String raw = phraseEditText.getText().toString();
-            String phrase = com.m3.veil.utils.AnonymousAuthManager.normalizePhrase(raw);
-            String[] words = phrase.split("\\s+");
-            if (phrase.isEmpty() || words.length < 12) {
-                int count = phrase.isEmpty() ? 0 : words.length;
-                showSnackbar("Please enter all 12 words of your recovery phrase (found " + count + ")");
+            String phrase = SovereignIdentityAndDirectoryEngine.normalizePhrase(raw);
+            String reason = SovereignIdentityAndDirectoryEngine.getInstance(this).validatePhraseWithReason(phrase);
+            if (reason != null) {
+                showSnackbar(reason);
             } else {
-                restoreAnonymousAccount(phrase);
+                restoreSovereignAccount(phrase);
             }
         });
     }
 
-    private void restoreAnonymousAccount(String phrase) {
+    private void restoreSovereignAccount(String phrase) {
         showLoading(true);
-        String email = com.m3.veil.utils.AnonymousAuthManager.getEmailFromPhrase(phrase);
-        String password = com.m3.veil.utils.AnonymousAuthManager.getPasswordFromPhrase(phrase);
 
-        mAuth.signInWithEmailAndPassword(email, password)
-                .addOnCompleteListener(this, task -> {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        showLoading(false);
-                        com.google.firebase.auth.FirebaseUser user = task.getResult().getUser();
-                        com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(RestoreAnonymousActivity.this, user);
-                        saveRecoveryPhrase(phrase);
-                        navigateToSplash();
-                    } else {
-                        Exception signInEx = task.getException();
-                        android.util.Log.w("RestoreAnonymous", "Sign in attempt failed for email: " + email, signInEx);
+        SovereignIdentityAndDirectoryEngine engine = SovereignIdentityAndDirectoryEngine.getInstance(this);
+        engine.restoreAccount(this, phrase, null, new SovereignIdentityAndDirectoryEngine.RestoreCallback() {
+            @Override
+            public void onSuccess(SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest, boolean hadExistingProfile) {
+                showLoading(false);
 
-                        // If network error, stop and report immediately
-                        if (signInEx instanceof com.google.firebase.FirebaseNetworkException) {
-                            showLoading(false);
-                            showSnackbar("Network error. Please check your internet connection.");
-                            return;
-                        }
+                // Best-effort Firebase Auth background link if internet is present
+                try {
+                    String email = AnonymousAuthManager.getEmailFromPhrase(phrase);
+                    String password = AnonymousAuthManager.getPasswordFromPhrase(phrase);
+                    FirebaseAuth mAuth = FirebaseAuth.getInstance();
+                    mAuth.signInWithEmailAndPassword(email, password)
+                            .addOnFailureListener(e -> {
+                                try {
+                                    mAuth.createUserWithEmailAndPassword(email, password);
+                                } catch (Exception ignored) {}
+                            });
+                } catch (Exception ignored) {}
 
-                        // If user record is not yet in Firebase Auth, restore credential deterministically
-                        mAuth.createUserWithEmailAndPassword(email, password)
-                                .addOnCompleteListener(this, createTask -> {
-                                    showLoading(false);
-                                    if (createTask.isSuccessful() && createTask.getResult() != null) {
-                                        com.google.firebase.auth.FirebaseUser newUser = createTask.getResult().getUser();
-                                        com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(RestoreAnonymousActivity.this, newUser);
-                                        saveRecoveryPhrase(phrase);
-                                        navigateToSplash();
-                                    } else {
-                                        Exception createEx = createTask.getException();
-                                        android.util.Log.e("RestoreAnonymous", "Failed to restore anonymous account", createEx);
-                                        if (createEx instanceof com.google.firebase.FirebaseNetworkException) {
-                                            showSnackbar("Network error. Please check your internet connection.");
-                                        } else if (createEx instanceof com.google.firebase.auth.FirebaseAuthUserCollisionException) {
-                                            showSnackbar("Recovery phrase password mismatch. Please verify your words.");
-                                        } else if (createEx != null && createEx.getMessage() != null) {
-                                            showSnackbar("Restore failed: " + createEx.getMessage());
-                                        } else {
-                                            showSnackbar("Invalid recovery phrase. Account not found.");
-                                        }
-                                    }
-                                });
-                    }
-                });
+                // Lossless restore: If user had an existing username, go directly to Main or PinUnlock
+                if (hadExistingProfile && manifest.username != null && !manifest.username.trim().isEmpty()) {
+                    navigateToNextScreen();
+                } else {
+                    // Brand-new phrase, proceed to Username setup
+                    navigateToUsername();
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                showLoading(false);
+                showSnackbar(message != null ? message : "Invalid recovery phrase. Please check your words.");
+            }
+        });
     }
 
-    private void saveRecoveryPhrase(String phrase) {
+    private void navigateToNextScreen() {
         try {
-            String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
-            android.content.SharedPreferences securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
-                    "veil_encrypted_prefs",
-                    masterKeyAlias,
-                    RestoreAnonymousActivity.this,
-                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            );
-            securePrefs.edit().putString("recovery_phrase", phrase).apply();
-        } catch (Exception ignored) {
+            SharedPreferences sharedPreferences;
             try {
-                getSharedPreferences("veil_encrypted_prefs_fallback", MODE_PRIVATE)
-                        .edit().putString("recovery_phrase", phrase).apply();
-            } catch (Exception ignored2) {}
+                String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
+                sharedPreferences = androidx.security.crypto.EncryptedSharedPreferences.create(
+                        "veil_encrypted_prefs",
+                        masterKeyAlias,
+                        this,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+            } catch (Exception secEx) {
+                sharedPreferences = getSharedPreferences("veil_encrypted_prefs_fallback", MODE_PRIVATE);
+            }
+
+            boolean isPinSet = sharedPreferences.getBoolean("pin_set", false)
+                    || com.m3.veil.manager.VeilFeatureManager.getInstance(this).hasMasterPin();
+
+            Intent intent;
+            if (isPinSet) {
+                intent = new Intent(RestoreAnonymousActivity.this, com.m3.veil.ui.auth.PinUnlockActivity.class);
+            } else {
+                intent = new Intent(RestoreAnonymousActivity.this, MainActivity.class);
+            }
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+            finish();
+        } catch (Exception e) {
+            Intent intent = new Intent(RestoreAnonymousActivity.this, MainActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+            finish();
         }
     }
 
-    private void navigateToSplash() {
-        Intent intent = new Intent(this, com.m3.veil.ui.splash.SplashActivity.class);
+    private void navigateToUsername() {
+        Intent intent = new Intent(this, UsernameActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);

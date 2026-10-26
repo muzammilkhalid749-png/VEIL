@@ -258,6 +258,22 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     public static final String COL_SCHED_IS_CHANNEL = "is_channel_broadcast";
     public static final String COL_SCHED_CREATED_AT = "created_at";
 
+    // Table: sovereign_identity_manifest
+    public static final String TABLE_SOVEREIGN_MANIFEST = "sovereign_identity_manifest";
+    public static final String COL_SM_UID = "uid";
+    public static final String COL_SM_USERNAME = "username";
+    public static final String COL_SM_DISPLAY_NAME = "display_name";
+    public static final String COL_SM_BIO = "bio";
+    public static final String COL_SM_AVATAR_BASE64 = "avatar_base64";
+    public static final String COL_SM_MOOD = "mood";
+    public static final String COL_SM_XP = "xp";
+    public static final String COL_SM_KARMA = "karma";
+    public static final String COL_SM_VEIL_COINS = "veil_coins";
+    public static final String COL_SM_PERSONAS_JSON = "personas_json";
+    public static final String COL_SM_PUBLIC_KEY = "public_key_base64";
+    public static final String COL_SM_UPDATED_AT = "updated_at";
+    public static final String COL_SM_SIGNATURE = "signature";
+
     // Table: read_later_reminders (#178)
     public static final String TABLE_REMINDERS = "read_later_reminders";
     public static final String COL_REM_ID = "id";
@@ -706,6 +722,22 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 COL_SCHED_STATUS + " TEXT DEFAULT 'PENDING', " +
                 COL_SCHED_IS_CHANNEL + " INTEGER DEFAULT 0, " +
                 COL_SCHED_CREATED_AT + " INTEGER" +
+                ");");
+
+        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_SOVEREIGN_MANIFEST + " (" +
+                COL_SM_UID + " TEXT PRIMARY KEY, " +
+                COL_SM_USERNAME + " TEXT, " +
+                COL_SM_DISPLAY_NAME + " TEXT, " +
+                COL_SM_BIO + " TEXT, " +
+                COL_SM_AVATAR_BASE64 + " TEXT, " +
+                COL_SM_MOOD + " TEXT, " +
+                COL_SM_XP + " INTEGER, " +
+                COL_SM_KARMA + " INTEGER, " +
+                COL_SM_VEIL_COINS + " INTEGER, " +
+                COL_SM_PERSONAS_JSON + " TEXT, " +
+                COL_SM_PUBLIC_KEY + " TEXT, " +
+                COL_SM_UPDATED_AT + " INTEGER, " +
+                COL_SM_SIGNATURE + " TEXT" +
                 ");");
 
         db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_REMINDERS + " (" +
@@ -3772,6 +3804,87 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         if (id == null) return;
         SQLiteDatabase db = getEncryptedDb();
         db.delete(TABLE_SCHEDULED_MESSAGES, COL_SCHED_ID + " = ?", new String[]{id});
+    }
+
+    public synchronized void saveSovereignProfileManifest(com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest) {
+        if (manifest == null || manifest.uid == null || manifest.uid.isEmpty()) return;
+        SQLiteDatabase db = getEncryptedDb();
+        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_SOVEREIGN_MANIFEST + " (" +
+                COL_SM_UID + " TEXT PRIMARY KEY, " +
+                COL_SM_USERNAME + " TEXT, " +
+                COL_SM_DISPLAY_NAME + " TEXT, " +
+                COL_SM_BIO + " TEXT, " +
+                COL_SM_AVATAR_BASE64 + " TEXT, " +
+                COL_SM_MOOD + " TEXT, " +
+                COL_SM_XP + " INTEGER, " +
+                COL_SM_KARMA + " INTEGER, " +
+                COL_SM_VEIL_COINS + " INTEGER, " +
+                COL_SM_PERSONAS_JSON + " TEXT, " +
+                COL_SM_PUBLIC_KEY + " TEXT, " +
+                COL_SM_UPDATED_AT + " INTEGER, " +
+                COL_SM_SIGNATURE + " TEXT" +
+                ");");
+        ContentValues cv = new ContentValues();
+        cv.put(COL_SM_UID, manifest.uid);
+        cv.put(COL_SM_USERNAME, manifest.username);
+        cv.put(COL_SM_DISPLAY_NAME, manifest.displayName);
+        cv.put(COL_SM_BIO, manifest.bio);
+        cv.put(COL_SM_AVATAR_BASE64, manifest.avatarBase64);
+        cv.put(COL_SM_MOOD, manifest.mood);
+        cv.put(COL_SM_XP, manifest.xp);
+        cv.put(COL_SM_KARMA, manifest.karma);
+        cv.put(COL_SM_VEIL_COINS, manifest.veilCoins);
+        cv.put(COL_SM_PERSONAS_JSON, manifest.personasJsonArray);
+        cv.put(COL_SM_PUBLIC_KEY, manifest.publicKeyBase64);
+        cv.put(COL_SM_UPDATED_AT, manifest.updatedAtTimestamp);
+        cv.put(COL_SM_SIGNATURE, manifest.signature);
+        db.insertWithOnConflict(TABLE_SOVEREIGN_MANIFEST, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public synchronized com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest getSovereignProfileManifest(String uid) {
+        if (uid == null || uid.isEmpty()) return null;
+        SQLiteDatabase db = getEncryptedDb();
+        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_SOVEREIGN_MANIFEST + " (" +
+                COL_SM_UID + " TEXT PRIMARY KEY, " +
+                COL_SM_USERNAME + " TEXT, " +
+                COL_SM_DISPLAY_NAME + " TEXT, " +
+                COL_SM_BIO + " TEXT, " +
+                COL_SM_AVATAR_BASE64 + " TEXT, " +
+                COL_SM_MOOD + " TEXT, " +
+                COL_SM_XP + " INTEGER, " +
+                COL_SM_KARMA + " INTEGER, " +
+                COL_SM_VEIL_COINS + " INTEGER, " +
+                COL_SM_PERSONAS_JSON + " TEXT, " +
+                COL_SM_PUBLIC_KEY + " TEXT, " +
+                COL_SM_UPDATED_AT + " INTEGER, " +
+                COL_SM_SIGNATURE + " TEXT" +
+                ");");
+        Cursor c = db.query(TABLE_SOVEREIGN_MANIFEST, null, COL_SM_UID + " = ?", new String[]{uid}, null, null, null);
+        if (c != null) {
+            try {
+                if (c.moveToFirst()) {
+                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest m =
+                            new com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest();
+                    m.uid = c.getString(c.getColumnIndexOrThrow(COL_SM_UID));
+                    m.username = c.getString(c.getColumnIndexOrThrow(COL_SM_USERNAME));
+                    m.displayName = c.getString(c.getColumnIndexOrThrow(COL_SM_DISPLAY_NAME));
+                    m.bio = c.getString(c.getColumnIndexOrThrow(COL_SM_BIO));
+                    m.avatarBase64 = c.getString(c.getColumnIndexOrThrow(COL_SM_AVATAR_BASE64));
+                    m.mood = c.getString(c.getColumnIndexOrThrow(COL_SM_MOOD));
+                    m.xp = c.getLong(c.getColumnIndexOrThrow(COL_SM_XP));
+                    m.karma = c.getLong(c.getColumnIndexOrThrow(COL_SM_KARMA));
+                    m.veilCoins = c.getLong(c.getColumnIndexOrThrow(COL_SM_VEIL_COINS));
+                    m.personasJsonArray = c.getString(c.getColumnIndexOrThrow(COL_SM_PERSONAS_JSON));
+                    m.publicKeyBase64 = c.getString(c.getColumnIndexOrThrow(COL_SM_PUBLIC_KEY));
+                    m.updatedAtTimestamp = c.getLong(c.getColumnIndexOrThrow(COL_SM_UPDATED_AT));
+                    m.signature = c.getString(c.getColumnIndexOrThrow(COL_SM_SIGNATURE));
+                    return m;
+                }
+            } finally {
+                c.close();
+            }
+        }
+        return null;
     }
 
     public synchronized int reapExpiredChannelPosts(long now) {

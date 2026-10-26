@@ -330,6 +330,10 @@ public class VeilFeatureManager {
         return prefs.getInt("user_xp", 120);
     }
 
+    public void setXp(int xp) {
+        prefs.edit().putInt("user_xp", Math.max(0, xp)).apply();
+    }
+
     public void addXp(int delta) {
         int next = Math.max(0, getXp() + delta);
         prefs.edit().putInt("user_xp", next).apply();
@@ -351,12 +355,26 @@ public class VeilFeatureManager {
         return prefs.getInt("user_karma", 42);
     }
 
+    public void setKarma(int karma) {
+        prefs.edit().putInt("user_karma", Math.max(0, karma)).apply();
+    }
+
     public void addKarma(int delta) {
         prefs.edit().putInt("user_karma", Math.max(0, getKarma() + delta)).apply();
     }
 
     public int getVeilCoins() {
         return prefs.getInt("veil_coins", 250);
+    }
+
+    public void setVeilCoins(int coins) {
+        prefs.edit().putInt("veil_coins", Math.max(0, coins)).apply();
+    }
+
+    public void restorePersonasJson(String personasJson) {
+        if (personasJson != null && !personasJson.trim().isEmpty() && !personasJson.equals("[]")) {
+            prefs.edit().putString("personas_json", personasJson).apply();
+        }
     }
 
     public boolean spendVeilCoins(int amount) {

@@ -50,12 +50,37 @@ public class AuthManager {
         return mAuth.getCurrentUser() != null;
     }
 
+    public boolean isLoggedIn(Context context) {
+        if (mAuth.getCurrentUser() != null) return true;
+        try {
+            com.m3.veil.utils.UserPreferences prefs = new com.m3.veil.utils.UserPreferences(context);
+            return prefs.isLoggedIn() && prefs.getUserId() != null;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public FirebaseUser getCurrentUser() {
         return mAuth.getCurrentUser();
     }
 
     public String getCurrentUserId() {
-        return mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
+        if (mAuth.getCurrentUser() != null) {
+            return mAuth.getCurrentUser().getUid();
+        }
+        return null;
+    }
+
+    public String getCurrentUserId(Context context) {
+        if (mAuth.getCurrentUser() != null) {
+            return mAuth.getCurrentUser().getUid();
+        }
+        try {
+            com.m3.veil.utils.UserPreferences prefs = new com.m3.veil.utils.UserPreferences(context);
+            return prefs.getUserId();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
@@ -188,6 +213,65 @@ public class AuthManager {
         } catch (Exception e) {
             Log.e(TAG, "Failed to sync user public key", e);
         }
+    }
+
+    public void onSovereignSessionStarted(Context context, com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest) {
+        if (manifest == null || manifest.uid == null || manifest.uid.isEmpty()) return;
+        String uid = manifest.uid;
+
+        // 1. Initialize WebRTC P2P Manager with Sovereign UID
+        WebRtcManager.getInstance(context).init(uid);
+
+        // 2. Bring up Call Engine
+        try {
+            com.m3.veil.calling.CallEngine engine = com.m3.veil.calling.CallEngine.getInstance(context);
+            engine.init(uid);
+            if (manifest.displayName != null && !manifest.displayName.isEmpty()) {
+                engine.setDisplayName(manifest.displayName);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Call engine init failed for sovereign session", e);
+        }
+
+        // 3. Register FCM Token if Firebase is present
+        try {
+            FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+                if (task.isSuccessful() && task.getResult() != null) {
+                    String token = task.getResult();
+                    java.util.Map<String, Object> tokenMap = new java.util.HashMap<>();
+                    tokenMap.put("userId", uid);
+                    tokenMap.put("fcmToken", token);
+                    db.collection("users").document(uid).set(tokenMap, com.google.firebase.firestore.SetOptions.merge());
+                }
+            });
+        } catch (Exception ignored) {}
+
+        // 4. Ensure E2EE keypair exists
+        try {
+            com.m3.veil.utils.EncryptionManager.generateKeyPair();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to ensure keypair for sovereign session", e);
+        }
+    }
+
+    public void onSovereignPhoneSessionStarted(Context context, String uid, String phoneNumber) {
+        if (uid == null || uid.isEmpty()) return;
+
+        // 1. Initialize WebRTC P2P Manager
+        WebRtcManager.getInstance(context).init(uid);
+
+        // 2. Initialize Call Engine
+        try {
+            com.m3.veil.calling.CallEngine engine = com.m3.veil.calling.CallEngine.getInstance(context);
+            engine.init(uid);
+        } catch (Exception e) {
+            Log.e(TAG, "Call engine init failed for phone session", e);
+        }
+
+        // 3. Ensure E2EE keypair exists
+        try {
+            com.m3.veil.utils.EncryptionManager.generateKeyPair();
+        } catch (Exception ignored) {}
     }
 
     public void signOut(Context context) {
