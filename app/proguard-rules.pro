@@ -8,10 +8,17 @@
 -keepclassmembers class com.m3.veil.model.** { *; }
 -keep class com.m3.veil.database.EncryptedChatDatabase$* { *; }
 -keep class com.m3.veil.manager.VeilBoardController$* { *; }
+-keep class com.m3.veil.manager.** { *; }
+-keep class com.m3.veil.utils.SovereignIdentityAndDirectoryEngine$* { *; }
+-keep class com.m3.veil.webrtc.SovereignNatTraversalEngine$* { *; }
+-keep class com.m3.veil.webrtc.VeilPacket { *; }
+-keep class com.m3.veil.calling.** { *; }
+-keep class com.m3.veil.services.** { *; }
 -keep class com.m3.veil.ui.views.** {
     public <init>(android.content.Context);
     public <init>(android.content.Context, android.util.AttributeSet);
     public <init>(android.content.Context, android.util.AttributeSet, int);
+    *;
 }
 
 # 2. SQLCipher & Zetetic Native JNI Callbacks
