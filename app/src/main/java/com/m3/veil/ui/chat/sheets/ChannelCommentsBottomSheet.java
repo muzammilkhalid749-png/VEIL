@@ -20,10 +20,11 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
-import com.m3.veil.bridge.firestore.DocumentSnapshot;
-import com.m3.veil.bridge.firestore.FirebaseFirestore;
-import com.m3.veil.bridge.firestore.ListenerRegistration;
-import com.m3.veil.bridge.firestore.Query;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Query;
 import com.m3.veil.R;
 import com.m3.veil.manager.VeilFeatureManager;
 import com.m3.veil.model.Persona;

@@ -10,25 +10,26 @@ import java.util.List;
 /**
  * Central tuning + infrastructure configuration for {@link CallEngine}.
  *
- * <p>TURN is first-class here (unlike the legacy call path which shipped STUN
- * only and therefore failed on symmetric NAT / CGNAT). Populate TURN once at
- * app start:
- *
- * <pre>
- *   CallConfig.setGlobalTurn(
- *       Arrays.asList("turn:turn.veil.network:3478?transport=udp",
- *                     "turns:turn.veil.network:5349?transport=tcp"),
- *       "veil", "secret");
- * </pre>
- *
- * With no TURN configured the engine still works on open networks and reports
- * {@link CallInfo#isRelayInUse()} so the UI can explain failures.
+ * <p>Implements the Signal Smart-Hybrid NAT Traversal Strategy:
+ * <ul>
+ *   <li>Tier 1 (0ms - 1,200ms): Direct STUN P2P ({@code stun:stun.l.google.com:19302},
+ *       {@code stun:stun.cloudflare.com:3478}).</li>
+ *   <li>Tier 2 (CGNAT / Firewall Fallback): Port 443 TURN TCP/TLS/UDP
+ *       ({@code turn:openrelay.metered.ca:443?transport=tcp},
+ *       {@code turns:openrelay.metered.ca:443?transport=tcp}, and configurable Cloudflare /
+ *       custom Coturn relays) while keeping {@link CallE2ee} (AES-256-GCM SFrame) and DTLS-SRTP
+ *       active so the TURN relay only ever sees blind ciphertext.</li>
+ * </ul>
  */
 public final class CallConfig {
 
     private static volatile List<String> turnUrls = Collections.emptyList();
     private static volatile String turnUsername;
     private static volatile String turnPassword;
+
+    private static volatile List<String> cloudflareTurnUrls = Collections.emptyList();
+    private static volatile String cloudflareTurnUsername;
+    private static volatile String cloudflareTurnPassword;
 
     /** Public STUN pool used for server-reflexive candidates. */
     public static final List<String> DEFAULT_STUN = Collections.unmodifiableList(Arrays.asList(
@@ -38,46 +39,106 @@ public final class CallConfig {
             "stun:stun3.l.google.com:19302",
             "stun:stun.cloudflare.com:3478"));
 
+    /** Default Port 443 OpenRelay TURN fallback endpoints for strict 4G/5G CGNAT traversal. */
+    public static final List<String> DEFAULT_PORT_443_TURN = Collections.unmodifiableList(Arrays.asList(
+            "turn:openrelay.metered.ca:443?transport=tcp",
+            "turn:openrelay.metered.ca:443?transport=udp",
+            "turns:openrelay.metered.ca:443?transport=tcp",
+            "turn:openrelay.metered.ca:80?transport=tcp"));
+
+    public static final String DEFAULT_TURN_USER = "openrelayproject";
+    public static final String DEFAULT_TURN_PASS = "openrelayproject";
+
+    /** Direct STUN P2P probing window before escalating to TURN TCP/TLS on Port 443. */
+    public static final long DIRECT_STUN_TIMEOUT_MS = 1_200L;
+
+    /** Maximum age of an incoming call invite signal before it is ignored as stale (60s). */
+    public static final long INVITE_MAX_AGE_MS = 60_000L;
+    /** Maximum age of an ephemeral call SDP/ICE signal document in Firestore (90s). */
+    public static final long SIGNAL_MAX_AGE_MS = 90_000L;
+
     public static void setGlobalTurn(List<String> urls, String username, String password) {
         turnUrls = urls == null ? Collections.<String>emptyList() : new ArrayList<>(urls);
         turnUsername = username;
         turnPassword = password;
     }
 
-    public static boolean hasTurn() {
-        return !turnUrls.isEmpty();
+    public static void setCloudflareTurn(List<String> urls, String username, String password) {
+        cloudflareTurnUrls = urls == null ? Collections.<String>emptyList() : new ArrayList<>(urls);
+        cloudflareTurnUsername = username;
+        cloudflareTurnPassword = password;
     }
 
-    /** Builds the ICE server list: STUN always, TURN when configured with Anycast fallback. */
+    public static boolean hasTurn() {
+        return true;
+    }
+
+    /**
+     * Builds the ICE server list: Direct STUN P2P first, followed by Port 443 TURN TCP/TLS
+     * (OpenRelay + Cloudflare TURN + custom/ephemeral TURN) without blocking standard WebRTC ICE gathering.
+     */
     public static List<PeerConnection.IceServer> iceServers() {
-        if (hasTurn()) {
-            List<PeerConnection.IceServer> servers = new ArrayList<>();
-            for (String stun : DEFAULT_STUN) {
-                servers.add(PeerConnection.IceServer.builder(stun).createIceServer());
-            }
+        return iceServers(true);
+    }
+
+    /**
+     * Builds the ICE server list with optional TURN inclusion for staged 0-1,200ms STUN-first escalation.
+     */
+    public static List<PeerConnection.IceServer> iceServers(boolean includeTurn) {
+        List<PeerConnection.IceServer> servers = new ArrayList<>();
+
+        // Tier 1: Direct STUN P2P (Google + Cloudflare STUN)
+        for (String stun : DEFAULT_STUN) {
+            servers.add(PeerConnection.IceServer.builder(stun).createIceServer());
+        }
+
+        if (!includeTurn) {
+            return servers;
+        }
+
+        // Tier 2A: Explicitly configured custom TURN servers
+        if (!turnUrls.isEmpty()) {
             for (String url : turnUrls) {
                 PeerConnection.IceServer.Builder b = PeerConnection.IceServer.builder(url);
                 if (turnUsername != null) b.setUsername(turnUsername);
                 if (turnPassword != null) b.setPassword(turnPassword);
                 servers.add(b.createIceServer());
             }
-            return servers;
         }
 
-        // Delegate to SovereignNatTraversalEngine for 4-Stage Progressive NAT Piercing Matrix & STUN/TURN
-        try {
-            return com.m3.veil.webrtc.SovereignNatTraversalEngine.getInstance(null).getExpandedIceServers(true);
-        } catch (Throwable t) {
-            try {
-                return com.m3.veil.webrtc.TurnCredentialManager.getInstance(null).getIceServers(true);
-            } catch (Throwable t2) {
-                List<PeerConnection.IceServer> fallback = new ArrayList<>();
-                for (String stun : DEFAULT_STUN) {
-                    fallback.add(PeerConnection.IceServer.builder(stun).createIceServer());
-                }
-                return fallback;
+        // Tier 2B: Configurable Cloudflare TURN on Port 443
+        if (!cloudflareTurnUrls.isEmpty()) {
+            for (String url : cloudflareTurnUrls) {
+                PeerConnection.IceServer.Builder b = PeerConnection.IceServer.builder(url);
+                if (cloudflareTurnUsername != null) b.setUsername(cloudflareTurnUsername);
+                if (cloudflareTurnPassword != null) b.setPassword(cloudflareTurnPassword);
+                servers.add(b.createIceServer());
             }
         }
+
+        // Tier 2C: Reliable Port 443 TURN TCP/TLS/UDP fallback (openrelay.metered.ca:443)
+        for (String turnUrl : DEFAULT_PORT_443_TURN) {
+            servers.add(PeerConnection.IceServer.builder(turnUrl)
+                    .setUsername(DEFAULT_TURN_USER)
+                    .setPassword(DEFAULT_TURN_PASS)
+                    .createIceServer());
+        }
+
+        // Tier 2D: Ephemeral RFC 5389 TURN Fleet from TurnCredentialManager
+        try {
+            List<PeerConnection.IceServer> fleetServers =
+                    com.m3.veil.webrtc.TurnCredentialManager.getInstance(null).getIceServers(true);
+            if (fleetServers != null) {
+                for (PeerConnection.IceServer s : fleetServers) {
+                    if (s != null && ! servers.contains(s)) {
+                        servers.add(s);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
+        return servers;
     }
 
     // ---- behaviour -----------------------------------------------------------

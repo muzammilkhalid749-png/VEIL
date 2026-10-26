@@ -327,42 +327,42 @@ public class TurnCredentialManager {
             servers.add(PeerConnection.IceServer.builder("stun:stun.cloudflare.com:3478").createIceServer());
         }
 
-        // TIER 2: Time-Limited HMAC Zero-Log TURN Relay Nodes
+        // TIER 2: Port 443 TURN TCP/TLS/UDP Relay Nodes (OpenRelay + Zero-Log Fleet)
         if (includeTurn || strictRelay) {
-            TurnCredentials credentials = getOrGenerateCredentials();
-            boolean addedAnyRelay = false;
+            // Guaranteed Port 443 TURN TCP/TLS/UDP fallback for strict 4G/5G CGNAT traversal
+            servers.add(PeerConnection.IceServer.builder("turn:openrelay.metered.ca:443?transport=tcp")
+                    .setUsername("openrelayproject")
+                    .setPassword("openrelayproject")
+                    .createIceServer());
+            servers.add(PeerConnection.IceServer.builder("turn:openrelay.metered.ca:443?transport=udp")
+                    .setUsername("openrelayproject")
+                    .setPassword("openrelayproject")
+                    .createIceServer());
+            servers.add(PeerConnection.IceServer.builder("turns:openrelay.metered.ca:443?transport=tcp")
+                    .setUsername("openrelayproject")
+                    .setPassword("openrelayproject")
+                    .createIceServer());
+            servers.add(PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80?transport=tcp")
+                    .setUsername("openrelayproject")
+                    .setPassword("openrelayproject")
+                    .createIceServer());
 
-            // Iterate over fleet sorted by lowest RTT
+            TurnCredentials credentials = getOrGenerateCredentials();
             for (RelayNode node : mRelayFleet) {
-                if (node.isHealthy || !addedAnyRelay) {
-                    // UDP Port 443 (Fastest packet relay)
+                if (node.isHealthy) {
                     servers.add(PeerConnection.IceServer.builder("turn:" + node.hostname + ":" + node.turnPortUdp + "?transport=udp")
                             .setUsername(credentials.username)
                             .setPassword(credentials.password)
                             .createIceServer());
-
-                    // TCP Port 443 (CGNAT & Stateful Firewall Punch-through)
                     servers.add(PeerConnection.IceServer.builder("turn:" + node.hostname + ":" + node.turnPortTcp + "?transport=tcp")
                             .setUsername(credentials.username)
                             .setPassword(credentials.password)
                             .createIceServer());
-
-                    // TLS Port 5349 / 443 (Deep Packet Inspection / Censorship Bypass)
                     servers.add(PeerConnection.IceServer.builder("turns:" + node.hostname + ":" + node.turnPortTls + "?transport=tcp")
                             .setUsername(credentials.username)
                             .setPassword(credentials.password)
                             .createIceServer());
-
-                    addedAnyRelay = true;
                 }
-            }
-
-            // Always add primary Anycast as guaranteed fallback if not already added
-            if (mRelayFleet.isEmpty()) {
-                servers.add(PeerConnection.IceServer.builder("turn:turn.veil-mesh.net:443?transport=tcp")
-                        .setUsername(credentials.username)
-                        .setPassword(credentials.password)
-                        .createIceServer());
             }
         }
 

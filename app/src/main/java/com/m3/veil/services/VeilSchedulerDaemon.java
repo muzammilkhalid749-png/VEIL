@@ -304,7 +304,7 @@ public class VeilSchedulerDaemon {
                             m.senderId,
                             m.dialogId,
                             m.text,
-                            new com.m3.veil.model.Timestamp(new java.util.Date(now)),
+                            new com.google.firebase.Timestamp(new java.util.Date(now)),
                             m.msgType != null ? m.msgType : "text"
                     );
                     msg.setSenderName(m.senderName);

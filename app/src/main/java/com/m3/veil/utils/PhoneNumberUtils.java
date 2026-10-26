@@ -268,9 +268,9 @@ public class PhoneNumberUtils {
     }
 
     /**
-     * Validate phone number for Sovereign Auth requirements
+     * Validate phone number for Firebase requirements
      */
-    public static ValidationResult validatePhoneNumber(String countryCode, String phoneNumber) {
+    public static ValidationResult validatePhoneNumberForFirebase(String countryCode, String phoneNumber) {
         if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
             return new ValidationResult(false, "Phone number cannot be empty");
         }
@@ -300,7 +300,7 @@ public class PhoneNumberUtils {
         // Check maximum length (Firebase limit)
         if (processedDigits.length() > 15) {
             return new ValidationResult(false,
-                    "Phone number is too long for authentication");
+                    "Phone number is too long for Firebase authentication");
         }
 
         // Country-specific validation
@@ -308,10 +308,10 @@ public class PhoneNumberUtils {
             return new ValidationResult(false, format.errorMessage + " Example: " + format.example);
         }
 
-        // Prepare number for Sovereign Auth (country code + processed digits)
-        String formattedNumber = countryCode + processedDigits;
+        // Prepare number for Firebase (country code + processed digits)
+        String firebaseNumber = countryCode + processedDigits;
 
-        return new ValidationResult(true, "Valid", formattedNumber);
+        return new ValidationResult(true, "Valid", firebaseNumber);
     }
 
     /**
@@ -418,14 +418,14 @@ public class PhoneNumberUtils {
     }
 
     /**
-     * Remove formatting for Sovereign Auth (country code + digits only)
+     * Remove formatting for Firebase (country code + digits only)
      */
-    public static String preparePhoneNumber(String countryCode, String formattedNumber) {
+    public static String prepareForFirebase(String countryCode, String formattedNumber) {
         if (formattedNumber == null) return "";
 
         String digitsOnly = formattedNumber.replaceAll("[^0-9]", "");
 
-        // Country-specific processing for Sovereign Auth
+        // Country-specific processing for Firebase
         switch (countryCode) {
             case "+92": // Pakistan - remove leading zero if present
                 if (digitsOnly.startsWith("0") && digitsOnly.length() == 11) {

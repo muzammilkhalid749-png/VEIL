@@ -2,8 +2,8 @@ package com.m3.veil.utils;
 
 import androidx.annotation.Nullable;
 
-import com.m3.veil.model.Timestamp;
-import com.m3.veil.bridge.firestore.DocumentSnapshot;
+import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.DocumentSnapshot;
 
 import java.util.Date;
 
@@ -19,7 +19,7 @@ public final class VeilFirestoreUtils {
 
     /**
      * Safely parses a Timestamp object from a DocumentSnapshot field.
-     * Supports com.m3.veil.model.Timestamp, java.lang.Number (epoch millis),
+     * Supports com.google.firebase.Timestamp, java.lang.Number (epoch millis),
      * java.util.Date, or ISO / numeric String representations.
      */
     public static Timestamp getSafeTimestamp(@Nullable DocumentSnapshot doc, String field, @Nullable Timestamp defaultVal) {

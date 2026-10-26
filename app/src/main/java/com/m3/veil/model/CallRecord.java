@@ -1,6 +1,6 @@
 package com.m3.veil.model;
 
-import com.m3.veil.model.Timestamp;
+import com.google.firebase.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 
@@ -63,7 +63,9 @@ public class CallRecord {
     private void resolvePeerInfo() {
         String currentUid = null;
         try {
-            currentUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId();
+            if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid();
+            }
         } catch (Throwable ignored) {}
 
         boolean isOut = "outgoing".equalsIgnoreCase(status);

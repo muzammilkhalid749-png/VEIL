@@ -6,7 +6,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import com.m3.veil.bridge.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import org.json.JSONObject;
 
@@ -127,7 +127,7 @@ public final class FcmCallPusher {
                 java.util.Map<String, Object> signalData = new java.util.HashMap<>();
                 signalData.put("type", "mesh_wake");
                 signalData.put("mailbox", blindMailboxHash);
-                signalData.put("timestamp", com.m3.veil.model.Timestamp.now());
+                signalData.put("timestamp", com.google.firebase.Timestamp.now());
 
                 FirebaseFirestore.getInstance()
                         .collection("users")

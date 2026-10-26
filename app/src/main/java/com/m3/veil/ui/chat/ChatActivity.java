@@ -84,14 +84,15 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.m3.veil.model.Timestamp;
-import com.m3.veil.bridge.firestore.DocumentChange;
-import com.m3.veil.bridge.firestore.DocumentSnapshot;
-import com.m3.veil.bridge.firestore.FieldValue;
-import com.m3.veil.bridge.firestore.FirebaseFirestore;
-import com.m3.veil.bridge.firestore.ListenerRegistration;
-import com.m3.veil.bridge.firestore.MetadataChanges;
-import com.m3.veil.bridge.firestore.Query;
+import com.google.firebase.Timestamp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentChange;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.MetadataChanges;
+import com.google.firebase.firestore.Query;
 import com.gowtham.library.utils.TrimType;
 import com.gowtham.library.utils.TrimVideo;
 import com.m3.veil.R;
@@ -606,11 +607,10 @@ public class ChatActivity extends AppCompatActivity {
         com.m3.veil.webrtc.WebRtcManager.getInstance(this).init(currentUserId);
         if (recipientId != null && !recipientId.trim().isEmpty()
                 && !recipientId.startsWith("group_") && !recipientId.startsWith("channel_") && !recipientId.startsWith("lounge_")) {
-            // Perfect Negotiation: lexicographically larger peer initiates WebRTC offer, smaller sends Wake-Knock
+            // Perfect Negotiation: only the lexicographically larger peer initiates WebRTC on chat open
+            // to avoid simultaneous SDP offer collisions (glare) and kHaveLocalOffer state aborts
             if (currentUserId != null && currentUserId.compareTo(recipientId) > 0) {
                 com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
-            } else {
-                com.m3.veil.webrtc.SignalingClient.getInstance().sendWakeUp(recipientId, chatId);
             }
         }
         com.m3.veil.webrtc.WebRtcManager.getInstance(this).addEventListener(p2pChatListener);
@@ -2739,7 +2739,7 @@ public class ChatActivity extends AppCompatActivity {
                     currentUserId,
                     recipientId != null ? recipientId : "",
                     "[roulette_control:reveal_request]",
-                    com.m3.veil.model.Timestamp.now(),
+                    com.google.firebase.Timestamp.now(),
                     "control"
             );
             com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, recipientId, controlMsg);
@@ -2796,7 +2796,7 @@ public class ChatActivity extends AppCompatActivity {
         if (speedChatBanner != null) speedChatBanner.setVisibility(View.GONE);
 
         if (recipientId != null && !recipientId.isEmpty()) {
-            com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance().collection("users").document(recipientId)
+            com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("users").document(recipientId)
                     .get()
                     .addOnSuccessListener(doc -> {
                         if (doc != null && doc.exists()) {
@@ -3593,11 +3593,11 @@ public class ChatActivity extends AppCompatActivity {
         if (groupMessagesListener != null) groupMessagesListener.remove();
         groupMessagesListener = db.collection("groups").document(chatId)
                 .collection("messages")
-                .orderBy("timestamp", com.m3.veil.bridge.firestore.Query.Direction.ASCENDING)
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
                 .addSnapshotListener(this, (snapshots, error) -> {
                     if (error != null || snapshots == null) return;
                     boolean changed = false;
-                    for (com.m3.veil.bridge.firestore.DocumentSnapshot mDoc : snapshots.getDocuments()) {
+                    for (com.google.firebase.firestore.DocumentSnapshot mDoc : snapshots.getDocuments()) {
                         try {
                             String mId = mDoc.getString("id");
                             if (mId == null) mId = mDoc.getId();
@@ -3671,7 +3671,7 @@ public class ChatActivity extends AppCompatActivity {
         if (directMessagesListener != null) directMessagesListener.remove();
         directMessagesListener = db.collection("groups").document(chatId)
                 .collection("messages")
-                .orderBy("timestamp", com.m3.veil.bridge.firestore.Query.Direction.ASCENDING)
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
                 .addSnapshotListener(this, (snapshots, error) -> {
                     if (error != null) {
                         Log.e("ChatActivity", "Direct message listener error on groups: " + error.getMessage(), error);
@@ -3679,7 +3679,7 @@ public class ChatActivity extends AppCompatActivity {
                     }
                     if (snapshots == null) return;
                     boolean changed = false;
-                    for (com.m3.veil.bridge.firestore.DocumentSnapshot mDoc : snapshots.getDocuments()) {
+                    for (com.google.firebase.firestore.DocumentSnapshot mDoc : snapshots.getDocuments()) {
                         try {
                             String mId = mDoc.getString("id");
                             if (mId == null) mId = mDoc.getId();
@@ -3756,10 +3756,10 @@ public class ChatActivity extends AppCompatActivity {
                                     Map<String, Object> ack = new HashMap<>();
                                     ack.put("delivered", true);
                                     ack.put("read", true);
-                                    mDoc.getReference().set(ack, com.m3.veil.bridge.firestore.SetOptions.merge());
+                                    mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
                                     try {
                                         db.collection("chats").document(chatId).collection("messages").document(mId)
-                                                .set(ack, com.m3.veil.bridge.firestore.SetOptions.merge());
+                                                .set(ack, com.google.firebase.firestore.SetOptions.merge());
                                     } catch (Throwable ignored) {}
 
                                     if (recipientId != null) {
@@ -3776,10 +3776,10 @@ public class ChatActivity extends AppCompatActivity {
                                         Map<String, Object> ack = new HashMap<>();
                                         ack.put("delivered", true);
                                         ack.put("read", true);
-                                        mDoc.getReference().set(ack, com.m3.veil.bridge.firestore.SetOptions.merge());
+                                        mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
                                         try {
                                             db.collection("chats").document(chatId).collection("messages").document(mId)
-                                                    .set(ack, com.m3.veil.bridge.firestore.SetOptions.merge());
+                                                    .set(ack, com.google.firebase.firestore.SetOptions.merge());
                                         } catch (Throwable ignored) {}
 
                                         if (recipientId != null) {

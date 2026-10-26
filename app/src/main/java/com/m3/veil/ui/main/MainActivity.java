@@ -115,17 +115,20 @@ public class MainActivity extends AppCompatActivity {
         // Initialize P2P WebRTC & Auth Session (Firebase or Sovereign)
         if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
             String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
-            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
-                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getLocalManifest();
-            if (manifest != null) {
-                com.m3.veil.manager.AuthManager.getInstance().onSovereignSessionStarted(this, manifest);
-            } else if (uid != null) {
-                com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this, uid);
-            }
-            if (uid != null && !uid.isEmpty()) {
-                com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).init(uid);
-                com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).announceLocalProfile();
-                com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).sendDirectoryProbe("");
+            if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this,
+                        com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser());
+            } else {
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getLocalManifest();
+                if (manifest != null) {
+                    com.m3.veil.manager.AuthManager.getInstance().onSovereignSessionStarted(this, manifest);
+                } else if (uid != null) {
+                    com.m3.veil.webrtc.WebRtcManager.getInstance(this).init(uid);
+                    try {
+                        com.m3.veil.calling.CallEngine.getInstance(this).init(uid);
+                    } catch (Throwable ignored) {}
+                }
             }
             com.m3.veil.services.VeilMeshDaemonService.start(this);
         }
@@ -136,13 +139,13 @@ public class MainActivity extends AppCompatActivity {
         handleNotificationIntent(getIntent());
 
         // Fetch and save FCM Token for wake-up signaling only
-        com.m3.veil.bridge.messaging.FirebaseMessaging.getInstance().getToken()
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken()
                 .addOnCompleteListener(task -> {
                     if (!task.isSuccessful()) return;
                     String token = task.getResult();
-                    if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
-                        String userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
-                        com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance().collection("users").document(userId)
+                    if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                        String userId = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid();
+                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("users").document(userId)
                                 .update("fcmToken", token);
                     }
                 });

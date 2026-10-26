@@ -19,9 +19,10 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
-import com.m3.veil.bridge.firestore.DocumentSnapshot;
-import com.m3.veil.bridge.firestore.FieldValue;
-import com.m3.veil.bridge.firestore.FirebaseFirestore;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.m3.veil.R;
 import com.m3.veil.manager.VeilFeatureManager;
 import com.m3.veil.model.Persona;
@@ -105,7 +106,7 @@ public class WalletBottomSheet extends BottomSheetDialogFragment {
         btnCopyAddress.setOnClickListener(v -> copyAddress());
 
         // Sync coin balance with remote Firestore user profile
-        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(getContext())) {
+        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
             db.collection("users").document(currentUserId).get().addOnSuccessListener(doc -> {
                 if (getContext() == null || !isAdded()) return;
                 if (doc.exists() && doc.contains("veilCoins")) {
@@ -157,7 +158,7 @@ public class WalletBottomSheet extends BottomSheetDialogFragment {
         featureManager.addXp(15);
         featureManager.addKarma(1);
 
-        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(getContext())) {
+        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
             db.collection("users").document(currentUserId)
                     .update("veilCoins", FieldValue.increment(25));
         }
@@ -234,7 +235,7 @@ public class WalletBottomSheet extends BottomSheetDialogFragment {
                     updateBalanceDisplay();
 
                     // Atomically update sender and recipient balances in Firestore
-                    if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(getContext())) {
+                    if (FirebaseAuth.getInstance().getCurrentUser() != null) {
                         db.collection("users").document(currentUserId)
                                 .update("veilCoins", FieldValue.increment(-transferAmount));
                     }

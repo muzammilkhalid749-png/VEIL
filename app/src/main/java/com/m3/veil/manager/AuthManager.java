@@ -1,390 +1,524 @@
 package com.m3.veil.manager;
 
 import android.content.Context;
+import android.content.Intent;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.m3.veil.bridge.tasks.OnCompleteListener;
-import com.m3.veil.bridge.tasks.Task;
-import com.m3.veil.bridge.firestore.FirebaseFirestore;
-import com.m3.veil.bridge.messaging.FirebaseMessaging;
-import com.m3.veil.utils.AnonymousAuthManager;
+import com.google.firebase.Timestamp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
+import com.m3.veil.calling.CallEngine;
+import com.m3.veil.calling.VeilCallService;
+import com.m3.veil.database.EncryptedChatDatabase;
+import com.m3.veil.model.User;
+import com.m3.veil.services.VeilMeshDaemonService;
+import com.m3.veil.ui.splash.SplashActivity;
+import com.m3.veil.utils.PreferenceManager;
 import com.m3.veil.utils.SovereignIdentityAndDirectoryEngine;
+import com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest;
 import com.m3.veil.utils.UserPreferences;
 import com.m3.veil.webrtc.SignalingClient;
 import com.m3.veil.webrtc.WebRtcManager;
 
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 /**
- * 100% Sovereign Authentication & Session Manager for VEIL.
- * Decoupled completely from FirebaseAuth. Manages deterministic cryptographic identities,
- * local encrypted preferences, WebRTC P2P mesh initialization, and Nostr/P2P signaling.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════════
+ * VEIL CENTRALIZED AUTH & IDENTITY STATE MACHINE (SIGNAL SMART-HYBRID ARCHITECTURE)
+ * ═════════════════════════════════════════════════════════════════════════════════════════════════
+ * Coordinates deterministic 12-word BIP-39 Sovereign Identity ("veil_<sha256_prefix>") and
+ * Phone Auth ("phone_<sha256_prefix>") across:
+ *   1. UserPreferences (EncryptedSharedPreferences)
+ *   2. PreferenceManager ("VeilPrefs")
+ *   3. EncryptedChatDatabase (SQLCipher WAL)
+ *   4. Firebase Firestore ("users/{uid}" & "usernames/{username}") + Nostr Relay Backup
+ * ═════════════════════════════════════════════════════════════════════════════════════════════════
  */
 public class AuthManager {
-
     private static final String TAG = "AuthManager";
 
-    public static class SessionUser {
-        private final String uid;
-        private final String displayName;
-        private final String email;
-        private final String phoneNumber;
+    private static final String KEY_SOVEREIGN_LOGGED_IN = "sovereign_logged_in";
+    private static final String KEY_SOVEREIGN_UID = "sovereign_uid";
 
-        public SessionUser(String uid, String displayName, String email, String phoneNumber) {
-            this.uid = uid != null ? uid : "";
-            this.displayName = displayName != null ? displayName : "";
-            this.email = email != null ? email : "";
-            this.phoneNumber = phoneNumber != null ? phoneNumber : "";
-        }
+    private static volatile AuthManager instance;
+    private final ExecutorService authExecutor = Executors.newSingleThreadExecutor();
+    private volatile boolean isLoggingOut = false;
 
-        public String getUid() {
-            return uid;
-        }
-
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public String getEmail() {
-            return email;
-        }
-
-        public String getPhoneNumber() {
-            return phoneNumber;
-        }
+    public interface ProfileRestoreCallback {
+        void onResult(boolean hasCompleteProfile, @Nullable User restoredUser);
     }
 
-    public interface AuthCallback {
-        void onSuccess(SessionUser user);
-        void onFailure(Exception exception);
-    }
+    private AuthManager() {}
 
-    private static AuthManager instance;
-    private static volatile String sCurrentUserId = null;
-    private static volatile SessionUser sCurrentUser = null;
-    private final FirebaseFirestore db;
-
-    public static synchronized AuthManager getInstance() {
+    public static AuthManager getInstance() {
         if (instance == null) {
-            instance = new AuthManager();
+            synchronized (AuthManager.class) {
+                if (instance == null) {
+                    instance = new AuthManager();
+                }
+            }
         }
         return instance;
     }
 
-    private AuthManager() {
-        db = FirebaseFirestore.getInstance();
+    /**
+     * Authoritative check for whether an authenticated Sovereign or Phone session is active.
+     */
+    public boolean isLoggedIn(@NonNull Context context) {
+        Context appCtx = context.getApplicationContext();
+        String uid = getCurrentUserId(appCtx);
+        if (uid == null || uid.trim().isEmpty()) {
+            return false;
+        }
+        PreferenceManager pm = new PreferenceManager(appCtx);
+        UserPreferences up = new UserPreferences(appCtx);
+        return Boolean.TRUE.equals(pm.getBoolean(KEY_SOVEREIGN_LOGGED_IN, false)) || up.isLoggedIn();
     }
 
-    public boolean isLoggedIn() {
-        return sCurrentUserId != null && !sCurrentUserId.isEmpty();
-    }
+    /**
+     * Authoritative check for whether the current logged-in user has claimed a valid @username.
+     * Filters out any legacy auto-generated placeholder handles unless explicitly confirmed.
+     */
+    public boolean hasCompleteProfile(@NonNull Context context) {
+        Context appCtx = context.getApplicationContext();
+        UserPreferences up = new UserPreferences(appCtx);
+        String uid = getCurrentUserId(appCtx);
+        String username = up.getUsername();
+        if (isValidClaimedUsername(username, uid)) {
+            return true;
+        }
 
-    public boolean isLoggedIn(Context context) {
-        if (sCurrentUserId != null && !sCurrentUserId.isEmpty()) return true;
-        if (context == null) return false;
-        try {
-            UserPreferences prefs = new UserPreferences(context);
-            if (prefs.isLoggedIn() && prefs.getUserId() != null && !prefs.getUserId().isEmpty()) {
-                sCurrentUserId = prefs.getUserId();
-                return true;
+        PreferenceManager pm = new PreferenceManager(appCtx);
+        String pmUsername = pm.getString("username", null);
+        if (isValidClaimedUsername(pmUsername, uid)) {
+            up.updateUserField("username", pmUsername.trim());
+            return true;
+        }
+
+        if (uid != null && !uid.isEmpty()) {
+            try {
+                SovereignProfileManifest manifest = EncryptedChatDatabase.getInstance(appCtx).getSovereignProfileManifest(uid);
+                if (manifest != null && isValidClaimedUsername(manifest.username, uid)) {
+                    SovereignIdentityAndDirectoryEngine.getInstance(appCtx).persistManifestLocally(manifest);
+                    return true;
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "SQLCipher manifest check failed: " + e.getMessage());
             }
-            if (SovereignIdentityAndDirectoryEngine.getInstance(context).isLoggedIn()) {
-                sCurrentUserId = SovereignIdentityAndDirectoryEngine.getInstance(context).getCurrentUserId();
-                return true;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "isLoggedIn check failed", e);
         }
         return false;
     }
 
-    @Nullable
-    public SessionUser getCurrentUser() {
-        if (sCurrentUser != null) return sCurrentUser;
-        if (sCurrentUserId != null && !sCurrentUserId.isEmpty()) {
-            return new SessionUser(sCurrentUserId, "@" + sCurrentUserId, "", "");
+    public boolean isValidClaimedUsername(@Nullable String username, @Nullable String uid) {
+        if (username == null) return false;
+        String clean = username.trim();
+        if (clean.isEmpty()) return false;
+        if (uid != null && uid.startsWith("veil_") && uid.length() >= 13) {
+            String autoSuffix = "veil_" + uid.substring(5, 13);
+            if (clean.equalsIgnoreCase(autoSuffix)) {
+                return false;
+            }
         }
-        return null;
-    }
-
-    @Nullable
-    public SessionUser getCurrentUser(Context context) {
-        if (context == null) return getCurrentUser();
-        try {
-            UserPreferences prefs = new UserPreferences(context);
-            com.m3.veil.model.User user = prefs.getCurrentUser();
-            if (user != null && user.getUserId() != null) {
-                sCurrentUserId = user.getUserId();
-                sCurrentUser = new SessionUser(user.getUserId(), user.getDisplayName(), "", user.getPhone());
-                return sCurrentUser;
-            }
-            SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
-                    SovereignIdentityAndDirectoryEngine.getInstance(context).getLocalManifest();
-            if (manifest != null && manifest.uid != null) {
-                sCurrentUserId = manifest.uid;
-                sCurrentUser = new SessionUser(manifest.uid, manifest.displayName, "", "");
-                return sCurrentUser;
-            }
-        } catch (Exception ignored) {}
-        return getCurrentUser();
-    }
-
-    @Nullable
-    public String getCurrentUserId() {
-        return sCurrentUserId;
-    }
-
-    @Nullable
-    public String getCurrentUserId(Context context) {
-        if (context == null) return sCurrentUserId;
-        try {
-            UserPreferences prefs = new UserPreferences(context);
-            String uid = prefs.getUserId();
-            if (uid != null && !uid.trim().isEmpty()) {
-                sCurrentUserId = uid;
-                return uid;
-            }
-            String sovUid = SovereignIdentityAndDirectoryEngine.getInstance(context).getCurrentUserId();
-            if (sovUid != null && !sovUid.trim().isEmpty()) {
-                sCurrentUserId = sovUid;
-                return sovUid;
-            }
-        } catch (Exception ignored) {}
-        return sCurrentUserId;
-    }
-
-    @NonNull
-    public String getCurrentUserName(Context context) {
-        if (context != null) {
-            try {
-                UserPreferences prefs = new UserPreferences(context);
-                com.m3.veil.model.User u = prefs.getCurrentUser();
-                if (u != null && u.getDisplayName() != null && !u.getDisplayName().isEmpty()) {
-                    return u.getDisplayName();
-                }
-                SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
-                        SovereignIdentityAndDirectoryEngine.getInstance(context).getLocalManifest();
-                if (manifest != null && manifest.displayName != null && !manifest.displayName.isEmpty()) {
-                    return manifest.displayName;
-                }
-            } catch (Exception ignored) {}
-        }
-        return sCurrentUserId != null ? ("@" + sCurrentUserId) : "Anonymous";
+        return true;
     }
 
     /**
-     * Signs in or restores an anonymous sovereign account using the 12-word BIP-39 recovery phrase.
+     * Returns the deterministic user ID ("veil_<28_hex>" or "phone_<24_hex>").
      */
-    public void signInWithRecoveryPhrase(Context context, String recoveryPhrase, AuthCallback callback) {
-        SovereignIdentityAndDirectoryEngine.getInstance(context).restoreAccount(context, recoveryPhrase, null,
-                new SovereignIdentityAndDirectoryEngine.RestoreCallback() {
-                    @Override
-                    public void onSuccess(SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest, boolean hadExistingProfile) {
-                        onSovereignSessionStarted(context, manifest);
-                        SessionUser user = new SessionUser(manifest.uid, manifest.displayName, "", "");
-                        if (callback != null) callback.onSuccess(user);
+    @Nullable
+    public String getCurrentUserId(@NonNull Context context) {
+        Context appCtx = context.getApplicationContext();
+
+        PreferenceManager pm = new PreferenceManager(appCtx);
+        String sovUid = pm.getString(KEY_SOVEREIGN_UID, null);
+        if (sovUid != null && !sovUid.trim().isEmpty()) {
+            FirebaseAuth.getInstance().setCurrentUserUid(sovUid.trim());
+            return sovUid.trim();
+        }
+
+        UserPreferences up = new UserPreferences(appCtx);
+        String upUid = up.getUserId();
+        if (upUid != null && !upUid.trim().isEmpty()) {
+            pm.putString(KEY_SOVEREIGN_UID, upUid.trim());
+            pm.putBoolean(KEY_SOVEREIGN_LOGGED_IN, true);
+            FirebaseAuth.getInstance().setCurrentUserUid(upUid.trim());
+            return upUid.trim();
+        }
+
+        try {
+            SovereignIdentityAndDirectoryEngine engine = SovereignIdentityAndDirectoryEngine.getInstance(appCtx);
+            if (engine.isIdentityInitialized()) {
+                String engineUid = engine.getCurrentUid();
+                if (engineUid != null && !engineUid.trim().isEmpty()) {
+                    pm.putString(KEY_SOVEREIGN_UID, engineUid.trim());
+                    pm.putBoolean(KEY_SOVEREIGN_LOGGED_IN, true);
+                    up.updateUserField("userId", engineUid.trim());
+                    FirebaseAuth.getInstance().setCurrentUserUid(engineUid.trim());
+                    return engineUid.trim();
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Engine UID lookup failed: " + e.getMessage());
+        }
+
+        return null;
+    }
+
+    public void onSessionStarted(@NonNull Context context, @NonNull FirebaseUser firebaseUser) {
+        String uid = getCurrentUserId(context);
+        if (uid == null || uid.isEmpty()) {
+            uid = firebaseUser.getUid();
+        }
+        if (uid != null && !uid.isEmpty()) {
+            onSovereignIdentityInitialized(context, uid, hasCompleteProfile(context));
+            initRealtimeEngines(context.getApplicationContext(), uid);
+        }
+    }
+
+    public void onSovereignSessionStarted(@NonNull Context context, @NonNull SovereignProfileManifest manifest) {
+        if (manifest.uid == null || manifest.uid.isEmpty()) return;
+        Context appCtx = context.getApplicationContext();
+        boolean hasValidUsername = isValidClaimedUsername(manifest.username, manifest.uid);
+        onSovereignIdentityInitialized(appCtx, manifest.uid, hasValidUsername);
+        if (hasValidUsername) {
+            SovereignIdentityAndDirectoryEngine.getInstance(appCtx).persistManifestLocally(manifest);
+        }
+        initRealtimeEngines(appCtx, manifest.uid);
+    }
+
+    /**
+     * Called when a 12-word Sovereign Identity is created or restored.
+     */
+    public void onSovereignIdentityInitialized(@NonNull Context context, @NonNull String uid, boolean hasProfile) {
+        Context appCtx = context.getApplicationContext();
+        PreferenceManager pm = new PreferenceManager(appCtx);
+        pm.putBoolean(KEY_SOVEREIGN_LOGGED_IN, true);
+        pm.putString(KEY_SOVEREIGN_UID, uid);
+        pm.putString("userId", uid);
+
+        FirebaseAuth.getInstance().setCurrentUserUid(uid);
+
+        UserPreferences up = new UserPreferences(appCtx);
+        User currentUser = up.getCurrentUser();
+        if (currentUser == null || !uid.equals(currentUser.getUserId())) {
+            User minimal = new User();
+            minimal.setUserId(uid);
+            minimal.setPhone("");
+            minimal.setCountryCode("SOV");
+            minimal.setOnline(true);
+            up.saveUser(minimal);
+        } else {
+            up.updateUserField("userId", uid);
+        }
+
+        initRealtimeEngines(appCtx, uid);
+        Log.i(TAG, "Sovereign session active for UID=" + uid + " (hasProfile=" + hasProfile + ")");
+    }
+
+    /**
+     * Called when Phone OTP verification completes.
+     */
+    public void onSovereignPhoneSessionStarted(@NonNull Context context, @NonNull String uid, @NonNull String phoneNumber) {
+        Context appCtx = context.getApplicationContext();
+        PreferenceManager pm = new PreferenceManager(appCtx);
+        pm.putBoolean(KEY_SOVEREIGN_LOGGED_IN, true);
+        pm.putString(KEY_SOVEREIGN_UID, uid);
+        pm.putString("userId", uid);
+        pm.putString("phone_number", phoneNumber);
+
+        FirebaseAuth.getInstance().setCurrentUserUid(uid);
+
+        UserPreferences up = new UserPreferences(appCtx);
+        User existing = up.getCurrentUser();
+        if (existing == null || !uid.equals(existing.getUserId())) {
+            User phoneUser = new User(uid, phoneNumber, "US");
+            phoneUser.setOnline(true);
+            up.saveUser(phoneUser);
+        } else {
+            up.updateUserField("userId", uid);
+        }
+
+        initRealtimeEngines(appCtx, uid);
+        Log.i(TAG, "Phone session active for UID=" + uid);
+    }
+
+    private void initRealtimeEngines(@NonNull Context appCtx, @NonNull String uid) {
+        try {
+            WebRtcManager.getInstance(appCtx).init(uid);
+        } catch (Throwable t) {
+            Log.w(TAG, "WebRtcManager init notice: " + t.getMessage());
+        }
+        try {
+            CallEngine.getInstance(appCtx).init(uid);
+        } catch (Throwable t) {
+            Log.w(TAG, "CallEngine init notice: " + t.getMessage());
+        }
+        try {
+            VeilMeshDaemonService.start(appCtx);
+        } catch (Throwable t) {
+            Log.w(TAG, "VeilMeshDaemonService start notice: " + t.getMessage());
+        }
+    }
+
+    /**
+     * Synchronizes and persists the complete user profile across UserPreferences, PreferenceManager,
+     * SQLCipher, and Firebase Firestore ("users/{uid}" and "usernames/{username}").
+     */
+    public void saveAndSyncUserProfile(
+            @NonNull Context context,
+            @NonNull String userId,
+            @NonNull String username,
+            @NonNull String displayName,
+            @Nullable String bio,
+            @Nullable String avatarPath,
+            @Nullable String avatarBase64) {
+
+        Context appCtx = context.getApplicationContext();
+        String cleanUsername = username.trim().replaceFirst("^@", "");
+        String cleanDisplay = displayName != null && !displayName.trim().isEmpty() ? displayName.trim() : cleanUsername;
+        String cleanBio = bio != null ? bio.trim() : "";
+
+        UserPreferences up = new UserPreferences(appCtx);
+        User user = up.getCurrentUser();
+        if (user == null) {
+            user = new User();
+        }
+        user.setUserId(userId);
+        user.setUsername(cleanUsername);
+        user.setDisplayName(cleanDisplay);
+        user.setBio(cleanBio);
+        if (avatarPath != null && !avatarPath.isEmpty()) {
+            user.setPhotoUrl(avatarPath);
+        } else if (avatarBase64 != null && !avatarBase64.isEmpty()) {
+            user.setPhotoUrl(avatarBase64);
+        }
+        if (avatarBase64 != null && !avatarBase64.isEmpty()) {
+            user.setAvatar(avatarBase64);
+        }
+        user.setOnline(true);
+        user.setLastSeen(Timestamp.now());
+        if (user.getJoinedAt() == null) {
+            user.setJoinedAt(Timestamp.now());
+        }
+        up.saveUser(user);
+
+        String resolvedAvatarPref = (avatarPath != null && !avatarPath.isEmpty())
+                ? avatarPath
+                : (avatarBase64 != null ? avatarBase64 : "");
+        up.saveProfileFields(userId, cleanUsername, cleanDisplay, cleanBio, resolvedAvatarPref);
+
+        PreferenceManager pm = new PreferenceManager(appCtx);
+        pm.putString("userId", userId);
+        pm.putString("username", cleanUsername);
+        pm.putString("displayName", cleanDisplay);
+        pm.putString("bio", cleanBio);
+        if (avatarPath != null && !avatarPath.isEmpty()) {
+            pm.putString("avatarPath", avatarPath);
+        }
+        if (avatarBase64 != null && !avatarBase64.isEmpty()) {
+            pm.putString("avatarBase64", avatarBase64);
+        }
+
+        SovereignIdentityAndDirectoryEngine.getInstance(appCtx).recordClaimedUsername(cleanUsername);
+
+        Map<String, Object> userDoc = new HashMap<>();
+        userDoc.put("userId", userId);
+        userDoc.put("username", cleanUsername);
+        userDoc.put("usernameLower", cleanUsername.toLowerCase());
+        userDoc.put("displayName", cleanDisplay);
+        userDoc.put("bio", cleanBio);
+        userDoc.put("status", user.getStatus() != null ? user.getStatus() : "Hey there! I am using Veil");
+        userDoc.put("isOnline", true);
+        userDoc.put("lastSeen", Timestamp.now());
+        if (avatarBase64 != null && !avatarBase64.isEmpty()) {
+            userDoc.put("avatar", avatarBase64);
+            userDoc.put("photoUrl", avatarBase64);
+        } else if (avatarPath != null && !avatarPath.isEmpty()) {
+            userDoc.put("photoUrl", avatarPath);
+        }
+        try {
+            String pubKey = SovereignIdentityAndDirectoryEngine.getInstance(appCtx).getCurrentPublicKeyBase64();
+            if (pubKey != null && !pubKey.isEmpty()) {
+                userDoc.put("publicKey", pubKey);
+            }
+        } catch (Exception ignored) {}
+
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        db.collection("users").document(userId).set(userDoc, SetOptions.merge());
+
+        Map<String, Object> usernameDoc = new HashMap<>();
+        usernameDoc.put("userId", userId);
+        usernameDoc.put("username", cleanUsername);
+        usernameDoc.put("displayName", cleanDisplay);
+        usernameDoc.put("updatedAt", System.currentTimeMillis());
+        if (avatarBase64 != null && !avatarBase64.isEmpty()) {
+            usernameDoc.put("avatar", avatarBase64);
+        }
+        db.collection("usernames").document(cleanUsername.toLowerCase()).set(usernameDoc, SetOptions.merge());
+    }
+
+    /**
+     * Restores or verifies user profile state on Splash or after 12-word recovery:
+     * 1. Local UserPreferences / PreferenceManager / SQLCipher
+     * 2. Firebase Firestore "users/{uid}" (instant 50ms restore)
+     * 3. Surviving external backup / Nostr relay fallback
+     */
+    public void verifyOrRestoreProfile(@NonNull Context context, @NonNull ProfileRestoreCallback callback) {
+        final Context appCtx = context.getApplicationContext();
+        final String uid = getCurrentUserId(appCtx);
+        if (uid == null || uid.isEmpty()) {
+            callback.onResult(false, null);
+            return;
+        }
+
+        UserPreferences up = new UserPreferences(appCtx);
+        if (hasCompleteProfile(appCtx)) {
+            callback.onResult(true, up.getCurrentUser());
+            return;
+        }
+
+        FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(uid)
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
+                        DocumentSnapshot doc = task.getResult();
+                        String username = doc.getString("username");
+                        if (isValidClaimedUsername(username, uid)) {
+                            String displayName = doc.getString("displayName");
+                            String bio = doc.getString("bio");
+                            String avatar = doc.getString("avatar");
+                            String photoUrl = doc.getString("photoUrl");
+                            String resolvedAvatar = (avatar != null && !avatar.isEmpty()) ? avatar : photoUrl;
+
+                            String savedPath = null;
+                            if (resolvedAvatar != null && !resolvedAvatar.isEmpty() && !resolvedAvatar.startsWith("/") && !resolvedAvatar.startsWith("http")) {
+                                File f = SovereignIdentityAndDirectoryEngine.getInstance(appCtx).saveAvatarBase64ToLocalFile(uid, resolvedAvatar);
+                                if (f != null) {
+                                    savedPath = f.getAbsolutePath();
+                                }
+                            } else if (photoUrl != null && !photoUrl.isEmpty()) {
+                                savedPath = photoUrl;
+                            }
+
+                            String chosenAvatarPref = (savedPath != null && !savedPath.isEmpty())
+                                    ? savedPath
+                                    : (resolvedAvatar != null ? resolvedAvatar : "");
+                            up.saveProfileFields(
+                                    uid,
+                                    username.trim(),
+                                    displayName != null && !displayName.isEmpty() ? displayName : username.trim(),
+                                    bio != null ? bio : "",
+                                    chosenAvatarPref
+                            );
+
+                            PreferenceManager pm = new PreferenceManager(appCtx);
+                            pm.putString("userId", uid);
+                            pm.putString("username", username.trim());
+                            pm.putString("displayName", displayName != null && !displayName.isEmpty() ? displayName : username.trim());
+                            pm.putString("bio", bio != null ? bio : "");
+                            if (savedPath != null && !savedPath.isEmpty()) {
+                                pm.putString("avatarPath", savedPath);
+                            }
+
+                            SovereignIdentityAndDirectoryEngine.getInstance(appCtx).recordClaimedUsername(username.trim());
+                            callback.onResult(true, up.getCurrentUser());
+                            return;
+                        }
                     }
 
-                    @Override
-                    public void onError(String error) {
-                        if (callback != null) callback.onFailure(new Exception(error));
-                    }
+                    authExecutor.execute(() -> {
+                        SovereignIdentityAndDirectoryEngine engine = SovereignIdentityAndDirectoryEngine.getInstance(appCtx);
+                        SovereignProfileManifest manifest = engine.resolveProfileByUidBlocking(uid);
+                        if (manifest != null && isValidClaimedUsername(manifest.username, uid)) {
+                            engine.persistManifestLocally(manifest);
+                            User restored = new UserPreferences(appCtx).getCurrentUser();
+                            new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                                    callback.onResult(true, restored));
+                        } else {
+                            new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                                    callback.onResult(false, null));
+                        }
+                    });
                 });
     }
 
-    public void onSessionStarted(Context context, String uid) {
-        if (uid == null || uid.isEmpty()) return;
-        sCurrentUserId = uid;
-        sCurrentUser = new SessionUser(uid, "@" + uid, "", "");
-
-        try {
-            UserPreferences prefs = new UserPreferences(context);
-            com.m3.veil.model.User u = prefs.getCurrentUser();
-            if (u == null) {
-                u = new com.m3.veil.model.User(uid, "", "US");
-            }
-            u.setUserId(uid);
-            prefs.saveUser(u);
-            prefs.saveUserId(uid);
-        } catch (Throwable ignored) {}
-
-        try {
-            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).init(uid);
-            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).announceLocalProfile();
-        } catch (Throwable ignored) {}
-
-        // 1. Initialize WebRTC P2P Manager with authenticated UID
-        WebRtcManager.getInstance(context).init(uid);
-
-        // 2. Bring up Call Engine
-        try {
-            com.m3.veil.calling.CallEngine engine = com.m3.veil.calling.CallEngine.getInstance(context);
-            engine.init(uid);
-            com.m3.veil.model.Persona persona =
-                    com.m3.veil.manager.VeilFeatureManager.getInstance(context).getActivePersona();
-            if (persona != null && persona.getDisplayName() != null) {
-                engine.setDisplayName(persona.getDisplayName());
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Call engine init failed", e);
-        }
-
-        // 3. Register FCM Token if available
-        try {
-            FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
-                if (task.isSuccessful() && task.getResult() != null) {
-                    String token = task.getResult();
-                    java.util.Map<String, Object> tokenMap = new java.util.HashMap<>();
-                    tokenMap.put("userId", uid);
-                    tokenMap.put("fcmToken", token);
-                    db.collection("users").document(uid).set(tokenMap, com.m3.veil.bridge.firestore.SetOptions.merge());
-                }
-            });
-        } catch (Exception ignored) {}
-
-        // 4. Ensure E2EE keypair exists
-        try {
-            com.m3.veil.utils.EncryptionManager.generateKeyPair();
-            String pubKey = com.m3.veil.utils.EncryptionManager.getPublicKeyString();
-            if (pubKey != null) {
-                java.util.Map<String, Object> keyMap = new java.util.HashMap<>();
-                keyMap.put("userId", uid);
-                keyMap.put("publicKey", pubKey);
-                db.collection("users").document(uid).set(keyMap, com.m3.veil.bridge.firestore.SetOptions.merge());
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to sync user public key", e);
-        }
+    public void signOut(@NonNull Context context) {
+        logout(context);
     }
 
-    public void onSessionStarted(Context context, SessionUser user) {
-        if (user == null) return;
-        sCurrentUser = user;
-        onSessionStarted(context, user.getUid());
-    }
-
-    public void onSovereignSessionStarted(Context context, SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest) {
-        if (manifest == null || manifest.uid == null || manifest.uid.isEmpty()) return;
-        sCurrentUserId = manifest.uid;
-        sCurrentUser = new SessionUser(manifest.uid, manifest.displayName, "", manifest.phoneNumber != null ? manifest.phoneNumber : "");
-
-        try {
-            UserPreferences prefs = new UserPreferences(context);
-            com.m3.veil.model.User u = prefs.getCurrentUser();
-            if (u == null) {
-                u = new com.m3.veil.model.User(manifest.uid, manifest.phoneNumber != null ? manifest.phoneNumber : "", "US");
-            }
-            u.setUserId(manifest.uid);
-            if (manifest.displayName != null && !manifest.displayName.isEmpty()) {
-                u.setDisplayName(manifest.displayName);
-            }
-            if (manifest.username != null && !manifest.username.isEmpty()) {
-                u.setUsername(manifest.username);
-            }
-            prefs.saveUser(u);
-            prefs.saveUserId(manifest.uid);
-        } catch (Throwable t) {
-            Log.w(TAG, "Failed to persist sovereign session to UserPreferences", t);
+    public synchronized void logout(@NonNull Context context) {
+        if (isLoggingOut) {
+            return;
         }
+        isLoggingOut = true;
+        final Context appContext = context.getApplicationContext();
 
-        try {
-            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).init(manifest.uid);
-            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).announceLocalProfile();
-        } catch (Throwable ignored) {}
-
-        // 1. Initialize WebRTC P2P Manager with Sovereign UID
-        WebRtcManager.getInstance(context).init(manifest.uid);
-
-        // 2. Bring up Call Engine
-        try {
-            com.m3.veil.calling.CallEngine engine = com.m3.veil.calling.CallEngine.getInstance(context);
-            engine.init(manifest.uid);
-            if (manifest.displayName != null && !manifest.displayName.isEmpty()) {
-                engine.setDisplayName(manifest.displayName);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Call engine init failed for sovereign session", e);
-        }
-
-        // 3. Register FCM Token if available
-        try {
-            FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
-                if (task.isSuccessful() && task.getResult() != null) {
-                    String token = task.getResult();
-                    java.util.Map<String, Object> tokenMap = new java.util.HashMap<>();
-                    tokenMap.put("userId", manifest.uid);
-                    tokenMap.put("fcmToken", token);
-                    db.collection("users").document(manifest.uid).set(tokenMap, com.m3.veil.bridge.firestore.SetOptions.merge());
-                }
-            });
-        } catch (Exception ignored) {}
-
-        // 4. Ensure E2EE keypair exists
-        try {
-            com.m3.veil.utils.EncryptionManager.generateKeyPair();
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to ensure keypair for sovereign session", e);
-        }
-    }
-
-    public void onSovereignPhoneSessionStarted(Context context, String uid, String phoneNumber) {
-        if (uid == null || uid.isEmpty()) return;
-        sCurrentUserId = uid;
-        sCurrentUser = new SessionUser(uid, "@" + uid, "", phoneNumber);
-
-        try {
-            UserPreferences prefs = new UserPreferences(context);
-            com.m3.veil.model.User u = prefs.getCurrentUser();
-            if (u == null) {
-                u = new com.m3.veil.model.User(uid, phoneNumber, "US");
-            }
-            u.setUserId(uid);
-            prefs.saveUser(u);
-            prefs.saveUserId(uid);
-        } catch (Throwable ignored) {}
-
-        try {
-            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).init(uid);
-            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).announceLocalProfile();
-        } catch (Throwable ignored) {}
-
-        // 1. Initialize WebRTC P2P Manager
-        WebRtcManager.getInstance(context).init(uid);
-
-        // 2. Initialize Call Engine
-        try {
-            com.m3.veil.calling.CallEngine engine = com.m3.veil.calling.CallEngine.getInstance(context);
-            engine.init(uid);
-        } catch (Exception e) {
-            Log.e(TAG, "Call engine init failed for phone session", e);
-        }
-
-        // 3. Ensure E2EE keypair exists
-        try {
-            com.m3.veil.utils.EncryptionManager.generateKeyPair();
-        } catch (Exception ignored) {}
-    }
-
-    public void signOut(Context context) {
-        com.m3.veil.manager.PresenceManager.getInstance().markOfflineOnSignOut();
-        if (sCurrentUserId != null && !sCurrentUserId.isEmpty()) {
-            java.util.Map<String, Object> offlineMap = new java.util.HashMap<>();
-            offlineMap.put("status", "offline");
-            offlineMap.put("lastSeen", com.m3.veil.bridge.firestore.FieldValue.serverTimestamp());
+        authExecutor.execute(() -> {
             try {
-                db.collection("users").document(sCurrentUserId).update(offlineMap);
-            } catch (Exception ignored) {}
-        }
-        SignalingClient.getInstance().disconnect();
-        try {
-            com.m3.veil.calling.CallEngine.getInstance(context).shutdown();
-        } catch (Exception ignored) {}
-        try {
-            UserPreferences prefs = new UserPreferences(context);
-            prefs.clearUser();
-        } catch (Exception ignored) {}
-        sCurrentUserId = null;
-        sCurrentUser = null;
+                Log.i(TAG, "Starting atomic teardown of user session...");
+
+                try {
+                    SignalingClient.getInstance().disconnect();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error disconnecting SignalingClient", e);
+                }
+
+                try {
+                    WebRtcManager.getInstance(appContext).disconnectAll();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error disconnecting WebRtcManager", e);
+                }
+
+                try {
+                    VeilCallService.stop(appContext);
+                } catch (Exception ignored) {}
+
+                try {
+                    appContext.stopService(new Intent(appContext, VeilMeshDaemonService.class));
+                } catch (Exception ignored) {}
+
+                try {
+                    EncryptedChatDatabase.getInstance(appContext).secureWipeAllData();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error wiping EncryptedChatDatabase", e);
+                }
+
+                try {
+                    SovereignIdentityAndDirectoryEngine.getInstance(appContext).wipeIdentity();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error wiping SovereignIdentityAndDirectoryEngine", e);
+                }
+
+                try {
+                    new UserPreferences(appContext).clearUserData();
+                } catch (Exception ignored) {}
+
+                try {
+                    new PreferenceManager(appContext).clearAll();
+                } catch (Exception ignored) {}
+
+                try {
+                    FirebaseAuth.getInstance().signOut();
+                } catch (Exception ignored) {}
+
+                Intent intent = new Intent(appContext, SplashActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                appContext.startActivity(intent);
+            } finally {
+                isLoggingOut = false;
+            }
+        });
     }
 }

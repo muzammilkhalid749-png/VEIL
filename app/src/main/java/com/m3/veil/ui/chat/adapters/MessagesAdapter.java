@@ -20,6 +20,8 @@ import android.os.Looper;
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.firebase.auth.FirebaseAuth;
 import com.m3.veil.R;
 import com.m3.veil.model.Message;
 import com.m3.veil.ui.chat.MediaViewerActivity;
@@ -242,8 +244,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     public MessagesAdapter(List<Message> messages, OnMessageLongClickListener longClickListener, OnReactionClickListener reactionClickListener) {
         this.messages = messages;
         this.currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(com.m3.veil.VeilApplication.getInstance());
-        if (this.currentUserId == null) {
-            this.currentUserId = "";
+        if (this.currentUserId == null || this.currentUserId.isEmpty()) {
+            this.currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null 
+                    ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
         }
         this.timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
         this.longClickListener = longClickListener;
@@ -361,7 +364,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 || cal1.get(java.util.Calendar.DAY_OF_YEAR) != cal2.get(java.util.Calendar.DAY_OF_YEAR);
     }
 
-    private String formatDateHeader(com.m3.veil.model.Timestamp timestamp) {
+    private String formatDateHeader(com.google.firebase.Timestamp timestamp) {
         if (timestamp == null) return "";
         java.util.Calendar msgCal = java.util.Calendar.getInstance();
         msgCal.setTime(timestamp.toDate());

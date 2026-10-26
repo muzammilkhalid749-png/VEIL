@@ -1,241 +1,361 @@
 package com.m3.veil.calling;
 
+import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
-import com.m3.veil.bridge.firestore.DocumentChange;
-import com.m3.veil.bridge.firestore.FieldValue;
-import com.m3.veil.bridge.firestore.FirebaseFirestore;
-import com.m3.veil.bridge.firestore.ListenerRegistration;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.google.firebase.firestore.DocumentChange;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.m3.veil.VeilApplication;
+import com.m3.veil.utils.SovereignIdentityAndDirectoryEngine;
+
+import org.json.JSONObject;
+import org.webrtc.IceCandidate;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 /**
- * Durable call signaling transport.
- *
- * <p>Each user owns the Firestore collection
- * {@code users/{uid}/call_signals}. Signals are addressed by writing into the
- * recipient's collection, so no server code is required and delivery survives
- * process death / offline periods. Once a call is ACTIVE the engine additionally
- * mirrors control signals over the call DataChannel so reactions, raise-hand,
- * DTMF and video-upgrade requests do not pay a server round-trip.
- *
- * <p>This replaces the legacy single-listener, call-invite-only path and adds
- * proper dedup, TTL cleanup and per-call correlation.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════════
+ * VEIL VOIP CALL SIGNALING TRANSPORT (SIGNAL SMART-HYBRID DUAL-PATH)
+ * ═════════════════════════════════════════════════════════════════════════════════════════════════
+ * 1. Primary Channel: Firebase Firestore ("users/{uid}/call_signals") for 100% reliable VoIP
+ *    invite, ringing, accept, SDP offer/answer, and ICE candidate delivery.
+ * 2. Zero-Footprint Ephemeral Deletion: Every call signal document is deleted from Firestore
+ *    immediately upon receipt ("doc.getReference().delete()").
+ * 3. Blind FCM Wake Push: Automatically invokes FcmCallPusher.pushCallSignal(...) on INVITE,
+ *    END, DECLINE, and VIDEO_UPGRADE_REQUEST so sleeping phones wake in <200ms.
+ * 4. Secondary Fast-Path: Parallel Nostr / WebSocket ephemeral relay dispatch.
+ * ═════════════════════════════════════════════════════════════════════════════════════════════════
  */
 public class CallSignaling {
 
     private static final String TAG = "CallSignaling";
-    private static final String COLLECTION = "call_signals";
-    private static final long SEEN_CAPACITY = 1024L;
+    private static final long MAX_SIGNAL_AGE_MS = 60_000L;
+    private static final long MAX_INVITE_AGE_MS = 45_000L;
 
     public interface Listener {
         void onSignal(CallSignal signal);
     }
 
-    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
+    private Context context;
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
-    private final Set<String> seenDocIds = Collections.synchronizedSet(
-            Collections.newSetFromMap(new LinkedHashMap<String, Boolean>(256, 0.75f, true) {
-                @Override protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
-                    return size() > SEEN_CAPACITY;
-                }
-            }));
-    private final Executor io = Executors.newSingleThreadExecutor();
+    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final Set<String> processedIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    private volatile String uid;
-    private android.content.Context context;
     private ListenerRegistration registration;
+    private String myUid;
 
-    public void setContext(android.content.Context context) {
+    public CallSignaling() {
+        this.context = VeilApplication.getInstance();
+    }
+
+    public CallSignaling(@Nullable Listener initialListener) {
+        this.context = VeilApplication.getInstance();
+        if (initialListener != null) {
+            this.listeners.add(initialListener);
+        }
+    }
+
+    public void setContext(Context context) {
         if (context != null) {
             this.context = context.getApplicationContext();
         }
     }
 
     public void addListener(Listener listener) {
-        if (listener != null && !listeners.contains(listener)) listeners.add(listener);
+        if (listener != null && !listeners.contains(listener)) {
+            listeners.add(listener);
+        }
     }
 
     public void removeListener(Listener listener) {
-        listeners.remove(listener);
+        if (listener != null) {
+            listeners.remove(listener);
+        }
     }
 
-    public synchronized void start(String userId) {
-        if (userId == null) return;
-        if (userId.equals(uid) && registration != null) return;
-        stop();
-        this.uid = userId;
-
-        // 1. Instant ephemeral signal subscription via Universal Signaling Relay (<50ms)
-        android.content.Context ctx = context != null ? context : com.m3.veil.VeilApplication.getInstance();
-        if (ctx != null) {
-            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(ctx)
-                    .start(userId, (type, fromUid, payload) -> {
-                        if (fromUid == null || fromUid.equals(userId) || payload == null) return;
-                        String docId = payload.optString("sigId", type + "_" + fromUid + "_" + payload.optLong("timestamp", System.currentTimeMillis()));
-                        if (!seenDocIds.add(docId)) return;
-
-                        CallSignal signal = null;
-                        String rawEncoded = payload.optString("signal", null);
-                        if (rawEncoded != null) {
-                            signal = CallSignal.decode(rawEncoded);
-                        }
-                        if (signal == null) {
-                            signal = CallSignal.decode(payload.toString());
-                        }
-                        if (signal != null) {
-                            dispatch(signal);
-                        }
-                    });
+    public void start(String myUid) {
+        if (myUid == null || myUid.trim().isEmpty()) {
+            return;
         }
+        String cleanUid = myUid.trim();
+        if (cleanUid.equals(this.myUid) && this.registration != null) {
+            return;
+        }
+        stop();
+        this.myUid = cleanUid;
 
-        registration = db.collection("users").document(userId).collection(COLLECTION)
+        purgeStaleCallSignals(cleanUid);
+
+        // 1. Primary Channel: Firestore real-time listener on "users/{myUid}/call_signals"
+        this.registration = this.db.collection("users")
+                .document(this.myUid)
+                .collection("call_signals")
                 .addSnapshotListener((snapshots, error) -> {
-                    if (error != null) {
-                        Log.w(TAG, "signal listener error: " + error.getMessage());
+                    if (error != null || snapshots == null) {
                         return;
                     }
-                    if (snapshots == null) return;
-                    java.util.List<CallSignal> batch = new java.util.ArrayList<>();
-                    for (DocumentChange change : snapshots.getDocumentChanges()) {
-                        if (change.getType() == DocumentChange.Type.REMOVED) continue;
-                        String docId = change.getDocument().getId();
-                        if (!seenDocIds.add(docId)) continue;
-                        Map<String, Object> raw = change.getDocument().getData();
-                        Object encoded = raw.get("signal");
-                        String json = encoded instanceof String ? (String) encoded : null;
-                        if (json == null) {
-                            // expanded form: rebuild the envelope from raw fields
-                            org.json.JSONObject rebuilt = new org.json.JSONObject();
-                            try {
-                                for (Map.Entry<String, Object> e : raw.entrySet()) {
-                                    rebuilt.put(e.getKey(), e.getValue());
-                                }
-                            } catch (Exception ignored) { }
-                            json = rebuilt.toString();
+                    long now = System.currentTimeMillis();
+                    for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                        if (dc.getType() != DocumentChange.Type.ADDED
+                                && dc.getType() != DocumentChange.Type.MODIFIED) {
+                            continue;
                         }
-                        CallSignal signal = CallSignal.decode(json);
-                        if (signal == null) continue;
-                        batch.add(signal);
-                        // best-effort cleanup so the mailbox never grows unbounded
-                        final String id = docId;
-                        final String owner = userId;
-                        io.execute(() -> {
-                            try {
-                                db.collection("users").document(owner).collection(COLLECTION)
-                                        .document(id).delete();
-                            } catch (Exception ignored) { }
-                        });
+                        DocumentSnapshot doc = dc.getDocument();
+                        // Immediately delete ephemeral call signal document from Firestore
+                        doc.getReference().delete();
+
+                        if (!this.processedIds.add(doc.getId())) {
+                            continue;
+                        }
+
+                        try {
+                            String raw = doc.getString("raw");
+                            CallSignal sig = (raw != null && !raw.isEmpty())
+                                    ? CallSignal.decode(raw)
+                                    : decodeFromDocumentFields(doc);
+
+                            if (sig == null || sig.type == null || sig.from == null) {
+                                continue;
+                            }
+                            if (sig.from.equals(this.myUid)) {
+                                continue;
+                            }
+
+                            long age = now - sig.timestamp;
+                            long maxAge = CallSignal.INVITE.equals(sig.type)
+                                    ? MAX_INVITE_AGE_MS : MAX_SIGNAL_AGE_MS;
+                            if (age > maxAge) {
+                                continue;
+                            }
+
+                            String dedupKey = sig.callId + "_" + sig.type + "_" + sig.timestamp;
+                            this.processedIds.add(dedupKey);
+                            dispatchSignalToListeners(sig);
+                        } catch (Exception ex) {
+                            Log.e(TAG, "Failed to parse Firestore call signal", ex);
+                        }
                     }
-                    // Deliver in the order the sender produced them: a queued
-                    // INVITE must never overtake its matching END.
-                    batch.sort((x, y) -> Long.compare(x.timestamp, y.timestamp));
-                    for (CallSignal signal : batch) dispatch(signal);
                 });
-        Log.i(TAG, "call signaling started for " + userId);
-    }
 
-    private void dispatch(CallSignal signal) {
-        for (Listener l : listeners) {
-            try {
-                l.onSignal(signal);
-            } catch (Exception e) {
-                Log.e(TAG, "signal listener crashed", e);
-            }
-        }
-    }
-
-    public synchronized void stop() {
-        if (registration != null) {
-            registration.remove();
-            registration = null;
-        }
-        seenDocIds.clear();
-    }
-
-    public String getUid() {
-        return uid;
-    }
-
-    /** Sends to {@link CallSignal#to}. */
-    public void send(CallSignal signal) {
-        if (signal == null || signal.to == null) return;
-        sendTo(signal.to, signal);
-    }
-
-    public void sendTo(String targetUid, CallSignal signal) {
-        if (targetUid == null) return;
-        signal.to = targetUid;
-
-        // 1. Instant ephemeral signaling via Universal Signaling Relay (UDP LAN + MQTT + Nostr)
-        android.content.Context ctx = context != null ? context : com.m3.veil.VeilApplication.getInstance();
-        if (ctx != null) {
-            try {
-                org.json.JSONObject payload = new org.json.JSONObject();
-                payload.put("signal", signal.encode());
-                payload.put("type", signal.type);
-                payload.put("callId", signal.callId);
-                payload.put("from", signal.from);
-                payload.put("fromName", signal.fromName);
-                payload.put("callType", signal.callType);
-                payload.put("timestamp", System.currentTimeMillis());
-                payload.put("sigId", signal.type + "_" + signal.from + "_" + signal.callId + "_" + System.currentTimeMillis());
-                com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(ctx)
-                        .sendSignal(targetUid, signal.type, payload);
-            } catch (Exception ignored) {}
-        }
-
-        // 2. Best-effort Firestore write if Firebase is present
+        // 2. Secondary Fast-Path: Decentralized WebSocket / Nostr ephemeral signal subscription
         try {
-            Map<String, Object> doc = new HashMap<>();
-            doc.put("signal", signal.encode());
-            doc.put("type", signal.type);
-            doc.put("callId", signal.callId);
-            doc.put("from", signal.from);
-            doc.put("createdAt", FieldValue.serverTimestamp());
-            doc.put("timestamp", System.currentTimeMillis());
-            db.collection("users").document(targetUid).collection(COLLECTION)
-                    .add(doc)
-                    .addOnFailureListener(e -> Log.w(TAG, "failed to send " + signal.type + ": " + e.getMessage()));
-        } catch (Throwable ignored) {}
+            Context ctx = resolveContext();
+            if (ctx != null) {
+                SovereignIdentityAndDirectoryEngine.getInstance(ctx)
+                        .subscribeToIncomingSignals(cleanUid, (type, fromUid, payload) -> {
+                            if (!"call_signal".equals(type) || payload == null) return;
+                            String raw = payload.optString("raw", null);
+                            if (raw == null || raw.isEmpty()) return;
+                            CallSignal sig = CallSignal.decode(raw);
+                            if (sig == null || sig.type == null || sig.from == null) return;
+                            if (sig.from.equals(this.myUid)) return;
 
-        // Also dispatch direct high-priority FCM push to instantly wake callee if backgrounded/killed
-        if (context != null) {
-            String signalType = null;
-            if (CallSignal.INVITE.equals(signal.type)) {
-                signalType = "call_wake";
-            } else if (CallSignal.END.equals(signal.type) || CallSignal.DECLINE.equals(signal.type)) {
-                signalType = "call_end";
-            } else if (CallSignal.VIDEO_UPGRADE_REQUEST.equals(signal.type)) {
-                signalType = "call_upgrade";
+                            String dedupKey = sig.callId + "_" + sig.type + "_" + sig.timestamp;
+                            if (!this.processedIds.add(dedupKey)) return;
+
+                            long age = System.currentTimeMillis() - sig.timestamp;
+                            long maxAge = CallSignal.INVITE.equals(sig.type)
+                                    ? MAX_INVITE_AGE_MS : MAX_SIGNAL_AGE_MS;
+                            if (age > maxAge) return;
+
+                            dispatchSignalToListeners(sig);
+                        });
             }
-            if (signalType != null) {
+        } catch (Exception e) {
+            Log.d(TAG, "WebSocket call signal fallback notice: " + e.getMessage());
+        }
+    }
+
+    private void dispatchSignalToListeners(@NonNull CallSignal sig) {
+        this.main.post(() -> {
+            for (Listener l : this.listeners) {
+                try {
+                    l.onSignal(sig);
+                } catch (Throwable t) {
+                    Log.w(TAG, "Error in CallSignaling listener", t);
+                }
+            }
+        });
+    }
+
+    private Context resolveContext() {
+        return this.context != null ? this.context : VeilApplication.getInstance();
+    }
+
+    private CallSignal decodeFromDocumentFields(DocumentSnapshot doc) {
+        try {
+            String typeWire = doc.getString("type");
+            String callId = doc.getString("callId");
+            String from = doc.getString("from");
+            if (typeWire == null || callId == null || from == null) return null;
+
+            CallSignal s = CallSignal.of(typeWire, callId, from).to(this.myUid);
+            s.fromName = doc.getString("fromName");
+            if (s.fromName == null) s.fromName = doc.getString("callerName");
+            String ct = doc.getString("callType");
+            if (ct != null) s.callType = ct;
+            s.sdpType = doc.getString("sdpType");
+            s.sdp = doc.getString("sdp");
+            s.candidateMid = doc.getString("candidateMid");
+            Long line = doc.getLong("candidateLine");
+            if (line != null) s.candidateLine = line.intValue();
+            s.candidateSdp = doc.getString("candidateSdp");
+            s.e2eeKeyB64 = doc.getString("e2eeKey");
+            Long keyIdx = doc.getLong("e2eeKeyIndex");
+            if (keyIdx != null) s.e2eeKeyIndex = keyIdx.intValue();
+            s.groupId = doc.getString("groupId");
+            s.groupName = doc.getString("groupName");
+            s.payload = doc.getString("payload");
+            Long ts = doc.getLong("ts");
+            if (ts == null) ts = doc.getLong("timestamp");
+            if (ts != null) s.timestamp = ts;
+            return s;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void purgeStaleCallSignals(String uid) {
+        try {
+            this.db.collection("users")
+                    .document(uid)
+                    .collection("call_signals")
+                    .limit(50)
+                    .get()
+                    .addOnSuccessListener(snapshots -> {
+                        if (snapshots == null) return;
+                        long cutoff = System.currentTimeMillis() - MAX_SIGNAL_AGE_MS;
+                        for (DocumentSnapshot doc : snapshots.getDocuments()) {
+                            Long ts = doc.getLong("ts");
+                            if (ts == null) ts = doc.getLong("timestamp");
+                            if (ts == null || ts < cutoff) {
+                                doc.getReference().delete();
+                            }
+                        }
+                    });
+        } catch (Exception ignored) {}
+    }
+
+    public void stop() {
+        if (this.registration != null) {
+            this.registration.remove();
+            this.registration = null;
+        }
+        this.myUid = null;
+        this.processedIds.clear();
+    }
+
+    public void send(CallSignal sig) {
+        if (sig == null || sig.to == null || sig.to.isEmpty()) {
+            return;
+        }
+        if (sig.from == null || sig.from.isEmpty()) {
+            sig.from = this.myUid;
+        }
+
+        final String rawJson = sig.encode();
+        final String docId = UUID.randomUUID().toString();
+
+        // 1. Primary Path: Write to Firestore "users/{to}/call_signals/{docId}"
+        Map<String, Object> doc = new HashMap<>();
+        doc.put("raw", rawJson);
+        doc.put("type", sig.type != null ? sig.type : "");
+        doc.put("callId", sig.callId != null ? sig.callId : "");
+        doc.put("from", sig.from != null ? sig.from : "");
+        doc.put("fromName", sig.fromName != null ? sig.fromName : "Veil Peer");
+        doc.put("callType", sig.callType != null ? sig.callType : "audio");
+        doc.put("ts", sig.timestamp);
+        doc.put("timestamp", sig.timestamp);
+
+        this.db.collection("users")
+                .document(sig.to)
+                .collection("call_signals")
+                .document(docId)
+                .set(doc)
+                .addOnFailureListener(e -> Log.w(TAG, "Firestore call signal write notice: " + e.getMessage()));
+
+        // Auto-expire unconsumed signal document after 45 seconds for zero cloud footprint
+        this.main.postDelayed(() -> {
+            try {
+                this.db.collection("users")
+                        .document(sig.to)
+                        .collection("call_signals")
+                        .document(docId)
+                        .delete();
+            } catch (Exception ignored) {}
+        }, MAX_INVITE_AGE_MS);
+
+        // 2. Blind FCM Wake Push for INVITE / END / DECLINE / VIDEO_UPGRADE_REQUEST
+        Context ctx = resolveContext();
+        if (ctx != null) {
+            if (CallSignal.INVITE.equals(sig.type) || CallSignal.GROUP_INVITE.equals(sig.type)) {
                 FcmCallPusher.pushCallSignal(
-                        context,
-                        targetUid,
-                        signalType,
-                        signal.callId,
-                        signal.from,
-                        signal.fromName,
-                        signal.callType
+                        ctx,
+                        sig.to,
+                        "call_wake",
+                        sig.callId != null ? sig.callId : "",
+                        sig.from != null ? sig.from : "",
+                        sig.fromName != null ? sig.fromName : "Incoming Call",
+                        sig.callType != null ? sig.callType : "audio"
+                );
+            } else if (CallSignal.END.equals(sig.type) || CallSignal.DECLINE.equals(sig.type)) {
+                FcmCallPusher.pushCallSignal(
+                        ctx,
+                        sig.to,
+                        "call_end",
+                        sig.callId != null ? sig.callId : "",
+                        sig.from != null ? sig.from : "",
+                        sig.fromName != null ? sig.fromName : "Call Ended",
+                        sig.callType != null ? sig.callType : "audio"
+                );
+            } else if (CallSignal.VIDEO_UPGRADE_REQUEST.equals(sig.type)) {
+                FcmCallPusher.pushCallSignal(
+                        ctx,
+                        sig.to,
+                        "call_upgrade",
+                        sig.callId != null ? sig.callId : "",
+                        sig.from != null ? sig.from : "",
+                        sig.fromName != null ? sig.fromName : "Video Upgrade",
+                        "video"
                 );
             }
         }
+
+        // 3. Secondary Fast-Path: Parallel WebSocket / Nostr ephemeral signal
+        try {
+            if (ctx != null) {
+                JSONObject payload = new JSONObject();
+                payload.put("type", "call_signal");
+                payload.put("from", sig.from != null ? sig.from : "");
+                payload.put("raw", rawJson);
+                payload.put("ts", sig.timestamp);
+                SovereignIdentityAndDirectoryEngine.getInstance(ctx)
+                        .sendEphemeralSignal(sig.to, payload, null);
+            }
+        } catch (Exception ignored) {}
     }
 
-    public void sendToAll(List<String> targetUids, CallSignal signal) {
-        if (targetUids == null) return;
-        for (String target : targetUids) {
-            if (target == null || target.equals(signal.from)) continue;
-            sendTo(target, signal);
-        }
+    public void sendCandidate(String callId, String toUid, IceCandidate c) {
+        if (c == null) return;
+        CallSignal s = CallSignal.of(CallSignal.CANDIDATE, callId, this.myUid).to(toUid);
+        s.candidateMid = c.sdpMid != null ? c.sdpMid : "0";
+        s.candidateLine = c.sdpMLineIndex;
+        s.candidateSdp = c.sdp;
+        send(s);
     }
 }

@@ -14,7 +14,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import com.m3.veil.model.Timestamp;
+import com.google.firebase.Timestamp;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.model.CallRecord;
 
@@ -101,7 +101,8 @@ public class CallEngine implements CallSignaling.Listener {
      */
     public enum CallTopology {
         DIRECT_P2P_MESH,
-        SFRAME_RELAY_OVERLAY
+        SFRAME_RELAY_OVERLAY,
+        CASCADED_P2P_TREE
     }
 
     public interface CallLogSink {
@@ -389,7 +390,7 @@ public class CallEngine implements CallSignaling.Listener {
      */
     private void loadTurnConfig() {
         try {
-            com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
                     .collection("config").document("webrtc")
                     .get()
                     .addOnSuccessListener(doc -> {
@@ -450,10 +451,12 @@ public class CallEngine implements CallSignaling.Listener {
                 this.displayName = manifest.displayName.trim();
                 return this.displayName;
             }
-            String fName = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserName(context);
-            if (fName != null && !fName.trim().isEmpty() && !isSelfName(fName)) {
-                this.displayName = fName.trim();
-                return this.displayName;
+            if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                String fName = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getDisplayName();
+                if (fName != null && !fName.trim().isEmpty() && !isSelfName(fName)) {
+                    this.displayName = fName.trim();
+                    return this.displayName;
+                }
             }
         } catch (Throwable ignored) {}
         return "Veil User";
@@ -2419,7 +2422,7 @@ public class CallEngine implements CallSignaling.Listener {
     public void evaluateTopologyScaling() {
         int totalParticipants = peers.size() + 1; // including self
         CallTopology newTopology = (totalParticipants >= 5)
-                ? CallTopology.SFRAME_RELAY_OVERLAY
+                ? CallTopology.CASCADED_P2P_TREE
                 : CallTopology.DIRECT_P2P_MESH;
 
         if (topology != newTopology) {
@@ -2428,8 +2431,22 @@ public class CallEngine implements CallSignaling.Listener {
             Log.i(TAG, "Group Call Topology transitioned: " + oldTopology + " -> " + newTopology
                     + " (" + totalParticipants + " participants in call)");
 
-            if (newTopology == CallTopology.SFRAME_RELAY_OVERLAY) {
+            if (newTopology == CallTopology.CASCADED_P2P_TREE || newTopology == CallTopology.SFRAME_RELAY_OVERLAY) {
                 applySFrameRelayOverlaySettings();
+                try {
+                    boolean isHighSpec = com.m3.veil.utils.VeilPerformanceController.getInstance().isHighEndDevice();
+                    long selfBwKbps = isHighSpec ? 3500L : 800L;
+                    long selfRttMs = stats != null && stats.roundTripTimeMs > 0 ? (long) stats.roundTripTimeMs : 35L;
+                    List<com.m3.veil.webrtc.SovereignNatTraversalEngine.CascadedGroupNode> nodes = new ArrayList<>();
+                    nodes.add(new com.m3.veil.webrtc.SovereignNatTraversalEngine.CascadedGroupNode(
+                            currentUserId != null ? currentUserId : "local", selfBwKbps, selfRttMs));
+                    for (Peer p : peers.values()) {
+                        nodes.add(new com.m3.veil.webrtc.SovereignNatTraversalEngine.CascadedGroupNode(
+                                p.peerId, 2000L, 45L));
+                    }
+                    com.m3.veil.webrtc.SovereignNatTraversalEngine.getInstance(context)
+                            .electGroupCallStemRelayer(callId != null ? callId : "group_call", nodes);
+                } catch (Throwable ignored) { }
             } else {
                 restoreDirectMeshSettings();
             }

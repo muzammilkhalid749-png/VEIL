@@ -6,7 +6,7 @@ public class Chat {
     private String id;
     private String name;
     private String lastMessage;
-    private com.m3.veil.model.Timestamp lastMessageTime;
+    private com.google.firebase.Timestamp lastMessageTime;
     private String avatar;
     private int unreadCount;
     private long vanishTimer; // 0 = off, else millis
@@ -45,7 +45,7 @@ public class Chat {
 
     public Chat() {}
 
-    public Chat(String id, String name, String lastMessage, com.m3.veil.model.Timestamp lastMessageTime,
+    public Chat(String id, String name, String lastMessage, com.google.firebase.Timestamp lastMessageTime,
                 String avatar, int unreadCount, boolean isGroup, boolean isOnline, String type, java.util.List<String> participants) {
         this.id = id;
         this.name = name;
@@ -70,8 +70,8 @@ public class Chat {
     public String getLastMessage() { return lastMessage; }
     public void setLastMessage(String lastMessage) { this.lastMessage = lastMessage; }
 
-    public com.m3.veil.model.Timestamp getLastMessageTime() { return lastMessageTime; }
-    public void setLastMessageTime(com.m3.veil.model.Timestamp lastMessageTime) { this.lastMessageTime = lastMessageTime; }
+    public com.google.firebase.Timestamp getLastMessageTime() { return lastMessageTime; }
+    public void setLastMessageTime(com.google.firebase.Timestamp lastMessageTime) { this.lastMessageTime = lastMessageTime; }
 
     public String getAvatar() { return avatar; }
     public void setAvatar(String avatar) { this.avatar = avatar; }

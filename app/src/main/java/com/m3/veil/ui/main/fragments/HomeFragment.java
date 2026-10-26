@@ -36,6 +36,7 @@ import androidx.recyclerview.widget.SimpleItemAnimator;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.snackbar.Snackbar;
+import com.google.firebase.auth.FirebaseAuth;
 import com.m3.veil.R;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.manager.VeilFeatureManager;
@@ -68,8 +69,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     private View secretVaultRow;
     private TextView secretVaultCount;
     private View secretVaultDivider;
-    private com.m3.veil.bridge.firestore.ListenerRegistration groupsListenerRegistration;
-    private com.m3.veil.bridge.firestore.ListenerRegistration directChatsListenerRegistration;
+    private com.google.firebase.firestore.ListenerRegistration groupsListenerRegistration;
+    private com.google.firebase.firestore.ListenerRegistration directChatsListenerRegistration;
 
     private TextView btnActivePersona;
     private TextView tvMeshStatusPill;
@@ -1083,7 +1084,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
             WebRtcManager.getInstance(requireContext()).fetchAndProcessOfflineInboxOnce(uid);
             if (groupsListenerRegistration == null) {
-                groupsListenerRegistration = com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
+                groupsListenerRegistration = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                         .collection("groups")
                         .whereArrayContains("participants", uid)
                         .addSnapshotListener((snapshots, error) -> {
@@ -1092,7 +1093,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                             java.util.Set<String> deletedGroups = requireContext()
                                     .getSharedPreferences("VeilPrefs", 0)
                                     .getStringSet("deleted_group_ids", new java.util.HashSet<>());
-                            for (com.m3.veil.bridge.firestore.DocumentSnapshot doc : snapshots.getDocuments()) {
+                            for (com.google.firebase.firestore.DocumentSnapshot doc : snapshots.getDocuments()) {
                                 String gId = doc.getString("groupId");
                                 if (gId == null) gId = doc.getId();
                                 if (deletedGroups != null && deletedGroups.contains(gId)) continue;
@@ -1116,8 +1117,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                 java.util.List<String> parts = (java.util.List<String>) doc.get("participants");
                                 @SuppressWarnings("unchecked")
                                 java.util.List<String> adminIds = (java.util.List<String>) doc.get("adminIds");
-                                com.m3.veil.model.Timestamp ts = doc.getTimestamp("timestamp");
-                                if (ts == null) ts = com.m3.veil.model.Timestamp.now();
+                                com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
+                                if (ts == null) ts = com.google.firebase.Timestamp.now();
 
                                 String peerId = null;
                                 if (parts != null) {
@@ -1197,7 +1198,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                 if (isDirectChat && peerId != null && (chatTitle == null || "Veil User".equals(chatTitle))) {
                                     final String fPeerId = peerId;
                                     final String fGId = gId;
-                                    com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
+                                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                             .collection("users").document(fPeerId).get()
                                             .addOnSuccessListener(userDoc -> {
                                                 if (userDoc != null && userDoc.exists() && getContext() != null) {
@@ -1226,17 +1227,17 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
                                 // Sync recent group messages from Firestore so offline/multi-device members receive everything
                                 final String finalGroupId = gId;
-                                com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
+                                com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                         .collection("groups")
                                         .document(finalGroupId)
                                         .collection("messages")
-                                        .orderBy("timestamp", com.m3.veil.bridge.firestore.Query.Direction.DESCENDING)
+                                        .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                                         .limit(40)
                                         .get()
                                         .addOnSuccessListener(msgSnaps -> {
                                             if (msgSnaps == null || getContext() == null) return;
                                             boolean anyNewMsg = false;
-                                            for (com.m3.veil.bridge.firestore.DocumentSnapshot mDoc : msgSnaps.getDocuments()) {
+                                            for (com.google.firebase.firestore.DocumentSnapshot mDoc : msgSnaps.getDocuments()) {
                                                 try {
                                                     String mId = mDoc.getString("id");
                                                 if (mId == null) mId = mDoc.getId();
@@ -1254,7 +1255,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 String sId = mDoc.getString("senderId");
                                                 if (existingMsg == null) {
                                                     String sName = mDoc.getString("senderName");
-                                                    com.m3.veil.model.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.m3.veil.model.Timestamp.now());
+                                                    com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
                                                     com.m3.veil.model.Message m = new com.m3.veil.model.Message(
                                                             mId,
                                                             sId != null ? sId : "",
@@ -1279,7 +1280,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                     if (!isFromMe) {
                                                         java.util.Map<String, Object> ack = new java.util.HashMap<>();
                                                         ack.put("delivered", true);
-                                                        mDoc.getReference().set(ack, com.m3.veil.bridge.firestore.SetOptions.merge());
+                                                        mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
                                                         if (sId != null && !sId.isEmpty()) {
                                                             WebRtcManager.getInstance(requireContext()).sendReceipt(sId, mId, true, false);
                                                         }
@@ -1292,7 +1293,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                 .updateMessageStatus(mId, true, existingMsg.isRead());
                                                         java.util.Map<String, Object> ack = new java.util.HashMap<>();
                                                         ack.put("delivered", true);
-                                                        mDoc.getReference().set(ack, com.m3.veil.bridge.firestore.SetOptions.merge());
+                                                        mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
                                                     }
                                                     boolean msgChanged = false;
                                                     if ("deleted".equals(mType) && !"deleted".equals(existingMsg.getType())) {
@@ -1324,13 +1325,13 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             }
 
             if (directChatsListenerRegistration == null) {
-                directChatsListenerRegistration = com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
+                directChatsListenerRegistration = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                         .collection("chats")
                         .whereArrayContains("participants", uid)
                         .addSnapshotListener((snapshots, error) -> {
                             if (error != null || snapshots == null || getContext() == null) return;
                             boolean updated = false;
-                            for (com.m3.veil.bridge.firestore.DocumentSnapshot doc : snapshots.getDocuments()) {
+                            for (com.google.firebase.firestore.DocumentSnapshot doc : snapshots.getDocuments()) {
                                 String cId = doc.getString("chatId");
                                 if (cId == null) cId = doc.getId();
                                 @SuppressWarnings("unchecked")
@@ -1353,8 +1354,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                 if (peerId == null) continue;
 
                                 String lastMsg = doc.getString("lastMessage");
-                                com.m3.veil.model.Timestamp ts = doc.getTimestamp("timestamp");
-                                if (ts == null) ts = com.m3.veil.model.Timestamp.now();
+                                com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
+                                if (ts == null) ts = com.google.firebase.Timestamp.now();
 
                                 Chat existing = EncryptedChatDatabase.getInstance(requireContext()).getChat(cId);
                                 if (existing == null) {
@@ -1377,17 +1378,17 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                 // Sync recent messages for this 1-on-1 chat
                                 final String finalChatId = cId;
                                 final String finalPeerId = peerId;
-                                com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
+                                com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                         .collection("chats")
                                         .document(finalChatId)
                                         .collection("messages")
-                                        .orderBy("timestamp", com.m3.veil.bridge.firestore.Query.Direction.DESCENDING)
+                                        .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                                         .limit(30)
                                         .get()
                                         .addOnSuccessListener(msgSnaps -> {
                                             if (msgSnaps == null || getContext() == null) return;
                                             boolean anyNew = false;
-                                            for (com.m3.veil.bridge.firestore.DocumentSnapshot mDoc : msgSnaps.getDocuments()) {
+                                            for (com.google.firebase.firestore.DocumentSnapshot mDoc : msgSnaps.getDocuments()) {
                                                 try {
                                                     String mId = mDoc.getString("id");
                                                     if (mId == null) mId = mDoc.getId();
@@ -1399,7 +1400,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                     }
                                                     String sId = mDoc.getString("senderId");
                                                     String sName = mDoc.getString("senderName");
-                                                    com.m3.veil.model.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.m3.veil.model.Timestamp.now());
+                                                    com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
 
                                                     if (existingMsg == null) {
                                                         com.m3.veil.model.Message m = new com.m3.veil.model.Message(
@@ -2211,9 +2212,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                     delSet.add(deletedId);
                     prefs.edit().putStringSet("deleted_group_ids", delSet).apply();
                     if (currentUserId != null && !currentUserId.isEmpty()) {
-                        com.m3.veil.bridge.firestore.FirebaseFirestore.getInstance()
+                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                 .collection("groups").document(deletedId)
-                                .update("participants", com.m3.veil.bridge.firestore.FieldValue.arrayRemove(currentUserId));
+                                .update("participants", com.google.firebase.firestore.FieldValue.arrayRemove(currentUserId));
                     }
                 }
                 com.m3.veil.manager.VeilMessagesController.getInstance(requireContext()).removeDialogFromCache(deletedId);

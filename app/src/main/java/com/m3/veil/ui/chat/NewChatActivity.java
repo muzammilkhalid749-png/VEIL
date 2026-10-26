@@ -2,7 +2,6 @@ package com.m3.veil.ui.chat;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
@@ -23,11 +22,12 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
-import com.m3.veil.model.Timestamp;
-import com.m3.veil.bridge.firestore.DocumentSnapshot;
-import com.m3.veil.bridge.firestore.FieldValue;
-import com.m3.veil.bridge.firestore.FirebaseFirestore;
-import com.m3.veil.bridge.firestore.ListenerRegistration;
+import com.google.firebase.Timestamp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.m3.veil.R;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.manager.VeilFeatureManager;
@@ -58,7 +58,6 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
 
     private FirebaseFirestore db;
     private String currentUserId;
-    private com.m3.veil.webrtc.UniversalSignalingRelay.DirectoryListener directoryListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,38 +75,14 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
         if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = "veil_anonymous";
         }
-        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
-            com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this, currentUserId);
-        }
-        if (!"veil_anonymous".equals(currentUserId)) {
-            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).init(currentUserId);
-            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).announceLocalProfile();
-            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).sendDirectoryProbe("");
+        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+            com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this, FirebaseAuth.getInstance().getCurrentUser());
         }
 
         initializeViews();
         handleWindowInsets();
         setupRecyclerView();
         setupSearchListener();
-
-        directoryListener = manifest -> {
-            if (manifest == null || manifest.uid == null || manifest.uid.equals(currentUserId)) return;
-            runOnUiThread(() -> {
-                boolean exists = false;
-                for (User u : userList) {
-                    if (manifest.uid.equals(u.getUserId())) { exists = true; break; }
-                }
-                if (!exists) {
-                    User nu = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).manifestToUser(manifest);
-                    if (nu != null) {
-                        userList.add(0, nu);
-                        usersAdapter.notifyDataSetChanged();
-                        updateEmptyState();
-                    }
-                }
-            });
-        };
-        com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).addDirectoryListener(directoryListener);
         searchUsers("");
     }
 
@@ -203,10 +178,6 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (directoryListener != null) {
-            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).removeDirectoryListener(directoryListener);
-            directoryListener = null;
-        }
         if (rouletteListener != null) {
             rouletteListener.remove();
             rouletteListener = null;
@@ -729,9 +700,6 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
             );
             EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(newChat);
         }
-        try {
-            com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(otherUser.getUserId());
-        } catch (Throwable ignored) {}
         navigateToChat(chatId, otherUser);
     }
 

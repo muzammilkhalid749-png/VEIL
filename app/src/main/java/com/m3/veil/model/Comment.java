@@ -1,6 +1,6 @@
 package com.m3.veil.model;
 
-import com.m3.veil.model.Timestamp;
+import com.google.firebase.Timestamp;
 
 public class Comment {
     private String id;

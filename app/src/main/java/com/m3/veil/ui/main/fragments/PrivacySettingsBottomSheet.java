@@ -21,7 +21,8 @@ import androidx.core.content.ContextCompat;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.android.material.card.MaterialCardView;
-import com.m3.veil.bridge.firestore.FirebaseFirestore;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.m3.veil.R;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.model.Chat;
@@ -387,7 +388,7 @@ public class PrivacySettingsBottomSheet extends BottomSheetDialogFragment {
                 prefs.edit().putString(prefKey, selected).apply();
                 statusView.setText(selected);
 
-                if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(getContext())) {
+                if (FirebaseAuth.getInstance().getCurrentUser() != null) {
                     FirebaseFirestore.getInstance().collection("users")
                             .document(currentUserId)
                             .update(prefKey, selected.toLowerCase().replace(" ", "_"));

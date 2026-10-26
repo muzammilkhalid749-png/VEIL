@@ -1,6 +1,6 @@
 package com.m3.veil.model;
 
-import com.m3.veil.model.Timestamp;
+import com.google.firebase.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 

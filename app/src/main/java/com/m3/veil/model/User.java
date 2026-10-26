@@ -1,7 +1,7 @@
 package com.m3.veil.model;
 
-import com.m3.veil.model.Timestamp;
-import com.m3.veil.bridge.firestore.IgnoreExtraProperties;
+import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.IgnoreExtraProperties;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -79,6 +79,9 @@ public class User {
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
 
+    public String getPhoneNumber() { return phone; }
+    public void setPhoneNumber(String phone) { this.phone = phone; }
+
     public boolean isPhoneVisible() { return phoneVisible; }
     public void setPhoneVisible(boolean phoneVisible) { this.phoneVisible = phoneVisible; }
 
@@ -111,6 +114,9 @@ public class User {
 
     public Timestamp getJoinedAt() { return joinedAt; }
     public void setJoinedAt(Timestamp joinedAt) { this.joinedAt = joinedAt; }
+
+    public Timestamp getCreatedAt() { return joinedAt; }
+    public void setCreatedAt(Timestamp createdAt) { this.joinedAt = createdAt; }
 
     public boolean isVerified() { return verified; }
     public void setVerified(boolean verified) { this.verified = verified; }
@@ -150,6 +156,17 @@ public class User {
 
     public String getAvatar() { return avatar != null ? avatar : photoUrl; }
     public void setAvatar(String avatar) { this.avatar = avatar; this.photoUrl = avatar; }
+
+    public void setOnline(boolean online) {
+        this.status = online ? "online" : "offline";
+        if (online) {
+            this.lastSeen = Timestamp.now();
+        }
+    }
+
+    public boolean isOnline() {
+        return "online".equalsIgnoreCase(this.status) || isUserOnline();
+    }
 
     /**
      * Telegram-grade presence verification.

@@ -34,11 +34,19 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.material.snackbar.Snackbar;
 
-import com.m3.veil.bridge.FirebaseException;
+import com.google.firebase.FirebaseException;
 
-import com.m3.veil.bridge.firestore.FirebaseFirestore;
+import com.google.firebase.auth.FirebaseAuth;
 
-import com.m3.veil.bridge.firestore.WriteBatch;
+import com.google.firebase.auth.PhoneAuthCredential;
+
+import com.google.firebase.auth.PhoneAuthOptions;
+
+import com.google.firebase.auth.PhoneAuthProvider;
+
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import com.google.firebase.firestore.WriteBatch;
 
 import com.m3.veil.ui.main.MainActivity;
 
@@ -74,11 +82,13 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
 
 
+    private FirebaseAuth mAuth;
 
     private String verificationId;
 
     private String phoneNumber;
 
+    private PhoneAuthProvider.ForceResendingToken resendToken;
 
 
 
@@ -102,6 +112,7 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
 
 
+        mAuth = FirebaseAuth.getInstance();
 
         initializeViews();
 
@@ -173,6 +184,7 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
         phoneNumber = intent.getStringExtra("phone_number");
 
+        resendToken = intent.getParcelableExtra("resend_token");
 
     }
 
@@ -368,7 +380,13 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
 
 
+    private void signInWithPhoneAuthCredential(PhoneAuthCredential credential) {
 
+        // Fallback backward compatibility
+
+        navigateAfterVerification();
+
+    }
 
 
 
@@ -473,54 +491,151 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
 
     private void navigateAfterVerification() {
-        String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        // Check if user has username in Firestore
+        String currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null ? FirebaseAuth.getInstance().getCurrentUser().getUid() : com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
         if (currentUserId == null) {
             navigateToUsername();
             return;
         }
 
-        // 1. Check local UserPreferences
-        com.m3.veil.utils.UserPreferences prefs = new com.m3.veil.utils.UserPreferences(this);
-        User localUser = prefs.getCurrentUser();
-        if (localUser != null && localUser.getUsername() != null && !localUser.getUsername().trim().isEmpty()) {
-            navigateToMain();
-            return;
-        }
 
-        // 2. Check local SQLCipher profile manifest
-        try {
-            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
-                    com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getSovereignProfileManifest(currentUserId);
-            if (manifest != null && manifest.username != null && !manifest.username.trim().isEmpty()) {
-                navigateToMain();
-                return;
-            }
-        } catch (Throwable ignored) {}
 
-        // User doesn't have username yet, create local user record and navigate to UsernameActivity
-        createUserDocumentAndNavigate();
+        FirebaseFirestore.getInstance()
+
+                .collection("users")
+
+                .document(currentUserId)
+
+                .get()
+
+                .addOnCompleteListener(task -> {
+
+                    if (task.isSuccessful() && task.getResult().exists()) {
+
+                        User user = task.getResult().toObject(User.class);
+
+                        if (user != null && user.getUsername() != null && !user.getUsername().isEmpty()) {
+
+                            // User has username, go to MainActivity
+
+                            navigateToMain();
+
+                        } else {
+
+                            // User doesn't have username, go to UsernameActivity
+
+                            navigateToUsername();
+
+                        }
+
+                    } else {
+
+                        // User document doesn't exist, create it and go to UsernameActivity
+
+                        createUserDocumentAndNavigate();
+
+                    }
+
+                });
+
     }
 
+
+
     private void createUserDocumentAndNavigate() {
-        String userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        com.google.firebase.auth.FirebaseUser fUser = FirebaseAuth.getInstance().getCurrentUser();
+        String userId = fUser != null ? fUser.getUid() : com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
         if (userId == null) {
             navigateToUsername();
             return;
         }
-        String phoneNumber = this.phoneNumber != null ? this.phoneNumber : "";
+        String phoneNumber = fUser != null && fUser.getPhoneNumber() != null ? fUser.getPhoneNumber() : (this.phoneNumber != null ? this.phoneNumber : "");
+
+
 
         // Extract country code from phone number
+
         String countryCode = extractCountryCode(phoneNumber);
 
-        // Create sovereign user record locally
-        User newUser = new User(userId, phoneNumber, countryCode);
-        new com.m3.veil.utils.UserPreferences(this).saveUser(newUser);
 
-        navigateToUsername();
+
+        // Create main user document
+
+        User newUser = new User(userId, phoneNumber, countryCode);
+
+
+
+        FirebaseFirestore.getInstance()
+
+                .collection("users")
+
+                .document(userId)
+
+                .set(newUser)
+
+                .addOnCompleteListener(task -> {
+
+                    if (task.isSuccessful()) {
+
+                        // Now create the other documents (privacy, keys, settings)
+
+                        createAdditionalUserDocuments(userId);
+
+                    } else {
+
+                        showSnackbar(getString(R.string.error_create_profile));
+
+                    }
+
+                });
+
     }
 
+
+
     private void createAdditionalUserDocuments(String userId) {
-        navigateToUsername();
+
+        WriteBatch batch = FirebaseFirestore.getInstance().batch();
+
+
+
+        // Create privacy document
+
+        UserPrivacy privacy = new UserPrivacy(userId);
+
+        batch.set(FirebaseFirestore.getInstance().collection("userPrivacy").document(userId), privacy);
+
+
+
+        // Create keys document
+
+        UserKeys keys = new UserKeys(userId);
+
+        batch.set(FirebaseFirestore.getInstance().collection("userKeys").document(userId), keys);
+
+
+
+        // Create settings document
+
+        UserSettings settings = new UserSettings(userId);
+
+        batch.set(FirebaseFirestore.getInstance().collection("userSettings").document(userId), settings);
+
+
+
+        batch.commit().addOnCompleteListener(task -> {
+
+            if (task.isSuccessful()) {
+
+                navigateToUsername();
+
+            } else {
+
+                showSnackbar(getString(R.string.error_setup_prefs));
+
+            }
+
+        });
 
     }
 

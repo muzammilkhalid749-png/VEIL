@@ -62,7 +62,9 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import com.google.android.material.button.MaterialButton;
 
-import com.m3.veil.bridge.firestore.FirebaseFirestore;
+import com.google.firebase.auth.FirebaseAuth;
+
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import com.m3.veil.R;
 
@@ -122,6 +124,7 @@ public class ProfileFragment extends Fragment {
 
 
 
+    private FirebaseAuth mAuth;
 
     private FirebaseFirestore db;
 
@@ -139,6 +142,7 @@ public class ProfileFragment extends Fragment {
 
 
 
+        mAuth = FirebaseAuth.getInstance();
 
         db = FirebaseFirestore.getInstance();
 
@@ -2239,8 +2243,8 @@ public class ProfileFragment extends Fragment {
     private void loadUserData() {
 
         String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
-        if (currentUserId == null) {
-            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (currentUserId == null && mAuth != null && mAuth.getCurrentUser() != null) {
+            currentUserId = mAuth.getCurrentUser().getUid();
         }
 
 
@@ -2270,107 +2274,96 @@ public class ProfileFragment extends Fragment {
 
 
         if (localUser != null) {
-
             updateUIWithUserData(localUser);
-
         }
-
-
 
         if (currentUserId != null) {
-
             java.io.File avatarFile = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(requireContext()).getAvatarWebpFile(currentUserId);
-
             if (avatarFile.exists()) {
-
                 android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeFile(avatarFile.getAbsolutePath());
-
                 if (bmp != null && profileImage != null) {
-
                     profileImage.setImageBitmap(bmp);
-
                 }
-
             }
-
         }
-
-
 
         refreshGamificationAndVaultStats();
 
-
-
-        if (currentUserId != null && db != null) {
-
+        final String finalUid = currentUserId;
+        if (finalUid != null && db != null) {
             try {
-
-                db.collection("users").document(currentUserId)
-
+                db.collection("users").document(finalUid)
                         .get()
-
                         .addOnCompleteListener(task -> {
-
-                            if (isAdded()) {
-
+                            if (isAdded() && getContext() != null) {
                                 if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
-
                                     User user = task.getResult().toObject(User.class);
-
                                     if (user != null) {
-
+                                        if (user.getUserId() == null || user.getUserId().isEmpty()) {
+                                            user.setUserId(finalUid);
+                                        }
+                                        if (user.getUsername() != null && !user.getUsername().isEmpty()) {
+                                            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine
+                                                    .getInstance(requireContext())
+                                                    .recordClaimedUsername(user.getUsername());
+                                        }
+                                        up.saveUser(user);
                                         updateUIWithUserData(user);
-
                                     }
-
                                 }
-
                                 refreshGamificationAndVaultStats();
-
                             }
-
                         });
-
             } catch (Exception ignored) {}
-
         }
-
     }
 
-
-
     private void updateUIWithUserData(User user) {
+        if (getContext() == null || user == null) return;
 
-        if (user.getDisplayName() != null && !user.getDisplayName().isEmpty()) {
-
-            profileName.setText(user.getDisplayName());
-
+        com.m3.veil.utils.UserPreferences up = new com.m3.veil.utils.UserPreferences(requireContext());
+        String displayName = user.getDisplayName();
+        if (displayName == null || displayName.trim().isEmpty()) {
+            displayName = up.getDisplayName();
+        }
+        if (displayName != null && !displayName.trim().isEmpty()) {
+            profileName.setText(displayName.trim());
         } else {
-
             profileName.setText(R.string.anonymous);
-
         }
 
-
-
-        if (user.getUsername() != null && !user.getUsername().isEmpty()) {
-
-            profileUsername.setText("@" + user.getUsername());
-
+        String username = user.getUsername();
+        if (username == null || username.trim().isEmpty()) {
+            username = up.getUsername();
+        }
+        if (username != null && !username.trim().isEmpty()) {
+            String cleanHandle = username.trim().replaceFirst("^@", "");
+            profileUsername.setText("@" + cleanHandle);
         } else {
-
             profileUsername.setText("@username");
-
         }
-
-
 
         if (profileImage != null) {
-
-            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileImage, user.getAvatar(), user.getDisplayName(), false);
-
+            String uid = user.getUserId() != null ? user.getUserId() : up.getUserId();
+            java.io.File localWebp = uid != null
+                    ? com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(requireContext()).getAvatarWebpFile(uid)
+                    : null;
+            String avatarSource = user.getAvatar();
+            if ((avatarSource == null || avatarSource.isEmpty()) && localWebp != null && localWebp.exists()) {
+                avatarSource = localWebp.getAbsolutePath();
+            }
+            if (avatarSource == null || avatarSource.isEmpty()) {
+                avatarSource = up.getAvatarPath();
+            }
+            if (avatarSource != null && !avatarSource.isEmpty()) {
+                com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileImage, avatarSource, displayName, false);
+            } else if (localWebp != null && localWebp.exists()) {
+                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeFile(localWebp.getAbsolutePath());
+                if (bmp != null) {
+                    profileImage.setImageBitmap(bmp);
+                }
+            }
         }
-
     }
 
 
@@ -2503,7 +2496,7 @@ public class ProfileFragment extends Fragment {
 
             sheet.dismiss();
             try {
-                com.m3.veil.manager.AuthManager.getInstance().signOut(requireContext());
+                if (mAuth != null) mAuth.signOut();
             } catch (Exception ignored) {}
             com.m3.veil.manager.AuthManager.getInstance().signOut(requireContext());
             Intent intent = new Intent(requireContext(), com.m3.veil.ui.auth.PhoneAuthActivity.class);
