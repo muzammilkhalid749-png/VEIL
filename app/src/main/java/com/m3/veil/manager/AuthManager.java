@@ -254,6 +254,11 @@ public class AuthManager {
 
     private void initRealtimeEngines(@NonNull Context appCtx, @NonNull String uid) {
         try {
+            SovereignIdentityAndDirectoryEngine.getInstance(appCtx).ensureCurrentUserPublished();
+        } catch (Throwable t) {
+            Log.w(TAG, "ensureCurrentUserPublished notice: " + t.getMessage());
+        }
+        try {
             WebRtcManager.getInstance(appCtx).init(uid);
         } catch (Throwable t) {
             Log.w(TAG, "WebRtcManager init notice: " + t.getMessage());

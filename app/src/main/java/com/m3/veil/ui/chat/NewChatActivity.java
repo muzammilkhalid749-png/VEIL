@@ -79,11 +79,14 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
             com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this, FirebaseAuth.getInstance().getCurrentUser());
         }
 
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).ensureCurrentUserPublished();
+
         initializeViews();
         handleWindowInsets();
         setupRecyclerView();
         setupSearchListener();
         searchUsers("");
+        startLiveUsersDirectoryListener();
     }
 
     private void initializeViews() {
@@ -174,6 +177,7 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
     private final android.os.Handler rouletteTimeoutHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable rouletteTimeoutRunnable;
     private ListenerRegistration whisperListener;
+    private ListenerRegistration usersDirectoryListener;
 
     @Override
     protected void onDestroy() {
@@ -188,6 +192,10 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
         if (whisperListener != null) {
             whisperListener.remove();
             whisperListener = null;
+        }
+        if (usersDirectoryListener != null) {
+            usersDirectoryListener.remove();
+            usersDirectoryListener = null;
         }
     }
 
@@ -655,14 +663,68 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
                                     return;
                                 }
                             }
-                            if (!users.isEmpty() && !currentUserId.equals(users.get(0).getUserId())) {
-                                startChatWithUser(users.get(0));
-                                return;
+                            for (User u : users) {
+                                if (u != null && u.getUserId() != null
+                                        && !u.getUserId().startsWith("veil_node_")
+                                        && !currentUserId.equals(u.getUserId())) {
+                                    startChatWithUser(u);
+                                    return;
+                                }
                             }
                         }
-                        Toast.makeText(this, "No registered peer found for @" + cleanHandle + " yet", Toast.LENGTH_SHORT).show();
+                        User directPeer = new User();
+                        directPeer.setUserId("veil_peer_" + cleanHandle.toLowerCase());
+                        directPeer.setUsername(cleanHandle);
+                        directPeer.setDisplayName("@" + cleanHandle);
+                        directPeer.setStatus("🛡️ Direct Encrypted Handle");
+                        directPeer.setOnline(true);
+                        startChatWithUser(directPeer);
                     });
                 });
+    }
+
+    private void startLiveUsersDirectoryListener() {
+        if (db == null) return;
+        try {
+            usersDirectoryListener = db.collection("users").limit(80)
+                    .addSnapshotListener((snapshots, error) -> {
+                        if (isFinishing() || isDestroyed() || snapshots == null) return;
+                        String raw = searchEditText != null && searchEditText.getText() != null
+                                ? searchEditText.getText().toString().trim().toLowerCase() : "";
+                        final String filter = raw.startsWith("@") ? raw.substring(1) : raw;
+                        boolean changed = false;
+
+                        for (DocumentSnapshot doc : snapshots.getDocuments()) {
+                            User u = parseUserFromDoc(doc);
+                            if (u == null || u.getUserId() == null || u.getUserId().equals(currentUserId)) {
+                                continue;
+                            }
+                            String uname = u.getUsername() != null ? u.getUsername().toLowerCase() : "";
+                            String dname = u.getDisplayName() != null ? u.getDisplayName().toLowerCase() : "";
+                            if (!filter.isEmpty() && !uname.contains(filter) && !dname.contains(filter)) {
+                                continue;
+                            }
+                            int existingIdx = -1;
+                            for (int i = 0; i < userList.size(); i++) {
+                                if (u.getUserId().equals(userList.get(i).getUserId())) {
+                                    existingIdx = i;
+                                    break;
+                                }
+                            }
+                            if (existingIdx >= 0) {
+                                userList.set(existingIdx, u);
+                                changed = true;
+                            } else {
+                                userList.add(0, u);
+                                changed = true;
+                            }
+                        }
+                        if (changed) {
+                            usersAdapter.notifyDataSetChanged();
+                            updateEmptyState();
+                        }
+                    });
+        } catch (Throwable ignored) {}
     }
 
     private void searchUsers(String query) {

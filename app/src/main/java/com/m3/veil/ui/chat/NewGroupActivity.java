@@ -163,29 +163,21 @@ public class NewGroupActivity extends AppCompatActivity {
 
     private void loadUsers() {
         loadingBar.setVisibility(View.VISIBLE);
-        db.collection("users").limit(50).get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    loadingBar.setVisibility(View.GONE);
-                    allUsers.clear();
-                    for (DocumentSnapshot doc : queryDocumentSnapshots) {
-                        User user = doc.toObject(User.class);
-                        if (user != null) {
-                            if (user.getUserId() == null || user.getUserId().isEmpty()) {
-                                user.setUserId(doc.getId());
-                            }
-                            if (user.getUsername() == null || user.getUsername().isEmpty()) {
-                                user.setUsername("anon_" + doc.getId().substring(0, Math.min(6, doc.getId().length())).toLowerCase());
-                            }
-                            if (!user.getUserId().equals(currentUserId)) {
-                                allUsers.add(user);
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this)
+                .searchUsersByUsername("", users -> {
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        loadingBar.setVisibility(View.GONE);
+                        allUsers.clear();
+                        if (users != null) {
+                            for (User user : users) {
+                                if (user != null && user.getUserId() != null && !user.getUserId().equals(currentUserId)) {
+                                    allUsers.add(user);
+                                }
                             }
                         }
-                    }
-                    filterUsers(searchEditText.getText().toString().trim());
-                })
-                .addOnFailureListener(e -> {
-                    loadingBar.setVisibility(View.GONE);
-                    updateEmptyState();
+                        filterUsers(searchEditText.getText() != null ? searchEditText.getText().toString().trim() : "");
+                    });
                 });
     }
 
