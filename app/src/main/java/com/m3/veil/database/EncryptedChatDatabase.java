@@ -385,6 +385,10 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         return db;
     }
 
+    public static synchronized EncryptedChatDatabase getInstance(Context context, String personaId) {
+        return getInstance(context, personaId, false);
+    }
+
     public static synchronized EncryptedChatDatabase getInstance(Context context) {
         boolean isDecoy = false;
         String personaId = null;
