@@ -122,6 +122,11 @@ public class MainActivity extends AppCompatActivity {
             } else if (uid != null) {
                 com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this, uid);
             }
+            if (uid != null && !uid.isEmpty()) {
+                com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).init(uid);
+                com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).announceLocalProfile();
+                com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).sendDirectoryProbe("");
+            }
             com.m3.veil.services.VeilMeshDaemonService.start(this);
         }
 

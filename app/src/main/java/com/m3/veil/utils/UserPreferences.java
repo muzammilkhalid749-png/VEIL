@@ -130,6 +130,10 @@ public class UserPreferences {
     }
 
     // Quick access methods for commonly used fields
+    public void saveUserId(String userId) {
+        prefs.edit().putString(KEY_USER_ID, userId).putBoolean(KEY_IS_LOGGED_IN, true).apply();
+    }
+
     public String getUserId() {
         return prefs.getString(KEY_USER_ID, null);
     }

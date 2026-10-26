@@ -58,7 +58,6 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
 
     private FirebaseFirestore db;
     private String currentUserId;
-    private androidx.activity.result.ActivityResultLauncher<String> requestContactsPermissionLauncher;
     private com.m3.veil.webrtc.UniversalSignalingRelay.DirectoryListener directoryListener;
 
     @Override
@@ -80,18 +79,17 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
         if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
             com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this, currentUserId);
         }
+        if (!"veil_anonymous".equals(currentUserId)) {
+            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).init(currentUserId);
+            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).announceLocalProfile();
+            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(this).sendDirectoryProbe("");
+        }
 
         initializeViews();
         handleWindowInsets();
         setupRecyclerView();
         setupSearchListener();
-        requestContactsPermissionLauncher = registerForActivityResult(
-                new androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-                isGranted -> searchUsers(searchEditText != null && searchEditText.getText() != null ? searchEditText.getText().toString().trim() : "")
-        );
-        if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestContactsPermissionLauncher.launch(android.Manifest.permission.READ_CONTACTS);
-        }
+
         directoryListener = manifest -> {
             if (manifest == null || manifest.uid == null || manifest.uid.equals(currentUserId)) return;
             runOnUiThread(() -> {
@@ -629,7 +627,6 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
                             }
                         }
                         appendNearbyMeshPeers(finalQuery);
-                        appendPhonebookContacts(finalQuery);
                         usersAdapter.notifyDataSetChanged();
                         updateEmptyState();
                     });
@@ -663,70 +660,6 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
             String dname = doc.getString("displayName");
             fallback.setDisplayName(dname != null && !dname.isEmpty() ? dname : ("@" + uname));
             return fallback;
-        }
-    }
-
-    private void appendPhonebookContacts(String queryLower) {
-        if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_CONTACTS)
-                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        String[] proj = {
-                android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER
-        };
-        try (android.database.Cursor c = getContentResolver().query(
-                android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                proj, null, null,
-                android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC")) {
-            if (c != null) {
-                int nameCol = c.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME);
-                int numCol = c.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER);
-                java.util.Set<String> seenNumbers = new java.util.HashSet<>();
-                for (User u : userList) {
-                    if (u.getPhone() != null && !u.getPhone().isEmpty()) {
-                        seenNumbers.add(u.getPhone().replaceAll("[^0-9+]", ""));
-                    }
-                }
-
-                while (c.moveToNext()) {
-                    String name = nameCol != -1 ? c.getString(nameCol) : "";
-                    String num = numCol != -1 ? c.getString(numCol) : "";
-                    if (name == null) name = "";
-                    if (num == null) num = "";
-                    String cleanNum = num.replaceAll("[^0-9+]", "");
-                    if (cleanNum.isEmpty()) continue;
-
-                    if (seenNumbers.contains(cleanNum)) {
-                        for (User u : userList) {
-                            if (u.getPhone() != null && cleanNum.equals(u.getPhone().replaceAll("[^0-9+]", ""))) {
-                                if (u.getDisplayName() == null || u.getDisplayName().startsWith("@") || u.getDisplayName().startsWith("anon_") || u.getDisplayName().startsWith("user_")) {
-                                    u.setDisplayName(name);
-                                }
-                                break;
-                            }
-                        }
-                        continue;
-                    }
-
-                    boolean matches = queryLower.isEmpty()
-                            || name.toLowerCase(java.util.Locale.ROOT).contains(queryLower)
-                            || num.contains(queryLower)
-                            || cleanNum.contains(queryLower);
-
-                    if (matches && seenNumbers.add(cleanNum)) {
-                        User contactUser = new User();
-                        contactUser.setUserId("phone_" + cleanNum);
-                        contactUser.setUsername(num);
-                        contactUser.setDisplayName(name.isEmpty() ? num : name);
-                        contactUser.setPhone(num);
-                        contactUser.setStatus("Mobile • Device Contact");
-                        userList.add(contactUser);
-                    }
-                }
-            }
-        } catch (Throwable t) {
-            Log.w("NewChatActivity", "Error loading phonebook contacts: " + t.getMessage());
         }
     }
 

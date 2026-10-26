@@ -102,6 +102,7 @@ public class UniversalSignalingRelay {
     // UDP LAN state
     private DatagramSocket mUdpSocket;
     private Thread mUdpListenThread;
+    private android.net.wifi.WifiManager.MulticastLock mMulticastLock;
     private volatile boolean mIsRunning = false;
 
     // MQTT WS state
@@ -148,10 +149,34 @@ public class UniversalSignalingRelay {
         this.mOkHttpClient = b.build();
     }
 
+    public synchronized void init(String userId) {
+        if (userId != null && !userId.isEmpty()) {
+            this.mCurrentUserId = userId;
+        }
+        if (!mIsRunning) {
+            start(userId, null);
+        } else {
+            if (mMqttConnected && mCurrentUserId != null) {
+                sendMqttSubscribe();
+            }
+            announceLocalProfile();
+        }
+    }
+
     public synchronized void start(String userId, SignalCallback callback) {
-        this.mCurrentUserId = userId;
-        this.mListener = callback;
-        if (mIsRunning) return;
+        if (userId != null && !userId.isEmpty()) {
+            this.mCurrentUserId = userId;
+        }
+        if (callback != null) {
+            this.mListener = callback;
+        }
+        if (mIsRunning) {
+            if (mMqttConnected && mCurrentUserId != null) {
+                sendMqttSubscribe();
+            }
+            announceLocalProfile();
+            return;
+        }
         mIsRunning = true;
 
         startLanUdpSignaling();
@@ -175,10 +200,29 @@ public class UniversalSignalingRelay {
     private void startLanUdpSignaling() {
         if (mUdpListenThread != null && mUdpListenThread.isAlive()) return;
 
+        // Acquire MulticastLock so Android Wi-Fi hardware delivers incoming UDP broadcast packets
+        try {
+            android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) mContext.getApplicationContext()
+                    .getSystemService(Context.WIFI_SERVICE);
+            if (wm != null) {
+                if (mMulticastLock == null) {
+                    mMulticastLock = wm.createMulticastLock("veil_udp_multicast_lock");
+                    mMulticastLock.setReferenceCounted(true);
+                }
+                if (!mMulticastLock.isHeld()) {
+                    mMulticastLock.acquire();
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "MulticastLock notice: " + t.getMessage());
+        }
+
         mUdpListenThread = new Thread(() -> {
             try {
-                mUdpSocket = new DatagramSocket(UDP_PORT);
+                mUdpSocket = new DatagramSocket(null);
+                mUdpSocket.setReuseAddress(true);
                 mUdpSocket.setBroadcast(true);
+                mUdpSocket.bind(new java.net.InetSocketAddress(UDP_PORT));
                 byte[] buffer = new byte[65507];
 
                 Log.i(TAG, "LAN UDP Signaling listening on port " + UDP_PORT);
@@ -204,6 +248,11 @@ public class UniversalSignalingRelay {
     }
 
     private void stopLanUdp() {
+        try {
+            if (mMulticastLock != null && mMulticastLock.isHeld()) {
+                mMulticastLock.release();
+            }
+        } catch (Throwable ignored) {}
         try {
             if (mUdpSocket != null && !mUdpSocket.isClosed()) {
                 mUdpSocket.close();
@@ -588,7 +637,11 @@ public class UniversalSignalingRelay {
     private void handleDirectoryProbe(JSONObject obj) {
         try {
             String from = obj.optString("from");
-            if (from == null || from.isEmpty() || from.equals(mCurrentUserId)) return;
+            if (from != null && !from.isEmpty() && from.equals(mCurrentUserId)) {
+                if (!"veil_anon".equals(from) && !"veil_anonymous".equals(from) && !"anon".equals(from)) {
+                    return;
+                }
+            }
             String query = obj.optString("query", "").trim().toLowerCase(java.util.Locale.ROOT);
 
             SovereignIdentityAndDirectoryEngine.SovereignProfileManifest myManifest =
@@ -612,9 +665,11 @@ public class UniversalSignalingRelay {
         try {
             JSONObject obj = new JSONObject(jsonStr);
             String from = obj.optString("from");
-            if (mCurrentUserId != null && mCurrentUserId.equals(from)) {
-                // Ignore loopback from own self
-                return;
+            if (mCurrentUserId != null && !mCurrentUserId.isEmpty() && mCurrentUserId.equals(from)) {
+                if (!"veil_anon".equals(from) && !"veil_anonymous".equals(from) && !"anon".equals(from)) {
+                    // Ignore loopback from authentic sovereign UID
+                    return;
+                }
             }
 
             String type = obj.optString("type");

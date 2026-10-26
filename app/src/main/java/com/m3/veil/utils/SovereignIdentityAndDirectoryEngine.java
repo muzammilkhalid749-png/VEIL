@@ -1225,6 +1225,9 @@ public class SovereignIdentityAndDirectoryEngine {
                 final SovereignProfileManifest finalManifest = best;
                 final boolean hasUsername = finalManifest.username != null && !finalManifest.username.trim().isEmpty();
 
+                // Broadcast newly restored or generated sovereign profile across LAN and MQTT directory
+                publishProfileManifest(context, finalManifest, null);
+
                 mMainHandler.post(() -> {
                     AuthManager.getInstance().onSovereignSessionStarted(context, finalManifest);
                     callback.onSuccess(finalManifest, hasUsername);
@@ -1349,19 +1352,70 @@ public class SovereignIdentityAndDirectoryEngine {
 
     public boolean isLoggedIn() {
         UserPreferences prefs = new UserPreferences(mContext);
-        return prefs.isLoggedIn() && prefs.getUserId() != null;
+        if (prefs.isLoggedIn() && prefs.getUserId() != null && !prefs.getUserId().trim().isEmpty()) {
+            return true;
+        }
+        String phrase = loadRecoveryPhraseLocally(mContext);
+        if (phrase != null && !phrase.trim().isEmpty() && validatePhrase(phrase)) {
+            try {
+                byte[] masterSeed = deriveMasterSeed(normalizePhrase(phrase), null);
+                String derived = deriveUid(masterSeed);
+                if (derived != null && !derived.trim().isEmpty()) {
+                    prefs.saveUserId(derived);
+                    return true;
+                }
+            } catch (Throwable ignored) {}
+        }
+        return false;
     }
 
     public String getCurrentUserId() {
         UserPreferences prefs = new UserPreferences(mContext);
-        return prefs.getUserId();
+        String uid = prefs.getUserId();
+        if (uid != null && !uid.trim().isEmpty()) {
+            return uid;
+        }
+        String phrase = loadRecoveryPhraseLocally(mContext);
+        if (phrase != null && !phrase.trim().isEmpty() && validatePhrase(phrase)) {
+            try {
+                byte[] masterSeed = deriveMasterSeed(normalizePhrase(phrase), null);
+                String derived = deriveUid(masterSeed);
+                if (derived != null && !derived.trim().isEmpty()) {
+                    prefs.saveUserId(derived);
+                    return derived;
+                }
+            } catch (Throwable ignored) {}
+        }
+        return null;
     }
 
     @Nullable
     public SovereignProfileManifest getLocalManifest() {
         String uid = getCurrentUserId();
         if (uid == null) return null;
-        return getLocalManifest(uid);
+        SovereignProfileManifest manifest = getLocalManifest(uid);
+        if (manifest != null) return manifest;
+        // Fallback: build and persist from recovery phrase
+        String phrase = loadRecoveryPhraseLocally(mContext);
+        if (phrase != null && !phrase.trim().isEmpty() && validatePhrase(phrase)) {
+            try {
+                byte[] masterSeed = deriveMasterSeed(normalizePhrase(phrase), null);
+                KeyPair keyPair = deriveIdentityKeyPair(masterSeed);
+                SovereignProfileManifest newManifest = new SovereignProfileManifest();
+                newManifest.uid = uid;
+                String shortHash = uid.length() >= 12 ? uid.substring(5, 13) : uid;
+                newManifest.username = "veil_" + shortHash;
+                newManifest.displayName = "Veil @" + shortHash;
+                newManifest.publicKeyBase64 = Base64.encodeToString(keyPair.getPublic().getEncoded(), Base64.NO_WRAP);
+                newManifest.updatedAtTimestamp = System.currentTimeMillis();
+                signManifest(newManifest, keyPair);
+                persistManifestLocally(newManifest);
+                return newManifest;
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to auto-construct manifest from phrase: " + t.getMessage());
+            }
+        }
+        return null;
     }
 
     public SovereignProfileManifest getLocalManifest(String uid) {

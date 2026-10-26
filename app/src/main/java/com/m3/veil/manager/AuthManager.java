@@ -198,6 +198,22 @@ public class AuthManager {
         sCurrentUserId = uid;
         sCurrentUser = new SessionUser(uid, "@" + uid, "", "");
 
+        try {
+            UserPreferences prefs = new UserPreferences(context);
+            com.m3.veil.model.User u = prefs.getCurrentUser();
+            if (u == null) {
+                u = new com.m3.veil.model.User(uid, "", "US");
+            }
+            u.setUserId(uid);
+            prefs.saveUser(u);
+            prefs.saveUserId(uid);
+        } catch (Throwable ignored) {}
+
+        try {
+            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).init(uid);
+            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).announceLocalProfile();
+        } catch (Throwable ignored) {}
+
         // 1. Initialize WebRTC P2P Manager with authenticated UID
         WebRtcManager.getInstance(context).init(uid);
 
@@ -251,7 +267,31 @@ public class AuthManager {
     public void onSovereignSessionStarted(Context context, SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest) {
         if (manifest == null || manifest.uid == null || manifest.uid.isEmpty()) return;
         sCurrentUserId = manifest.uid;
-        sCurrentUser = new SessionUser(manifest.uid, manifest.displayName, "", "");
+        sCurrentUser = new SessionUser(manifest.uid, manifest.displayName, "", manifest.phoneNumber != null ? manifest.phoneNumber : "");
+
+        try {
+            UserPreferences prefs = new UserPreferences(context);
+            com.m3.veil.model.User u = prefs.getCurrentUser();
+            if (u == null) {
+                u = new com.m3.veil.model.User(manifest.uid, manifest.phoneNumber != null ? manifest.phoneNumber : "", "US");
+            }
+            u.setUserId(manifest.uid);
+            if (manifest.displayName != null && !manifest.displayName.isEmpty()) {
+                u.setDisplayName(manifest.displayName);
+            }
+            if (manifest.username != null && !manifest.username.isEmpty()) {
+                u.setUsername(manifest.username);
+            }
+            prefs.saveUser(u);
+            prefs.saveUserId(manifest.uid);
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to persist sovereign session to UserPreferences", t);
+        }
+
+        try {
+            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).init(manifest.uid);
+            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).announceLocalProfile();
+        } catch (Throwable ignored) {}
 
         // 1. Initialize WebRTC P2P Manager with Sovereign UID
         WebRtcManager.getInstance(context).init(manifest.uid);
@@ -292,6 +332,22 @@ public class AuthManager {
         if (uid == null || uid.isEmpty()) return;
         sCurrentUserId = uid;
         sCurrentUser = new SessionUser(uid, "@" + uid, "", phoneNumber);
+
+        try {
+            UserPreferences prefs = new UserPreferences(context);
+            com.m3.veil.model.User u = prefs.getCurrentUser();
+            if (u == null) {
+                u = new com.m3.veil.model.User(uid, phoneNumber, "US");
+            }
+            u.setUserId(uid);
+            prefs.saveUser(u);
+            prefs.saveUserId(uid);
+        } catch (Throwable ignored) {}
+
+        try {
+            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).init(uid);
+            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context).announceLocalProfile();
+        } catch (Throwable ignored) {}
 
         // 1. Initialize WebRTC P2P Manager
         WebRtcManager.getInstance(context).init(uid);

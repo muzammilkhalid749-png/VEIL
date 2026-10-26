@@ -335,7 +335,6 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
                             }
                         }
                     }
-                    appendPhonebookMatches(cleanQuery);
                     if (addedNew) {
                         chatsAdapter.notifyDataSetChanged();
                         updateEmptyState();
@@ -343,64 +342,6 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
                 });
             });
         }
-    }
-
-    private void appendPhonebookMatches(String queryLower) {
-        if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_CONTACTS)
-                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        String[] proj = {
-                android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER
-        };
-        try (android.database.Cursor c = getContentResolver().query(
-                android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                proj, null, null,
-                android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC")) {
-            if (c != null) {
-                int nameCol = c.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME);
-                int numCol = c.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER);
-                while (c.moveToNext()) {
-                    String name = nameCol != -1 ? c.getString(nameCol) : "";
-                    String num = numCol != -1 ? c.getString(numCol) : "";
-                    if (name == null) name = "";
-                    if (num == null) num = "";
-                    String cleanNum = num.replaceAll("[^0-9+]", "");
-                    if (cleanNum.isEmpty()) continue;
-
-                    boolean matches = name.toLowerCase(java.util.Locale.ROOT).contains(queryLower)
-                            || num.contains(queryLower)
-                            || cleanNum.contains(queryLower);
-
-                    if (matches) {
-                        String fakeId = "phone_" + cleanNum;
-                        boolean exists = false;
-                        for (Chat ch : filteredChats) {
-                            if (ch.getParticipants() != null && ch.getParticipants().contains(fakeId)) {
-                                exists = true;
-                                break;
-                            }
-                        }
-                        if (!exists) {
-                            Chat fakeChat = new Chat(
-                                    currentUserId + "_" + fakeId,
-                                    name.isEmpty() ? num : name,
-                                    "Mobile Contact • " + num,
-                                    null,
-                                    null,
-                                    0,
-                                    false,
-                                    false,
-                                    "direct",
-                                    Arrays.asList(currentUserId, fakeId)
-                            );
-                            filteredChats.add(fakeChat);
-                        }
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
     }
 
     private Chat cloneChatWithSnippet(Chat src, String customSnippet) {
