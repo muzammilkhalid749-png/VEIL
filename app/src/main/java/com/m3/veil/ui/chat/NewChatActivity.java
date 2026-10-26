@@ -65,14 +65,18 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_new_chat);
 
-        db = FirebaseFirestore.getInstance();
+        try {
+            db = FirebaseFirestore.getInstance();
+        } catch (Throwable ignored) {}
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
+        }
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = "veil_anonymous";
+        }
         if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-            // Ensure this device's user document has userId & username synced in Firestore
             com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this, FirebaseAuth.getInstance().getCurrentUser());
-        } else {
-            finish();
-            return;
         }
 
         initializeViews();
@@ -575,64 +579,28 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
     private void searchUsers(String query) {
         loadingBar.setVisibility(View.VISIBLE);
 
-        if (query.isEmpty()) {
-            db.collection("users")
-                    .limit(50)
-                    .get()
-                    .addOnSuccessListener(queryDocumentSnapshots -> {
-                        loadingBar.setVisibility(View.GONE);
-                        userList.clear();
-                        for (DocumentSnapshot doc : queryDocumentSnapshots) {
-                            User user = parseUserFromDoc(doc);
-                            if (user != null && !user.getUserId().equals(currentUserId)) {
-                                userList.add(user);
-                            }
-                        }
-                        appendNearbyMeshPeers("");
-                        usersAdapter.notifyDataSetChanged();
-                        updateEmptyState();
-                    })
-                    .addOnFailureListener(e -> {
-                        loadingBar.setVisibility(View.GONE);
-                        userList.clear();
-                        appendNearbyMeshPeers("");
-                        usersAdapter.notifyDataSetChanged();
-                        updateEmptyState();
-                    });
-            return;
-        }
-        String cleanQuery = query.toLowerCase();
+        String cleanQuery = query != null ? query.trim().toLowerCase() : "";
         if (cleanQuery.startsWith("@")) {
             cleanQuery = cleanQuery.substring(1);
         }
         final String finalQuery = cleanQuery;
 
-        db.collection("users")
-                .limit(50)
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    loadingBar.setVisibility(View.GONE);
-                    userList.clear();
-                    for (DocumentSnapshot doc : queryDocumentSnapshots) {
-                        User user = parseUserFromDoc(doc);
-                        if (user != null && !user.getUserId().equals(currentUserId)) {
-                            String uname = user.getUsername() != null ? user.getUsername().toLowerCase() : "";
-                            String dname = user.getDisplayName() != null ? user.getDisplayName().toLowerCase() : "";
-                            if (uname.contains(finalQuery) || dname.contains(finalQuery) || user.getUserId().toLowerCase().contains(finalQuery)) {
-                                userList.add(user);
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this)
+                .searchUsersByUsername(finalQuery, users -> {
+                    runOnUiThread(() -> {
+                        loadingBar.setVisibility(View.GONE);
+                        userList.clear();
+                        if (users != null) {
+                            for (User user : users) {
+                                if (user != null && user.getUserId() != null && !user.getUserId().equals(currentUserId)) {
+                                    userList.add(user);
+                                }
                             }
                         }
-                    }
-                    appendNearbyMeshPeers(finalQuery);
-                    usersAdapter.notifyDataSetChanged();
-                    updateEmptyState();
-                })
-                .addOnFailureListener(e -> {
-                    loadingBar.setVisibility(View.GONE);
-                    userList.clear();
-                    appendNearbyMeshPeers(finalQuery);
-                    usersAdapter.notifyDataSetChanged();
-                    updateEmptyState();
+                        appendNearbyMeshPeers(finalQuery);
+                        usersAdapter.notifyDataSetChanged();
+                        updateEmptyState();
+                    });
                 });
     }
 

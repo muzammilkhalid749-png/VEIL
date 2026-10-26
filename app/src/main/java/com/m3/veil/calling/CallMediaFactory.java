@@ -149,7 +149,12 @@ public final class CallMediaFactory {
 
     public static PeerConnection createPeerConnection(CallConfig config, PeerConnection.Observer observer) {
         PeerConnection.RTCConfiguration rtc = new PeerConnection.RTCConfiguration(CallConfig.iceServers());
-        rtc.iceTransportsType = config.iceTransportsType;
+        if (com.m3.veil.VeilApplication.getInstance() != null &&
+                com.m3.veil.utils.VeilTorProxyBridge.getInstance(com.m3.veil.VeilApplication.getInstance()).isStrictRelayEnforced()) {
+            rtc.iceTransportsType = PeerConnection.IceTransportsType.RELAY;
+        } else {
+            rtc.iceTransportsType = config.iceTransportsType;
+        }
         rtc.continualGatheringPolicy = config.continualGatheringPolicy;
         rtc.iceCandidatePoolSize = config.iceCandidatePoolSize;
         rtc.enableDscp = config.enableDscp;

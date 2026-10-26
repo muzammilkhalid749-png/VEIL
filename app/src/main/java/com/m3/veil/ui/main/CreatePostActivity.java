@@ -140,10 +140,16 @@ public class CreatePostActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_create_post);
 
-        db = FirebaseFirestore.getInstance();
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+        try {
+            db = FirebaseFirestore.getInstance();
+        } catch (Exception ignored) {
+            db = null;
+        }
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (currentUserId == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
             currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        } else {
+        }
+        if (currentUserId == null) {
             currentUserId = SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
         }
 
@@ -162,10 +168,17 @@ public class CreatePostActivity extends AppCompatActivity {
     }
 
     private void fetchCurrentUser() {
-        db.collection("users").document(currentUserId).get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    currentUser = documentSnapshot.toObject(User.class);
-                });
+        if (currentUserId != null && db != null) {
+            try {
+                db.collection("users").document(currentUserId).get()
+                        .addOnSuccessListener(documentSnapshot -> {
+                            if (documentSnapshot != null && documentSnapshot.exists()) {
+                                currentUser = documentSnapshot.toObject(User.class);
+                            }
+                        })
+                        .addOnFailureListener(e -> {});
+            } catch (Exception ignored) {}
+        }
     }
 
     private void initializeViews() {

@@ -513,45 +513,18 @@ public class UsernameActivity extends AppCompatActivity {
 
 
     private void checkUsernameAvailability(String username) {
-
-        db.collection("users")
-
-                .whereEqualTo("username", username.toLowerCase())
-
-                .get()
-
-                .addOnCompleteListener(task -> {
-
-                    if (task.isSuccessful()) {
-
-                        if (task.getResult().isEmpty()) {
-
-                            usernameAvailabilityText.setText("✓ Username is available");
-
-                            usernameAvailabilityText.setTextColor(getResources().getColor(R.color.veil_accent));
-
-                        } else {
-
-                            usernameAvailabilityText.setText("✗ Username is already taken");
-
-                            usernameAvailabilityText.setTextColor(getResources().getColor(R.color.error_red));
-
-                        }
-
-                        updateContinueButtonState();
-
-                    } else {
-
-                        usernameAvailabilityText.setText("✓ Username is available");
-
-                        usernameAvailabilityText.setTextColor(getResources().getColor(R.color.veil_accent));
-
-                        updateContinueButtonState();
-
-                    }
-
-                });
-
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).isUsernameTaken(username, isTaken -> {
+            runOnUiThread(() -> {
+                if (!isTaken) {
+                    usernameAvailabilityText.setText("✓ Username is available");
+                    usernameAvailabilityText.setTextColor(getResources().getColor(R.color.veil_accent));
+                } else {
+                    usernameAvailabilityText.setText("✗ Username is already taken");
+                    usernameAvailabilityText.setTextColor(getResources().getColor(R.color.error_red));
+                }
+                updateContinueButtonState();
+            });
+        });
     }
 
 
@@ -884,31 +857,17 @@ public class UsernameActivity extends AppCompatActivity {
 
 
 
-        db.collection("users")
-
-                .whereEqualTo("username", username.toLowerCase())
-
-                .get()
-
-                .addOnCompleteListener(task -> {
-
-                    if (task.isSuccessful() && !task.getResult().isEmpty()) {
-
-                        showLoading(false);
-
-                        usernameAvailabilityText.setText("✗ Username was just taken. Please choose another.");
-
-                        usernameAvailabilityText.setTextColor(getResources().getColor(R.color.error_red));
-
-                        return;
-
-                    }
-
-
-
-                    updateUserProfile(username, displayName);
-
-                });
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).isUsernameTaken(username, isTaken -> {
+            runOnUiThread(() -> {
+                if (isTaken) {
+                    showLoading(false);
+                    usernameAvailabilityText.setText("✗ Username was just taken. Please choose another.");
+                    usernameAvailabilityText.setTextColor(getResources().getColor(R.color.error_red));
+                    return;
+                }
+                updateUserProfile(username, displayName);
+            });
+        });
 
     }
 
@@ -968,33 +927,19 @@ public class UsernameActivity extends AppCompatActivity {
 
 
 
-        // Check availability in Firestore
-
-        db.collection("users")
-
-                .whereEqualTo("username", randomUsername.toLowerCase())
-
-                .get()
-
-                .addOnCompleteListener(task -> {
-
-                    if (task.isSuccessful() && task.getResult().isEmpty()) {
-
-                        usernameEditText.setText(randomUsername);
-
-                        usernameAvailabilityText.setText("✓ Generated random username");
-
-                        usernameAvailabilityText.setTextColor(getResources().getColor(R.color.veil_accent));
-
-                        updateUserProfile(randomUsername, displayName);
-
-                    } else {
-
-                        generateAndCheckRandomUsername(displayName, attemptsLeft - 1);
-
-                    }
-
-                });
+        // Check availability in Sovereign Mesh
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).isUsernameTaken(randomUsername, isTaken -> {
+            runOnUiThread(() -> {
+                if (!isTaken) {
+                    usernameEditText.setText(randomUsername);
+                    usernameAvailabilityText.setText("✓ Generated random username");
+                    usernameAvailabilityText.setTextColor(getResources().getColor(R.color.veil_accent));
+                    updateUserProfile(randomUsername, displayName);
+                } else {
+                    generateAndCheckRandomUsername(displayName, attemptsLeft - 1);
+                }
+            });
+        });
 
     }
 

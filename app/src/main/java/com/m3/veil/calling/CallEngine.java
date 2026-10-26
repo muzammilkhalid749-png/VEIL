@@ -444,6 +444,12 @@ public class CallEngine implements CallSignaling.Listener {
             }
         } catch (Throwable ignored) {}
         try {
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context).getLocalManifest();
+            if (manifest != null && manifest.displayName != null && !manifest.displayName.trim().isEmpty() && !isSelfName(manifest.displayName)) {
+                this.displayName = manifest.displayName.trim();
+                return this.displayName;
+            }
             if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
                 String fName = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getDisplayName();
                 if (fName != null && !fName.trim().isEmpty() && !isSelfName(fName)) {

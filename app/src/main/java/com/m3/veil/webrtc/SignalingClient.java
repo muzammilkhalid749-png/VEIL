@@ -52,10 +52,22 @@ public class SignalingClient {
     }
 
     private static SignalingClient instance;
+    private Context mContext;
     private Socket socket;
     private String currentUserId;
     private SignalingListener listener;
-    private final FirebaseFirestore db;
+    private FirebaseFirestore db;
+
+    public void setContext(Context context) {
+        if (context != null) {
+            this.mContext = context.getApplicationContext();
+        }
+    }
+
+    private Context getContext() {
+        if (mContext != null) return mContext;
+        return com.m3.veil.VeilApplication.getInstance();
+    }
     private ListenerRegistration firestoreSignalingListener;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isSocketConnected = false;
@@ -74,11 +86,16 @@ public class SignalingClient {
         if (instance == null) {
             instance = new SignalingClient();
         }
+        if (instance.mContext == null) {
+            instance.mContext = com.m3.veil.VeilApplication.getInstance();
+        }
         return instance;
     }
 
     private SignalingClient() {
-        db = FirebaseFirestore.getInstance();
+        try {
+            db = FirebaseFirestore.getInstance();
+        } catch (Throwable ignored) {}
     }
 
     public void setListener(SignalingListener listener) {
@@ -90,7 +107,80 @@ public class SignalingClient {
         this.currentUserId = userId;
 
         connectSocket(DEFAULT_SOCKET_URL);
+        listenWebSocketSignaling();
         listenFirestoreSignaling();
+    }
+
+    private void listenWebSocketSignaling() {
+        if (currentUserId == null) return;
+        Context ctx = getContext();
+        if (ctx == null) return;
+
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(ctx)
+                .subscribeToIncomingSignals(currentUserId, (type, fromUid, payload) -> {
+                    if (fromUid == null || fromUid.equals(currentUserId) || payload == null) return;
+                    String sigId = payload.optString("sigId", type + "_" + fromUid + "_" + payload.optLong("timestamp", System.currentTimeMillis()));
+                    if (processedSignalDocIds.contains(sigId)) return;
+                    processedSignalDocIds.add(sigId);
+
+                    mainHandler.post(() -> {
+                        try {
+                            if ("offer".equals(type)) {
+                                String sdp = payload.optString("sdp");
+                                if (listener != null) listener.onOfferReceived(fromUid, sdp);
+                            } else if ("answer".equals(type)) {
+                                String sdp = payload.optString("sdp");
+                                if (listener != null) listener.onAnswerReceived(fromUid, sdp);
+                            } else if ("candidate".equals(type) || "ice_candidate".equals(type)) {
+                                String sdpMid = payload.optString("sdpMid");
+                                int sdpMLineIndex = payload.optInt("sdpMLineIndex", 0);
+                                String sdp = payload.optString("candidate");
+                                IceCandidate candidate = new IceCandidate(sdpMid, sdpMLineIndex, sdp);
+                                checkAndTriggerHolePunchSpray(fromUid, candidate);
+                                if (listener != null) listener.onIceCandidateReceived(fromUid, candidate);
+                            } else if ("wake_up".equals(type)) {
+                                String chatId = payload.optString("chatId");
+                                if (listener != null) listener.onWakeUpReceived(fromUid, chatId);
+                            } else if ("call_invite".equals(type)) {
+                                String callId = payload.optString("callId");
+                                String callerName = payload.optString("callerName", "@Anonymous");
+                                String callType = payload.optString("callType", "audio");
+                                if (listener != null) listener.onCallInviteReceived(fromUid, callId, callerName, callType);
+                            } else if ("call_ringing".equals(type)) {
+                                String callId = payload.optString("callId");
+                                if (listener != null) listener.onCallRingingReceived(fromUid, callId);
+                            } else if ("call_accept".equals(type)) {
+                                String callId = payload.optString("callId");
+                                if (listener != null) listener.onCallAcceptReceived(fromUid, callId);
+                            } else if ("call_reject".equals(type)) {
+                                String callId = payload.optString("callId");
+                                String reason = payload.optString("reason", "declined");
+                                if (listener != null) listener.onCallRejectReceived(fromUid, callId, reason);
+                            } else if ("call_end".equals(type)) {
+                                String callId = payload.optString("callId");
+                                if (listener != null) listener.onCallEndReceived(fromUid, callId);
+                            }
+                        } catch (Exception e) {
+                            Log.w(TAG, "Error handling websocket signal: " + e.getMessage());
+                        }
+                    });
+                });
+    }
+
+    private void dispatchEphemeralSignal(String targetUserId, String type, JSONObject customPayload) {
+        if (targetUserId == null) return;
+        Context ctx = getContext();
+        if (ctx == null) return;
+        try {
+            JSONObject data = customPayload != null ? customPayload : new JSONObject();
+            data.put("type", type);
+            data.put("from", currentUserId != null ? currentUserId : "veil_anon");
+            data.put("to", targetUserId);
+            data.put("timestamp", System.currentTimeMillis());
+            data.put("sigId", type + "_" + (currentUserId != null ? currentUserId : "anon") + "_" + System.currentTimeMillis());
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(ctx)
+                    .sendEphemeralSignal(targetUserId, data, null);
+        } catch (Exception ignored) {}
     }
 
     private void connectSocket(String url) {
@@ -348,6 +438,12 @@ public class SignalingClient {
     }
 
     public void sendOffer(String targetUserId, String sdp) {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("sdp", sdp);
+            dispatchEphemeralSignal(targetUserId, "offer", payload);
+        } catch (Exception ignored) {}
+
         if (isSocketConnected && socket != null) {
             try {
                 JSONObject data = new JSONObject();
@@ -360,15 +456,25 @@ public class SignalingClient {
         }
 
         // Firestore Fallback
-        Map<String, Object> signal = new HashMap<>();
-        signal.put("type", "offer");
-        signal.put("from", currentUserId);
-        signal.put("sdp", sdp);
-        signal.put("timestamp", Timestamp.now());
-        db.collection("users").document(targetUserId).collection("signals").add(signal);
+        if (db != null) {
+            try {
+                Map<String, Object> signal = new HashMap<>();
+                signal.put("type", "offer");
+                signal.put("from", currentUserId);
+                signal.put("sdp", sdp);
+                signal.put("timestamp", Timestamp.now());
+                db.collection("users").document(targetUserId).collection("signals").add(signal);
+            } catch (Throwable ignored) {}
+        }
     }
 
     public void sendAnswer(String targetUserId, String sdp) {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("sdp", sdp);
+            dispatchEphemeralSignal(targetUserId, "answer", payload);
+        } catch (Exception ignored) {}
+
         if (isSocketConnected && socket != null) {
             try {
                 JSONObject data = new JSONObject();
@@ -381,15 +487,27 @@ public class SignalingClient {
         }
 
         // Firestore Fallback
-        Map<String, Object> signal = new HashMap<>();
-        signal.put("type", "answer");
-        signal.put("from", currentUserId);
-        signal.put("sdp", sdp);
-        signal.put("timestamp", Timestamp.now());
-        db.collection("users").document(targetUserId).collection("signals").add(signal);
+        if (db != null) {
+            try {
+                Map<String, Object> signal = new HashMap<>();
+                signal.put("type", "answer");
+                signal.put("from", currentUserId);
+                signal.put("sdp", sdp);
+                signal.put("timestamp", Timestamp.now());
+                db.collection("users").document(targetUserId).collection("signals").add(signal);
+            } catch (Throwable ignored) {}
+        }
     }
 
     public void sendIceCandidate(String targetUserId, IceCandidate candidate) {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("sdpMid", candidate.sdpMid);
+            payload.put("sdpMLineIndex", candidate.sdpMLineIndex);
+            payload.put("candidate", candidate.sdp);
+            dispatchEphemeralSignal(targetUserId, "candidate", payload);
+        } catch (Exception ignored) {}
+
         if (isSocketConnected && socket != null) {
             try {
                 JSONObject data = new JSONObject();
@@ -404,17 +522,27 @@ public class SignalingClient {
         }
 
         // Firestore Fallback
-        Map<String, Object> signal = new HashMap<>();
-        signal.put("type", "candidate");
-        signal.put("from", currentUserId);
-        signal.put("sdpMid", candidate.sdpMid);
-        signal.put("sdpMLineIndex", candidate.sdpMLineIndex);
-        signal.put("candidate", candidate.sdp);
-        signal.put("timestamp", Timestamp.now());
-        db.collection("users").document(targetUserId).collection("signals").add(signal);
+        if (db != null) {
+            try {
+                Map<String, Object> signal = new HashMap<>();
+                signal.put("type", "candidate");
+                signal.put("from", currentUserId);
+                signal.put("sdpMid", candidate.sdpMid);
+                signal.put("sdpMLineIndex", candidate.sdpMLineIndex);
+                signal.put("candidate", candidate.sdp);
+                signal.put("timestamp", Timestamp.now());
+                db.collection("users").document(targetUserId).collection("signals").add(signal);
+            } catch (Throwable ignored) {}
+        }
     }
 
     public void sendWakeUp(String targetUserId, String chatId) {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("chatId", chatId);
+            dispatchEphemeralSignal(targetUserId, "wake_up", payload);
+        } catch (Exception ignored) {}
+
         if (isSocketConnected && socket != null) {
             try {
                 JSONObject data = new JSONObject();
@@ -425,16 +553,28 @@ public class SignalingClient {
             } catch (Exception ignored) {}
         }
 
-        Map<String, Object> signal = new HashMap<>();
-        signal.put("type", "wake_up");
-        signal.put("from", currentUserId);
-        signal.put("chatId", chatId);
-        signal.put("timestamp", Timestamp.now());
-        db.collection("users").document(targetUserId).collection("signals").add(signal);
+        if (db != null) {
+            try {
+                Map<String, Object> signal = new HashMap<>();
+                signal.put("type", "wake_up");
+                signal.put("from", currentUserId);
+                signal.put("chatId", chatId);
+                signal.put("timestamp", Timestamp.now());
+                db.collection("users").document(targetUserId).collection("signals").add(signal);
+            } catch (Throwable ignored) {}
+        }
     }
 
     public void sendCallInvite(String targetUserId, String callId, String callerName, String callType) {
         if (targetUserId == null) return;
+        try {
+            JSONObject p = new JSONObject();
+            p.put("callId", callId);
+            p.put("callerName", callerName);
+            p.put("callType", callType);
+            dispatchEphemeralSignal(targetUserId, "call_invite", p);
+        } catch (Exception ignored) {}
+
         if (isSocketConnected && socket != null) {
             try {
                 JSONObject data = new JSONObject();
@@ -446,21 +586,30 @@ public class SignalingClient {
                 socket.emit("call_invite", data);
             } catch (Exception ignored) {}
         }
-        Map<String, Object> signal = new HashMap<>();
-        signal.put("type", "call_invite");
-        signal.put("from", currentUserId);
-        signal.put("callId", callId);
-        signal.put("callerName", callerName);
-        signal.put("callType", callType);
-        signal.put("timestamp", Timestamp.now());
-        db.collection("users").document(targetUserId).collection("signals").add(signal);
+        if (db != null) {
+            try {
+                Map<String, Object> signal = new HashMap<>();
+                signal.put("type", "call_invite");
+                signal.put("from", currentUserId);
+                signal.put("callId", callId);
+                signal.put("callerName", callerName);
+                signal.put("callType", callType);
+                signal.put("timestamp", Timestamp.now());
+                db.collection("users").document(targetUserId).collection("signals").add(signal);
+            } catch (Throwable ignored) {}
+        }
 
-        // Also trigger wake_up so background processes on target device are stimulated
         sendWakeUp(targetUserId, "call_" + callId);
     }
 
     public void sendCallRinging(String targetUserId, String callId) {
         if (targetUserId == null) return;
+        try {
+            JSONObject p = new JSONObject();
+            p.put("callId", callId);
+            dispatchEphemeralSignal(targetUserId, "call_ringing", p);
+        } catch (Exception ignored) {}
+
         if (isSocketConnected && socket != null) {
             try {
                 JSONObject data = new JSONObject();
@@ -470,16 +619,26 @@ public class SignalingClient {
                 socket.emit("call_ringing", data);
             } catch (Exception ignored) {}
         }
-        Map<String, Object> signal = new HashMap<>();
-        signal.put("type", "call_ringing");
-        signal.put("from", currentUserId);
-        signal.put("callId", callId);
-        signal.put("timestamp", Timestamp.now());
-        db.collection("users").document(targetUserId).collection("signals").add(signal);
+        if (db != null) {
+            try {
+                Map<String, Object> signal = new HashMap<>();
+                signal.put("type", "call_ringing");
+                signal.put("from", currentUserId);
+                signal.put("callId", callId);
+                signal.put("timestamp", Timestamp.now());
+                db.collection("users").document(targetUserId).collection("signals").add(signal);
+            } catch (Throwable ignored) {}
+        }
     }
 
     public void sendCallAccept(String targetUserId, String callId) {
         if (targetUserId == null) return;
+        try {
+            JSONObject p = new JSONObject();
+            p.put("callId", callId);
+            dispatchEphemeralSignal(targetUserId, "call_accept", p);
+        } catch (Exception ignored) {}
+
         if (isSocketConnected && socket != null) {
             try {
                 JSONObject data = new JSONObject();
@@ -489,16 +648,27 @@ public class SignalingClient {
                 socket.emit("call_accept", data);
             } catch (Exception ignored) {}
         }
-        Map<String, Object> signal = new HashMap<>();
-        signal.put("type", "call_accept");
-        signal.put("from", currentUserId);
-        signal.put("callId", callId);
-        signal.put("timestamp", Timestamp.now());
-        db.collection("users").document(targetUserId).collection("signals").add(signal);
+        if (db != null) {
+            try {
+                Map<String, Object> signal = new HashMap<>();
+                signal.put("type", "call_accept");
+                signal.put("from", currentUserId);
+                signal.put("callId", callId);
+                signal.put("timestamp", Timestamp.now());
+                db.collection("users").document(targetUserId).collection("signals").add(signal);
+            } catch (Throwable ignored) {}
+        }
     }
 
     public void sendCallReject(String targetUserId, String callId, String reason) {
         if (targetUserId == null) return;
+        try {
+            JSONObject p = new JSONObject();
+            p.put("callId", callId);
+            p.put("reason", reason != null ? reason : "declined");
+            dispatchEphemeralSignal(targetUserId, "call_reject", p);
+        } catch (Exception ignored) {}
+
         if (isSocketConnected && socket != null) {
             try {
                 JSONObject data = new JSONObject();
@@ -509,17 +679,27 @@ public class SignalingClient {
                 socket.emit("call_reject", data);
             } catch (Exception ignored) {}
         }
-        Map<String, Object> signal = new HashMap<>();
-        signal.put("type", "call_reject");
-        signal.put("from", currentUserId);
-        signal.put("callId", callId);
-        signal.put("reason", reason != null ? reason : "declined");
-        signal.put("timestamp", Timestamp.now());
-        db.collection("users").document(targetUserId).collection("signals").add(signal);
+        if (db != null) {
+            try {
+                Map<String, Object> signal = new HashMap<>();
+                signal.put("type", "call_reject");
+                signal.put("from", currentUserId);
+                signal.put("callId", callId);
+                signal.put("reason", reason != null ? reason : "declined");
+                signal.put("timestamp", Timestamp.now());
+                db.collection("users").document(targetUserId).collection("signals").add(signal);
+            } catch (Throwable ignored) {}
+        }
     }
 
     public void sendCallEnd(String targetUserId, String callId) {
         if (targetUserId == null) return;
+        try {
+            JSONObject p = new JSONObject();
+            p.put("callId", callId);
+            dispatchEphemeralSignal(targetUserId, "call_end", p);
+        } catch (Exception ignored) {}
+
         if (isSocketConnected && socket != null) {
             try {
                 JSONObject data = new JSONObject();
@@ -529,12 +709,16 @@ public class SignalingClient {
                 socket.emit("call_end", data);
             } catch (Exception ignored) {}
         }
-        Map<String, Object> signal = new HashMap<>();
-        signal.put("type", "call_end");
-        signal.put("from", currentUserId);
-        signal.put("callId", callId);
-        signal.put("timestamp", Timestamp.now());
-        db.collection("users").document(targetUserId).collection("signals").add(signal);
+        if (db != null) {
+            try {
+                Map<String, Object> signal = new HashMap<>();
+                signal.put("type", "call_end");
+                signal.put("from", currentUserId);
+                signal.put("callId", callId);
+                signal.put("timestamp", Timestamp.now());
+                db.collection("users").document(targetUserId).collection("signals").add(signal);
+            } catch (Throwable ignored) {}
+        }
     }
 
     private void checkAndTriggerHolePunchSpray(String targetUserId, IceCandidate candidate) {

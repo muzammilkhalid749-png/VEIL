@@ -22,9 +22,19 @@ public class CommentsAdapter extends RecyclerView.Adapter<CommentsAdapter.Commen
 
     private List<Comment> commentList;
     private OnCommentReplyListener replyListener;
+    private String postAuthor;
 
     public CommentsAdapter(List<Comment> commentList) {
+        this(commentList, null);
+    }
+
+    public CommentsAdapter(List<Comment> commentList, String postAuthor) {
         this.commentList = commentList;
+        this.postAuthor = postAuthor;
+    }
+
+    public void setPostAuthor(String postAuthor) {
+        this.postAuthor = postAuthor;
     }
 
     public void setOnCommentReplyListener(OnCommentReplyListener listener) {
@@ -41,12 +51,12 @@ public class CommentsAdapter extends RecyclerView.Adapter<CommentsAdapter.Commen
     @Override
     public void onBindViewHolder(@NonNull CommentViewHolder holder, int position) {
         Comment comment = commentList.get(position);
-        holder.bind(comment, replyListener);
+        holder.bind(comment, postAuthor, replyListener);
     }
 
     @Override
     public int getItemCount() {
-        return commentList.size();
+        return commentList != null ? commentList.size() : 0;
     }
 
     public void updateComments(List<Comment> newComments) {
@@ -64,14 +74,21 @@ public class CommentsAdapter extends RecyclerView.Adapter<CommentsAdapter.Commen
             text = itemView.findViewById(R.id.commentText);
         }
 
-        public void bind(Comment comment, OnCommentReplyListener replyListener) {
+        public void bind(Comment comment, String postAuthor, OnCommentReplyListener replyListener) {
             String rawUser = comment.getAuthorUsername() != null ? comment.getAuthorUsername() : "anonymous";
             String username = rawUser.startsWith("@") ? rawUser : "@" + rawUser;
+
+            boolean isOp = postAuthor != null && !postAuthor.isEmpty() &&
+                    (postAuthor.equalsIgnoreCase(rawUser) ||
+                     postAuthor.equalsIgnoreCase(comment.getAuthorId()) ||
+                     ("@" + postAuthor).equalsIgnoreCase(rawUser));
+            String opBadge = isOp ? " [OP]" : "";
+
             int depth = Math.min(1, Math.max(0, comment.getDepth())); // 2-level nested comments (#93)
             if (depth > 0) {
-                author.setText("↳ " + username + " • Reply");
+                author.setText("↳ " + username + opBadge + " • Reply");
             } else {
-                author.setText(username + " • Tap to reply");
+                author.setText(username + opBadge + " • Tap to reply");
             }
             text.setText(comment.getText());
 

@@ -64,8 +64,8 @@ public class ArchivedChatsActivity extends AppCompatActivity implements ChatsAda
         handleWindowInsets();
 
         encryptedDb = EncryptedChatDatabase.getInstance(this);
-        currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (currentUserId == null) currentUserId = "";
 
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
 

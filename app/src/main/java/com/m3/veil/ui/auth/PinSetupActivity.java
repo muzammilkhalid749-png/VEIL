@@ -354,17 +354,24 @@ public class PinSetupActivity extends AppCompatActivity {
             mac.init(keySpec);
             byte[] pinHash = mac.doFinal(pin.getBytes());
 
-            // Store in Firestore
-            String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-            Map<String, Object> pinData = new HashMap<>();
-            pinData.put("pin_hash", Base64.encodeToString(pinHash, Base64.DEFAULT));
-            pinData.put("server_salt", Base64.encodeToString(serverSalt, Base64.DEFAULT));
-            pinData.put("created_at", com.google.firebase.Timestamp.now());
+            // Store in Firestore if available
+            String userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+            if (userId == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
+                userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+            }
+            if (userId != null) {
+                Map<String, Object> pinData = new HashMap<>();
+                pinData.put("pin_hash", Base64.encodeToString(pinHash, Base64.DEFAULT));
+                pinData.put("server_salt", Base64.encodeToString(serverSalt, Base64.DEFAULT));
+                pinData.put("created_at", com.google.firebase.Timestamp.now());
 
-            FirebaseFirestore.getInstance()
-                    .collection("userSecurity")
-                    .document(userId)
-                    .set(pinData);
+                try {
+                    FirebaseFirestore.getInstance()
+                            .collection("userSecurity")
+                            .document(userId)
+                            .set(pinData);
+                } catch (Exception ignored) {}
+            }
 
         } catch (Exception e) {
             // Log error but don't fail the setup
@@ -377,15 +384,22 @@ public class PinSetupActivity extends AppCompatActivity {
         EncryptionManager.generateKeyPair();
         String publicKey = EncryptionManager.getPublicKeyString();
         
-        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        Map<String, Object> keyData = new HashMap<>();
-        keyData.put("publicKey", publicKey);
-        keyData.put("uploaded_at", com.google.firebase.Timestamp.now());
+        String userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (userId == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
+        if (userId != null) {
+            Map<String, Object> keyData = new HashMap<>();
+            keyData.put("publicKey", publicKey);
+            keyData.put("uploaded_at", com.google.firebase.Timestamp.now());
 
-        FirebaseFirestore.getInstance()
-                .collection("users")
-                .document(userId)
-                .set(keyData, com.google.firebase.firestore.SetOptions.merge());
+            try {
+                FirebaseFirestore.getInstance()
+                        .collection("users")
+                        .document(userId)
+                        .set(keyData, com.google.firebase.firestore.SetOptions.merge());
+            } catch (Exception ignored) {}
+        }
     }
 
     private void updateUI() {

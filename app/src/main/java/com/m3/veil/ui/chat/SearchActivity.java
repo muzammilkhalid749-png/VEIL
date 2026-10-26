@@ -68,12 +68,16 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_search);
 
-        db = FirebaseFirestore.getInstance();
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        } else {
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
+        }
+        if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = "local_user";
         }
+        try {
+            db = FirebaseFirestore.getInstance();
+        } catch (Throwable ignored) {}
 
         initializeViews();
         handleWindowInsets();
@@ -291,26 +295,16 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
         chatsAdapter.notifyDataSetChanged();
         updateEmptyState();
 
-        // 3. Ephemeral user directory lookup (username/handle discovery)
+        // 3. Ephemeral user directory lookup via Sovereign Nostr & SQLCipher Directory Engine
         if (!lower.isEmpty() && "all".equals(activeCategory)) {
             String cleanQuery = lower.startsWith("@") ? lower.substring(1) : lower;
             loadingBar.setVisibility(View.VISIBLE);
-            db.collection("users")
-                    .orderBy("username")
-                    .startAt(cleanQuery)
-                    .endAt(cleanQuery + "\uf8ff")
-                    .limit(10)
-                    .get()
-                    .addOnSuccessListener(queryDocumentSnapshots -> {
-                        loadingBar.setVisibility(View.GONE);
-                        boolean addedNew = false;
-                        for (DocumentSnapshot doc : queryDocumentSnapshots) {
-                            User user = doc.toObject(User.class);
-                            if (user != null) {
-                                if (user.getUserId() == null || user.getUserId().isEmpty()) {
-                                    user.setUserId(doc.getId());
-                                }
-                            }
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).searchUsersByUsername(cleanQuery, users -> {
+                runOnUiThread(() -> {
+                    loadingBar.setVisibility(View.GONE);
+                    boolean addedNew = false;
+                    if (users != null) {
+                        for (User user : users) {
                             if (user != null && user.getUserId() != null && !user.getUserId().equals(currentUserId)) {
                                 boolean exists = false;
                                 for (Chat c : filteredChats) {
@@ -341,12 +335,13 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
                                 }
                             }
                         }
-                        if (addedNew) {
-                            chatsAdapter.notifyDataSetChanged();
-                            updateEmptyState();
-                        }
-                    })
-                    .addOnFailureListener(e -> loadingBar.setVisibility(View.GONE));
+                    }
+                    if (addedNew) {
+                        chatsAdapter.notifyDataSetChanged();
+                        updateEmptyState();
+                    }
+                });
+            });
         }
     }
 

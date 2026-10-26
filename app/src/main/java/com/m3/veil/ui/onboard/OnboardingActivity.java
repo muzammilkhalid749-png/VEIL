@@ -196,8 +196,7 @@ public class OnboardingActivity extends AppCompatActivity {
         preferenceManager.setFirstTime(false);
 
         // Check if user is already signed in (might have signed in during onboarding)
-        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
-        if (currentUser != null) {
+        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
             // User is signed in, go to MainActivity
             navigateToMain();
         } else {

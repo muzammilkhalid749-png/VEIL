@@ -114,9 +114,10 @@ public class ChannelCommentsBottomSheet extends BottomSheetDialogFragment {
             postAuthor = getArguments().getString(ARG_POST_AUTHOR);
         }
 
-        currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid()
-                : "local_user";
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = "local_user";
+        }
 
         Persona persona = VeilFeatureManager.getInstance(requireContext()).getActivePersona();
         if (persona != null) {

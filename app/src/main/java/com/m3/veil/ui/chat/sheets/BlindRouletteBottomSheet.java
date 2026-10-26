@@ -70,8 +70,10 @@ public class BlindRouletteBottomSheet extends BottomSheetDialogFragment {
         super.onViewCreated(view, savedInstanceState);
 
         db = FirebaseFirestore.getInstance();
-        currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null ?
-                FirebaseAuth.getInstance().getCurrentUser().getUid() : "anon_" + UUID.randomUUID().toString().substring(0, 6);
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = "anon_" + UUID.randomUUID().toString().substring(0, 6);
+        }
         activePersonaName = VeilFeatureManager.getInstance(requireContext()).getActivePersona().getDisplayName();
 
         pbRadar = view.findViewById(R.id.pbRouletteRadar);

@@ -66,9 +66,11 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_calls, container, false);
 
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        } else {
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(requireContext()).getCurrentUserId();
+        }
+        if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = "local_user";
         }
 
@@ -517,8 +519,8 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
     private void startCall(CallRecord call) {
         if (call == null || getContext() == null) return;
         String myUid = (currentUserId != null && !currentUserId.isEmpty() && !"local_user".equals(currentUserId))
-                ? currentUserId : (FirebaseAuth.getInstance().getCurrentUser() != null
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "local_user");
+                ? currentUserId : (com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext()) != null
+                ? com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext()) : "local_user");
 
         boolean isOutgoing = "outgoing".equalsIgnoreCase(call.getStatus())
                 || (call.getCallerId() != null && call.getCallerId().equals(myUid))

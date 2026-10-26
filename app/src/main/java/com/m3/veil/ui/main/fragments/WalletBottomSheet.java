@@ -61,9 +61,8 @@ public class WalletBottomSheet extends BottomSheetDialogFragment {
         featureManager = VeilFeatureManager.getInstance(requireContext());
         db = FirebaseFirestore.getInstance();
 
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        } else {
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = "local_user";
         }
 

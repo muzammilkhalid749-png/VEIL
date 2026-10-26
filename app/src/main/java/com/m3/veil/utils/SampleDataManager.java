@@ -41,11 +41,14 @@ public class SampleDataManager {
 
     public static void generateSampleData(Context context, OnDataGeneratedListener listener) {
         FirebaseFirestore db = FirebaseFirestore.getInstance();
-        if (FirebaseAuth.getInstance().getCurrentUser() == null) {
+        String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(context);
+        if (currentUserId == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
+        if (currentUserId == null) {
             if (listener != null) listener.onFailure(new IllegalStateException("Not authenticated"));
             return;
         }
-        String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
         WriteBatch batch = db.batch();
         Random random = new Random();
         EncryptedChatDatabase localDb = EncryptedChatDatabase.getInstance(context);

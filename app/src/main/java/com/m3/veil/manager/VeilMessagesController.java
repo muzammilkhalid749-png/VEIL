@@ -384,10 +384,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         android.content.SharedPreferences prefs = mContext.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE);
         this.mCurrentUserId = prefs.getString("user_id", null);
         if (this.mCurrentUserId == null) {
-            com.google.firebase.auth.FirebaseUser fbUser = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
-            if (fbUser != null) {
-                this.mCurrentUserId = fbUser.getUid();
-            }
+            this.mCurrentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(mContext);
+        }
+        if (this.mCurrentUserId == null) {
+            this.mCurrentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(mContext).getCurrentUserId();
         }
         this.mCurrentUserName = prefs.getString("username", "VeilUser");
     }

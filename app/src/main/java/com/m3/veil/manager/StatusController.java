@@ -682,6 +682,8 @@ public class StatusController {
     }
 
     public String getCurrentUserId() {
+        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(appContext);
+        if (uid != null && !uid.isEmpty()) return uid;
         FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
         return u != null ? u.getUid() : "local_user";
     }

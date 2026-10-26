@@ -84,9 +84,13 @@ public class CreateChannelActivity extends AppCompatActivity {
         setContentView(R.layout.activity_create_channel);
         com.m3.veil.utils.UiAnimator.enableEdgeToEdge(this, findViewById(android.R.id.content));
 
-        currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid()
-                : "local_user";
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
+        }
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = "local_user";
+        }
 
         generatedChannelId = "channel_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 6);
 

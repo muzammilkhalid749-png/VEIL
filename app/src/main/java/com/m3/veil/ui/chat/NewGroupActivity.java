@@ -70,11 +70,12 @@ public class NewGroupActivity extends AppCompatActivity {
         handleWindowInsets();
 
         db = FirebaseFirestore.getInstance();
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        } else {
-            finish();
-            return;
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
+        }
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = "local_user";
         }
 
         initializeViews();

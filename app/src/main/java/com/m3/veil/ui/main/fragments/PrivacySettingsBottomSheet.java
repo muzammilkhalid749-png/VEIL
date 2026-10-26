@@ -59,8 +59,10 @@ public class PrivacySettingsBottomSheet extends BottomSheetDialogFragment {
         super.onViewCreated(view, savedInstanceState);
 
         prefs = requireContext().getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE);
-        currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "local";
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = "local";
+        }
 
         tvDefaultVanishStatus = view.findViewById(R.id.tvDefaultVanishStatus);
         tvLastSeenStatus = view.findViewById(R.id.tvLastSeenStatus);

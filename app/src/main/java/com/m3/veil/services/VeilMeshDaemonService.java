@@ -95,7 +95,8 @@ public class VeilMeshDaemonService extends Service {
         }
         if (instance == null) {
             instance = new VeilMeshDaemonService(appContext);
-            if (!isServiceRunning && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            String currentUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(appContext != null ? appContext : context);
+            if (!isServiceRunning && currentUid != null && !currentUid.isEmpty()) {
                 start(appContext != null ? appContext : context);
             }
         }
@@ -119,7 +120,8 @@ public class VeilMeshDaemonService extends Service {
             appContext = context.getApplicationContext();
         }
         if (isServiceRunning) return;
-        if (FirebaseAuth.getInstance().getCurrentUser() == null) return;
+        String currentUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(context);
+        if (currentUid == null || currentUid.isEmpty()) return;
         try {
             isServiceRunning = true;
             Intent intent = new Intent(context, VeilMeshDaemonService.class);
@@ -161,9 +163,8 @@ public class VeilMeshDaemonService extends Service {
     }
 
     private void ensureSignalingActive() {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user != null) {
-            String uid = user.getUid();
+        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(getCtx());
+        if (uid != null && !uid.isEmpty()) {
             if (uid.equals(activeSignalingUid)) {
                 return;
             }
@@ -333,8 +334,8 @@ public class VeilMeshDaemonService extends Service {
         if (recipientId == null || rawJsonPayload == null || rawJsonPayload.isEmpty()) return;
         daemonExecutor.execute(() -> {
             try {
-                FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-                String myUid = user != null ? user.getUid() : "local_user";
+                String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(getCtx());
+                if (myUid == null || myUid.isEmpty()) myUid = "local_user";
                 String chatId = WebRtcManager.getChatId(myUid, recipientId);
                 String actionId = "act_" + UUID.randomUUID().toString();
 
@@ -488,8 +489,8 @@ public class VeilMeshDaemonService extends Service {
 
                 // Broadcast signed MESH_DELIVERY_ACK across connected peers to wipe dead-drop from all relay nodes
                 if (purgedEnvId != null) {
-                    FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-                    String myUid = user != null ? user.getUid() : "";
+                    String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(getCtx());
+                    if (myUid == null) myUid = "";
                     sendMeshDeliveryAck(purgedEnvId, myUid);
                 }
 
@@ -541,8 +542,8 @@ public class VeilMeshDaemonService extends Service {
             String envelopeId = UUID.randomUUID().toString();
             String blindMailbox = computeBlindMailboxHash(item.recipientId);
 
-            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-            String originId = user != null ? user.getUid() : "anonymous";
+            String originId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(getCtx());
+            if (originId == null || originId.isEmpty()) originId = "anonymous";
 
             EncryptedChatDatabase.MeshEnvelopeRecord record = new EncryptedChatDatabase.MeshEnvelopeRecord();
             record.envelopeId = envelopeId;
@@ -642,8 +643,8 @@ public class VeilMeshDaemonService extends Service {
             long expiresAt = json.optLong("expiresAt", System.currentTimeMillis() + ENVELOPE_TTL_MS);
             String originPeerId = json.optString("originPeerId", "");
 
-            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-            String myUid = user != null ? user.getUid() : "";
+            String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(getCtx());
+            if (myUid == null) myUid = "";
             String currentMailbox = computeBlindMailboxHash(myUid, 0);
             String prevMailbox = computeBlindMailboxHash(myUid, -1);
 

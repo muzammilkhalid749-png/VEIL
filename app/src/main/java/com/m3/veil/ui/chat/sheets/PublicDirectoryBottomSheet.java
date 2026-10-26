@@ -100,8 +100,8 @@ public class PublicDirectoryBottomSheet extends BottomSheetDialogFragment {
         super.onViewCreated(view, savedInstanceState);
 
         db = FirebaseFirestore.getInstance();
-        currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null ?
-                FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (currentUserId == null) currentUserId = "";
 
         etSearch = view.findViewById(R.id.etSearchDirectory);
         chipGroupType = view.findViewById(R.id.chipGroupDirectoryType);

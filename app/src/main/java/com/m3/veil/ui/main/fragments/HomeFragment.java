@@ -246,10 +246,12 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_home, container, false);
 
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        } else {
-            currentUserId = "";
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(requireContext()).getCurrentUserId();
+        }
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = "local_user";
         }
 
         initializeViews(view);
@@ -1078,8 +1080,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     public void onResume() {
         super.onResume();
         loadLocalEncryptedChats();
-        if (getContext() != null && com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
-            String uid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid();
+        if (getContext() != null && com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(requireContext())) {
+            String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
             WebRtcManager.getInstance(requireContext()).fetchAndProcessOfflineInboxOnce(uid);
             if (groupsListenerRegistration == null) {
                 groupsListenerRegistration = com.google.firebase.firestore.FirebaseFirestore.getInstance()

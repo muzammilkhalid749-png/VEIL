@@ -38,13 +38,9 @@ public class AccountSettingsBottomSheet extends BottomSheetDialogFragment {
         super.onViewCreated(view, savedInstanceState);
 
         TextView tvAccountPhone = view.findViewById(R.id.tvAccountPhone);
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            String phone = FirebaseAuth.getInstance().getCurrentUser().getPhoneNumber();
-            if (phone != null && !phone.isEmpty()) {
-                tvAccountPhone.setText(phone);
-            } else {
-                tvAccountPhone.setText("UID: " + FirebaseAuth.getInstance().getCurrentUser().getUid());
-            }
+        String currentUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (tvAccountPhone != null && currentUid != null) {
+            tvAccountPhone.setText("Sovereign ID: " + currentUid);
         }
 
         view.findViewById(R.id.btnAccountPhone).setOnClickListener(v -> {
@@ -152,7 +148,7 @@ public class AccountSettingsBottomSheet extends BottomSheetDialogFragment {
                     requireContext().getSharedPreferences("veil_appearance_prefs", 0).edit().clear().apply();
                 } catch (Throwable ignored) { }
                 try {
-                    FirebaseAuth.getInstance().signOut();
+                    com.m3.veil.manager.AuthManager.getInstance().signOut(requireContext());
                 } catch (Throwable ignored) { }
 
                 Toast.makeText(requireContext(), "🔥 All local keys & conversations wiped", Toast.LENGTH_LONG).show();

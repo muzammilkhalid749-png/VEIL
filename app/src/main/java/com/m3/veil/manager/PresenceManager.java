@@ -87,9 +87,8 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
     }
 
     private void onAppForeground() {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) return;
-        String uid = user.getUid();
+        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        if (uid == null || uid.isEmpty()) return;
         Log.d(TAG, "App entered foreground -> status: online for " + uid);
 
         Map<String, Object> updates = new HashMap<>();
@@ -103,16 +102,15 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
     }
 
     private void onAppBackground() {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         stopHeartbeat();
-        if (user == null) return;
+        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        if (uid == null || uid.isEmpty()) return;
         if (context != null) {
             try {
                 com.m3.veil.webrtc.WebRtcManager.getInstance(context).broadcastLeaving();
             } catch (Throwable ignored) { }
         }
-        String uid = user.getUid();
-        Log.d(TAG, "App entered background -> status: offline for " + uid);
+                Log.d(TAG, "App entered background -> status: offline for " + uid);
 
         Map<String, Object> updates = new HashMap<>();
         updates.put("status", "offline");
@@ -124,9 +122,8 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
 
     public void markOfflineOnSignOut() {
         stopHeartbeat();
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user != null) {
-            String uid = user.getUid();
+        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        if (uid != null && !uid.isEmpty()) {
             Map<String, Object> updates = new HashMap<>();
             updates.put("status", "offline");
             updates.put("lastSeen", FieldValue.serverTimestamp());
@@ -139,7 +136,7 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
         heartbeatRunnable = new Runnable() {
             @Override
             public void run() {
-                if (isForeground && FirebaseAuth.getInstance().getCurrentUser() != null) {
+                if (isForeground && com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(PresenceManager.this.context)) {
                     Map<String, Object> updates = new HashMap<>();
                     updates.put("status", "online");
                     updates.put("lastSeen", FieldValue.serverTimestamp());

@@ -73,6 +73,30 @@ public class CallSignaling {
         if (userId.equals(uid) && registration != null) return;
         stop();
         this.uid = userId;
+
+        // 1. Instant ephemeral WebSocket signal subscription via Sovereign Nostr relays (<80ms)
+        android.content.Context ctx = context != null ? context : com.m3.veil.VeilApplication.getInstance();
+        if (ctx != null) {
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(ctx)
+                    .subscribeToIncomingSignals(userId, (type, fromUid, payload) -> {
+                        if (fromUid == null || fromUid.equals(userId) || payload == null) return;
+                        String docId = payload.optString("sigId", type + "_" + fromUid + "_" + payload.optLong("timestamp", System.currentTimeMillis()));
+                        if (!seenDocIds.add(docId)) return;
+
+                        CallSignal signal = null;
+                        String rawEncoded = payload.optString("signal", null);
+                        if (rawEncoded != null) {
+                            signal = CallSignal.decode(rawEncoded);
+                        }
+                        if (signal == null) {
+                            signal = CallSignal.decode(payload.toString());
+                        }
+                        if (signal != null) {
+                            dispatch(signal);
+                        }
+                    });
+        }
+
         registration = db.collection("users").document(userId).collection(COLLECTION)
                 .addSnapshotListener((snapshots, error) -> {
                     if (error != null) {
@@ -150,16 +174,38 @@ public class CallSignaling {
     public void sendTo(String targetUid, CallSignal signal) {
         if (targetUid == null) return;
         signal.to = targetUid;
-        Map<String, Object> doc = new HashMap<>();
-        doc.put("signal", signal.encode());
-        doc.put("type", signal.type);
-        doc.put("callId", signal.callId);
-        doc.put("from", signal.from);
-        doc.put("createdAt", FieldValue.serverTimestamp());
-        doc.put("timestamp", System.currentTimeMillis());
-        db.collection("users").document(targetUid).collection(COLLECTION)
-                .add(doc)
-                .addOnFailureListener(e -> Log.w(TAG, "failed to send " + signal.type + ": " + e.getMessage()));
+
+        // 1. Instant ephemeral WebSocket signaling via Sovereign Nostr relays (<80ms)
+        android.content.Context ctx = context != null ? context : com.m3.veil.VeilApplication.getInstance();
+        if (ctx != null) {
+            try {
+                org.json.JSONObject payload = new org.json.JSONObject();
+                payload.put("signal", signal.encode());
+                payload.put("type", signal.type);
+                payload.put("callId", signal.callId);
+                payload.put("from", signal.from);
+                payload.put("fromName", signal.fromName);
+                payload.put("callType", signal.callType);
+                payload.put("timestamp", System.currentTimeMillis());
+                payload.put("sigId", signal.type + "_" + signal.from + "_" + signal.callId + "_" + System.currentTimeMillis());
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(ctx)
+                        .sendEphemeralSignal(targetUid, payload, null);
+            } catch (Exception ignored) {}
+        }
+
+        // 2. Best-effort Firestore write if Firebase is present
+        try {
+            Map<String, Object> doc = new HashMap<>();
+            doc.put("signal", signal.encode());
+            doc.put("type", signal.type);
+            doc.put("callId", signal.callId);
+            doc.put("from", signal.from);
+            doc.put("createdAt", FieldValue.serverTimestamp());
+            doc.put("timestamp", System.currentTimeMillis());
+            db.collection("users").document(targetUid).collection(COLLECTION)
+                    .add(doc)
+                    .addOnFailureListener(e -> Log.w(TAG, "failed to send " + signal.type + ": " + e.getMessage()));
+        } catch (Throwable ignored) {}
 
         // Also dispatch direct high-priority FCM push to instantly wake callee if backgrounded/killed
         if (context != null) {

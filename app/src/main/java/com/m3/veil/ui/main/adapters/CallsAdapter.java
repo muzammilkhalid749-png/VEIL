@@ -82,8 +82,8 @@ public class CallsAdapter extends RecyclerView.Adapter<CallsAdapter.CallViewHold
 
         public void bind(CallRecord record, String currentUserId, OnCallItemClickListener listener) {
             String myId = (currentUserId != null && !currentUserId.isEmpty() && !"local_user".equals(currentUserId))
-                    ? currentUserId : (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null
-                    ? com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid() : "");
+                    ? currentUserId : com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(itemView.getContext());
+            if (myId == null) myId = "";
             android.content.Context ctx = itemView.getContext();
 
             boolean isMissed = "missed".equalsIgnoreCase(record.getStatus())

@@ -80,7 +80,7 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
                 } catch (Exception ignored) {}
 
                 // Lossless restore: If user had an existing username, go directly to Main or PinUnlock
-                if (hadExistingProfile && manifest.username != null && !manifest.username.trim().isEmpty()) {
+                if (manifest != null && manifest.username != null && !manifest.username.trim().isEmpty()) {
                     navigateToNextScreen();
                 } else {
                     // Brand-new phrase, proceed to Username setup
@@ -142,6 +142,8 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
         finish();
     }
 
+    private androidx.appcompat.app.AlertDialog restoreProgressDialog;
+
     private void showLoading(boolean show) {
         if (progressBar != null) {
             progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
@@ -153,6 +155,37 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
         }
         if (phraseEditText != null) {
             phraseEditText.setEnabled(!show);
+        }
+        if (show) {
+            if (restoreProgressDialog == null) {
+                android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+                layout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                float dp = getResources().getDisplayMetrics().density;
+                layout.setPadding((int) (24 * dp), (int) (20 * dp), (int) (24 * dp), (int) (20 * dp));
+                layout.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+                ProgressBar pb = new ProgressBar(this);
+                layout.addView(pb);
+
+                android.widget.TextView tv = new android.widget.TextView(this);
+                tv.setText("Restoring Sovereign Identity from Mesh...");
+                tv.setTextSize(15f);
+                tv.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.textPrimary));
+                tv.setPadding((int) (16 * dp), 0, 0, 0);
+                layout.addView(tv);
+
+                restoreProgressDialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setView(layout)
+                        .setCancelable(false)
+                        .create();
+            }
+            if (!isFinishing() && !isDestroyed()) {
+                try { restoreProgressDialog.show(); } catch (Exception ignored) {}
+            }
+        } else {
+            if (restoreProgressDialog != null && restoreProgressDialog.isShowing()) {
+                try { restoreProgressDialog.dismiss(); } catch (Exception ignored) {}
+            }
         }
     }
 

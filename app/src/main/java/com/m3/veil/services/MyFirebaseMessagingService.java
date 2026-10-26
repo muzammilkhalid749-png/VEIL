@@ -36,10 +36,12 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     @Override
     public void onNewToken(@NonNull String token) {
         super.onNewToken(token);
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-            FirebaseFirestore.getInstance().collection("users").document(userId)
-                    .update("fcmToken", token);
+        String userId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (userId != null && !userId.isEmpty()) {
+            try {
+                FirebaseFirestore.getInstance().collection("users").document(userId)
+                        .update("fcmToken", token);
+            } catch (Exception ignored) {}
         }
     }
 
@@ -70,8 +72,8 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
             VeilMeshDaemonService.start(this);
 
-            if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-                String currentUid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+            String currentUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+            if (currentUid != null && !currentUid.isEmpty()) {
                 WebRtcManager.getInstance(this).init(currentUid);
                 WebRtcManager.getInstance(this).fetchAndProcessOfflineInboxOnce(currentUid);
                 VeilMeshDaemonService daemon = VeilMeshDaemonService.getInstance();
@@ -114,8 +116,8 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
             // 3. Initialize CallEngine
             String currentUid = null;
-            if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-                currentUid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+            currentUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+            if (currentUid != null && !currentUid.isEmpty()) {
                 try {
                     com.m3.veil.calling.CallEngine.getInstance(this).init(currentUid);
                 } catch (Throwable t) {
@@ -147,9 +149,8 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         }
 
         // 1. Wake the appropriate stack.
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            String currentUid = FirebaseAuth.getInstance().getCurrentUser().getUid();
-
+        String currentUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (currentUid != null && !currentUid.isEmpty()) {
             // Wake up WebRTC P2P manager in background & immediately ingest any offline mailbox packets
             WebRtcManager.getInstance(this).init(currentUid);
             WebRtcManager.getInstance(this).fetchAndProcessOfflineInboxOnce(currentUid);

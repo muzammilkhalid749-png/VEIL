@@ -63,9 +63,11 @@ public class UserProfileActivity extends AppCompatActivity {
         androidx.activity.EdgeToEdge.enable(this);
         setContentView(R.layout.activity_user_profile);
 
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        } else {
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
+        }
+        if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = "local_user";
         }
 
@@ -114,21 +116,17 @@ public class UserProfileActivity extends AppCompatActivity {
         }
         if (avatarSrc == null && peerUserId != null && !peerUserId.trim().isEmpty()
                 && !peerUserId.startsWith("group_") && !peerUserId.startsWith("channel_")) {
-            FirebaseFirestore.getInstance().collection("users").document(peerUserId).get().addOnSuccessListener(doc -> {
-                if (doc.exists() && profileAvatarImage != null) {
-                    String remoteAvatar = doc.getString("avatar");
-                    if (remoteAvatar != null && !remoteAvatar.isEmpty()) {
-                        com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, remoteAvatar, peerUserName, isGroup);
-                        profileAvatarImage.setOnClickListener(v -> {
-                            Intent viewerIntent = new Intent(this, MediaViewerActivity.class);
-                            viewerIntent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, remoteAvatar);
-                            viewerIntent.putExtra(MediaViewerActivity.EXTRA_MEDIA_TYPE, "image");
-                            viewerIntent.putExtra(MediaViewerActivity.EXTRA_SENDER_NAME, peerUserName != null ? peerUserName : "Profile");
-                            startActivity(viewerIntent);
-                        });
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest cachedM =
+                    EncryptedChatDatabase.getInstance(this).getSovereignProfileManifest(peerUserId);
+            if (cachedM != null && cachedM.avatarBase64 != null && !cachedM.avatarBase64.isEmpty()) {
+                com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, cachedM.avatarBase64, peerUserName, isGroup);
+            } else {
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).queryNostrRelays(peerUserId, 3000, m -> {
+                    if (m != null && m.avatarBase64 != null && !m.avatarBase64.isEmpty() && profileAvatarImage != null) {
+                        runOnUiThread(() -> com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, m.avatarBase64, peerUserName, isGroup));
                     }
-                }
-            });
+                });
+            }
         }
 
         tvBlockUser = findViewById(R.id.tvBlockUser);

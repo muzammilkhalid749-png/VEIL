@@ -55,10 +55,24 @@ public class VeilApplication extends Application {
             android.util.Log.e("VeilApplication", "SQLCipher init error", e);
         }
 
-        // Initialize WebRTC & FCM session if user is logged in
-        if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
-            com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this,
-                    com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser());
+        // Initialize WebRTC, Call Engine & Mesh Daemon session if user is logged in (Firebase or Sovereign)
+        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
+            String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+            if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this,
+                        com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser());
+            } else {
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getLocalManifest();
+                if (manifest != null) {
+                    com.m3.veil.manager.AuthManager.getInstance().onSovereignSessionStarted(this, manifest);
+                } else if (uid != null) {
+                    com.m3.veil.webrtc.WebRtcManager.getInstance(this).init(uid);
+                    try {
+                        com.m3.veil.calling.CallEngine.getInstance(this).init(uid);
+                    } catch (Throwable ignored) {}
+                }
+            }
             com.m3.veil.services.VeilMeshDaemonService.start(this);
         }
     }

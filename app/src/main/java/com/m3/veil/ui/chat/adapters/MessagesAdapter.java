@@ -243,8 +243,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     public MessagesAdapter(List<Message> messages, OnMessageLongClickListener longClickListener, OnReactionClickListener reactionClickListener) {
         this.messages = messages;
-        this.currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null 
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
+        this.currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(com.m3.veil.VeilApplication.getInstance());
+        if (this.currentUserId == null || this.currentUserId.isEmpty()) {
+            this.currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null 
+                    ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
+        }
         this.timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
         this.longClickListener = longClickListener;
         this.reactionClickListener = reactionClickListener;

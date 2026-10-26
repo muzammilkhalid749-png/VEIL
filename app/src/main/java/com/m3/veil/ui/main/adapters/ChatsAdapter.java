@@ -31,8 +31,8 @@ public class ChatsAdapter extends RecyclerView.Adapter<ChatsAdapter.ChatViewHold
     public ChatsAdapter(List<Chat> chatList, OnChatClickListener listener) {
         this.chatList = chatList != null ? chatList : new ArrayList<>();
         this.listener = listener;
-        this.currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
+        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(com.m3.veil.VeilApplication.getInstance());
+        this.currentUserId = uid != null ? uid : "";
     }
 
     @NonNull

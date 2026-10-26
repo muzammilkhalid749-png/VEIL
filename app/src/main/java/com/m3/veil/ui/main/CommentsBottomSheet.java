@@ -86,9 +86,11 @@ public class CommentsBottomSheet extends BottomSheetDialogFragment {
             postId = getArguments().getString(ARG_POST_ID);
             postAuthor = getArguments().getString(ARG_POST_AUTHOR);
         }
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        } else {
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(requireContext()).getCurrentUserId();
+        }
+        if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = "local_user";
         }
     }
@@ -125,7 +127,7 @@ public class CommentsBottomSheet extends BottomSheetDialogFragment {
         btnClose.setOnClickListener(v -> dismiss());
 
         commentList = new ArrayList<>();
-        adapter = new CommentsAdapter(commentList);
+        adapter = new CommentsAdapter(commentList, postAuthor);
         adapter.setOnCommentReplyListener(parentComment -> {
             if (parentComment == null) return;
             // Enforce max 2-level nesting (#93): if replying to a depth-1 comment, attach to its root parent

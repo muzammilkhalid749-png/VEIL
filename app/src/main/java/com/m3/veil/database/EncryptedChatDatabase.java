@@ -1445,9 +1445,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     }
 
     public synchronized void markMessagesAsRead(String chatId) {
-        String uid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null
-                ? com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid()
-                : "";
+        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        if (uid == null) uid = "";
         markAllAsRead(chatId, uid);
     }
 
@@ -1972,9 +1971,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         if (chatId == null) return;
         String safeUserId = currentUserId;
         if (safeUserId == null) {
-            safeUserId = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null
-                    ? com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid()
-                    : "";
+            safeUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+            if (safeUserId == null) safeUserId = "";
         }
         SQLiteDatabase db = getEncryptedDb();
 
@@ -2531,8 +2529,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         if (record == null || record.getId() == null) return;
         SQLiteDatabase db = getEncryptedDb();
 
-        String myUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null ?
-                com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid() : "local_user";
+        String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        if (myUid == null || myUid.isEmpty()) myUid = "local_user";
 
         String callerId = record.getCallerId() != null ? record.getCallerId() : "";
         String receiverId = record.getReceiverId() != null ? record.getReceiverId() : "";
@@ -2649,8 +2647,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         if (chat == null) {
             chat = new Chat();
             chat.setId(chatId);
-            String myUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null ?
-                    com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid() : "local_user";
+            String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+            if (myUid == null || myUid.isEmpty()) myUid = "local_user";
             boolean isOutgoing = callerId.equals(myUid);
             String name = isOutgoing ? record.getReceiverName() : record.getCallerName();
             if (isMeOrBlank(name)) {
@@ -2706,8 +2704,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 int colStatus = cursor.getColumnIndex(COL_CALL_STATUS);
                 int colIsOut = cursor.getColumnIndex(COL_CALL_IS_OUTGOING);
 
-                String myUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null ?
-                        com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid() : "local_user";
+                String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+                if (myUid == null || myUid.isEmpty()) myUid = "local_user";
 
                 while (cursor.moveToNext()) {
                     String id = colId != -1 ? cursor.getString(colId) : "";
@@ -3889,6 +3887,56 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             }
         }
         return null;
+    }
+
+    public synchronized List<com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest> searchSovereignProfileManifests(String query) {
+        List<com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest> list = new ArrayList<>();
+        if (query == null) return list;
+        SQLiteDatabase db = getEncryptedDb();
+        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_SOVEREIGN_MANIFEST + " (" +
+                COL_SM_UID + " TEXT PRIMARY KEY, " +
+                COL_SM_USERNAME + " TEXT, " +
+                COL_SM_DISPLAY_NAME + " TEXT, " +
+                COL_SM_BIO + " TEXT, " +
+                COL_SM_AVATAR_BASE64 + " TEXT, " +
+                COL_SM_MOOD + " TEXT, " +
+                COL_SM_XP + " INTEGER, " +
+                COL_SM_KARMA + " INTEGER, " +
+                COL_SM_VEIL_COINS + " INTEGER, " +
+                COL_SM_PERSONAS_JSON + " TEXT, " +
+                COL_SM_PUBLIC_KEY + " TEXT, " +
+                COL_SM_UPDATED_AT + " INTEGER, " +
+                COL_SM_SIGNATURE + " TEXT" +
+                ");");
+        String q = "%" + query.toLowerCase(java.util.Locale.ROOT) + "%";
+        Cursor cursor = db.query(TABLE_SOVEREIGN_MANIFEST, null,
+                "LOWER(" + COL_SM_USERNAME + ") LIKE ? OR LOWER(" + COL_SM_DISPLAY_NAME + ") LIKE ? OR LOWER(" + COL_SM_UID + ") LIKE ?",
+                new String[]{q, q, q}, null, null, COL_SM_UPDATED_AT + " DESC LIMIT 30");
+        if (cursor != null) {
+            try {
+                while (cursor.moveToNext()) {
+                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest m =
+                            new com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest();
+                    m.uid = cursor.getString(cursor.getColumnIndexOrThrow(COL_SM_UID));
+                    m.username = cursor.getString(cursor.getColumnIndexOrThrow(COL_SM_USERNAME));
+                    m.displayName = cursor.getString(cursor.getColumnIndexOrThrow(COL_SM_DISPLAY_NAME));
+                    m.bio = cursor.getString(cursor.getColumnIndexOrThrow(COL_SM_BIO));
+                    m.avatarBase64 = cursor.getString(cursor.getColumnIndexOrThrow(COL_SM_AVATAR_BASE64));
+                    m.mood = cursor.getString(cursor.getColumnIndexOrThrow(COL_SM_MOOD));
+                    m.xp = cursor.getLong(cursor.getColumnIndexOrThrow(COL_SM_XP));
+                    m.karma = cursor.getLong(cursor.getColumnIndexOrThrow(COL_SM_KARMA));
+                    m.veilCoins = cursor.getLong(cursor.getColumnIndexOrThrow(COL_SM_VEIL_COINS));
+                    m.personasJsonArray = cursor.getString(cursor.getColumnIndexOrThrow(COL_SM_PERSONAS_JSON));
+                    m.publicKeyBase64 = cursor.getString(cursor.getColumnIndexOrThrow(COL_SM_PUBLIC_KEY));
+                    m.updatedAtTimestamp = cursor.getLong(cursor.getColumnIndexOrThrow(COL_SM_UPDATED_AT));
+                    m.signature = cursor.getString(cursor.getColumnIndexOrThrow(COL_SM_SIGNATURE));
+                    list.add(m);
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+        return list;
     }
 
     public synchronized int reapExpiredChannelPosts(long now) {

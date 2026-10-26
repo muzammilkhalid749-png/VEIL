@@ -544,8 +544,13 @@ public class ChatActivity extends AppCompatActivity {
 
         audioRecorderHelper = new AudioRecorderHelper();
         db = FirebaseFirestore.getInstance();
-        currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
+        }
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = "local_user";
+        }
 
         if (savedInstanceState != null) {
             isChatPinUnlocked = savedInstanceState.getBoolean("isChatPinUnlocked", false);

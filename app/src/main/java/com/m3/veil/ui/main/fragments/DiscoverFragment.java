@@ -583,8 +583,8 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
     @Override
     public void onAuthorClick(Post post) {
         if (post == null || getContext() == null) return;
-        String currentUid = FirebaseAuth.getInstance().getCurrentUser() != null
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
+        String currentUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (currentUid == null) currentUid = "";
 
         com.google.android.material.bottomsheet.BottomSheetDialog dialog =
                 new com.google.android.material.bottomsheet.BottomSheetDialog(requireContext());
@@ -630,8 +630,8 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
 
     private void startDirectChatWithAuthor(String authorId, String authorUsername) {
         if (authorId == null || authorId.isEmpty() || getContext() == null) return;
-        String currentUid = FirebaseAuth.getInstance().getCurrentUser() != null
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "local";
+        String currentUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        if (currentUid == null || currentUid.isEmpty()) currentUid = "local";
 
         List<String> ids = Arrays.asList(currentUid, authorId);
         Collections.sort(ids);

@@ -104,8 +104,8 @@ public class NotificationsActivity extends AppCompatActivity {
 
         chatDb = EncryptedChatDatabase.getInstance(this);
         featureManager = VeilFeatureManager.getInstance(this);
-        currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null ?
-                FirebaseAuth.getInstance().getCurrentUser().getUid() : "me";
+        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        if (currentUserId == null) currentUserId = "me";
         activePersonaName = featureManager.getActivePersona().getDisplayName();
 
         bindViews();
