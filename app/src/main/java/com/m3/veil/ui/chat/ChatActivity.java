@@ -292,6 +292,7 @@ public class ChatActivity extends AppCompatActivity {
     private boolean isChatPinUnlocked = false;
     private ConnectivityManager.NetworkCallback networkCallback;
     private boolean isP2PActive = false;
+    private boolean isActivityResumed = false;
     private int newMessagesWhileScrolledUp = 0;
 
     private final com.m3.veil.manager.VeilMessagesController.MessagesObserver messagesControllerObserver =
@@ -322,7 +323,9 @@ public class ChatActivity extends AppCompatActivity {
                             if (m.getId() != null && m.getId().equals(messageId)) {
                                 m.setDelivered(delivered);
                                 m.setRead(read);
-                                m.setPending(false);
+                                if (delivered || read || isNetworkAvailable()) {
+                                    m.setPending(false);
+                                }
                                 messagesAdapter.notifyItemChanged(i + 1);
                                 break;
                             }
@@ -424,15 +427,18 @@ public class ChatActivity extends AppCompatActivity {
                     return;
                 }
                 runOnUiThread(() -> {
+                    boolean canMarkRead = isActivityResumed && hasWindowFocus();
                     android.content.SharedPreferences privacyPrefs = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE);
                     boolean sendReadReceipt = privacyPrefs.getBoolean("read_receipts_enabled", true);
                     String targetReceiptPeer = (peerId != null && !peerId.isEmpty()) ? peerId : recipientId;
                     if (targetReceiptPeer != null && message != null) {
                         com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this)
-                                .sendReceipt(targetReceiptPeer, message.getId(), true, sendReadReceipt);
+                                .sendReceipt(targetReceiptPeer, message.getId(), true, canMarkRead && sendReadReceipt);
                     }
-                    com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this)
-                            .markAllAsRead(chatId, currentUserId);
+                    if (canMarkRead) {
+                        com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this)
+                                .markAllAsRead(chatId, currentUserId);
+                    }
                     reloadMessagesFromLocalVault();
                 });
             }
@@ -446,7 +452,9 @@ public class ChatActivity extends AppCompatActivity {
                     if (m.getId() != null && m.getId().equals(messageId)) {
                         m.setDelivered(delivered);
                         m.setRead(read);
-                        m.setPending(false);
+                        if (delivered || read || isNetworkAvailable()) {
+                            m.setPending(false);
+                        }
                         messagesAdapter.notifyItemChanged(i + 1);
                         break;
                     }
@@ -488,7 +496,9 @@ public class ChatActivity extends AppCompatActivity {
             if (peerId != null && peerId.equals(recipientId)) {
                 runOnUiThread(() -> {
                     updatePeerP2PStatus(true);
-                    sendReadReceiptsForUnreadMessages();
+                    if (isActivityResumed) {
+                        sendReadReceiptsForUnreadMessages();
+                    }
                 });
             }
         }
@@ -519,12 +529,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private boolean isNetworkAvailable() {
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (cm != null) {
-            NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-            return activeNetwork != null && activeNetwork.isConnectedOrConnecting();
-        }
-        return false;
+        return com.m3.veil.manager.VeilMessagesController.getInstance(this).isNetworkConnected();
     }
 
     @Override
@@ -661,7 +666,7 @@ public class ChatActivity extends AppCompatActivity {
 
         ensureLocalChatExists();
         if (isNetworkAvailable() && chatId != null) {
-            com.m3.veil.database.EncryptedChatDatabase.getInstance(this).clearPendingFlagsForChat(chatId);
+            com.m3.veil.manager.VeilMessagesController.getInstance(this).flushPendingOfflineMessagesOnNetworkAvailable();
         }
         loadLocalChatSettings();
         checkChatLockIfEnabled();
@@ -1496,6 +1501,9 @@ public class ChatActivity extends AppCompatActivity {
                 type
         );
         message.setBlink(isBlinkModeActive);
+        message.setPending(true);
+        message.setDelivered(false);
+        message.setRead(false);
         message.setSenderName(com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName());
 
         // Anonymous Channel Admin System (#82) - Blind rotating alias
@@ -1689,6 +1697,9 @@ public class ChatActivity extends AppCompatActivity {
                 Timestamp.now(),
                 mediaType
         );
+        message.setPending(true);
+        message.setDelivered(false);
+        message.setRead(false);
 
         if (replyMessage != null) {
             message.setReplyToMessageId(replyMessage.getId());
@@ -3592,6 +3603,9 @@ public class ChatActivity extends AppCompatActivity {
                 "text"
         );
         message.setBlink(isBlinkModeActive);
+        message.setPending(true);
+        message.setDelivered(false);
+        message.setRead(false);
         message.setSenderName(com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName());
 
         // Anonymous Channel Admin System (#82) - Blind rotating alias
@@ -3642,9 +3656,11 @@ public class ChatActivity extends AppCompatActivity {
 
     private void listenForMessages() {
         if (chatId == null) return;
-        com.m3.veil.database.EncryptedChatDatabase.getInstance(this).markAllAsRead(chatId, currentUserId);
+        if (isActivityResumed) {
+            com.m3.veil.database.EncryptedChatDatabase.getInstance(this).markAllAsRead(chatId, currentUserId);
+            sendReadReceiptsForUnreadMessages();
+        }
         reloadMessagesFromLocalVault();
-        sendReadReceiptsForUnreadMessages();
 
         if (isGroupChatContext() || chatId.startsWith("lounge_")) {
             attachGroupRealtimeListeners();
@@ -3745,7 +3761,7 @@ public class ChatActivity extends AppCompatActivity {
                                 } else {
                                     m.setPending(false);
                                     m.setDelivered(true);
-                                    m.setRead(true);
+                                    m.setRead(isActivityResumed);
                                 }
                                 com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveMessage(chatId, m);
                                 changed = true;
@@ -3774,7 +3790,9 @@ public class ChatActivity extends AppCompatActivity {
                         }
                     }
                     if (changed) {
-                        com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId);
+                        if (isActivityResumed) {
+                            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId);
+                        }
                         reloadMessagesFromLocalVault();
                     }
                 });
@@ -3813,7 +3831,7 @@ public class ChatActivity extends AppCompatActivity {
     private void processDirectFirestoreSnapshots(com.google.firebase.firestore.QuerySnapshot snapshots) {
         if (snapshots == null || chatId == null) return;
         boolean changed = false;
-        boolean isChatActiveInFg = chatId.equals(
+        boolean isChatActiveInFg = isActivityResumed && chatId.equals(
                 com.m3.veil.manager.VeilMessagesController.getInstance(ChatActivity.this).getActiveChatIdInForeground());
         String myOwnName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
         for (com.google.firebase.firestore.DocumentSnapshot mDoc : snapshots.getDocuments()) {
@@ -3986,13 +4004,15 @@ public class ChatActivity extends AppCompatActivity {
             }
         }
         if (changed) {
-            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId);
+            if (isChatActiveInFg) {
+                com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId);
+            }
             reloadMessagesFromLocalVault();
         }
     }
 
     private void sendReadReceiptsForUnreadMessages() {
-        if (chatId == null || recipientId == null) return;
+        if (!isActivityResumed || chatId == null || recipientId == null) return;
         android.content.SharedPreferences privacyPrefs = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE);
         boolean sendReadReceipt = privacyPrefs.getBoolean("read_receipts_enabled", true);
         if (!sendReadReceipt) return;
@@ -4032,6 +4052,7 @@ public class ChatActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        isActivityResumed = true;
         presenceHandler.removeCallbacks(presenceTicker);
         presenceHandler.post(presenceTicker);
         if (currentUserId != null) {
@@ -4047,9 +4068,10 @@ public class ChatActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
-        super.onPause();
-        presenceHandler.removeCallbacks(presenceTicker);
+        isActivityResumed = false;
         com.m3.veil.manager.VeilMessagesController.getInstance(this).setActiveChatIdInForeground(null);
+        presenceHandler.removeCallbacks(presenceTicker);
+        super.onPause();
     }
 
     private void reloadMessagesFromLocalVault() {

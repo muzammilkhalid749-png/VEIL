@@ -255,6 +255,9 @@ public class CallActivity extends AppCompatActivity {
         startPulseAnimation();
 
         if (isIncoming) {
+            if (engine.getState() == CallState.NONE && contactId != null) {
+                engine.onExternalInvite(contactId, callId, contactName, callType);
+            }
             showIncomingUi();
         } else {
             showOutgoingUi();

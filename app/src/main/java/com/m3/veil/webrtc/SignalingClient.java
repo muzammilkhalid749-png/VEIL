@@ -226,7 +226,7 @@ public class SignalingClient {
                             doc.getReference().delete();
 
                             Long ts = doc.getLong("timestamp");
-                            if (ts != null && (now - ts) > SIGNAL_MAX_AGE_MS) {
+                            if (ts != null && ts > 0 && (now - ts) > Math.max(SIGNAL_MAX_AGE_MS, 120_000L)) {
                                 continue;
                             }
 

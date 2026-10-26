@@ -384,18 +384,17 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         try {
             android.net.ConnectivityManager cm = (android.net.ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
             if (cm == null) return false;
+            android.net.NetworkInfo ni = cm.getActiveNetworkInfo();
+            if (ni == null || !ni.isConnected()) return false;
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                 android.net.Network net = cm.getActiveNetwork();
                 if (net == null) return false;
                 android.net.NetworkCapabilities caps = cm.getNetworkCapabilities(net);
-                return caps != null && (caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                        || caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
-                        || caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR)
-                        || caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET));
-            } else {
-                android.net.NetworkInfo ni = cm.getActiveNetworkInfo();
-                return ni != null && ni.isConnected();
+                if (caps == null) return false;
+                return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                        && caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED);
             }
+            return true;
         } catch (Exception e) {
             return false;
         }
@@ -782,23 +781,31 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         if (!isGroupOrChannel && (finalRecipientId == null || finalRecipientId.isEmpty())) return;
         final String effectiveRecipientId = finalRecipientId;
         message.setChatId(dialogId);
+        message.setPending(true);
+        message.setDelivered(false);
+        message.setRead(false);
+        if (message.getTimestamp() == null) {
+            message.setTimestamp(Timestamp.now());
+        }
+        if (message.getSenderId() == null) {
+            message.setSenderId(getCurrentUserId());
+        }
+        if (message.getSenderName() == null) {
+            message.setSenderName(getCurrentUserName());
+        }
+        if (isGroupOrChannel && (message.getReceiverId() == null || message.getReceiverId().isEmpty())) {
+            message.setReceiverId(dialogId);
+        }
+
+        // Synchronously cache & persist with pending=true BEFORE returning so ChatActivity.reloadMessagesFromLocalVault()
+        // immediately renders the Clock icon without a race condition.
+        putMessageInCache(dialogId, message);
+        mDatabase.saveMessage(dialogId, message);
+        updateDialogLastMessage(dialogId, message);
 
         mStageQueue.post(() -> {
             long lamport = nextLamportClock();
             int seq = nextDialogSeq(dialogId);
-
-            if (message.getTimestamp() == null) {
-                message.setTimestamp(Timestamp.now());
-            }
-            if (message.getSenderId() == null) {
-                message.setSenderId(getCurrentUserId());
-            }
-            if (message.getSenderName() == null) {
-                message.setSenderName(getCurrentUserName());
-            }
-            if (isGroupOrChannel && (message.getReceiverId() == null || message.getReceiverId().isEmpty())) {
-                message.setReceiverId(dialogId);
-            }
 
             long vanishTimer = message.getVanishTimer();
             if (vanishTimer <= 0 && chat != null && chat.getVanishTimer() > 0) {
@@ -999,11 +1006,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
                 for (String peer : targetPeers) {
                     boolean transmitted = false;
-                    if (localFile != null && localFile.exists()) {
-                        transmitted = sendMediaP2P(peer, msg, localFile);
-                    } else {
-                        VeilPacket pkt = new VeilPacket(VeilPacket.LANE_MSG, VeilPacket.TYPE_CHAT_MESSAGE, jsonPayloadStr);
-                        transmitted = WebRtcManager.getInstance(mContext).sendPacket(peer, pkt);
+                    if (hasNetwork) {
+                        if (localFile != null && localFile.exists()) {
+                            transmitted = sendMediaP2P(peer, msg, localFile);
+                        } else {
+                            VeilPacket pkt = new VeilPacket(VeilPacket.LANE_MSG, VeilPacket.TYPE_CHAT_MESSAGE, jsonPayloadStr);
+                            transmitted = WebRtcManager.getInstance(mContext).sendPacket(peer, pkt);
+                        }
                     }
 
                     if (transmitted) {
@@ -1031,8 +1040,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     }
                 }
 
-                if (anyTransmitted || hasNetwork) {
-                    // Dispatched over active P2P DataChannel or online relay: transition from Clock (pending=true) to Single Tick (pending=false)
+                if (hasNetwork) {
+                    // Dispatched while online: transition from Clock (pending=true) to Single Tick (pending=false)
                     msg.setPending(false);
                     mStorageQueue.execute(() -> {
                         mDatabase.updateMessageStatus(msg.getId(), msg.isDelivered(), msg.isRead());
@@ -1048,8 +1057,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         }
                     });
                 } else {
-                    // Device has NO network connectivity and no direct P2P channel: keep Clock icon (pending=true)
+                    // Device has NO network connectivity: strictly keep Clock icon (pending=true)
                     msg.setPending(true);
+                    msg.setDelivered(false);
+                    msg.setRead(false);
                     mStorageQueue.execute(() -> {
                         mDatabase.setMessagePending(msg.getId(), true);
                         refreshDialogInCache(dialogId);
@@ -2478,11 +2489,12 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
      * Marks all messages in a dialog as read and broadcasts READ_ACK packets.
      */
     public void markDialogAsRead(String dialogId, String recipientId) {
-        if (dialogId == null) return;
+        if (dialogId == null || !dialogId.equals(mActiveChatIdInForeground)) return;
 
         mStageQueue.post(() -> {
+            if (!dialogId.equals(mActiveChatIdInForeground)) return;
             mStorageQueue.execute(() -> {
-                mDatabase.markMessagesAsRead(dialogId);
+                mDatabase.markAllAsRead(dialogId, getCurrentUserId());
                 mUnreadCountByDialog.put(dialogId, new AtomicInteger(0));
                 refreshDialogInCache(dialogId);
             });

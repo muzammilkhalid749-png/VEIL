@@ -1446,6 +1446,12 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     public synchronized void markMessagesAsRead(String chatId) {
         String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        if (uid == null || uid.trim().isEmpty()) {
+            uid = this.context.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE).getString("user_id", null);
+        }
+        if (uid == null || uid.trim().isEmpty()) {
+            uid = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context).getCurrentUserId();
+        }
         if (uid == null) uid = "";
         markAllAsRead(chatId, uid);
     }
@@ -2055,52 +2061,58 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     public synchronized void markAllAsRead(String chatId, String currentUserId) {
         if (chatId == null) return;
         String safeUserId = currentUserId;
-        if (safeUserId == null) {
+        if (safeUserId == null || safeUserId.trim().isEmpty()) {
             safeUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
-            if (safeUserId == null) safeUserId = "";
         }
+        if (safeUserId == null || safeUserId.trim().isEmpty()) {
+            safeUserId = this.context.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE).getString("user_id", null);
+        }
+        if (safeUserId == null || safeUserId.trim().isEmpty()) {
+            safeUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context).getCurrentUserId();
+        }
+        if (safeUserId == null) safeUserId = "";
         SQLiteDatabase db = getEncryptedDb();
 
         // 1. If any unread incoming message is in "after_read" vanish mode and hasn't started its timer yet (COL_MSG_EXPIRES_AT == 0),
         // start its expiration countdown now upon being read!
-        try {
-            Chat chat = getChat(chatId);
-            long defaultTimer = chat != null ? chat.getVanishTimer() : 0;
-            String defaultMode = chat != null ? chat.getVanishMode() : "after_send";
-            long now = System.currentTimeMillis();
-
-            Cursor cursor = db.query(TABLE_MESSAGES,
-                    new String[]{COL_MSG_ID, COL_MSG_VANISH_TIMER, COL_MSG_VANISH_MODE, COL_MSG_EXPIRES_AT},
-                    COL_MSG_CHAT_ID + "=? AND " + COL_MSG_SENDER_ID + "!=? AND " + COL_MSG_READ + "=0",
-                    new String[]{chatId, safeUserId}, null, null, null);
-            if (cursor != null) {
-                try {
-                    while (cursor.moveToNext()) {
-                        String msgId = cursor.getString(0);
-                        long vTimer = cursor.getLong(1);
-                        String vMode = cursor.getString(2);
-                        long expAt = cursor.getLong(3);
-
-                        if (vTimer <= 0) vTimer = defaultTimer;
-                        if (vMode == null || vMode.isEmpty()) vMode = defaultMode;
-
-                        if ("after_read".equals(vMode) && vTimer > 0 && expAt == 0) {
-                            ContentValues expCv = new ContentValues();
-                            expCv.put(COL_MSG_EXPIRES_AT, now + vTimer);
-                            db.update(TABLE_MESSAGES, expCv, COL_MSG_ID + "=?", new String[]{msgId});
-                        }
-                    }
-                } finally {
-                    cursor.close();
-                }
-            }
-        } catch (Exception ignored) {}
-
-        ContentValues cv = new ContentValues();
-        cv.put(COL_MSG_READ, 1);
-        cv.put(COL_MSG_DELIVERED, 1);
-
         if (!safeUserId.isEmpty()) {
+            try {
+                Chat chat = getChat(chatId);
+                long defaultTimer = chat != null ? chat.getVanishTimer() : 0;
+                String defaultMode = chat != null ? chat.getVanishMode() : "after_send";
+                long now = System.currentTimeMillis();
+
+                Cursor cursor = db.query(TABLE_MESSAGES,
+                        new String[]{COL_MSG_ID, COL_MSG_VANISH_TIMER, COL_MSG_VANISH_MODE, COL_MSG_EXPIRES_AT},
+                        COL_MSG_CHAT_ID + "=? AND " + COL_MSG_SENDER_ID + "!=? AND " + COL_MSG_READ + "=0",
+                        new String[]{chatId, safeUserId}, null, null, null);
+                if (cursor != null) {
+                    try {
+                        while (cursor.moveToNext()) {
+                            String msgId = cursor.getString(0);
+                            long vTimer = cursor.getLong(1);
+                            String vMode = cursor.getString(2);
+                            long expAt = cursor.getLong(3);
+
+                            if (vTimer <= 0) vTimer = defaultTimer;
+                            if (vMode == null || vMode.isEmpty()) vMode = defaultMode;
+
+                            if ("after_read".equals(vMode) && vTimer > 0 && expAt == 0) {
+                                ContentValues expCv = new ContentValues();
+                                expCv.put(COL_MSG_EXPIRES_AT, now + vTimer);
+                                db.update(TABLE_MESSAGES, expCv, COL_MSG_ID + "=?", new String[]{msgId});
+                            }
+                        }
+                    } finally {
+                        cursor.close();
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            ContentValues cv = new ContentValues();
+            cv.put(COL_MSG_READ, 1);
+            cv.put(COL_MSG_DELIVERED, 1);
+
             db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=? AND " + COL_MSG_SENDER_ID + "!=?",
                     new String[]{chatId, safeUserId});
             for (Message m : ramSingleMessageCache.values()) {
@@ -2109,9 +2121,6 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     m.setRead(true);
                 }
             }
-        } else {
-            db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=?",
-                    new String[]{chatId});
         }
 
         ContentValues chatCv = new ContentValues();

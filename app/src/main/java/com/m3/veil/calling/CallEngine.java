@@ -1170,19 +1170,36 @@ public class CallEngine implements CallSignaling.Listener {
         }
     }
 
+    public void onExternalInvite(String fromUserId, String incomingCallId, String callerName, String incomingCallType) {
+        if (fromUserId == null || incomingCallId == null || incomingCallId.isEmpty()) return;
+        main.post(() -> {
+            if (endedCallIds.contains(incomingCallId)) return;
+            if (isInCall() && callId != null && callId.equals(incomingCallId)) return;
+            CallSignal sig = CallSignal.of(CallSignal.INVITE, incomingCallId, fromUserId)
+                    .to(currentUserId != null ? currentUserId : "");
+            sig.fromName = callerName;
+            sig.callType = incomingCallType != null ? incomingCallType : "audio";
+            sig.timestamp = System.currentTimeMillis();
+            onInvite(sig, fromUserId);
+        });
+    }
+
     private void onInvite(CallSignal signal, String from) {
         if (signal.callId != null && endedCallIds.contains(signal.callId)) {
             Log.i(TAG, "ignoring invite for already-ended call " + signal.callId);
             return;
         }
         long ageMs = System.currentTimeMillis() - signal.timestamp;
-        if (ageMs > config.ringingTimeoutMs) {
+        if (signal.timestamp > 0 && ageMs > Math.max(config.ringingTimeoutMs, 120_000L)) {
             // The caller rang while this device was offline and has long since
             // given up: record a missed call instead of ringing a dead session.
             missedStaleCall(signal, from, ageMs);
             return;
         }
         if (isInCall()) {
+            if (callId != null && callId.equals(signal.callId)) {
+                return;
+            }
             CallSignal busy = CallSignal.of(CallSignal.DECLINE, signal.callId, currentUserId).to(from);
             busy.payload = reasonPayload(CallEndReason.BUSY);
             signaling.send(busy);

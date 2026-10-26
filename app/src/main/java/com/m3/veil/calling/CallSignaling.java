@@ -138,8 +138,8 @@ public class CallSignaling {
 
                             long age = now - sig.timestamp;
                             long maxAge = CallSignal.INVITE.equals(sig.type)
-                                    ? MAX_INVITE_AGE_MS : MAX_SIGNAL_AGE_MS;
-                            if (age > maxAge) {
+                                    ? Math.max(MAX_INVITE_AGE_MS, 120_000L) : Math.max(MAX_SIGNAL_AGE_MS, 180_000L);
+                            if (sig.timestamp > 0 && age > maxAge) {
                                 continue;
                             }
 
@@ -170,8 +170,8 @@ public class CallSignaling {
 
                             long age = System.currentTimeMillis() - sig.timestamp;
                             long maxAge = CallSignal.INVITE.equals(sig.type)
-                                    ? MAX_INVITE_AGE_MS : MAX_SIGNAL_AGE_MS;
-                            if (age > maxAge) return;
+                                    ? Math.max(MAX_INVITE_AGE_MS, 120_000L) : Math.max(MAX_SIGNAL_AGE_MS, 180_000L);
+                            if (sig.timestamp > 0 && age > maxAge) return;
 
                             dispatchSignalToListeners(sig);
                         });

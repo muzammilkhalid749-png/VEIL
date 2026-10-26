@@ -134,18 +134,31 @@ public class VeilCallService extends Service implements CallEngine.Listener {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 boolean isVideo = engine != null && engine.isVideoEnabled();
                 int type = computeForegroundServiceType(isVideo);
-                startForeground(NOTIFICATION_ID, notification, type);
+                if (type != 0) {
+                    startForeground(NOTIFICATION_ID, notification, type);
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+                } else {
+                    startForeground(NOTIFICATION_ID, notification);
+                }
             } else {
                 startForeground(NOTIFICATION_ID, notification);
             }
         } catch (Throwable t) {
-            Log.w(TAG, "startForeground failed: " + t.getMessage());
+            Log.w(TAG, "startForeground primary failed, trying fallback: " + t.getMessage());
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    startForeground(NOTIFICATION_ID, buildNotification(null), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+                } else {
+                    startForeground(NOTIFICATION_ID, buildNotification(null));
+                }
+            } catch (Throwable ignored) {}
         }
     }
 
     private int computeForegroundServiceType(boolean isVideo) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0;
-        int type = ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL;
+        int type = 0;
         if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO)
                 == android.content.pm.PackageManager.PERMISSION_GRANTED) {
             type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
@@ -158,6 +171,9 @@ public class VeilCallService extends Service implements CallEngine.Listener {
         }
         if (engine != null && engine.isScreenSharing()) {
             type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION;
+        }
+        if (type == 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            type = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE;
         }
         return type;
     }

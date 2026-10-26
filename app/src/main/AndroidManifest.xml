@@ -24,6 +24,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
@@ -205,7 +207,7 @@
         <service
             android:name=".calling.VeilCallService"
             android:exported="false"
-            android:foregroundServiceType="microphone|camera|mediaProjection|phoneCall" />
+            android:foregroundServiceType="microphone|camera|mediaProjection|phoneCall|specialUse" />
 
         <service
             android:name=".calling.VeilConnectionService"
@@ -226,6 +228,7 @@
 
         <service
             android:name=".services.VeilMeshDaemonService"
+            android:foregroundServiceType="dataSync|specialUse"
             android:stopWithTask="false"
             android:exported="false" />
 

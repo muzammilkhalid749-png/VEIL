@@ -234,20 +234,27 @@ public class VeilMeshDaemonService extends Service {
     private void startForegroundSafe() {
         try {
             Notification notification = buildSilentMeshNotification();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
                         NOTIFICATION_ID,
                         notification,
-                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-                                | android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
                 );
             } else {
                 startForeground(NOTIFICATION_ID, notification);
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             try {
-                startForeground(NOTIFICATION_ID, buildSilentMeshNotification());
-            } catch (Exception ignored) {}
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    startForeground(
+                            NOTIFICATION_ID,
+                            buildSilentMeshNotification(),
+                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                    );
+                } else {
+                    startForeground(NOTIFICATION_ID, buildSilentMeshNotification());
+                }
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -518,6 +525,7 @@ public class VeilMeshDaemonService extends Service {
             if (pending == null || pending.isEmpty()) return;
 
             WebRtcManager rtc = WebRtcManager.getInstance(ctx);
+            if (!rtc.isNetworkAvailable()) return;
             List<String> connectedPeers = rtc.getConnectedPeerIds();
             long now = System.currentTimeMillis();
 

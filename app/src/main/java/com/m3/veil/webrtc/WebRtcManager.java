@@ -210,6 +210,11 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          }
          this.initializedUserId = userId;
          SignalingClient.getInstance().init(userId);
+         this.mainHandler.post(() -> {
+            try {
+               com.m3.veil.calling.CallEngine.getInstance(this.context).init(userId);
+            } catch (Throwable ignored) {}
+         });
          VeilMeshDaemonService.start(this.context);
          this.syncAllPendingMessages();
       }
@@ -336,18 +341,24 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       try {
          ConnectivityManager cm = (ConnectivityManager)this.context.getSystemService("connectivity");
          if (cm == null) {
-            return true;
+            return false;
          } else {
-            Network network = cm.getActiveNetwork();
-            if (network == null) {
+            android.net.NetworkInfo ni = cm.getActiveNetworkInfo();
+            if (ni == null || !ni.isConnected()) {
                return false;
-            } else {
-               NetworkCapabilities caps = cm.getNetworkCapabilities(network);
-               return caps != null && (caps.hasCapability(12) || caps.hasTransport(1) || caps.hasTransport(0));
             }
+            if (VERSION.SDK_INT >= 23) {
+               Network network = cm.getActiveNetwork();
+               if (network == null) {
+                  return false;
+               }
+               NetworkCapabilities caps = cm.getNetworkCapabilities(network);
+               return caps != null && caps.hasCapability(12) && caps.hasCapability(16);
+            }
+            return true;
          }
       } catch (Exception var4) {
-         return true;
+         return false;
       }
    }
 
@@ -376,9 +387,27 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   }
                }
 
+               public void onLost(Network network) {
+                  try {
+                     if (this.activeNet != null && this.activeNet.equals(network)) {
+                        this.activeNet = null;
+                     }
+                     for (DataChannel dc : WebRtcManager.this.dataChannels.values()) {
+                        if (dc != null) {
+                           try {
+                              dc.close();
+                           } catch (Throwable ignored) {}
+                        }
+                     }
+                     WebRtcManager.this.dataChannels.clear();
+                     WebRtcManager.this.peerHubs.clear();
+                  } catch (Throwable ignored) {
+                  }
+               }
+
                public void onCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities) {
                   try {
-                     if (WebRtcManager.this.currentUserId != null && networkCapabilities != null && networkCapabilities.hasCapability(12)) {
+                     if (WebRtcManager.this.currentUserId != null && networkCapabilities != null && networkCapabilities.hasCapability(12) && networkCapabilities.hasCapability(16)) {
                         VeilMeshDaemonService daemon = VeilMeshDaemonService.getInstance(WebRtcManager.this.context);
                         if (daemon != null) {
                            daemon.triggerOutboxSync();
@@ -921,6 +950,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    }
 
    public boolean sendPacket(String peerId, VeilPacket packet) {
+      if (!this.isNetworkAvailable()) {
+         return false;
+      }
       if (peerId != null && packet != null) {
          PeerChannelHub hub = (PeerChannelHub)this.peerHubs.get(peerId);
          DataChannel dc = hub != null ? hub.getChannelForLane(packet.getLane()) : (DataChannel)this.dataChannels.get(peerId);
@@ -2781,6 +2813,15 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                         this.processedCallInvites.add(callId);
                         this.activeCallId = callId;
                         this.activeCallPeerId = fromUserId;
+                        try {
+                           com.m3.veil.calling.CallEngine engine = com.m3.veil.calling.CallEngine.getInstance(this.context);
+                           if (this.currentUserId != null) {
+                              engine.init(this.currentUserId);
+                           }
+                           engine.onExternalInvite(fromUserId, callId, callerName, callType);
+                        } catch (Throwable t) {
+                           Log.w("WebRtcManager", "CallEngine external invite sync warning: " + t.getMessage());
+                        }
                         SignalingClient.getInstance().sendCallRinging(fromUserId, callId);
                         this.getOrCreatePeerConnection(fromUserId, false);
 
