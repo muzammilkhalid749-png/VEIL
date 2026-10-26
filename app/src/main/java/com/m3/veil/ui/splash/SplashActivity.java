@@ -471,45 +471,26 @@ public class SplashActivity extends AppCompatActivity {
 
 
         if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
-
             String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
 
+            // 1. Check local user preferences
+            User localUser = userPrefs.getCurrentUser();
+            if (localUser != null && localUser.getUsername() != null && !localUser.getUsername().trim().isEmpty()) {
+                goToNextScreen();
+                return;
+            }
 
+            // 2. Check local SQLCipher sovereign profile manifest
+            try {
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                        com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getSovereignProfileManifest(currentUserId);
+                if (manifest != null && manifest.username != null && !manifest.username.trim().isEmpty()) {
+                    goToNextScreen();
+                    return;
+                }
+            } catch (Throwable ignored) {}
 
-            FirebaseFirestore.getInstance()
-
-                    .collection("users")
-
-                    .document(currentUserId)
-
-                    .get()
-
-                    .addOnCompleteListener(task -> {
-
-                        if (task.isSuccessful() && task.getResult().exists()) {
-
-                            User user = task.getResult().toObject(User.class);
-
-                            if (user != null && user.getUsername() != null && !user.getUsername().isEmpty()) {
-
-                                userPrefs.saveUser(user);
-
-                                goToNextScreen();
-
-                            } else {
-
-                                goToUsernameActivity();
-
-                            }
-
-                        } else {
-
-                            createUserDocumentAndGoToUsername();
-
-                        }
-
-                    });
-
+            goToUsernameActivity();
         } else {
 
             goToPhoneAuth();

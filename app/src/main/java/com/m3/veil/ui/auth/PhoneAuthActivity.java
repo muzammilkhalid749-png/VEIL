@@ -500,7 +500,7 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
 
         PhoneNumberUtils.ValidationResult result =
 
-                PhoneNumberUtils.validatePhoneNumberForFirebase(countryCode, rawPhoneNumber);
+                PhoneNumberUtils.validatePhoneNumber(countryCode, rawPhoneNumber);
 
 
 
@@ -514,13 +514,13 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
 
 
 
-        String firebaseNumber = result.formattedNumber;
+        String cleanNumber = result.formattedNumber;
 
 
 
         showLoading(true, false);
 
-        sendVerificationCode(firebaseNumber);
+        sendVerificationCode(cleanNumber);
 
     }
 
