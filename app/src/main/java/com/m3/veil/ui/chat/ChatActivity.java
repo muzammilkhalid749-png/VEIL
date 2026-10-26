@@ -606,10 +606,11 @@ public class ChatActivity extends AppCompatActivity {
         com.m3.veil.webrtc.WebRtcManager.getInstance(this).init(currentUserId);
         if (recipientId != null && !recipientId.trim().isEmpty()
                 && !recipientId.startsWith("group_") && !recipientId.startsWith("channel_") && !recipientId.startsWith("lounge_")) {
-            // Perfect Negotiation: only the lexicographically larger peer initiates WebRTC on chat open
-            // to avoid simultaneous SDP offer collisions (glare) and kHaveLocalOffer state aborts
+            // Perfect Negotiation: lexicographically larger peer initiates WebRTC offer, smaller sends Wake-Knock
             if (currentUserId != null && currentUserId.compareTo(recipientId) > 0) {
                 com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
+            } else {
+                com.m3.veil.webrtc.SignalingClient.getInstance().sendWakeUp(recipientId, chatId);
             }
         }
         com.m3.veil.webrtc.WebRtcManager.getInstance(this).addEventListener(p2pChatListener);

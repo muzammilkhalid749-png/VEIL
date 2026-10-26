@@ -1567,9 +1567,14 @@ public class SovereignIdentityAndDirectoryEngine {
                 String sigType = signalPayload.optString("type", "message");
                 long createdAt = System.currentTimeMillis() / 1000L;
 
+                // Deterministic BIP-340 Schnorr keypair derivation from UID
+                byte[] privKey32 = com.m3.veil.crypto.Bip340Schnorr.sha256(("nostr_seed_" + (myUid != null ? myUid : "veil_anon")).getBytes(StandardCharsets.UTF_8));
+                byte[] pubKey32 = com.m3.veil.crypto.Bip340Schnorr.getPublicKey(privKey32);
+                String pubKeyHex = com.m3.veil.crypto.Bip340Schnorr.bytesToHex(pubKey32);
+
                 JSONObject event = new JSONObject();
                 event.put("kind", 25000);
-                event.put("pubkey", sha256Hex((myUid != null ? myUid : "veil_anon").getBytes(StandardCharsets.UTF_8)));
+                event.put("pubkey", pubKeyHex);
                 event.put("created_at", createdAt);
 
                 JSONArray tags = new JSONArray();
@@ -1591,9 +1596,14 @@ public class SovereignIdentityAndDirectoryEngine {
                 event.put("tags", tags);
                 event.put("content", signalPayload.toString());
 
-                String serialized = "[0,\"" + event.getString("pubkey") + "\"," + createdAt + ",25000," + tags.toString() + ",\"" + escapeJson(signalPayload.toString()) + "\"]";
-                event.put("id", sha256Hex(serialized.getBytes(StandardCharsets.UTF_8)));
-                event.put("sig", "sig_" + createdAt);
+                String serialized = "[0,\"" + pubKeyHex + "\"," + createdAt + ",25000," + tags.toString() + ",\"" + escapeJson(signalPayload.toString()) + "\"]";
+                byte[] idHash = com.m3.veil.crypto.Bip340Schnorr.sha256(serialized.getBytes(StandardCharsets.UTF_8));
+                String idHex = com.m3.veil.crypto.Bip340Schnorr.bytesToHex(idHash);
+                event.put("id", idHex);
+
+                byte[] sigBytes = com.m3.veil.crypto.Bip340Schnorr.sign(idHash, privKey32);
+                String sigHex = com.m3.veil.crypto.Bip340Schnorr.bytesToHex(sigBytes);
+                event.put("sig", sigHex);
 
                 String eventMsg = "[\"EVENT\"," + event.toString() + "]";
 

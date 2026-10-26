@@ -74,11 +74,11 @@ public class CallSignaling {
         stop();
         this.uid = userId;
 
-        // 1. Instant ephemeral WebSocket signal subscription via Sovereign Nostr relays (<80ms)
+        // 1. Instant ephemeral signal subscription via Universal Signaling Relay (<50ms)
         android.content.Context ctx = context != null ? context : com.m3.veil.VeilApplication.getInstance();
         if (ctx != null) {
-            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(ctx)
-                    .subscribeToIncomingSignals(userId, (type, fromUid, payload) -> {
+            com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(ctx)
+                    .start(userId, (type, fromUid, payload) -> {
                         if (fromUid == null || fromUid.equals(userId) || payload == null) return;
                         String docId = payload.optString("sigId", type + "_" + fromUid + "_" + payload.optLong("timestamp", System.currentTimeMillis()));
                         if (!seenDocIds.add(docId)) return;
@@ -175,7 +175,7 @@ public class CallSignaling {
         if (targetUid == null) return;
         signal.to = targetUid;
 
-        // 1. Instant ephemeral WebSocket signaling via Sovereign Nostr relays (<80ms)
+        // 1. Instant ephemeral signaling via Universal Signaling Relay (UDP LAN + MQTT + Nostr)
         android.content.Context ctx = context != null ? context : com.m3.veil.VeilApplication.getInstance();
         if (ctx != null) {
             try {
@@ -188,8 +188,8 @@ public class CallSignaling {
                 payload.put("callType", signal.callType);
                 payload.put("timestamp", System.currentTimeMillis());
                 payload.put("sigId", signal.type + "_" + signal.from + "_" + signal.callId + "_" + System.currentTimeMillis());
-                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(ctx)
-                        .sendEphemeralSignal(targetUid, payload, null);
+                com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(ctx)
+                        .sendSignal(targetUid, signal.type, payload);
             } catch (Exception ignored) {}
         }
 

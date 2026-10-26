@@ -23,6 +23,7 @@ import com.m3.veil.utils.EncryptionManager;
 import com.m3.veil.utils.FileMediaManager;
 import com.m3.veil.webrtc.P2PFileTransferHelper;
 import com.m3.veil.webrtc.VeilPacket;
+import com.m3.veil.webrtc.SignalingClient;
 import com.m3.veil.webrtc.WebRtcManager;
 
 import org.json.JSONArray;
@@ -909,6 +910,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
                         // Enqueue into VeilMeshDaemonService with full Chat metadata
                         VeilMeshDaemonService.getInstance(mContext).enqueueOutgoingMessage(chat, peer, msg);
+
+                        // Proactively initiate WebRTC connection & send Wake-Knock so peer connects
+                        WebRtcManager.getInstance(mContext).initiateConnection(peer);
+                        SignalingClient.getInstance().sendWakeUp(peer, dialogId);
+
+                        // Immediate Direct E2EE Chat Delivery over multi-tier signaling (delivers in < 50ms without waiting for WebRTC ICE)
+                        if (localFile == null) {
+                            SignalingClient.getInstance().sendDirectChatPacket(peer, msg.getId(), jsonPayloadStr);
+                        }
                     }
                 }
 
