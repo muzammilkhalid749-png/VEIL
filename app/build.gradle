@@ -1,7 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.google.gms.google.services)
-    alias(libs.plugins.firebase.crashlytics)
     alias(libs.plugins.secrets)
 }
 
@@ -63,26 +61,11 @@ dependencies {
     implementation libs.activity
     implementation libs.constraintlayout
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.0.0'
-    implementation libs.firebase.auth
-    implementation libs.credentials
-    implementation libs.credentials.play.services.auth
-    implementation libs.googleid
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
 
     implementation 'com.github.mukeshsolanki:android-otpview-pinview:3.2.0'
-    
-    // Add Firebase BoM (Bill of Materials) to manage library versions
-    implementation platform('com.google.firebase:firebase-bom:34.5.0')
-
-    // Firebase libraries (versions are managed by the BoM)
-    // firebase-auth and material are already included via the libs alias above.
-    implementation 'com.google.firebase:firebase-firestore'
-    implementation 'com.google.firebase:firebase-messaging'
-    implementation 'com.google.firebase:firebase-analytics'
-    implementation("com.google.firebase:firebase-crashlytics-ndk")
-    implementation("com.google.firebase:firebase-analytics")
 
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
     implementation 'com.google.crypto.tink:tink-android:1.9.0'
