@@ -470,7 +470,13 @@ public class VeilMeshDaemonService extends Service {
             p.put("vanishMode", message.getVanishMode());
             if (chat != null) {
                 p.put("isGroup", chat.isGroup());
-                if (chat.getName() != null) p.put("chatName", chat.getName());
+                if (chat.isGroup() && chat.getName() != null) {
+                    p.put("chatName", chat.getName());
+                } else {
+                    String sName = message.getSenderName() != null ? message.getSenderName()
+                            : VeilFeatureManager.getInstance(ctx).getActivePersona().getDisplayName();
+                    p.put("chatName", sName);
+                }
                 if (chat.getType() != null) p.put("chatType", chat.getType());
             }
             json.put("payload", p);

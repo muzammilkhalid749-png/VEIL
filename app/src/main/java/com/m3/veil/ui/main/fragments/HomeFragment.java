@@ -788,8 +788,67 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         loadingBar.setVisibility(View.GONE);
         List<Chat> localChats = EncryptedChatDatabase.getInstance(requireContext()).getAllChats(true);
         allLocalChats.clear();
+        String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        String myPersonaName = VeilFeatureManager.getInstance(requireContext()).getActivePersona().getDisplayName();
         if (localChats != null) {
-            allLocalChats.addAll(localChats);
+            for (Chat c : localChats) {
+                allLocalChats.add(c);
+                if (!c.isGroup() && c.getId() != null && !c.getId().startsWith("group_") && !c.getId().startsWith("channel_")) {
+                    String curName = c.getName();
+                    boolean needsPeerLookup = curName == null || curName.isEmpty()
+                            || (myPersonaName != null && curName.equals(myPersonaName))
+                            || "Direct Chat".equals(curName)
+                            || "Veil Contact".equals(curName)
+                            || "Veil User".equals(curName)
+                            || "Anonymous Peer".equals(curName);
+                    if (needsPeerLookup) {
+                        String peerId = null;
+                        if (c.getParticipants() != null) {
+                            for (String p : c.getParticipants()) {
+                                if (p != null && !p.equals(myUid)) {
+                                    peerId = p;
+                                    break;
+                                }
+                            }
+                        }
+                        if (peerId == null && c.getId().contains("_")) {
+                            String[] sp = c.getId().split("_");
+                            if (sp.length == 2 && myUid != null) {
+                                peerId = sp[0].equals(myUid) ? sp[1] : sp[0];
+                            }
+                        }
+                        if (peerId != null && !peerId.isEmpty()) {
+                            final String fChatId = c.getId();
+                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    .collection("users").document(peerId).get()
+                                    .addOnSuccessListener(uDoc -> {
+                                        if (uDoc != null && uDoc.exists() && getContext() != null) {
+                                            String pName = uDoc.getString("displayName");
+                                            if (pName == null || pName.isEmpty()) pName = uDoc.getString("username");
+                                            String pAvatar = uDoc.getString("avatar");
+                                            if (pName != null && !pName.isEmpty()) {
+                                                Chat target = EncryptedChatDatabase.getInstance(requireContext()).getChat(fChatId);
+                                                if (target != null && (!pName.equals(target.getName()) || (pAvatar != null && !pAvatar.isEmpty()))) {
+                                                    target.setName(pName);
+                                                    if (pAvatar != null && !pAvatar.isEmpty()) target.setAvatar(pAvatar);
+                                                    EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(target);
+                                                    for (Chat mem : allLocalChats) {
+                                                        if (fChatId.equals(mem.getId())) {
+                                                            mem.setName(pName);
+                                                            if (pAvatar != null && !pAvatar.isEmpty()) mem.setAvatar(pAvatar);
+                                                        }
+                                                    }
+                                                    if (isAdded() && chatsAdapter != null) {
+                                                        chatsAdapter.notifyDataSetChanged();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                        }
+                    }
+                }
+            }
         }
         updateFilterCounts();
         applyFilterAndDisplay();
@@ -1136,20 +1195,47 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     }
                                 }
 
+                                Chat existing = EncryptedChatDatabase.getInstance(requireContext()).getChat(gId);
+                                String myPersonaName = VeilFeatureManager.getInstance(requireContext()).getActivePersona().getDisplayName();
                                 String chatTitle = gName;
                                 if (isDirectChat) {
-                                    if (chatTitle == null || chatTitle.isEmpty() || "Encrypted Group".equals(chatTitle) || "Direct Chat".equals(chatTitle)) {
-                                        chatTitle = "Veil Contact";
+                                    String resolvedPeerName = null;
+                                    Object pNamesObj = doc.get("participantNames");
+                                    if (pNamesObj instanceof java.util.Map && peerId != null) {
+                                        Object val = ((java.util.Map<?, ?>) pNamesObj).get(peerId);
+                                        if (val instanceof String && !((String) val).isEmpty()) {
+                                            resolvedPeerName = (String) val;
+                                        }
                                     }
+                                    String lastSenderId = doc.getString("lastMessageSenderId");
+                                    String lastSenderName = doc.getString("lastMessageSenderName");
+                                    if ((resolvedPeerName == null || resolvedPeerName.isEmpty())
+                                            && peerId != null && peerId.equals(lastSenderId)
+                                            && lastSenderName != null && !lastSenderName.isEmpty()) {
+                                        resolvedPeerName = lastSenderName;
+                                    }
+                                    if ((resolvedPeerName == null || resolvedPeerName.isEmpty()) && existing != null) {
+                                        String exName = existing.getName();
+                                        if (exName != null && !exName.isEmpty()
+                                                && !"Direct Chat".equals(exName)
+                                                && !"Encrypted Group".equals(exName)
+                                                && !"Veil Contact".equals(exName)
+                                                && !"Veil User".equals(exName)
+                                                && !"Anonymous Peer".equals(exName)
+                                                && (myPersonaName == null || !exName.equals(myPersonaName))) {
+                                            resolvedPeerName = exName;
+                                        }
+                                    }
+                                    chatTitle = (resolvedPeerName != null && !resolvedPeerName.isEmpty()) ? resolvedPeerName : null;
                                 } else if (chatTitle == null || chatTitle.isEmpty()) {
                                     chatTitle = "channel".equals(chatType) ? "Broadcast Channel" : "Encrypted Group";
                                 }
 
-                                Chat existing = EncryptedChatDatabase.getInstance(requireContext()).getChat(gId);
                                 if (existing == null) {
+                                    String initialTitle = chatTitle != null ? chatTitle : (isDirectChat ? "Veil Contact" : "Encrypted Group");
                                     Chat newGroup = new Chat(
                                             gId,
-                                            chatTitle,
+                                            initialTitle,
                                             lastMsg != null ? lastMsg : (isDirectChat ? "Direct chat created" : ("channel".equals(chatType) ? "Broadcast channel created" : "Group invite received")),
                                             ts,
                                             avatar,
@@ -1168,7 +1254,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     updated = true;
                                 } else {
                                     boolean changed = false;
-                                    if (chatTitle != null && !chatTitle.equals(existing.getName()) && !"Encrypted Group".equals(chatTitle)) {
+                                    if (chatTitle != null && !chatTitle.isEmpty() && !chatTitle.equals(existing.getName()) && !"Encrypted Group".equals(chatTitle)) {
                                         existing.setName(chatTitle);
                                         changed = true;
                                     }
@@ -1195,7 +1281,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     }
                                 }
 
-                                if (isDirectChat && peerId != null && (chatTitle == null || "Veil User".equals(chatTitle))) {
+                                if (isDirectChat && peerId != null) {
                                     final String fPeerId = peerId;
                                     final String fGId = gId;
                                     com.google.firebase.firestore.FirebaseFirestore.getInstance()
@@ -1204,12 +1290,23 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 if (userDoc != null && userDoc.exists() && getContext() != null) {
                                                     String dName = userDoc.getString("displayName");
                                                     if (dName == null || dName.isEmpty()) dName = userDoc.getString("username");
+                                                    String uAvatar = userDoc.getString("avatar");
                                                     if (dName != null && !dName.isEmpty()) {
                                                         Chat c = EncryptedChatDatabase.getInstance(requireContext()).getChat(fGId);
-                                                        if (c != null && !dName.equals(c.getName())) {
-                                                            c.setName(dName);
-                                                            EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(c);
-                                                            if (isAdded()) loadLocalEncryptedChats();
+                                                        if (c != null) {
+                                                            boolean cChanged = false;
+                                                            if (!dName.equals(c.getName())) {
+                                                                c.setName(dName);
+                                                                cChanged = true;
+                                                            }
+                                                            if (uAvatar != null && !uAvatar.isEmpty() && !uAvatar.equals(c.getAvatar())) {
+                                                                c.setAvatar(uAvatar);
+                                                                cChanged = true;
+                                                            }
+                                                            if (cChanged) {
+                                                                EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(c);
+                                                                if (isAdded()) loadLocalEncryptedChats();
+                                                            }
                                                         }
                                                     }
                                                 }

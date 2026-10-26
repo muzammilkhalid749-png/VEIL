@@ -50,7 +50,7 @@ public class FirebaseFirestore {
     private static final FirebaseFirestore INSTANCE = new FirebaseFirestore();
 
     private final ExecutorService ioExecutor = Executors.newCachedThreadPool();
-    private final ScheduledExecutorService pollExecutor = Executors.newScheduledThreadPool(2);
+    private final ScheduledExecutorService pollExecutor = Executors.newScheduledThreadPool(8);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final OkHttpClient httpClient = new OkHttpClient.Builder()
             .connectTimeout(4, TimeUnit.SECONDS)
@@ -230,7 +230,7 @@ public class FirebaseFirestore {
             Map<String, DocumentSnapshot> resultDocs = new HashMap<>();
 
             try {
-                String url = BASE_URL + "/" + normCollection + "?pageSize=100";
+                String url = BASE_URL + "/" + normCollection + "?pageSize=300";
                 Request req = new Request.Builder().url(url).get().build();
                 try (Response resp = httpClient.newCall(req).execute()) {
                     if (resp.isSuccessful() && resp.body() != null) {
@@ -308,7 +308,7 @@ public class FirebaseFirestore {
                     });
                 }
             });
-        }, 0, 1200, TimeUnit.MILLISECONDS);
+        }, 0, 850, TimeUnit.MILLISECONDS);
 
         return () -> {
             future.cancel(false);
@@ -378,7 +378,7 @@ public class FirebaseFirestore {
                             });
                         }
                     });
-        }, 0, 1000, TimeUnit.MILLISECONDS);
+        }, 0, 750, TimeUnit.MILLISECONDS);
 
         return () -> future.cancel(false);
     }

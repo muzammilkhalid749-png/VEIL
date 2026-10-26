@@ -131,7 +131,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         new Handler(Looper.getMainLooper()).post(() -> {
             for (int i = 0; i < messages.size(); i++) {
                 if (messageId.equals(messages.get(i).getId())) {
-                    notifyItemChanged(i);
+                    notifyItemChanged(i + 1);
                     break;
                 }
             }

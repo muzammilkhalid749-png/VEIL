@@ -901,9 +901,18 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     if (transmitted) {
                         anyTransmitted = true;
                     } else {
+                        if (localFile == null || !localFile.exists()) {
+                            try {
+                                com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(
+                                        peer, "p2p_chat", new org.json.JSONObject(jsonPayloadStr));
+                            } catch (Exception ignored) {}
+                        }
+                        WebRtcManager.getInstance(mContext).initiateConnection(peer);
+
                         String outboxKey = isGroup ? (msg.getId() + "_" + peer) : msg.getId();
                         OutboxEntry outbox = new OutboxEntry(msg, dialogId, peer, isGroup,
-                                chat != null ? chat.getName() : null, chat != null ? chat.getType() : "direct", localFile);
+                                chat != null && isGroup ? chat.getName() : getCurrentUserName(),
+                                chat != null ? chat.getType() : "direct", localFile);
                         mOutboxQueue.add(outbox);
                         mPendingOutboxById.put(outboxKey, outbox);
 
@@ -915,6 +924,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 // Dual-path Firestore + WebRTC dispatch completed: clear pending flag so Single Tick (Sent) displays immediately
                 msg.setPending(false);
                 mStorageQueue.execute(() -> mDatabase.updateMessageStatus(msg.getId(), msg.isDelivered(), msg.isRead()));
+                final String fDialogId = dialogId;
+                final String fMsgId = msg.getId();
+                final boolean fDelivered = msg.isDelivered();
+                final boolean fRead = msg.isRead();
+                mMainHandler.post(() -> {
+                    for (MessagesObserver obs : mObservers) {
+                        obs.onMessageStatusChanged(fDialogId, fMsgId, fDelivered, fRead);
+                    }
+                });
             } catch (Exception e) {
                 Log.e(TAG, "Error encoding and dispatching message packet", e);
             }
@@ -1066,11 +1084,22 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             chatSummary.put("timestampMs", tsVal.toDate().getTime());
             chatSummary.put("isGroup", false);
             chatSummary.put("type", "direct");
-            if (chat != null && chat.getName() != null && !chat.getName().isEmpty()) {
-                chatSummary.put("groupName", chat.getName());
-            } else {
-                chatSummary.put("groupName", "Direct Chat");
+            String senderDispName = msg.getSenderName() != null ? msg.getSenderName() : getCurrentUserName();
+            Map<String, Object> participantNames = new HashMap<>();
+            if (myId != null && !myId.isEmpty() && senderDispName != null && !senderDispName.isEmpty()) {
+                participantNames.put(myId, senderDispName);
             }
+            if (targetPeer != null && !targetPeer.isEmpty() && chat != null && chat.getName() != null
+                    && !chat.getName().isEmpty()
+                    && !chat.getName().equals(senderDispName)
+                    && !"Direct Chat".equals(chat.getName())
+                    && !"Veil Contact".equals(chat.getName())
+                    && !"Veil User".equals(chat.getName())
+                    && !"Anonymous Peer".equals(chat.getName())) {
+                participantNames.put(targetPeer, chat.getName());
+            }
+            chatSummary.put("participantNames", participantNames);
+            chatSummary.put("groupName", "Direct Chat");
 
             fs.collection("groups").document(directChatId)
                     .set(chatSummary, com.google.firebase.firestore.SetOptions.merge())
@@ -2270,7 +2299,11 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     || (dialogId != null && (dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_")));
             p.put("isGroup", isGroup);
             if (chat != null) {
-                if (chat.getName() != null) p.put("chatName", chat.getName());
+                if (isGroup && chat.getName() != null) {
+                    p.put("chatName", chat.getName());
+                } else {
+                    p.put("chatName", msg.getSenderName() != null ? msg.getSenderName() : getCurrentUserName());
+                }
                 if (chat.getType() != null) p.put("chatType", chat.getType());
                 if (chat.getAdminId() != null) p.put("adminId", chat.getAdminId());
                 if (chat.getDescription() != null) p.put("description", chat.getDescription());

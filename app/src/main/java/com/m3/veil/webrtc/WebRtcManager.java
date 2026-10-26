@@ -98,6 +98,8 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    private final Map<String, Runnable> turnFallbackRunnables = new ConcurrentHashMap<>();
    private final Set<String> turnActivePeers = Collections.newSetFromMap(new ConcurrentHashMap<>());
    private final Map<String, Long> peerLastSeenTime = new ConcurrentHashMap<>();
+   private final Map<String, List<IceCandidate>> pendingIceCandidates = new ConcurrentHashMap<>();
+   private final Map<String, Long> lastOfferTimestamp = new ConcurrentHashMap<>();
    private final List<P2PEventListener> listeners = Collections.synchronizedList(new ArrayList<>());
    private final Handler mainHandler = new Handler(Looper.getMainLooper());
    private final Handler heartbeatHandler = new Handler(Looper.getMainLooper());
@@ -126,7 +128,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             DataChannel dc = (DataChannel)entry.getValue();
             if (dc != null && dc.state() == State.OPEN) {
                Long lastSeen = (Long)WebRtcManager.this.peerLastSeenTime.get(peerId);
-               if (lastSeen != null && now - lastSeen > 10000L) {
+               if (lastSeen != null && now - lastSeen > 30000L) {
                   Log.d("WebRtcManager", "Peer " + peerId + " heartbeat dead-man timed out (" + (now - lastSeen) + "ms) -> disconnecting");
                   WebRtcManager.this.closePeerConnection(peerId);
                   WebRtcManager.this.mainHandler.post(() -> {
@@ -266,7 +268,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          PeerChannelHub hub = (PeerChannelHub)this.peerHubs.get(peerId);
          if (hub != null && hub.isConnected()) {
             Long lastSeen = (Long)this.peerLastSeenTime.get(peerId);
-            if (lastSeen != null && System.currentTimeMillis() - lastSeen < 15000L) {
+            if (lastSeen == null || System.currentTimeMillis() - lastSeen < 35000L) {
                return true;
             }
          }
@@ -274,7 +276,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          DataChannel dc = (DataChannel)this.dataChannels.get(peerId);
          if (dc != null && dc.state() == State.OPEN) {
             Long lastSeen = (Long)this.peerLastSeenTime.get(peerId);
-            return lastSeen != null && System.currentTimeMillis() - lastSeen < 15000L;
+            return lastSeen == null || System.currentTimeMillis() - lastSeen < 35000L;
          } else {
             return false;
          }
@@ -447,7 +449,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    }
 
    private List<PeerConnection.IceServer> getIceServers() {
-      return this.getIceServers(false);
+      return this.getIceServers(true);
    }
 
    private List<PeerConnection.IceServer> getIceServers(boolean includeTurn) {
@@ -462,14 +464,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             if (pc != null) {
                PeerConnection.IceConnectionState state = pc.iceConnectionState();
                if (state != IceConnectionState.CONNECTED && state != IceConnectionState.COMPLETED) {
-                  Log.i("WebRtcManager", "Tier 2 Activated: Direct STUN timed out (1,500ms). Falling back to TURN TCP/443 for peer: " + peerId);
+                  Log.i("WebRtcManager", "Tier 2 Activated: Direct STUN timed out (8,000ms). Falling back to TURN TCP/443 for peer: " + peerId);
                   this.restartIceWithTurn(peerId);
                }
             }
 
          };
          this.turnFallbackRunnables.put(peerId, r);
-         this.mainHandler.postDelayed(r, com.m3.veil.calling.CallConfig.DIRECT_STUN_TIMEOUT_MS);
+         this.mainHandler.postDelayed(r, 8000L);
       }
    }
 
@@ -544,6 +546,8 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          this.turnActivePeers.remove(peerId);
          this.peerLastSeenTime.remove(peerId);
          this.peerTypingStates.remove(peerId);
+         this.pendingIceCandidates.remove(peerId);
+         this.lastOfferTimestamp.remove(peerId);
          PeerChannelHub hub = (PeerChannelHub)this.peerHubs.remove(peerId);
          if (hub != null) {
             hub.closeAll();
@@ -603,7 +607,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          if (iceState != IceConnectionState.FAILED && iceState != IceConnectionState.CLOSED && sigState != SignalingState.CLOSED) {
             if (isInitiator) {
                PeerChannelHub hub = (PeerChannelHub)this.peerHubs.get(peerId);
-               if (hub == null || !hub.isConnected()) {
+               if (hub == null || (hub.ctrlChannel == null && hub.msgChannel == null)) {
                   this.createInitiatorDataChannels(pc, peerId);
                }
             }
@@ -634,7 +638,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       }
 
       boolean strictRelay = VeilTorProxyBridge.getInstance(this.context).isStrictRelayEnforced();
-      PeerConnection.RTCConfiguration rtcConfig = new PeerConnection.RTCConfiguration(this.getIceServers(strictRelay));
+      PeerConnection.RTCConfiguration rtcConfig = new PeerConnection.RTCConfiguration(this.getIceServers(true));
       rtcConfig.sdpSemantics = SdpSemantics.UNIFIED_PLAN;
       rtcConfig.continualGatheringPolicy = ContinualGatheringPolicy.GATHER_CONTINUALLY;
       if (strictRelay) {
@@ -842,15 +846,18 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             Log.d("WebRtcManager", "DataChannel [" + dataChannel.label() + "] state with " + peerId + ": " + dataChannel.state());
             if (dataChannel.state() == State.OPEN) {
                WebRtcManager.this.peerLastSeenTime.put(peerId, System.currentTimeMillis());
+               WebRtcManager.this.cancelTurnFallback(peerId);
                SignalingClient.getInstance().pruneSignalingForPeer(peerId);
+               if (lane == 1 || !WebRtcManager.this.dataChannels.containsKey(peerId)) {
+                  WebRtcManager.this.dataChannels.put(peerId, dataChannel);
+               }
+               WebRtcManager.this.mainHandler.post(() -> {
+                  for(P2PEventListener l : WebRtcManager.this.listeners) {
+                     l.onPeerConnected(peerId);
+                  }
+               });
+               VeilMeshDaemonService.getInstance(WebRtcManager.this.context).flushOutboxForPeer(peerId);
                if (lane == 1) {
-                  WebRtcManager.this.mainHandler.post(() -> {
-                     for(P2PEventListener l : WebRtcManager.this.listeners) {
-                        l.onPeerConnected(peerId);
-                     }
-
-                  });
-                  VeilMeshDaemonService.getInstance(WebRtcManager.this.context).flushOutboxForPeer(peerId);
                   WebRtcManager.this.syncVeilBoardGossipWithPeer(peerId, dataChannel);
                }
             } else if (dataChannel.state() == State.CLOSED) {
@@ -1189,9 +1196,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             }
 
             Chat existingChat = EncryptedChatDatabase.getInstance(this.context).getChat(chatId);
+            String myOwnPersonaName = VeilFeatureManager.getInstance(this.context).getActivePersona().getDisplayName();
             if (existingChat == null) {
-               String defaultName = isGroup ? "Encrypted Group" : (senderName != null ? senderName : "Peer " + peerId.substring(0, Math.min(5, peerId.length())));
-               String chatName = p.optString("chatName", defaultName);
+               String defaultName = isGroup ? "Encrypted Group" : (senderName != null && !senderName.isEmpty() ? senderName : "Peer " + peerId.substring(0, Math.min(5, peerId.length())));
+               String chatName = isGroup ? p.optString("chatName", defaultName) : defaultName;
                String chatType = p.optString("chatType", chatId != null && chatId.startsWith("channel_") ? "channel" : (isGroup ? "group" : "direct"));
                Chat newChat = new Chat(chatId, chatName, text, new Timestamp(new Date(timestamp)), "avatar_1", 1, isGroup, true, chatType, incomingParts);
                String adminId = p.optString("adminId", null);
@@ -1207,6 +1215,17 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                if (isGroup && incomingChatName != null && !incomingChatName.isEmpty()
                        && ("Encrypted Group".equals(existingChat.getName()) || "Anonymous Room".equals(existingChat.getName()))) {
                   existingChat.setName(incomingChatName);
+               } else if (!isGroup && senderName != null && !senderName.isEmpty()) {
+                  String curName = existingChat.getName();
+                  if (curName == null || curName.isEmpty()
+                          || curName.equals(myOwnPersonaName)
+                          || "Direct Chat".equals(curName)
+                          || "Veil Contact".equals(curName)
+                          || "Veil User".equals(curName)
+                          || "Anonymous Peer".equals(curName)
+                          || curName.startsWith("Peer ")) {
+                     existingChat.setName(senderName);
+                  }
                }
                existingChat.setUnreadCount(existingChat.getUnreadCount() + 1);
                existingChat.setLastMessage(text);
@@ -1653,8 +1672,11 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             p.put("vanishTimer", message.getVanishTimer());
             p.put("vanishMode", message.getVanishMode());
             p.put("isGroup", isGroup);
-            if (chatName != null) {
+            if (isGroup && chatName != null) {
                p.put("chatName", chatName);
+            } else if (!isGroup) {
+               String myDispName = message.getSenderName() != null ? message.getSenderName() : VeilFeatureManager.getInstance(this.context).getActivePersona().getDisplayName();
+               p.put("chatName", myDispName);
             }
 
             if (chatType != null) {
@@ -2858,6 +2880,24 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
    public void initiateConnection(final String peerId) {
       if (peerId != null && !peerId.isEmpty() && !peerId.equals(this.currentUserId)) {
+         if (this.isPeerConnected(peerId)) {
+            return;
+         }
+         PeerConnection existing = (PeerConnection)this.peerConnections.get(peerId);
+         Long lastOffer = (Long)this.lastOfferTimestamp.get(peerId);
+         long now = System.currentTimeMillis();
+         if (existing != null) {
+            PeerConnection.SignalingState sigState = existing.signalingState();
+            PeerConnection.IceConnectionState iceState = existing.iceConnectionState();
+            if (iceState == IceConnectionState.CONNECTED || iceState == IceConnectionState.COMPLETED) {
+               return;
+            }
+            if ((sigState == SignalingState.HAVE_LOCAL_OFFER || sigState == SignalingState.HAVE_REMOTE_OFFER || iceState == IceConnectionState.CHECKING)
+                    && lastOffer != null && (now - lastOffer) < 5000L) {
+               return;
+            }
+         }
+         this.lastOfferTimestamp.put(peerId, now);
          this.scheduleTurnFallback(peerId);
          final PeerConnection pc = this.getOrCreatePeerConnection(peerId, true);
          MediaConstraints sdpConstraints = new MediaConstraints();
@@ -2875,6 +2915,20 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       }
    }
 
+   private void drainPendingIceCandidates(String peerId, PeerConnection pc) {
+      if (peerId == null || pc == null) return;
+      List<IceCandidate> queued = this.pendingIceCandidates.remove(peerId);
+      if (queued != null && !queued.isEmpty()) {
+         synchronized (queued) {
+            for (IceCandidate c : queued) {
+               try {
+                  pc.addIceCandidate(c);
+               } catch (Exception ignored) {}
+            }
+         }
+      }
+   }
+
    public void onOfferReceived(final String fromUserId, String sdp) {
       if (fromUserId == null || sdp == null) return;
       PeerConnection existingPc = (PeerConnection)this.peerConnections.get(fromUserId);
@@ -2885,13 +2939,18 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             return;
          }
          Log.i("WebRtcManager", "Polite peer resetting local offer to accept remote offer from " + fromUserId);
+         List<IceCandidate> savedCandidates = this.pendingIceCandidates.remove(fromUserId);
          this.closePeerConnection(fromUserId);
+         if (savedCandidates != null) {
+            this.pendingIceCandidates.put(fromUserId, savedCandidates);
+         }
          existingPc = null;
       }
       final PeerConnection pc = (existingPc != null) ? existingPc : this.getOrCreatePeerConnection(fromUserId, false);
       SessionDescription remoteDesc = new SessionDescription(Type.OFFER, sdp);
       pc.setRemoteDescription(new SimpleSdpObserver() {
          public void onSetSuccess() {
+            WebRtcManager.this.drainPendingIceCandidates(fromUserId, pc);
             MediaConstraints sdpConstraints = new MediaConstraints();
             sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
             sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"));
@@ -2908,12 +2967,16 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       }, remoteDesc);
    }
 
-   public void onAnswerReceived(String fromUserId, String sdp) {
+   public void onAnswerReceived(final String fromUserId, String sdp) {
       if (fromUserId == null || sdp == null) return;
-      PeerConnection pc = (PeerConnection)this.peerConnections.get(fromUserId);
+      final PeerConnection pc = (PeerConnection)this.peerConnections.get(fromUserId);
       if (pc != null && pc.signalingState() == PeerConnection.SignalingState.HAVE_LOCAL_OFFER) {
          SessionDescription remoteDesc = new SessionDescription(Type.ANSWER, sdp);
-         pc.setRemoteDescription(new SimpleSdpObserver(), remoteDesc);
+         pc.setRemoteDescription(new SimpleSdpObserver() {
+            public void onSetSuccess() {
+               WebRtcManager.this.drainPendingIceCandidates(fromUserId, pc);
+            }
+         }, remoteDesc);
       }
    }
 
@@ -2924,6 +2987,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          try {
             pc.addIceCandidate(candidate);
          } catch (Exception ignored) {}
+      } else {
+         List<IceCandidate> queue = this.pendingIceCandidates.computeIfAbsent(
+                 fromUserId, k -> Collections.synchronizedList(new ArrayList<>()));
+         queue.add(candidate);
       }
    }
 
