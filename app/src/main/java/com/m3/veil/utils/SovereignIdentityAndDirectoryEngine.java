@@ -651,6 +651,7 @@ public class SovereignIdentityAndDirectoryEngine {
         public String publicKeyBase64;
         public long updatedAtTimestamp;
         public String signature;
+        public String phoneNumber;
 
         public SovereignProfileManifest() {
             this.uid = "";
@@ -666,6 +667,7 @@ public class SovereignIdentityAndDirectoryEngine {
             this.publicKeyBase64 = "";
             this.updatedAtTimestamp = System.currentTimeMillis();
             this.signature = "";
+            this.phoneNumber = "";
         }
 
         public String getPayloadForSigning() {
@@ -698,6 +700,7 @@ public class SovereignIdentityAndDirectoryEngine {
                 obj.put("publicKeyBase64", publicKeyBase64);
                 obj.put("updatedAtTimestamp", updatedAtTimestamp);
                 obj.put("signature", signature);
+                obj.put("phoneNumber", phoneNumber != null ? phoneNumber : "");
                 return obj;
             } catch (Exception e) {
                 return new JSONObject();
@@ -720,6 +723,7 @@ public class SovereignIdentityAndDirectoryEngine {
             m.publicKeyBase64 = obj.optString("publicKeyBase64", "");
             m.updatedAtTimestamp = obj.optLong("updatedAtTimestamp", 0);
             m.signature = obj.optString("signature", "");
+            m.phoneNumber = obj.optString("phoneNumber", obj.optString("phone", ""));
             return m;
         }
     }
@@ -1025,11 +1029,21 @@ public class SovereignIdentityAndDirectoryEngine {
      */
     private String buildNostrEventJson(SovereignProfileManifest manifest) {
         try {
-            JSONObject event = new JSONObject();
+            String uidKey = manifest.uid != null ? manifest.uid : "veil_anon";
+            byte[] privKey32 = com.m3.veil.crypto.Bip340Schnorr.sha256(("nostr_seed_" + uidKey).getBytes(StandardCharsets.UTF_8));
+            byte[] pubKey32 = com.m3.veil.crypto.Bip340Schnorr.getPublicKey(privKey32);
+            String pubKeyHex = com.m3.veil.crypto.Bip340Schnorr.bytesToHex(pubKey32);
             long createdAt = System.currentTimeMillis() / 1000L;
-            event.put("kind", 30078);
-            event.put("pubkey", sha256Hex(manifest.uid.getBytes(StandardCharsets.UTF_8)));
-            event.put("created_at", createdAt);
+
+            JSONObject contentObj = new JSONObject();
+            contentObj.put("name", manifest.username != null ? manifest.username : "");
+            contentObj.put("username", manifest.username != null ? manifest.username : "");
+            contentObj.put("display_name", manifest.displayName != null ? manifest.displayName : "");
+            contentObj.put("about", manifest.bio != null ? manifest.bio : "");
+            contentObj.put("pubkey", manifest.uid);
+            if (manifest.phoneNumber != null) contentObj.put("phone", manifest.phoneNumber);
+            contentObj.put("veil_manifest", manifest.toJson().toString());
+            String contentStr = contentObj.toString();
 
             JSONArray tags = new JSONArray();
             JSONArray tagD = new JSONArray();
@@ -1037,20 +1051,22 @@ public class SovereignIdentityAndDirectoryEngine {
             tagD.put(manifest.uid);
             tags.put(tagD);
 
-            if (manifest.username != null && !manifest.username.isEmpty()) {
-                JSONArray tagU = new JSONArray();
-                tagU.put("username");
-                tagU.put(manifest.username.toLowerCase(Locale.ROOT));
-                tags.put(tagU);
-            }
-            event.put("tags", tags);
-            event.put("content", manifest.toJson().toString());
+            String serialized = "[0,\"" + pubKeyHex + "\"," + createdAt + ",0,"
+                    + tags.toString() + ",\"" + escapeJson(contentStr) + "\"]";
+            byte[] idHash = com.m3.veil.crypto.Bip340Schnorr.sha256(serialized.getBytes(StandardCharsets.UTF_8));
+            String idHex = com.m3.veil.crypto.Bip340Schnorr.bytesToHex(idHash);
 
-            String serialized = "[0,\"" + event.getString("pubkey") + "\"," + createdAt + ",30078,"
-                    + tags.toString() + ",\"" + escapeJson(manifest.toJson().toString()) + "\"]";
-            String id = sha256Hex(serialized.getBytes(StandardCharsets.UTF_8));
-            event.put("id", id);
-            event.put("sig", manifest.signature != null ? manifest.signature : "sig_" + createdAt);
+            byte[] sigBytes = com.m3.veil.crypto.Bip340Schnorr.sign(idHash, privKey32);
+            String sigHex = com.m3.veil.crypto.Bip340Schnorr.bytesToHex(sigBytes);
+
+            JSONObject event = new JSONObject();
+            event.put("id", idHex);
+            event.put("pubkey", pubKeyHex);
+            event.put("created_at", createdAt);
+            event.put("kind", 0);
+            event.put("tags", tags);
+            event.put("content", contentStr);
+            event.put("sig", sigHex);
 
             return event.toString();
         } catch (Exception e) {
@@ -1256,7 +1272,15 @@ public class SovereignIdentityAndDirectoryEngine {
                 // 1. Persist multi-tier local storage
                 persistManifestLocally(manifest);
 
-                // 2. Publish to Nostr relays
+                // 2. Broadcast immediately over LAN UDP & High-Speed MQTT WebSocket Directory
+                try {
+                    com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(context != null ? context : mContext)
+                            .broadcastProfileManifest(manifest);
+                } catch (Throwable t) {
+                    Log.w(TAG, "Relay directory broadcast notice: " + t.getMessage());
+                }
+
+                // 3. Publish to Nostr relays
                 publishToNostrRelays(manifest, new PublishCallback() {
                     @Override
                     public void onSuccess() {
@@ -1658,7 +1682,7 @@ public class SovereignIdentityAndDirectoryEngine {
             String raw = query != null ? query.trim().toLowerCase(java.util.Locale.ROOT) : "";
             final String clean = raw.startsWith("@") ? raw.substring(1) : raw;
 
-            // 1. Query local EncryptedChatDatabase
+            // 1. Query local EncryptedChatDatabase (instant response)
             try {
                 List<SovereignProfileManifest> localMatches = EncryptedChatDatabase.getInstance(mContext).searchSovereignProfileManifests(clean);
                 for (SovereignProfileManifest m : localMatches) {
@@ -1670,7 +1694,14 @@ public class SovereignIdentityAndDirectoryEngine {
                 Log.w(TAG, "Local search notice: " + t.getMessage());
             }
 
-            // 2. Query Nostr directory across relay pool
+            // 2. Broadcast active Directory Probe across LAN UDP & MQTT WebSocket Relay
+            try {
+                com.m3.veil.webrtc.UniversalSignalingRelay.getInstance(mContext).sendDirectoryProbe(clean);
+            } catch (Throwable t) {
+                Log.w(TAG, "Relay probe notice: " + t.getMessage());
+            }
+
+            // 3. Query Nostr directory across relay pool (Kind 0 User Metadata)
             final CountDownLatch latch = new CountDownLatch(NOSTR_RELAYS.length);
             final String subId = "search_" + System.currentTimeMillis();
 
@@ -1679,12 +1710,7 @@ public class SovereignIdentityAndDirectoryEngine {
                 mOkHttpClient.newWebSocket(req, new WebSocketListener() {
                     @Override
                     public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
-                        String filter;
-                        if (!clean.isEmpty()) {
-                            filter = "[\"REQ\",\"" + subId + "\",{\"kinds\":[30078],\"#username\":[\"" + clean + "\"],\"limit\":20}]";
-                        } else {
-                            filter = "[\"REQ\",\"" + subId + "\",{\"kinds\":[30078],\"limit\":25}]";
-                        }
+                        String filter = "[\"REQ\",\"" + subId + "\",{\"kinds\":[0],\"limit\":40}]";
                         webSocket.send(filter);
                     }
 
@@ -1695,14 +1721,40 @@ public class SovereignIdentityAndDirectoryEngine {
                                 JSONArray arr = new JSONArray(text);
                                 if (arr.length() >= 3) {
                                     JSONObject eventObj = arr.getJSONObject(2);
-                                    String content = eventObj.optString("content");
-                                    if (content != null && !content.isEmpty()) {
-                                        JSONObject mJson = new JSONObject(content);
-                                        SovereignProfileManifest m = SovereignProfileManifest.fromJson(mJson);
-                                        if (m != null && m.uid != null && seenUids.add(m.uid)) {
-                                            persistManifestLocally(m);
-                                            results.add(manifestToUser(m));
-                                        }
+                                    String cStr = eventObj.optString("content");
+                                    if (cStr != null && !cStr.isEmpty()) {
+                                        try {
+                                            JSONObject cJson = new JSONObject(cStr);
+                                            String name = cJson.optString("name", cJson.optString("username", ""));
+                                            String disp = cJson.optString("display_name", "");
+                                            String phone = cJson.optString("phone", "");
+                                            String manifestStr = cJson.optString("veil_manifest", null);
+
+                                            boolean match = clean.isEmpty()
+                                                    || name.toLowerCase(Locale.ROOT).contains(clean)
+                                                    || disp.toLowerCase(Locale.ROOT).contains(clean)
+                                                    || phone.contains(clean);
+
+                                            if (match) {
+                                                SovereignProfileManifest m = null;
+                                                if (manifestStr != null && !manifestStr.isEmpty()) {
+                                                    try { m = SovereignProfileManifest.fromJson(new JSONObject(manifestStr)); } catch (Exception ignored) {}
+                                                }
+                                                if (m == null) {
+                                                    m = new SovereignProfileManifest();
+                                                    m.uid = cJson.optString("pubkey", "nostr_" + eventObj.optString("pubkey"));
+                                                    m.username = name;
+                                                    m.displayName = disp;
+                                                    m.bio = cJson.optString("about", "");
+                                                    m.phoneNumber = phone;
+                                                    m.updatedAtTimestamp = eventObj.optLong("created_at", 0) * 1000L;
+                                                }
+                                                if (m != null && m.uid != null && seenUids.add(m.uid)) {
+                                                    persistManifestLocally(m);
+                                                    results.add(manifestToUser(m));
+                                                }
+                                            }
+                                        } catch (Exception ignored) {}
                                     }
                                 }
                             } else if (text.startsWith("[\"EOSE\"")) {
@@ -1720,7 +1772,7 @@ public class SovereignIdentityAndDirectoryEngine {
             }
 
             try {
-                latch.await(2500, TimeUnit.MILLISECONDS);
+                latch.await(1500, TimeUnit.MILLISECONDS);
             } catch (InterruptedException ignored) {}
 
             mMainHandler.post(() -> callback.onResult(results));
@@ -1803,15 +1855,19 @@ public class SovereignIdentityAndDirectoryEngine {
         });
     }
 
-    private User manifestToUser(SovereignProfileManifest m) {
+    public User manifestToUser(SovereignProfileManifest m) {
+        if (m == null) return null;
         User u = new User();
         u.setUserId(m.uid);
-        u.setUsername(m.username != null && !m.username.isEmpty() ? m.username : "anon_" + m.uid.substring(5, 11));
+        String fallback = m.uid != null && m.uid.length() >= 6 ? m.uid.substring(m.uid.length() - 6) : (m.uid != null ? m.uid : "user");
+        u.setUsername(m.username != null && !m.username.isEmpty() ? m.username : "user_" + fallback);
         u.setDisplayName(m.displayName != null && !m.displayName.isEmpty() ? m.displayName : "@" + u.getUsername());
         u.setBio(m.bio != null ? m.bio : "");
+        u.setPhone(m.phoneNumber);
         u.setPublicKey(m.publicKeyBase64);
+        u.setStatus("online");
         File avatarFile = getAvatarWebpFile(m.uid);
-        if (avatarFile.exists()) {
+        if (avatarFile != null && avatarFile.exists()) {
             u.setPhotoUrl(avatarFile.getAbsolutePath());
         }
         return u;

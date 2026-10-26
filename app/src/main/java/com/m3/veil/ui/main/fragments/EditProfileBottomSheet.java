@@ -943,6 +943,8 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
 
         manifest.publicKeyBase64 = com.m3.veil.utils.EncryptionManager.getPublicKeyString();
 
+        manifest.phoneNumber = up.getCurrentUser() != null ? up.getCurrentUser().getPhone() : null;
+
 
 
         if (selectedAvatarBase64 != null) {

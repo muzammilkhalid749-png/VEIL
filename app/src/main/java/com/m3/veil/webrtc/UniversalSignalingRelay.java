@@ -60,6 +60,36 @@ public class UniversalSignalingRelay {
         void onSignalReceived(String type, String fromUserId, JSONObject payload);
     }
 
+    public interface DirectoryListener {
+        void onPeerDiscovered(SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest);
+    }
+
+    private final java.util.List<DirectoryListener> mDirectoryListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public void addDirectoryListener(DirectoryListener listener) {
+        if (listener != null && !mDirectoryListeners.contains(listener)) {
+            mDirectoryListeners.add(listener);
+        }
+    }
+
+    public void removeDirectoryListener(DirectoryListener listener) {
+        if (listener != null) {
+            mDirectoryListeners.remove(listener);
+        }
+    }
+
+    private void notifyDirectoryUpdated(SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest) {
+        mMainHandler.post(() -> {
+            for (DirectoryListener l : mDirectoryListeners) {
+                try {
+                    l.onPeerDiscovered(manifest);
+                } catch (Throwable t) {
+                    Log.w(TAG, "Directory listener error: " + t.getMessage());
+                }
+            }
+        });
+    }
+
     private static volatile UniversalSignalingRelay sInstance;
     private final Context mContext;
     private final Handler mMainHandler;
@@ -170,6 +200,7 @@ public class UniversalSignalingRelay {
         }, "Veil-UdpSignaler");
         mUdpListenThread.setDaemon(true);
         mUdpListenThread.start();
+        announceLocalProfile();
     }
 
     private void stopLanUdp() {
@@ -303,12 +334,17 @@ public class UniversalSignalingRelay {
     }
 
     /**
-     * Subscribes to topic veil/sig/<mCurrentUserId>.
+     * Subscribes to personal signaling topic and global directory topics.
      */
     private void sendMqttSubscribe() {
         if (mMqttWebSocket == null || mCurrentUserId == null) return;
+        subscribeToTopic("veil/sig/" + mCurrentUserId);
+        subscribeToTopic("veil/directory/#");
+    }
+
+    public void subscribeToTopic(String topic) {
+        if (mMqttWebSocket == null || topic == null) return;
         try {
-            String topic = "veil/sig/" + mCurrentUserId;
             byte[] topicBytes = topic.getBytes(StandardCharsets.UTF_8);
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -326,18 +362,14 @@ public class UniversalSignalingRelay {
             mMqttWebSocket.send(ByteString.of(packet));
             Log.i(TAG, "Subscribed to MQTT topic: " + topic);
         } catch (Exception e) {
-            Log.e(TAG, "Error sending MQTT SUBSCRIBE", e);
+            Log.e(TAG, "Error sending MQTT SUBSCRIBE for " + topic, e);
         }
     }
 
-    /**
-     * Publishes a signal payload to topic veil/sig/<targetUserId>.
-     */
-    private void publishMqttSignal(String targetUserId, String jsonPayload) {
-        if (mMqttWebSocket == null || !mMqttConnected || targetUserId == null) return;
+    public void publishMqttTopic(String topic, String jsonPayload) {
+        if (mMqttWebSocket == null || !mMqttConnected || topic == null) return;
         mExecutor.execute(() -> {
             try {
-                String topic = "veil/sig/" + targetUserId;
                 byte[] topicBytes = topic.getBytes(StandardCharsets.UTF_8);
                 byte[] payloadBytes = jsonPayload.getBytes(StandardCharsets.UTF_8);
 
@@ -353,9 +385,14 @@ public class UniversalSignalingRelay {
                 byte[] packet = encodeMqttPacket(0x30, baos.toByteArray());
                 mMqttWebSocket.send(ByteString.of(packet));
             } catch (Exception e) {
-                Log.w(TAG, "Error publishing MQTT signal: " + e.getMessage());
+                Log.w(TAG, "Error publishing MQTT topic " + topic + ": " + e.getMessage());
             }
         });
+    }
+
+    private void publishMqttSignal(String targetUserId, String jsonPayload) {
+        if (targetUserId == null) return;
+        publishMqttTopic("veil/sig/" + targetUserId, jsonPayload);
     }
 
     private void sendMqttPing() {
@@ -374,6 +411,7 @@ public class UniversalSignalingRelay {
                 mMqttConnected = true;
                 Log.i(TAG, "MQTT connection accepted by broker");
                 sendMqttSubscribe();
+                announceLocalProfile();
             }
         } else if (packetType == 3) { // PUBLISH
             try {
@@ -467,21 +505,139 @@ public class UniversalSignalingRelay {
         }
     }
 
+    public void announceLocalProfile() {
+        mExecutor.execute(() -> {
+            try {
+                SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                        SovereignIdentityAndDirectoryEngine.getInstance(mContext).getLocalManifest();
+                if (manifest != null && manifest.uid != null && !manifest.uid.isEmpty()) {
+                    broadcastProfileManifest(manifest);
+                }
+            } catch (Exception ignored) {}
+        });
+    }
+
+    public void broadcastProfileManifest(SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest) {
+        if (manifest == null || manifest.uid == null || manifest.uid.isEmpty()) return;
+        mExecutor.execute(() -> {
+            try {
+                JSONObject packet = new JSONObject();
+                packet.put("type", "directory_announce");
+                packet.put("from", manifest.uid);
+                packet.put("to", "*");
+                packet.put("timestamp", System.currentTimeMillis());
+                packet.put("sigId", "dir_" + manifest.uid + "_" + System.currentTimeMillis());
+                packet.put("manifest", manifest.toJson());
+
+                String jsonStr = packet.toString();
+
+                // 1. LAN UDP Broadcast (< 2ms)
+                broadcastLanUdp(jsonStr);
+
+                // 2. High-speed MQTT topic (< 50ms worldwide)
+                publishMqttTopic("veil/directory/announce", jsonStr);
+            } catch (Exception e) {
+                Log.w(TAG, "Error broadcasting profile manifest: " + e.getMessage());
+            }
+        });
+    }
+
+    public void sendDirectoryProbe(String query) {
+        mExecutor.execute(() -> {
+            try {
+                JSONObject packet = new JSONObject();
+                packet.put("type", "directory_probe");
+                packet.put("from", mCurrentUserId != null ? mCurrentUserId : "veil_anon");
+                packet.put("to", "*");
+                packet.put("query", query != null ? query : "");
+                packet.put("timestamp", System.currentTimeMillis());
+                packet.put("sigId", "probe_" + System.currentTimeMillis() + "_" + (mCurrentUserId != null ? mCurrentUserId : "anon"));
+
+                String jsonStr = packet.toString();
+
+                // 1. LAN UDP Broadcast (< 2ms)
+                broadcastLanUdp(jsonStr);
+
+                // 2. High-speed MQTT topic (< 50ms worldwide)
+                publishMqttTopic("veil/directory/query", jsonStr);
+            } catch (Exception e) {
+                Log.w(TAG, "Error sending directory probe: " + e.getMessage());
+            }
+        });
+    }
+
+    private void handleDirectoryAnnounce(JSONObject obj) {
+        try {
+            JSONObject mObj = obj.optJSONObject("manifest");
+            if (mObj == null) mObj = obj;
+            SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                    SovereignIdentityAndDirectoryEngine.SovereignProfileManifest.fromJson(mObj);
+            if (manifest != null && manifest.uid != null && !manifest.uid.isEmpty()) {
+                if (mCurrentUserId != null && mCurrentUserId.equals(manifest.uid)) {
+                    return; // Ignore own manifest
+                }
+                com.m3.veil.database.EncryptedChatDatabase.getInstance(mContext).saveSovereignProfileManifest(manifest);
+                Log.i(TAG, "Directory discovery saved: @" + manifest.username + " (" + manifest.uid + ")");
+                notifyDirectoryUpdated(manifest);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to parse directory announcement: " + e.getMessage());
+        }
+    }
+
+    private void handleDirectoryProbe(JSONObject obj) {
+        try {
+            String from = obj.optString("from");
+            if (from == null || from.isEmpty() || from.equals(mCurrentUserId)) return;
+            String query = obj.optString("query", "").trim().toLowerCase(java.util.Locale.ROOT);
+
+            SovereignIdentityAndDirectoryEngine.SovereignProfileManifest myManifest =
+                    SovereignIdentityAndDirectoryEngine.getInstance(mContext).getLocalManifest();
+            if (myManifest != null && myManifest.uid != null && !myManifest.uid.isEmpty()) {
+                boolean matches = query.isEmpty()
+                        || (myManifest.username != null && myManifest.username.toLowerCase(java.util.Locale.ROOT).contains(query))
+                        || (myManifest.displayName != null && myManifest.displayName.toLowerCase(java.util.Locale.ROOT).contains(query))
+                        || (myManifest.phoneNumber != null && myManifest.phoneNumber.contains(query));
+                if (matches) {
+                    broadcastProfileManifest(myManifest);
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to handle directory probe: " + e.getMessage());
+        }
+    }
+
     private void handleInboundRawSignalJson(String jsonStr, String transportSource) {
         if (jsonStr == null || jsonStr.trim().isEmpty()) return;
         try {
             JSONObject obj = new JSONObject(jsonStr);
-            String to = obj.optString("to");
-            if (mCurrentUserId != null && !mCurrentUserId.isEmpty() && !mCurrentUserId.equals(to)) {
-                // Not intended for this device
-                return;
-            }
             String from = obj.optString("from");
             if (mCurrentUserId != null && mCurrentUserId.equals(from)) {
                 // Ignore loopback from own self
                 return;
             }
+
             String type = obj.optString("type");
+            String to = obj.optString("to");
+
+            boolean isDirectory = "directory_announce".equals(type)
+                    || "directory_probe".equals(type)
+                    || "profile_manifest".equals(type)
+                    || "*".equals(to)
+                    || "all".equals(to)
+                    || to.isEmpty();
+
+            if (!isDirectory && mCurrentUserId != null && !mCurrentUserId.isEmpty() && !mCurrentUserId.equals(to)) {
+                // Not intended for this device
+                return;
+            }
+
+            if ("directory_announce".equals(type) || "profile_manifest".equals(type)) {
+                handleDirectoryAnnounce(obj);
+            } else if ("directory_probe".equals(type)) {
+                handleDirectoryProbe(obj);
+            }
+
             dispatchInboundSignal(type, from, obj, transportSource);
         } catch (Exception ignored) {}
     }

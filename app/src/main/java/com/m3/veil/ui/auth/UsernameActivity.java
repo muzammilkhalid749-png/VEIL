@@ -1066,6 +1066,8 @@ public class UsernameActivity extends AppCompatActivity {
 
         manifest.displayName = finalDisplayName;
 
+        manifest.phoneNumber = phoneNumber;
+
         manifest.publicKeyBase64 = publicKey != null ? publicKey : "";
 
         manifest.updatedAtTimestamp = System.currentTimeMillis();

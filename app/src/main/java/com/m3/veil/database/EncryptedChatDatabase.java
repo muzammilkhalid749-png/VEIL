@@ -273,6 +273,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     public static final String COL_SM_PUBLIC_KEY = "public_key_base64";
     public static final String COL_SM_UPDATED_AT = "updated_at";
     public static final String COL_SM_SIGNATURE = "signature";
+    public static final String COL_SM_PHONE = "phone_number";
 
     // Table: read_later_reminders (#178)
     public static final String TABLE_REMINDERS = "read_later_reminders";
@@ -741,7 +742,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 COL_SM_PERSONAS_JSON + " TEXT, " +
                 COL_SM_PUBLIC_KEY + " TEXT, " +
                 COL_SM_UPDATED_AT + " INTEGER, " +
-                COL_SM_SIGNATURE + " TEXT" +
+                COL_SM_SIGNATURE + " TEXT, " +
+                COL_SM_PHONE + " TEXT" +
                 ");");
 
         db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_REMINDERS + " (" +
@@ -3824,7 +3826,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 COL_SM_PERSONAS_JSON + " TEXT, " +
                 COL_SM_PUBLIC_KEY + " TEXT, " +
                 COL_SM_UPDATED_AT + " INTEGER, " +
-                COL_SM_SIGNATURE + " TEXT" +
+                COL_SM_SIGNATURE + " TEXT, " +
+                COL_SM_PHONE + " TEXT" +
                 ");");
         ContentValues cv = new ContentValues();
         cv.put(COL_SM_UID, manifest.uid);
@@ -3840,6 +3843,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         cv.put(COL_SM_PUBLIC_KEY, manifest.publicKeyBase64);
         cv.put(COL_SM_UPDATED_AT, manifest.updatedAtTimestamp);
         cv.put(COL_SM_SIGNATURE, manifest.signature);
+        cv.put(COL_SM_PHONE, manifest.phoneNumber);
         db.insertWithOnConflict(TABLE_SOVEREIGN_MANIFEST, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
@@ -3859,7 +3863,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 COL_SM_PERSONAS_JSON + " TEXT, " +
                 COL_SM_PUBLIC_KEY + " TEXT, " +
                 COL_SM_UPDATED_AT + " INTEGER, " +
-                COL_SM_SIGNATURE + " TEXT" +
+                COL_SM_SIGNATURE + " TEXT, " +
+                COL_SM_PHONE + " TEXT" +
                 ");");
         Cursor c = db.query(TABLE_SOVEREIGN_MANIFEST, null, COL_SM_UID + " = ?", new String[]{uid}, null, null, null);
         if (c != null) {
@@ -3880,6 +3885,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     m.publicKeyBase64 = c.getString(c.getColumnIndexOrThrow(COL_SM_PUBLIC_KEY));
                     m.updatedAtTimestamp = c.getLong(c.getColumnIndexOrThrow(COL_SM_UPDATED_AT));
                     m.signature = c.getString(c.getColumnIndexOrThrow(COL_SM_SIGNATURE));
+                    int phoneIdx = c.getColumnIndex(COL_SM_PHONE);
+                    if (phoneIdx >= 0) m.phoneNumber = c.getString(phoneIdx);
                     return m;
                 }
             } finally {
@@ -3906,12 +3913,20 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 COL_SM_PERSONAS_JSON + " TEXT, " +
                 COL_SM_PUBLIC_KEY + " TEXT, " +
                 COL_SM_UPDATED_AT + " INTEGER, " +
-                COL_SM_SIGNATURE + " TEXT" +
+                COL_SM_SIGNATURE + " TEXT, " +
+                COL_SM_PHONE + " TEXT" +
                 ");");
-        String q = "%" + query.toLowerCase(java.util.Locale.ROOT) + "%";
-        Cursor cursor = db.query(TABLE_SOVEREIGN_MANIFEST, null,
-                "LOWER(" + COL_SM_USERNAME + ") LIKE ? OR LOWER(" + COL_SM_DISPLAY_NAME + ") LIKE ? OR LOWER(" + COL_SM_UID + ") LIKE ?",
-                new String[]{q, q, q}, null, null, COL_SM_UPDATED_AT + " DESC LIMIT 30");
+        String raw = query.trim().toLowerCase(java.util.Locale.ROOT);
+        Cursor cursor;
+        if (raw.isEmpty()) {
+            cursor = db.query(TABLE_SOVEREIGN_MANIFEST, null,
+                    null, null, null, null, COL_SM_UPDATED_AT + " DESC LIMIT 100");
+        } else {
+            String q = "%" + raw + "%";
+            cursor = db.query(TABLE_SOVEREIGN_MANIFEST, null,
+                    "LOWER(" + COL_SM_USERNAME + ") LIKE ? OR LOWER(" + COL_SM_DISPLAY_NAME + ") LIKE ? OR LOWER(" + COL_SM_UID + ") LIKE ? OR " + COL_SM_PHONE + " LIKE ?",
+                    new String[]{q, q, q, q}, null, null, COL_SM_UPDATED_AT + " DESC LIMIT 50");
+        }
         if (cursor != null) {
             try {
                 while (cursor.moveToNext()) {
@@ -3930,6 +3945,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     m.publicKeyBase64 = cursor.getString(cursor.getColumnIndexOrThrow(COL_SM_PUBLIC_KEY));
                     m.updatedAtTimestamp = cursor.getLong(cursor.getColumnIndexOrThrow(COL_SM_UPDATED_AT));
                     m.signature = cursor.getString(cursor.getColumnIndexOrThrow(COL_SM_SIGNATURE));
+                    int phoneIdx = cursor.getColumnIndex(COL_SM_PHONE);
+                    if (phoneIdx >= 0) m.phoneNumber = cursor.getString(phoneIdx);
                     list.add(m);
                 }
             } finally {
