@@ -1350,6 +1350,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                     pollJson = EncryptionManager.decryptGroupPayload(finalGroupId, pollJson);
                                                 }
                                                 String sId = mDoc.getString("senderId");
+                                                boolean isFromMe = uid.equals(sId);
+                                                boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
+                                                boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
                                                 if (existingMsg == null) {
                                                     String sName = mDoc.getString("senderName");
                                                     com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
@@ -1367,10 +1370,16 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                     m.setReplySenderName(mDoc.getString("replySenderName"));
                                                     m.setPollJson(pollJson);
                                                     if (Boolean.TRUE.equals(isEditedObj)) m.setEdited(true);
-                                                    m.setDelivered(true);
-                                                    m.setPending(false);
-                                                    boolean isFromMe = uid.equals(sId);
-                                                    m.setRead(isFromMe);
+                                                    if (isFromMe) {
+                                                        boolean hasNet = com.m3.veil.manager.VeilMessagesController.getInstance(requireContext()).isNetworkConnected();
+                                                        m.setPending(!hasNet && !docDelivered && !docRead);
+                                                        m.setDelivered(docDelivered || docRead);
+                                                        m.setRead(docRead);
+                                                    } else {
+                                                        m.setPending(false);
+                                                        m.setDelivered(true);
+                                                        m.setRead(false);
+                                                    }
                                                     EncryptedChatDatabase.getInstance(requireContext()).saveMessage(finalGroupId, m);
                                                     anyNewMsg = true;
 
@@ -1378,19 +1387,33 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                         java.util.Map<String, Object> ack = new java.util.HashMap<>();
                                                         ack.put("delivered", true);
                                                         mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                                                .collection("chats").document(finalGroupId)
+                                                                .collection("messages").document(mId)
+                                                                .set(ack, com.google.firebase.firestore.SetOptions.merge());
                                                         if (sId != null && !sId.isEmpty()) {
                                                             WebRtcManager.getInstance(requireContext()).sendReceipt(sId, mId, true, false);
                                                         }
                                                     }
                                                 } else {
-                                                    boolean isFromMe = uid.equals(sId);
-                                                    if (!isFromMe && !existingMsg.isDelivered()) {
+                                                    if (isFromMe) {
+                                                        if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
+                                                            EncryptedChatDatabase.getInstance(requireContext())
+                                                                    .updateMessageStatus(mId, docDelivered || docRead, docRead);
+                                                            com.m3.veil.manager.VeilMessagesController.getInstance(requireContext())
+                                                                    .onMessageStatusChanged(mId, docDelivered || docRead, docRead);
+                                                            anyNewMsg = true;
+                                                        }
+                                                    } else if (!existingMsg.isDelivered() || !docDelivered) {
                                                         existingMsg.setDelivered(true);
                                                         EncryptedChatDatabase.getInstance(requireContext())
                                                                 .updateMessageStatus(mId, true, existingMsg.isRead());
                                                         java.util.Map<String, Object> ack = new java.util.HashMap<>();
                                                         ack.put("delivered", true);
                                                         mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                                        if (sId != null && !sId.isEmpty()) {
+                                                            WebRtcManager.getInstance(requireContext()).sendReceipt(sId, mId, true, existingMsg.isRead());
+                                                        }
                                                     }
                                                     boolean msgChanged = false;
                                                     if ("deleted".equals(mType) && !"deleted".equals(existingMsg.getType())) {
@@ -1498,6 +1521,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                     String sId = mDoc.getString("senderId");
                                                     String sName = mDoc.getString("senderName");
                                                     com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
+                                                    boolean isFromMe = sId != null && sId.equals(uid);
+                                                    boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
+                                                    boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
 
                                                     if (existingMsg == null) {
                                                         com.m3.veil.model.Message m = new com.m3.veil.model.Message(
@@ -1510,33 +1536,51 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                         );
                                                         m.setChatId(finalChatId);
                                                         m.setSenderName(sName);
-                                                        m.setDelivered(true);
-                                                        m.setPending(false);
-                                                        m.setRead(false);
+                                                        if (isFromMe) {
+                                                            boolean hasNet = com.m3.veil.manager.VeilMessagesController.getInstance(requireContext()).isNetworkConnected();
+                                                            m.setPending(!hasNet && !docDelivered && !docRead);
+                                                            m.setDelivered(docDelivered || docRead);
+                                                            m.setRead(docRead);
+                                                        } else {
+                                                            m.setPending(false);
+                                                            m.setDelivered(true);
+                                                            m.setRead(false);
+                                                        }
                                                         EncryptedChatDatabase.getInstance(requireContext()).saveMessage(finalChatId, m);
 
-                                                        // Acknowledge delivery on Firestore (both chats & groups paths) + P2P so sender sees double ticks immediately!
-                                                        if (sId != null && !sId.equals(uid)) {
-                                                            mDoc.getReference().update("delivered", true);
+                                                        // Acknowledge delivery on Firestore (both chats & groups paths) + P2P so sender sees double grey ticks immediately!
+                                                        if (!isFromMe && sId != null) {
+                                                            java.util.Map<String, Object> ack = new java.util.HashMap<>();
+                                                            ack.put("delivered", true);
+                                                            mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
                                                             com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                                                     .collection("groups").document(finalChatId)
                                                                     .collection("messages").document(mId)
-                                                                    .update("delivered", true);
+                                                                    .set(ack, com.google.firebase.firestore.SetOptions.merge());
                                                             com.m3.veil.webrtc.WebRtcManager.getInstance(requireContext())
                                                                     .sendReceipt(sId, mId, true, false);
                                                         }
                                                         anyNew = true;
                                                     } else {
                                                         // Sync delivery/read status back to sender's local database & VeilMessagesController
-                                                        boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
-                                                        boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
-                                                        if (sId != null && sId.equals(uid)) {
-                                                            if ((!existingMsg.isDelivered() && docDelivered) || (!existingMsg.isRead() && docRead)) {
+                                                        if (isFromMe) {
+                                                            if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
                                                                 EncryptedChatDatabase.getInstance(requireContext())
-                                                                        .updateMessageStatus(mId, docDelivered, docRead);
+                                                                        .updateMessageStatus(mId, docDelivered || docRead, docRead);
                                                                 com.m3.veil.manager.VeilMessagesController.getInstance(requireContext())
-                                                                        .onMessageStatusChanged(mId, docDelivered, docRead);
+                                                                        .onMessageStatusChanged(mId, docDelivered || docRead, docRead);
                                                                 anyNew = true;
+                                                            }
+                                                        } else if (!existingMsg.isDelivered() || !docDelivered) {
+                                                            existingMsg.setDelivered(true);
+                                                            EncryptedChatDatabase.getInstance(requireContext())
+                                                                    .updateMessageStatus(mId, true, existingMsg.isRead());
+                                                            java.util.Map<String, Object> ack = new java.util.HashMap<>();
+                                                            ack.put("delivered", true);
+                                                            mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                                            if (sId != null && !sId.isEmpty()) {
+                                                                com.m3.veil.webrtc.WebRtcManager.getInstance(requireContext())
+                                                                        .sendReceipt(sId, mId, true, existingMsg.isRead());
                                                             }
                                                         }
                                                     }

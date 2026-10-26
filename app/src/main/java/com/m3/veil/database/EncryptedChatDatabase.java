@@ -1677,6 +1677,10 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
         ramSingleMessageCache.put(message.getId(), message);
         ramMessageListCache.remove(chatId);
+        Chat cachedChat = ramChatCache.get(chatId);
+        if (cachedChat != null) {
+            populateLastMessageMetadata(cachedChat);
+        }
 
         notifyMessagesChanged(chatId);
         notifyChatsChanged();
@@ -1801,7 +1805,10 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             try {
                 while (cursor.moveToNext()) {
                     Message m = cursorToMessage(cursor);
-                    if (m != null) messages.add(m);
+                    if (m != null) {
+                        ramSingleMessageCache.put(m.getId(), m);
+                        messages.add(m);
+                    }
                 }
             } finally {
                 cursor.close();
@@ -1877,12 +1884,70 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         return messages;
     }
 
+    public synchronized List<Message> getUnsentPendingMessages() {
+        List<Message> messages = new ArrayList<>();
+        SQLiteDatabase db = getEncryptedDb();
+
+        Cursor cursor = db.query(TABLE_MESSAGES, null,
+                COL_MSG_PENDING + "=1",
+                null, null, null, COL_MSG_TIMESTAMP + " ASC");
+
+        if (cursor != null) {
+            try {
+                while (cursor.moveToNext()) {
+                    Message m = cursorToMessage(cursor);
+                    if (m != null) messages.add(m);
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+        return messages;
+    }
+
+    public synchronized void setMessagePending(String messageId, boolean pending) {
+        if (messageId == null) return;
+        SQLiteDatabase db = getEncryptedDb();
+        ContentValues cv = new ContentValues();
+        cv.put(COL_MSG_PENDING, pending ? 1 : 0);
+        db.update(TABLE_MESSAGES, cv, COL_MSG_ID + "=?", new String[]{messageId});
+
+        Message cachedMsg = ramSingleMessageCache.get(messageId);
+        if (cachedMsg != null) {
+            cachedMsg.setPending(pending);
+        }
+
+        Cursor cursor = db.query(TABLE_MESSAGES, new String[]{COL_MSG_CHAT_ID}, COL_MSG_ID + "=?",
+                new String[]{messageId}, null, null, null);
+        if (cursor != null) {
+            try {
+                if (cursor.moveToFirst()) {
+                    String chatId = cursor.getString(0);
+                    Chat cachedChat = ramChatCache.get(chatId);
+                    if (cachedChat != null) {
+                        populateLastMessageMetadata(cachedChat);
+                    }
+                    notifyMessagesChanged(chatId);
+                    notifyChatsChanged();
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+    }
+
     public synchronized void clearAllPendingFlags() {
         SQLiteDatabase db = getEncryptedDb();
         ContentValues cv = new ContentValues();
         cv.put(COL_MSG_PENDING, 0);
         int updated = db.update(TABLE_MESSAGES, cv, COL_MSG_PENDING + "=1", null);
         if (updated > 0) {
+            for (Message m : ramSingleMessageCache.values()) {
+                if (m != null) m.setPending(false);
+            }
+            for (Chat c : ramChatCache.values()) {
+                if (c != null) populateLastMessageMetadata(c);
+            }
             notifyChatsChanged();
         }
     }
@@ -1894,6 +1959,15 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         cv.put(COL_MSG_PENDING, 0);
         int updated = db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=? AND " + COL_MSG_PENDING + "=1", new String[]{chatId});
         if (updated > 0) {
+            for (Message m : ramSingleMessageCache.values()) {
+                if (m != null && chatId.equals(m.getChatId())) {
+                    m.setPending(false);
+                }
+            }
+            Chat cachedChat = ramChatCache.get(chatId);
+            if (cachedChat != null) {
+                populateLastMessageMetadata(cachedChat);
+            }
             notifyMessagesChanged(chatId);
             notifyChatsChanged();
         }
@@ -1952,12 +2026,23 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
         db.update(TABLE_MESSAGES, cv, COL_MSG_ID + "=?", new String[]{messageId});
 
+        Message cachedMsg = ramSingleMessageCache.get(messageId);
+        if (cachedMsg != null) {
+            cachedMsg.setPending(false);
+            if (delivered || read) cachedMsg.setDelivered(true);
+            if (read) cachedMsg.setRead(true);
+        }
+
         Cursor cursor = db.query(TABLE_MESSAGES, new String[]{COL_MSG_CHAT_ID}, COL_MSG_ID + "=?",
                 new String[]{messageId}, null, null, null);
         if (cursor != null) {
             try {
                 if (cursor.moveToFirst()) {
                     String chatId = cursor.getString(0);
+                    Chat cachedChat = ramChatCache.get(chatId);
+                    if (cachedChat != null) {
+                        populateLastMessageMetadata(cachedChat);
+                    }
                     notifyMessagesChanged(chatId);
                     notifyChatsChanged();
                 }
@@ -2018,6 +2103,12 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         if (!safeUserId.isEmpty()) {
             db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=? AND " + COL_MSG_SENDER_ID + "!=?",
                     new String[]{chatId, safeUserId});
+            for (Message m : ramSingleMessageCache.values()) {
+                if (m != null && chatId.equals(m.getChatId()) && m.getSenderId() != null && !safeUserId.equals(m.getSenderId())) {
+                    m.setDelivered(true);
+                    m.setRead(true);
+                }
+            }
         } else {
             db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=?",
                     new String[]{chatId});
@@ -2026,6 +2117,12 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         ContentValues chatCv = new ContentValues();
         chatCv.put(COL_CHAT_UNREAD_COUNT, 0);
         db.update(TABLE_CHATS, chatCv, COL_CHAT_ID + "=?", new String[]{chatId});
+
+        Chat cachedChat = ramChatCache.get(chatId);
+        if (cachedChat != null) {
+            cachedChat.setUnreadCount(0);
+            populateLastMessageMetadata(cachedChat);
+        }
 
         notifyMessagesChanged(chatId);
         notifyChatsChanged();
@@ -2050,6 +2147,10 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         db.delete(TABLE_MESSAGES, COL_MSG_ID + "=?", new String[]{messageId});
         if (chatId != null) {
             updateChatLastMessageSummary(db, chatId);
+            Chat cachedChat = ramChatCache.get(chatId);
+            if (cachedChat != null) {
+                populateLastMessageMetadata(cachedChat);
+            }
             notifyMessagesChanged(chatId);
             notifyChatsChanged();
         }
@@ -2065,6 +2166,11 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         chatCv.put(COL_CHAT_UNREAD_COUNT, 0);
         db.update(TABLE_CHATS, chatCv, COL_CHAT_ID + "=?", new String[]{chatId});
 
+        Chat cachedChat = ramChatCache.get(chatId);
+        if (cachedChat != null) {
+            populateLastMessageMetadata(cachedChat);
+        }
+
         notifyMessagesChanged(chatId);
         notifyChatsChanged();
     }
@@ -2077,6 +2183,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         if (chatId == null) return;
         SQLiteDatabase db = getEncryptedDb();
         long effectiveReadAt = readAt > 0 ? readAt : System.currentTimeMillis();
+        String myId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
 
         try {
             Chat chat = getChat(chatId);
@@ -2096,7 +2203,22 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         cv.put(COL_MSG_DELIVERED, 1);
         cv.put(COL_MSG_READ, 1);
         cv.put(COL_MSG_PENDING, 0);
-        db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=?", new String[]{chatId});
+        if (myId != null && !myId.isEmpty()) {
+            db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=? AND " + COL_MSG_SENDER_ID + "=?", new String[]{chatId, myId});
+        } else {
+            db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=?", new String[]{chatId});
+        }
+        for (Message m : ramSingleMessageCache.values()) {
+            if (m != null && chatId.equals(m.getChatId()) && (myId == null || myId.isEmpty() || myId.equals(m.getSenderId()))) {
+                m.setPending(false);
+                m.setDelivered(true);
+                m.setRead(true);
+            }
+        }
+        Chat cachedChat = ramChatCache.get(chatId);
+        if (cachedChat != null) {
+            populateLastMessageMetadata(cachedChat);
+        }
         notifyMessagesChanged(chatId);
         notifyChatsChanged();
     }

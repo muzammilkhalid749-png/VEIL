@@ -16,7 +16,9 @@ public class User {
     private String photoUrl;
     private String avatar;
     private String status;
+    private boolean isOnline;
     private Timestamp lastSeen;
+    private long lastSeenMs;
     private String countryCode;
     private String appVersion;
     private String language;
@@ -51,7 +53,9 @@ public class User {
         this.bio = "";
         this.photoUrl = null;
         this.status = "online";
+        this.isOnline = true;
         this.lastSeen = Timestamp.now();
+        this.lastSeenMs = System.currentTimeMillis();
         this.countryCode = countryCode;
         this.appVersion = "1.0.0";
         this.language = "en";
@@ -100,8 +104,19 @@ public class User {
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
+    public boolean getIsOnline() { return isOnline; }
+    public void setIsOnline(boolean isOnline) { this.isOnline = isOnline; }
+
     public Timestamp getLastSeen() { return lastSeen; }
     public void setLastSeen(Timestamp lastSeen) { this.lastSeen = lastSeen; }
+
+    public long getLastSeenMs() { return lastSeenMs; }
+    public void setLastSeenMs(long lastSeenMs) { this.lastSeenMs = lastSeenMs; }
+
+    public long getEffectiveLastSeenMillis() {
+        long tsMs = (lastSeen != null && lastSeen.toDate() != null) ? lastSeen.toDate().getTime() : 0L;
+        return Math.max(lastSeenMs, tsMs);
+    }
 
     public String getCountryCode() { return countryCode; }
     public void setCountryCode(String countryCode) { this.countryCode = countryCode; }
@@ -158,46 +173,71 @@ public class User {
     public void setAvatar(String avatar) { this.avatar = avatar; this.photoUrl = avatar; }
 
     public void setOnline(boolean online) {
+        this.isOnline = online;
         this.status = online ? "online" : "offline";
         if (online) {
             this.lastSeen = Timestamp.now();
+            this.lastSeenMs = System.currentTimeMillis();
         }
     }
 
     public boolean isOnline() {
-        return "online".equalsIgnoreCase(this.status) || isUserOnline();
+        return isUserOnline();
     }
 
     /**
      * Telegram-grade presence verification.
-     * Evaluates true IF AND ONLY IF status is "online" AND lastSeen is within TTL.
+     * Evaluates true IF AND ONLY IF status is "online" (or isOnline is true and not offline) AND lastSeen is within TTL.
      */
     public boolean isUserOnline() {
-        if (!"online".equalsIgnoreCase(status)) return false;
-        if (lastSeen == null) return false;
-        long diff = System.currentTimeMillis() - lastSeen.toDate().getTime();
+        if ("offline".equalsIgnoreCase(status)) return false;
+        boolean markedOnline = "online".equalsIgnoreCase(status) || isOnline;
+        if (!markedOnline) return false;
+        long effectiveMs = getEffectiveLastSeenMillis();
+        if (effectiveMs <= 0) return false;
+        long diff = System.currentTimeMillis() - effectiveMs;
         if (diff < 0) {
-            return Math.abs(diff) < 60_000L;
+            return Math.abs(diff) < 90_000L;
         }
         return diff < com.m3.veil.manager.PresenceManager.PRESENCE_TTL_MS;
     }
 
     /**
-     * Formats lastSeen timestamp into human-readable Telegram format:
-     * "online", "last seen just now", "last seen 5m ago", "last seen 2h ago", etc.
+     * Formats lastSeen timestamp into human-readable WhatsApp/Telegram format:
+     * "online", "last seen just now", "last seen 5m ago", "last seen today at 14:30", "last seen yesterday at 09:15", etc.
      */
     public String getFormattedLastSeen() {
         if (isUserOnline()) return "online";
-        if (lastSeen == null) return "offline";
-        long diff = System.currentTimeMillis() - lastSeen.toDate().getTime();
+        long effectiveMs = getEffectiveLastSeenMillis();
+        if (effectiveMs <= 0) return "offline";
+        long now = System.currentTimeMillis();
+        long diff = now - effectiveMs;
         if (diff < 0 || diff < 60_000L) return "last seen just now";
         long minutes = diff / 60_000L;
         if (minutes < 60) return "last seen " + minutes + "m ago";
-        long hours = minutes / 60;
-        if (hours < 24) return "last seen " + hours + "h ago";
-        long days = hours / 24;
-        if (days == 1) return "last seen yesterday";
-        if (days < 7) return "last seen " + days + "d ago";
-        return "last seen recently";
+
+        java.util.Calendar nowCal = java.util.Calendar.getInstance();
+        nowCal.setTimeInMillis(now);
+        java.util.Calendar seenCal = java.util.Calendar.getInstance();
+        seenCal.setTimeInMillis(effectiveMs);
+
+        java.text.SimpleDateFormat timeFmt = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+        String timeStr = timeFmt.format(new java.util.Date(effectiveMs));
+
+        if (nowCal.get(java.util.Calendar.YEAR) == seenCal.get(java.util.Calendar.YEAR)
+                && nowCal.get(java.util.Calendar.DAY_OF_YEAR) == seenCal.get(java.util.Calendar.DAY_OF_YEAR)) {
+            return "last seen today at " + timeStr;
+        }
+
+        nowCal.add(java.util.Calendar.DAY_OF_YEAR, -1);
+        if (nowCal.get(java.util.Calendar.YEAR) == seenCal.get(java.util.Calendar.YEAR)
+                && nowCal.get(java.util.Calendar.DAY_OF_YEAR) == seenCal.get(java.util.Calendar.DAY_OF_YEAR)) {
+            return "last seen yesterday at " + timeStr;
+        }
+
+        long days = diff / (24L * 3600_000L);
+        if (days < 7) return "last seen " + Math.max(1, days) + "d ago at " + timeStr;
+        java.text.SimpleDateFormat dateFmt = new java.text.SimpleDateFormat("MMM dd 'at' HH:mm", java.util.Locale.getDefault());
+        return "last seen " + dateFmt.format(new java.util.Date(effectiveMs));
     }
 }

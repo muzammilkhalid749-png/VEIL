@@ -528,7 +528,7 @@ public class VeilMeshDaemonService extends Service {
                     boolean sent = sendFrameOverDataChannel(rtc, entry.recipientId, entry.payload);
                     if (sent) {
                         db.removeOutboxItem(entry.id);
-                        db.updateMessageStatus(entry.id, true, false);
+                        db.updateMessageStatus(entry.id, false, false);
                     } else {
                         db.updateOutboxAttempt(entry.id, entry.retryCount + 1, now);
                     }

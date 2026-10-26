@@ -1024,7 +1024,8 @@ public class SovereignIdentityAndDirectoryEngine {
                 userMap.put("displayName", manifest.username.trim());
             }
             userMap.put("bio", manifest.bio != null ? manifest.bio : "");
-            userMap.put("status", manifest.mood != null ? manifest.mood : "🛡️ Encrypted");
+            userMap.put("mood", manifest.mood != null ? manifest.mood : "🛡️ Encrypted");
+            userMap.put("status", "online");
             if (manifest.avatarBase64 != null && !manifest.avatarBase64.isEmpty()) {
                 userMap.put("avatar", manifest.avatarBase64);
                 userMap.put("photoUrl", manifest.avatarBase64);
@@ -1040,6 +1041,7 @@ public class SovereignIdentityAndDirectoryEngine {
             userMap.put("signature", manifest.signature != null ? manifest.signature : "");
             userMap.put("isOnline", true);
             userMap.put("lastSeen", com.google.firebase.Timestamp.now());
+            userMap.put("lastSeenMs", System.currentTimeMillis());
 
             db.collection("users")
                     .document(manifest.uid)

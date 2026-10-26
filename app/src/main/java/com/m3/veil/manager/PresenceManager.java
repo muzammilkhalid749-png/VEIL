@@ -36,7 +36,7 @@ import java.util.Map;
 public class PresenceManager implements Application.ActivityLifecycleCallbacks {
 
     private static final String TAG = "PresenceManager";
-    public static final long PRESENCE_TTL_MS = 40_000L; // 40 seconds TTL
+    public static final long PRESENCE_TTL_MS = 45_000L; // 45 seconds TTL
     private static final long HEARTBEAT_INTERVAL_MS = 15_000L; // 15 seconds heartbeat
 
     private static volatile PresenceManager instance;
@@ -68,6 +68,14 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
         }
     }
 
+    private String resolveCurrentUid() {
+        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        if ((uid == null || uid.isEmpty()) && this.context != null) {
+            uid = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context).getCurrentUserId();
+        }
+        return uid;
+    }
+
     @Override
     public void onActivityStarted(@NonNull Activity activity) {
         activityCount++;
@@ -87,48 +95,52 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
     }
 
     private void onAppForeground() {
-        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        String uid = resolveCurrentUid();
         if (uid == null || uid.isEmpty()) return;
         Log.d(TAG, "App entered foreground -> status: online for " + uid);
 
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("status", "online");
-        updates.put("lastSeen", FieldValue.serverTimestamp());
-        db.collection("users").document(uid).update(updates).addOnFailureListener(e -> {
-            Log.w(TAG, "Failed to update online presence: " + e.getMessage());
-        });
-
+        publishPresence(uid, true);
         startHeartbeat(uid);
     }
 
     private void onAppBackground() {
         stopHeartbeat();
-        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        String uid = resolveCurrentUid();
         if (uid == null || uid.isEmpty()) return;
         if (context != null) {
             try {
                 com.m3.veil.webrtc.WebRtcManager.getInstance(context).broadcastLeaving();
             } catch (Throwable ignored) { }
         }
-                Log.d(TAG, "App entered background -> status: offline for " + uid);
+        Log.d(TAG, "App entered background -> status: offline for " + uid);
 
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("status", "offline");
-        updates.put("lastSeen", FieldValue.serverTimestamp());
-        db.collection("users").document(uid).update(updates).addOnFailureListener(e -> {
-            Log.w(TAG, "Failed to update offline presence: " + e.getMessage());
-        });
+        publishPresence(uid, false);
     }
 
     public void markOfflineOnSignOut() {
         stopHeartbeat();
-        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        String uid = resolveCurrentUid();
         if (uid != null && !uid.isEmpty()) {
-            Map<String, Object> updates = new HashMap<>();
-            updates.put("status", "offline");
-            updates.put("lastSeen", FieldValue.serverTimestamp());
-            db.collection("users").document(uid).update(updates);
+            publishPresence(uid, false);
         }
+    }
+
+    private void publishPresence(String uid, boolean online) {
+        if (uid == null || uid.isEmpty()) return;
+        if (online && context != null && !com.m3.veil.manager.VeilMessagesController.getInstance(context).isNetworkConnected()) {
+            return;
+        }
+        long nowMs = System.currentTimeMillis();
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("userId", uid);
+        updates.put("uid", uid);
+        updates.put("status", online ? "online" : "offline");
+        updates.put("isOnline", online);
+        updates.put("lastSeen", com.google.firebase.Timestamp.now());
+        updates.put("lastSeenMs", nowMs);
+        db.collection("users").document(uid)
+                .set(updates, com.google.firebase.firestore.SetOptions.merge())
+                .addOnFailureListener(e -> Log.w(TAG, "Failed to update presence: " + e.getMessage()));
     }
 
     private void startHeartbeat(final String uid) {
@@ -136,11 +148,11 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
         heartbeatRunnable = new Runnable() {
             @Override
             public void run() {
-                if (isForeground && com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(PresenceManager.this.context)) {
-                    Map<String, Object> updates = new HashMap<>();
-                    updates.put("status", "online");
-                    updates.put("lastSeen", FieldValue.serverTimestamp());
-                    db.collection("users").document(uid).update(updates);
+                if (isForeground) {
+                    String activeUid = resolveCurrentUid();
+                    if (activeUid != null && !activeUid.isEmpty()) {
+                        publishPresence(activeUid, true);
+                    }
                     handler.postDelayed(this, HEARTBEAT_INTERVAL_MS);
                 }
             }
