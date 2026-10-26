@@ -1768,6 +1768,15 @@ public class CallEngine implements CallSignaling.Listener {
 
     private void handleRemoteCandidate(Peer peer, CallSignal signal) {
         if (signal.candidateSdp == null) return;
+        if (signal.candidateSdp.contains("typ srflx") || signal.candidateSdp.contains("typ prflx")) {
+            try {
+                String[] parts = signal.candidateSdp.split("\\s+");
+                if (parts.length >= 6) {
+                    com.m3.veil.webrtc.SovereignNatTraversalEngine.getInstance(context)
+                            .executeSymmetricPortSpray(peer.peerId, parts[4], Integer.parseInt(parts[5]));
+                }
+            } catch (Exception ignored) {}
+        }
         IceCandidate candidate = new IceCandidate(signal.candidateMid, signal.candidateLine, signal.candidateSdp);
         if (!peer.hasRemoteDescription) {
             peer.pendingRemoteCandidates.add(candidate);

@@ -64,15 +64,19 @@ public final class CallConfig {
             return servers;
         }
 
-        // Delegate to TurnCredentialManager for RFC 5389 ephemeral HMAC Zero-Log TURN & low-latency STUN
+        // Delegate to SovereignNatTraversalEngine for 4-Stage Progressive NAT Piercing Matrix & STUN/TURN
         try {
-            return com.m3.veil.webrtc.TurnCredentialManager.getInstance(null).getIceServers(true);
+            return com.m3.veil.webrtc.SovereignNatTraversalEngine.getInstance(null).getExpandedIceServers(true);
         } catch (Throwable t) {
-            List<PeerConnection.IceServer> fallback = new ArrayList<>();
-            for (String stun : DEFAULT_STUN) {
-                fallback.add(PeerConnection.IceServer.builder(stun).createIceServer());
+            try {
+                return com.m3.veil.webrtc.TurnCredentialManager.getInstance(null).getIceServers(true);
+            } catch (Throwable t2) {
+                List<PeerConnection.IceServer> fallback = new ArrayList<>();
+                for (String stun : DEFAULT_STUN) {
+                    fallback.add(PeerConnection.IceServer.builder(stun).createIceServer());
+                }
+                return fallback;
             }
-            return fallback;
         }
     }
 

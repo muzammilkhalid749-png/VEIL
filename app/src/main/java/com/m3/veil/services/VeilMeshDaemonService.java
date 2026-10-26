@@ -135,6 +135,7 @@ public class VeilMeshDaemonService extends Service {
         appContext = getApplicationContext();
         instance = this;
         isServiceRunning = true;
+        com.m3.veil.webrtc.SovereignNatTraversalEngine.getInstance(this);
         ensureSignalingActive();
         startSyncLoops();
     }
@@ -144,6 +145,7 @@ public class VeilMeshDaemonService extends Service {
         appContext = getApplicationContext();
         instance = this;
         isServiceRunning = true;
+        com.m3.veil.webrtc.SovereignNatTraversalEngine.getInstance(this);
         ensureSignalingActive();
         startSyncLoops();
         triggerOutboxSync();

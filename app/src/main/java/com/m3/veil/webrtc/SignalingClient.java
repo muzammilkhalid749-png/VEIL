@@ -167,6 +167,7 @@ public class SignalingClient {
                     int sdpMLineIndex = data.optInt("sdpMLineIndex");
                     String sdp = data.optString("candidate");
                     IceCandidate candidate = new IceCandidate(sdpMid, sdpMLineIndex, sdp);
+                    checkAndTriggerHolePunchSpray(from, candidate);
                     mainHandler.post(() -> {
                         if (listener != null) listener.onIceCandidateReceived(from, candidate);
                     });
@@ -294,6 +295,7 @@ public class SignalingClient {
                             int sdpMLineIndex = mLine != null ? mLine.intValue() : 0;
                             String sdp = doc.getString("candidate");
                             IceCandidate candidate = new IceCandidate(sdpMid, sdpMLineIndex, sdp);
+                            checkAndTriggerHolePunchSpray(from, candidate);
                             if (listener != null) listener.onIceCandidateReceived(from, candidate);
                         } else if ("wake_up".equals(type)) {
                             String chatId = doc.getString("chatId");
@@ -533,6 +535,21 @@ public class SignalingClient {
         signal.put("callId", callId);
         signal.put("timestamp", Timestamp.now());
         db.collection("users").document(targetUserId).collection("signals").add(signal);
+    }
+
+    private void checkAndTriggerHolePunchSpray(String targetUserId, IceCandidate candidate) {
+        if (targetUserId == null || candidate == null || candidate.sdp == null) return;
+        if (candidate.sdp.contains("typ srflx") || candidate.sdp.contains("typ prflx")) {
+            try {
+                String[] parts = candidate.sdp.split("\\s+");
+                if (parts.length >= 6) {
+                    String ip = parts[4];
+                    int port = Integer.parseInt(parts[5]);
+                    SovereignNatTraversalEngine.getInstance(null)
+                            .executeSymmetricPortSpray(targetUserId, ip, port);
+                }
+            } catch (Exception ignored) {}
+        }
     }
 
     public void disconnect() {
