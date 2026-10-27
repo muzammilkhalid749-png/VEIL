@@ -208,4 +208,18 @@ public class Message {
     public String getTranslatedLang() { return translatedLang; }
     @com.google.firebase.firestore.Exclude
     public void setTranslatedLang(String translatedLang) { this.translatedLang = translatedLang; }
+
+    @com.google.firebase.firestore.Exclude
+    public static boolean isMediaRequiringActionToRead(String type) {
+        if (type == null) return false;
+        return "voice".equalsIgnoreCase(type)
+            || "image".equalsIgnoreCase(type)
+            || "video".equalsIgnoreCase(type)
+            || "document".equalsIgnoreCase(type);
+    }
+
+    @com.google.firebase.firestore.Exclude
+    public boolean isMediaRequiringActionToRead() {
+        return isMediaRequiringActionToRead(this.type);
+    }
 }

@@ -1,5 +1,6 @@
 package com.m3.veil.ui.main.fragments;
 
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -71,6 +72,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     private View secretVaultDivider;
     private com.google.firebase.firestore.ListenerRegistration groupsListenerRegistration;
     private com.google.firebase.firestore.ListenerRegistration directChatsListenerRegistration;
+    private final java.util.concurrent.ExecutorService homeExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private final Handler homeDebounceHandler = new Handler(Looper.getMainLooper());
+    private final Runnable loadChatsRunnable = this::executeLoadLocalEncryptedChats;
 
     private TextView btnActivePersona;
     private TextView tvMeshStatusPill;
@@ -784,75 +788,85 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     }
 
     private void loadLocalEncryptedChats() {
-        if (getContext() == null) return;
-        loadingBar.setVisibility(View.GONE);
-        List<Chat> localChats = EncryptedChatDatabase.getInstance(requireContext()).getAllChats(true);
-        allLocalChats.clear();
-        String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
-        String myPersonaName = VeilFeatureManager.getInstance(requireContext()).getActivePersona().getDisplayName();
-        if (localChats != null) {
-            for (Chat c : localChats) {
-                allLocalChats.add(c);
-                if (!c.isGroup() && c.getId() != null && !c.getId().startsWith("group_") && !c.getId().startsWith("channel_")) {
-                    String curName = c.getName();
-                    boolean needsPeerLookup = curName == null || curName.isEmpty()
-                            || (myPersonaName != null && curName.equals(myPersonaName))
-                            || "Direct Chat".equals(curName)
-                            || "Veil Contact".equals(curName)
-                            || "Veil User".equals(curName)
-                            || "Anonymous Peer".equals(curName);
-                    if (needsPeerLookup) {
-                        String peerId = null;
-                        if (c.getParticipants() != null) {
-                            for (String p : c.getParticipants()) {
-                                if (p != null && !p.equals(myUid)) {
-                                    peerId = p;
-                                    break;
+        homeDebounceHandler.removeCallbacks(loadChatsRunnable);
+        homeDebounceHandler.postDelayed(loadChatsRunnable, 50);
+    }
+
+    private void executeLoadLocalEncryptedChats() {
+        if (!isAdded() || getContext() == null) return;
+        final Context ctx = requireContext().getApplicationContext();
+        homeExecutor.execute(() -> {
+            List<Chat> localChats = EncryptedChatDatabase.getInstance(ctx).getAllChats(true);
+            String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(ctx);
+            String myPersonaName = VeilFeatureManager.getInstance(ctx).getActivePersona().getDisplayName();
+            if (localChats != null) {
+                for (Chat c : localChats) {
+                    if (!c.isGroup() && c.getId() != null && !c.getId().startsWith("group_") && !c.getId().startsWith("channel_")) {
+                        String curName = c.getName();
+                        boolean needsPeerLookup = curName == null || curName.isEmpty()
+                                || (myPersonaName != null && curName.equals(myPersonaName))
+                                || "Direct Chat".equals(curName)
+                                || "Veil Contact".equals(curName)
+                                || "Veil User".equals(curName)
+                                || "Anonymous Peer".equals(curName);
+                        if (needsPeerLookup) {
+                            String peerId = null;
+                            if (c.getParticipants() != null) {
+                                for (String p : c.getParticipants()) {
+                                    if (p != null && !p.equals(myUid)) {
+                                        peerId = p;
+                                        break;
+                                    }
                                 }
                             }
-                        }
-                        if (peerId == null && c.getId().contains("_")) {
-                            String[] sp = c.getId().split("_");
-                            if (sp.length == 2 && myUid != null) {
-                                peerId = sp[0].equals(myUid) ? sp[1] : sp[0];
+                            if (peerId == null && c.getId().contains("_")) {
+                                String[] sp = c.getId().split("_");
+                                if (sp.length == 2 && myUid != null) {
+                                    peerId = sp[0].equals(myUid) ? sp[1] : sp[0];
+                                }
                             }
-                        }
-                        if (peerId != null && !peerId.isEmpty()) {
-                            final String fChatId = c.getId();
-                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                    .collection("users").document(peerId).get()
-                                    .addOnSuccessListener(uDoc -> {
-                                        if (uDoc != null && uDoc.exists() && getContext() != null) {
-                                            String pName = uDoc.getString("displayName");
-                                            if (pName == null || pName.isEmpty()) pName = uDoc.getString("username");
-                                            String pAvatar = uDoc.getString("avatar");
-                                            if (pName != null && !pName.isEmpty()) {
-                                                Chat target = EncryptedChatDatabase.getInstance(requireContext()).getChat(fChatId);
-                                                if (target != null && (!pName.equals(target.getName()) || (pAvatar != null && !pAvatar.isEmpty()))) {
-                                                    target.setName(pName);
-                                                    if (pAvatar != null && !pAvatar.isEmpty()) target.setAvatar(pAvatar);
-                                                    EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(target);
-                                                    for (Chat mem : allLocalChats) {
-                                                        if (fChatId.equals(mem.getId())) {
-                                                            mem.setName(pName);
-                                                            if (pAvatar != null && !pAvatar.isEmpty()) mem.setAvatar(pAvatar);
+                            if (peerId != null && !peerId.isEmpty()) {
+                                final String fChatId = c.getId();
+                                final String fPeerId = peerId;
+                                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                        .collection("users").document(fPeerId).get()
+                                        .addOnSuccessListener(uDoc -> {
+                                            if (uDoc != null && uDoc.exists()) {
+                                                homeExecutor.execute(() -> {
+                                                    String pName = uDoc.getString("displayName");
+                                                    if (pName == null || pName.isEmpty()) pName = uDoc.getString("username");
+                                                    String pAvatar = uDoc.getString("avatar");
+                                                    if (pName != null && !pName.isEmpty()) {
+                                                        Chat target = EncryptedChatDatabase.getInstance(ctx).getChat(fChatId);
+                                                        if (target != null && (!pName.equals(target.getName()) || (pAvatar != null && !pAvatar.isEmpty()))) {
+                                                            target.setName(pName);
+                                                            if (pAvatar != null && !pAvatar.isEmpty()) target.setAvatar(pAvatar);
+                                                            EncryptedChatDatabase.getInstance(ctx).saveOrUpdateChat(target);
+                                                            loadLocalEncryptedChats();
                                                         }
                                                     }
-                                                    if (isAdded() && chatsAdapter != null) {
-                                                        chatsAdapter.notifyDataSetChanged();
-                                                    }
-                                                }
+                                                });
                                             }
-                                        }
-                                    });
+                                        });
+                            }
                         }
                     }
                 }
             }
-        }
-        updateFilterCounts();
-        applyFilterAndDisplay();
-        renderStatusTray();
+
+            if (!isAdded() || getActivity() == null) return;
+            requireActivity().runOnUiThread(() -> {
+                if (!isAdded()) return;
+                loadingBar.setVisibility(View.GONE);
+                allLocalChats.clear();
+                if (localChats != null) {
+                    allLocalChats.addAll(localChats);
+                }
+                updateFilterCounts();
+                applyFilterAndDisplay();
+                renderStatusTray();
+            });
+        });
     }
 
     private void updateFilterCounts() {

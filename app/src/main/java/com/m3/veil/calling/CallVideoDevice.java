@@ -169,23 +169,31 @@ public class CallVideoDevice {
 
     public void stopCamera() {
         cameraRunning = false;
-        try {
-            if (cameraCapturer != null) {
+        if (cameraCapturer != null) {
+            try {
                 cameraCapturer.stopCapture();
+            } catch (Throwable ignored) { }
+            try {
                 cameraCapturer.dispose();
-            }
-        } catch (Throwable ignored) { }
-        cameraCapturer = null;
-        try {
-            if (cameraHelper != null) cameraHelper.dispose();
-        } catch (Throwable ignored) { }
-        cameraHelper = null;
+            } catch (Throwable ignored) { }
+            cameraCapturer = null;
+        }
+        if (cameraHelper != null) {
+            try {
+                cameraHelper.dispose();
+            } catch (Throwable ignored) { }
+            cameraHelper = null;
+        }
         if (cameraSource != null) {
-            try { cameraSource.dispose(); } catch (Throwable ignored) { }
+            try {
+                cameraSource.dispose();
+            } catch (Throwable ignored) { }
             cameraSource = null;
         }
         if (cameraTrack != null) {
-            try { cameraTrack.dispose(); } catch (Throwable ignored) { }
+            try {
+                cameraTrack.dispose();
+            } catch (Throwable ignored) { }
             cameraTrack = null;
         }
     }
@@ -324,6 +332,15 @@ public class CallVideoDevice {
             Log.w(TAG, "attachRenderer failed: " + t.getMessage());
             return false;
         }
+    }
+
+    public static void removeSink(SurfaceViewRenderer renderer, VideoTrack track) {
+        try {
+            if (track != null && renderer != null) track.removeSink(renderer);
+        } catch (Throwable ignored) { }
+        try {
+            if (renderer != null) renderer.clearImage();
+        } catch (Throwable ignored) { }
     }
 
     public static void detachRenderer(SurfaceViewRenderer renderer, VideoTrack track) {

@@ -217,6 +217,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         default void onVanishDestroyed(String dialogId, String messageId) {}
         default void onBlinkOpened(String dialogId, String messageId) {}
         default void onScreenshotDetected(String dialogId, String peerId) {}
+        default void onMediaTransferProgress(String dialogId, String messageId, int percent) {}
     }
 
     /**
@@ -770,11 +771,20 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 || dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_");
         String finalRecipientId = recipientId;
         if (!isGroupOrChannel && (finalRecipientId == null || finalRecipientId.isEmpty())) {
-            if (dialogId.contains("_")) {
-                String[] parts = dialogId.split("_");
-                if (parts.length == 2) {
-                    String myId = getCurrentUserId();
-                    finalRecipientId = parts[0].equals(myId) ? parts[1] : parts[0];
+            String myId = getCurrentUserId();
+            if (myId != null && dialogId.contains(myId)) {
+                if (dialogId.startsWith(myId + "_")) {
+                    finalRecipientId = dialogId.substring((myId + "_").length());
+                } else if (dialogId.endsWith("_" + myId)) {
+                    finalRecipientId = dialogId.substring(0, dialogId.length() - ("_" + myId).length());
+                }
+            }
+            if (finalRecipientId == null || finalRecipientId.isEmpty()) {
+                if (dialogId.contains("_")) {
+                    String[] parts = dialogId.split("_");
+                    if (parts.length == 2) {
+                        finalRecipientId = parts[0].equals(myId) ? parts[1] : parts[0];
+                    }
                 }
             }
         }
@@ -1256,11 +1266,22 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             WebRtcManager.getInstance(mContext).sendFileMessage(peerId, msg, localFile,
                     new P2PFileTransferHelper.FileTransferCallback() {
                         @Override
-                        public void onProgress(int percent) {}
+                        public void onProgress(int percent) {
+                            runOnUI(() -> {
+                                for (MessagesObserver obs : mObservers) {
+                                    obs.onMediaTransferProgress(msg.getChatId(), msg.getId(), percent);
+                                }
+                            });
+                        }
 
                         @Override
                         public void onComplete(String transferId) {
                             Log.d(TAG, "P2P media stream complete for message: " + msg.getId());
+                            runOnUI(() -> {
+                                for (MessagesObserver obs : mObservers) {
+                                    obs.onMediaTransferProgress(msg.getChatId(), msg.getId(), 100);
+                                }
+                            });
                         }
 
                         @Override
@@ -2060,7 +2081,9 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 }
             }
 
-            boolean isChatOpenInForeground = dialogId != null && dialogId.equals(mActiveChatIdInForeground);
+            boolean sendReadReceipt = mContext.getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                    .getBoolean("read_receipts_enabled", true);
+            boolean isChatOpenInForeground = dialogId != null && dialogId.equals(mActiveChatIdInForeground) && sendReadReceipt;
             message.setDelivered(true);
             if (isChatOpenInForeground) {
                 message.setRead(true);
@@ -2109,8 +2132,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             if (msg == null) return;
 
             msg.setPending(false);
-            msg.setDelivered(delivered || read);
-            msg.setRead(read);
+            // Monotonic status: never downgrade read -> delivered when a late/duplicate ack arrives.
+            final boolean wasRead = msg.isRead();
+            msg.setDelivered(msg.isDelivered() || delivered || read);
+            msg.setRead(wasRead || read);
 
             String dialogId = (msg.getChatId() != null && !msg.getChatId().isEmpty())
                     ? msg.getChatId()
@@ -2146,8 +2171,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             List<String> updatedIds = new ArrayList<>();
             if (list != null) {
                 for (Message m : list) {
-                    if (m != null && m.getSenderId() != null && m.getSenderId().equals(myId) && !m.isRead()) {
-                        m.setPending(false);
+                    if (m != null && m.getSenderId() != null && m.getSenderId().equals(myId)
+                            && !m.isRead() && m.isDelivered() && !m.isPending() && !m.isMediaRequiringActionToRead()) {
                         m.setDelivered(true);
                         m.setRead(true);
                         updatedIds.add(m.getId());
@@ -2233,7 +2258,16 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         ok = WebRtcManager.getInstance(mContext).sendPacket(peerId, pkt);
                     }
                     if (ok) {
-                        mStorageQueue.execute(() -> mDatabase.updateMessageStatus(entry.message.getId(), false, false));
+                        entry.message.setPending(false);
+                        mStorageQueue.execute(() -> {
+                            mDatabase.updateMessageStatus(entry.message.getId(), false, false);
+                            refreshDialogInCache(entry.dialogId);
+                        });
+                        runOnUI(() -> {
+                            for (MessagesObserver obs : mObservers) {
+                                obs.onMessageStatusChanged(entry.dialogId, entry.message.getId(), false, false);
+                            }
+                        });
                         Log.d(TAG, "Outbox packet flushed successfully for peer: " + peerId);
                     } else {
                         // Re-enqueue if still failed
@@ -2506,6 +2540,50 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 });
             }
         });
+    }
+
+    /**
+     * Explicitly marks a media or single message as read when recipient interacts with it
+     * (e.g. plays audio, opens photo/video in viewer, opens document).
+     */
+    public void markMessageAsReadExplicitly(Message message) {
+        if (message == null || message.getId() == null) return;
+        String myId = getCurrentUserId();
+        if (myId != null && myId.equals(message.getSenderId())) return;
+        if (com.m3.veil.manager.AuthManager.getInstance().isMyUserId(mContext, message.getSenderId())) return;
+        if (message.isRead()) return;
+
+        message.setRead(true);
+        message.setDelivered(true);
+
+        final String msgId = message.getId();
+        final String senderId = message.getSenderId();
+        final String chatId = message.getChatId();
+
+        mStorageQueue.execute(() -> {
+            mDatabase.updateMessageStatus(msgId, true, true);
+            onMessageStatusChanged(msgId, true, true);
+        });
+
+        if (senderId != null && !senderId.isEmpty()) {
+            mCryptoQueue.execute(() -> {
+                WebRtcManager.getInstance(mContext).sendReceipt(senderId, msgId, true, true);
+            });
+        }
+
+        if (chatId != null && !chatId.isEmpty()) {
+            try {
+                java.util.Map<String, Object> ack = new java.util.HashMap<>();
+                ack.put("delivered", true);
+                ack.put("read", true);
+                ack.put("readAt", System.currentTimeMillis());
+                com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+                fs.collection("groups").document(chatId).collection("messages").document(msgId)
+                        .set(ack, com.google.firebase.firestore.SetOptions.merge());
+                fs.collection("chats").document(chatId).collection("messages").document(msgId)
+                        .set(ack, com.google.firebase.firestore.SetOptions.merge());
+            } catch (Throwable ignored) {}
+        }
     }
 
     /**

@@ -123,6 +123,9 @@ public class VoicePlayerManager {
 
         if (localAudio != null) {
             startPlaying(message.getId(), localAudio.getAbsolutePath(), message.getVoiceFilter());
+            try {
+                com.m3.veil.manager.VeilMessagesController.getInstance(context).markMessageAsReadExplicitly(message);
+            } catch (Throwable ignored) {}
         } else {
             Toast.makeText(context, "Voice note awaiting peer-to-peer WebRTC transfer", Toast.LENGTH_SHORT).show();
         }

@@ -11,20 +11,6 @@ public class VeilApplication extends Application {
     private static VeilApplication instance;
     private UserPreferences userPreferences;
 
-    // Telegram-Grade Shared RecycledViewPool across MainActivity, HomeFragment, and ChatActivity
-    private static final androidx.recyclerview.widget.RecyclerView.RecycledViewPool SHARED_RECYCLED_VIEW_POOL =
-            new androidx.recyclerview.widget.RecyclerView.RecycledViewPool();
-
-    static {
-        SHARED_RECYCLED_VIEW_POOL.setMaxRecycledViews(0, 35); // Dialog cell / Sent message
-        SHARED_RECYCLED_VIEW_POOL.setMaxRecycledViews(1, 35); // Received message
-        SHARED_RECYCLED_VIEW_POOL.setMaxRecycledViews(2, 20); // Notice / Media
-    }
-
-    public static androidx.recyclerview.widget.RecyclerView.RecycledViewPool getSharedRecycledViewPool() {
-        return SHARED_RECYCLED_VIEW_POOL;
-    }
-
     @Override
     public void onCreate() {
         super.onCreate();
@@ -84,7 +70,6 @@ public class VeilApplication extends Application {
         com.m3.veil.utils.BlurUtils.clearCache();
         com.m3.veil.ui.views.VeilDialogCell.clearAvatarCache();
         com.m3.veil.manager.VeilMessagesController.clearStaticLayoutCache();
-        SHARED_RECYCLED_VIEW_POOL.clear();
         try {
             com.m3.veil.database.EncryptedChatDatabase.getInstance(this).trimMemory(level);
         } catch (Throwable ignored) { }
@@ -97,10 +82,15 @@ public class VeilApplication extends Application {
         com.m3.veil.utils.BlurUtils.clearCache();
         com.m3.veil.ui.views.VeilDialogCell.clearAvatarCache();
         com.m3.veil.manager.VeilMessagesController.clearStaticLayoutCache();
-        SHARED_RECYCLED_VIEW_POOL.clear();
         try {
             com.m3.veil.database.EncryptedChatDatabase.getInstance(this).trimMemory(TRIM_MEMORY_COMPLETE);
         } catch (Throwable ignored) { }
+    }
+
+    private static final androidx.recyclerview.widget.RecyclerView.RecycledViewPool sharedRecycledViewPool = new androidx.recyclerview.widget.RecyclerView.RecycledViewPool();
+
+    public static androidx.recyclerview.widget.RecyclerView.RecycledViewPool getSharedRecycledViewPool() {
+        return sharedRecycledViewPool;
     }
 
     public static VeilApplication getInstance() {

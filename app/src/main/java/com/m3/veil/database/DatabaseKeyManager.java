@@ -18,8 +18,12 @@ public class DatabaseKeyManager {
 
     private static final String PREFS_NAME = "veil_db_security_prefs";
     private static final String KEY_DB_PASSPHRASE = "key_sqlcipher_passphrase";
+    private static volatile byte[] sCachedPassphrase = null;
 
     public static synchronized byte[] getDatabasePassphrase(Context context) {
+        if (sCachedPassphrase != null) {
+            return sCachedPassphrase;
+        }
         try {
             String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
             SharedPreferences securePrefs = EncryptedSharedPreferences.create(
@@ -37,15 +41,18 @@ public class DatabaseKeyManager {
                 new SecureRandom().nextBytes(newKey);
                 encodedKey = Base64.encodeToString(newKey, Base64.NO_WRAP);
                 securePrefs.edit().putString(KEY_DB_PASSPHRASE, encodedKey).apply();
+                sCachedPassphrase = newKey;
                 return newKey;
             }
 
-            return Base64.decode(encodedKey, Base64.NO_WRAP);
+            sCachedPassphrase = Base64.decode(encodedKey, Base64.NO_WRAP);
+            return sCachedPassphrase;
         } catch (Exception e) {
             // Fallback to internal hardware-bound hash if EncryptedSharedPreferences throws on legacy ROMs
             String fallback = "veil_secure_vault_" + android.provider.Settings.Secure.getString(
                     context.getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
-            return fallback.getBytes();
+            sCachedPassphrase = fallback.getBytes();
+            return sCachedPassphrase;
         }
     }
 }

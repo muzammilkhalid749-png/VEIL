@@ -112,7 +112,7 @@ public class ProfileFragment extends Fragment {
 
     private TextView contactsCount, groupsCount, channelsCount;
 
-    private TextView appVersion, currentLanguage;
+    private TextView appVersion, currentLanguage, tvLinkedDevicesCount;
 
     private Button editProfileButton, addFundsButton, sendMoneyButton, logoutButton;
 
@@ -256,6 +256,17 @@ public class ProfileFragment extends Fragment {
 
         }
 
+        if (tvLinkedDevicesCount != null && getContext() != null) {
+            SharedPreferences linkedPrefs = requireContext().getSharedPreferences("veil_linked_desktop_device", Context.MODE_PRIVATE);
+            String linkedSid = linkedPrefs.getString("sessionId", null);
+            String linkedPid = linkedPrefs.getString("webPeerId", null);
+            if (linkedSid != null || linkedPid != null) {
+                tvLinkedDevicesCount.setText("1 Linked");
+            } else {
+                tvLinkedDevicesCount.setText("QR Scanner");
+            }
+        }
+
     }
 
 
@@ -315,6 +326,7 @@ public class ProfileFragment extends Fragment {
         appVersion = view.findViewById(R.id.appVersion);
 
         currentLanguage = view.findViewById(R.id.currentLanguage);
+        tvLinkedDevicesCount = view.findViewById(R.id.tvLinkedDevicesCount);
 
 
 
@@ -395,6 +407,14 @@ public class ProfileFragment extends Fragment {
         view.findViewById(R.id.accountSettings).setOnClickListener(v -> openAccountSettings());
 
         view.findViewById(R.id.privacySettings).setOnClickListener(v -> startActivity(new Intent(requireContext(), com.m3.veil.ui.settings.PrivacySettingsActivity.class)));
+
+        View linkedDevicesView = view.findViewById(R.id.linkedDevicesSettings);
+        if (linkedDevicesView != null) {
+            linkedDevicesView.setOnClickListener(v -> {
+                LinkedDevicesBottomSheet sheet = new LinkedDevicesBottomSheet();
+                sheet.show(getChildFragmentManager(), "LinkedDevicesBottomSheet");
+            });
+        }
 
         view.findViewById(R.id.notificationSettings).setOnClickListener(v -> openNotificationSettings());
 

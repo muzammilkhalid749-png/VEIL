@@ -1277,6 +1277,13 @@ public class SovereignIdentityAndDirectoryEngine {
      * persists them locally, and returns the 12-word recovery phrase.
      */
     public String createNewAnonymousAccount() {
+        PreferenceManager pm = new PreferenceManager(mContext);
+        pm.remove("username");
+        pm.remove("displayName");
+        pm.remove("user_name");
+        UserPreferences up = new UserPreferences(mContext);
+        up.clearUserData();
+
         String mnemonic = generateMnemonic();
         String normalized = normalizePhrase(mnemonic);
         byte[] masterSeed = deriveMasterSeed(normalized, null);
@@ -1286,13 +1293,11 @@ public class SovereignIdentityAndDirectoryEngine {
 
         saveRecoveryPhraseLocally(mContext, normalized);
 
-        PreferenceManager pm = new PreferenceManager(mContext);
         pm.putString("sovereign_uid", uid);
         pm.putString("userId", uid);
         pm.putString("sovereign_pub_key", pubKeyB64);
         pm.putBoolean("sovereign_logged_in", true);
 
-        UserPreferences up = new UserPreferences(mContext);
         User newUser = new User(uid, "", "SOV");
         newUser.setPublicKey(pubKeyB64);
         newUser.setOnline(true);
@@ -1385,6 +1390,17 @@ public class SovereignIdentityAndDirectoryEngine {
             }
             mActiveSignalWebSockets.clear();
             mSubscribedUid = null;
+        } catch (Exception ignored) {}
+        try {
+            clearRecoveryPhraseLocally(mContext);
+            PreferenceManager pm = new PreferenceManager(mContext);
+            pm.remove("sovereign_uid");
+            pm.remove("userId");
+            pm.remove("username");
+            pm.remove("displayName");
+            pm.remove("user_name");
+            pm.remove("sovereign_pub_key");
+            pm.putBoolean("sovereign_logged_in", false);
         } catch (Exception ignored) {}
     }
 
@@ -1662,6 +1678,25 @@ public class SovereignIdentityAndDirectoryEngine {
                         .edit().putString("recovery_phrase", phrase).apply();
             } catch (Exception ignored2) {}
         }
+    }
+
+    public void clearRecoveryPhraseLocally(Context context) {
+        if (context == null) return;
+        try {
+            String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
+            SharedPreferences securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
+                    "veil_encrypted_prefs",
+                    masterKeyAlias,
+                    context,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
+            securePrefs.edit().clear().commit();
+        } catch (Exception ignored) {}
+        try {
+            context.getSharedPreferences("veil_encrypted_prefs_fallback", Context.MODE_PRIVATE)
+                    .edit().clear().commit();
+        } catch (Exception ignored2) {}
     }
 
     public String loadRecoveryPhraseLocally(Context context) {
@@ -2678,9 +2713,7 @@ public class SovereignIdentityAndDirectoryEngine {
             } catch (Throwable ignored) {}
 
             // 2. Authoritative Firebase Firestore check ("usernames/{clean}" & "users")
-            // If Bloom Filter returned false (0% false negatives locally), we use a tight 900ms timeout;
-            // if Bloom Filter returned true (probable collision), we verify authoritatively with 1800ms timeout.
-            long timeoutMs = bloomProbableHit ? 1800L : 900L;
+            long timeoutMs = 3500L;
             try {
                 com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
                 com.google.firebase.firestore.DocumentSnapshot unameDoc =
@@ -2693,11 +2726,17 @@ public class SovereignIdentityAndDirectoryEngine {
                     mUsernameBloomFilter.saveToPreferences(mContext);
                     String ownerUid = unameDoc.getString("userId");
                     if (ownerUid == null || ownerUid.isEmpty()) ownerUid = unameDoc.getString("uid");
-                    if (ownerUid != null && !ownerUid.isEmpty() && !ownerUid.equals(myUid)) {
+                    if (ownerUid != null && !ownerUid.isEmpty()) {
+                        if (myUid != null && ownerUid.equals(myUid)) {
+                            mMainHandler.post(() -> callback.onResult(false));
+                            return;
+                        } else {
+                            mMainHandler.post(() -> callback.onResult(true));
+                            return;
+                        }
+                    } else {
+                        // Document exists without UID -> taken
                         mMainHandler.post(() -> callback.onResult(true));
-                        return;
-                    } else if (ownerUid != null && ownerUid.equals(myUid)) {
-                        mMainHandler.post(() -> callback.onResult(false));
                         return;
                     }
                 }
@@ -2713,9 +2752,14 @@ public class SovereignIdentityAndDirectoryEngine {
                         if (docUid == null || docUid.isEmpty()) docUid = d.getId();
                         mUsernameBloomFilter.add(clean);
                         mUsernameBloomFilter.saveToPreferences(mContext);
-                        if (docUid != null && !docUid.equals(myUid)) {
-                            mMainHandler.post(() -> callback.onResult(true));
-                            return;
+                        if (docUid != null && !docUid.isEmpty()) {
+                            if (myUid != null && docUid.equals(myUid)) {
+                                mMainHandler.post(() -> callback.onResult(false));
+                                return;
+                            } else {
+                                mMainHandler.post(() -> callback.onResult(true));
+                                return;
+                            }
                         }
                     }
                 }

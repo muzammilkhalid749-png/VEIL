@@ -2073,19 +2073,36 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         if (safeUserId == null) safeUserId = "";
         SQLiteDatabase db = getEncryptedDb();
 
-        // 1. If any unread incoming message is in "after_read" vanish mode and hasn't started its timer yet (COL_MSG_EXPIRES_AT == 0),
-        // start its expiration countdown now upon being read!
-        if (!safeUserId.isEmpty()) {
+        // 1. Gather all local user IDs to ensure outbound sent messages are NEVER marked read!
+        java.util.Set<String> myIds = com.m3.veil.manager.AuthManager.getInstance().getMyUserIds(this.context);
+        if (currentUserId != null && !currentUserId.trim().isEmpty()) {
+            myIds.add(currentUserId.trim());
+        }
+        if (safeUserId != null && !safeUserId.trim().isEmpty()) {
+            myIds.add(safeUserId.trim());
+        }
+
+        if (!myIds.isEmpty()) {
             try {
                 Chat chat = getChat(chatId);
                 long defaultTimer = chat != null ? chat.getVanishTimer() : 0;
                 String defaultMode = chat != null ? chat.getVanishMode() : "after_send";
                 long now = System.currentTimeMillis();
 
+                StringBuilder whereSb = new StringBuilder(COL_MSG_CHAT_ID + "=? AND " + COL_MSG_READ + "=0 AND " + COL_MSG_TYPE + " NOT IN ('voice', 'image', 'video', 'document')");
+                List<String> argsList = new ArrayList<>();
+                argsList.add(chatId);
+                for (String mId : myIds) {
+                    if (mId != null && !mId.isEmpty()) {
+                        whereSb.append(" AND ").append(COL_MSG_SENDER_ID).append("!=?");
+                        argsList.add(mId);
+                    }
+                }
+
                 Cursor cursor = db.query(TABLE_MESSAGES,
-                        new String[]{COL_MSG_ID, COL_MSG_VANISH_TIMER, COL_MSG_VANISH_MODE, COL_MSG_EXPIRES_AT},
-                        COL_MSG_CHAT_ID + "=? AND " + COL_MSG_SENDER_ID + "!=? AND " + COL_MSG_READ + "=0",
-                        new String[]{chatId, safeUserId}, null, null, null);
+                        new String[]{COL_MSG_ID, COL_MSG_VANISH_TIMER, COL_MSG_VANISH_MODE, COL_MSG_EXPIRES_AT, COL_MSG_SENDER_ID},
+                        whereSb.toString(),
+                        argsList.toArray(new String[0]), null, null, null);
                 if (cursor != null) {
                     try {
                         while (cursor.moveToNext()) {
@@ -2093,6 +2110,10 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                             long vTimer = cursor.getLong(1);
                             String vMode = cursor.getString(2);
                             long expAt = cursor.getLong(3);
+                            String senderId = cursor.getString(4);
+                            if (com.m3.veil.manager.AuthManager.getInstance().isMyUserId(this.context, senderId)) {
+                                continue;
+                            }
 
                             if (vTimer <= 0) vTimer = defaultTimer;
                             if (vMode == null || vMode.isEmpty()) vMode = defaultMode;
@@ -2113,12 +2134,26 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             cv.put(COL_MSG_READ, 1);
             cv.put(COL_MSG_DELIVERED, 1);
 
-            db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=? AND " + COL_MSG_SENDER_ID + "!=?",
-                    new String[]{chatId, safeUserId});
+            StringBuilder updateWhereSb = new StringBuilder(COL_MSG_CHAT_ID + "=? AND " + COL_MSG_TYPE + " NOT IN ('voice', 'image', 'video', 'document')");
+            List<String> updateArgsList = new ArrayList<>();
+            updateArgsList.add(chatId);
+            for (String mId : myIds) {
+                if (mId != null && !mId.isEmpty()) {
+                    updateWhereSb.append(" AND ").append(COL_MSG_SENDER_ID).append("!=?");
+                    updateArgsList.add(mId);
+                }
+            }
+
+            db.update(TABLE_MESSAGES, cv, updateWhereSb.toString(),
+                    updateArgsList.toArray(new String[0]));
             for (Message m : ramSingleMessageCache.values()) {
-                if (m != null && chatId.equals(m.getChatId()) && m.getSenderId() != null && !safeUserId.equals(m.getSenderId())) {
-                    m.setDelivered(true);
-                    m.setRead(true);
+                if (m != null && chatId.equals(m.getChatId()) && m.getSenderId() != null) {
+                    if (!com.m3.veil.manager.AuthManager.getInstance().isMyUserId(this.context, m.getSenderId()) && !myIds.contains(m.getSenderId())) {
+                        if (!m.isMediaRequiringActionToRead()) {
+                            m.setDelivered(true);
+                            m.setRead(true);
+                        }
+                    }
                 }
             }
         }
@@ -2193,6 +2228,12 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         SQLiteDatabase db = getEncryptedDb();
         long effectiveReadAt = readAt > 0 ? readAt : System.currentTimeMillis();
         String myId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        if (myId == null || myId.isEmpty()) {
+            myId = this.context.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE).getString("user_id", null);
+        }
+        if (myId == null || myId.isEmpty()) {
+            myId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context).getCurrentUserId();
+        }
 
         try {
             Chat chat = getChat(chatId);
@@ -2212,16 +2253,19 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         cv.put(COL_MSG_DELIVERED, 1);
         cv.put(COL_MSG_READ, 1);
         cv.put(COL_MSG_PENDING, 0);
+        // Only mark messages that were already delivered and not pending, and not media requiring action
+        String mediaExclusion = " AND " + COL_MSG_TYPE + " NOT IN ('voice', 'image', 'video', 'document')";
         if (myId != null && !myId.isEmpty()) {
-            db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=? AND " + COL_MSG_SENDER_ID + "=?", new String[]{chatId, myId});
+            db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=? AND " + COL_MSG_SENDER_ID + "=? AND " + COL_MSG_DELIVERED + "=1 AND " + COL_MSG_PENDING + "=0" + mediaExclusion, new String[]{chatId, myId});
         } else {
-            db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=?", new String[]{chatId});
+            db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=? AND " + COL_MSG_DELIVERED + "=1 AND " + COL_MSG_PENDING + "=0" + mediaExclusion, new String[]{chatId});
         }
         for (Message m : ramSingleMessageCache.values()) {
             if (m != null && chatId.equals(m.getChatId()) && (myId == null || myId.isEmpty() || myId.equals(m.getSenderId()))) {
-                m.setPending(false);
-                m.setDelivered(true);
-                m.setRead(true);
+                if (m.isDelivered() && !m.isPending() && !m.isMediaRequiringActionToRead()) {
+                    m.setDelivered(true);
+                    m.setRead(true);
+                }
             }
         }
         Chat cachedChat = ramChatCache.get(chatId);
@@ -2230,6 +2274,62 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         }
         notifyMessagesChanged(chatId);
         notifyChatsChanged();
+    }
+
+    /**
+     * Watermark-bounded bulk read receipt (Telegram max_id semantics).
+     * Marks ONLY my outbound messages in {@code chatId} that the peer has provably received:
+     *  - messages whose id is explicitly listed in {@code explicitIds}, OR
+     *  - messages with timestamp &lt;= {@code readUpToTs} that are already delivered and not pending.
+     * Messages still in the outbox or not yet delivered are never turned blue.
+     *
+     * @return ids of messages whose read flag changed from 0 to 1.
+     */
+    public synchronized List<String> markOutboundMessagesReadUpTo(String chatId, long readUpToTs,
+                                                                 Set<String> explicitIds, long readAt) {
+        List<String> updated = new ArrayList<>();
+        if (chatId == null) return updated;
+        String myId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+        if (myId == null || myId.isEmpty()) {
+            myId = this.context.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE).getString("user_id", null);
+        }
+        if (myId == null || myId.isEmpty()) {
+            myId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context).getCurrentUserId();
+        }
+        if (myId == null || myId.isEmpty()) return updated;
+        SQLiteDatabase db = getEncryptedDb();
+        long effectiveReadAt = readAt > 0 ? readAt : System.currentTimeMillis();
+
+        Cursor c = db.query(TABLE_MESSAGES,
+                new String[]{COL_MSG_ID, COL_MSG_TIMESTAMP, COL_MSG_DELIVERED, COL_MSG_PENDING, COL_MSG_SENDER_ID, COL_MSG_TYPE},
+                COL_MSG_CHAT_ID + "=? AND " + COL_MSG_READ + "=0",
+                new String[]{chatId}, null, null, null);
+        if (c != null) {
+            try {
+                while (c.moveToNext()) {
+                    String id = c.getString(0);
+                    long ts = c.getLong(1);
+                    boolean delivered = c.getInt(2) == 1;
+                    boolean pending = c.getInt(3) == 1;
+                    String sId = c.getString(4);
+                    String mType = c.getString(5);
+                    // Only process outbound messages sent by the local user
+                    if (sId != null && !com.m3.veil.manager.AuthManager.getInstance().isMyUserId(this.context, sId)) {
+                        continue;
+                    }
+                    boolean isMediaAction = Message.isMediaRequiringActionToRead(mType);
+                    boolean listed = explicitIds != null && explicitIds.contains(id);
+                    boolean belowWatermark = !isMediaAction && readUpToTs > 0 && ts <= readUpToTs && !pending;
+                    if (listed || belowWatermark) updated.add(id);
+                }
+            } finally {
+                c.close();
+            }
+        }
+        for (String id : updated) {
+            updateMessageStatus(id, true, true, effectiveReadAt);
+        }
+        return updated;
     }
 
     public synchronized void deleteExpiredVanishMessages() {

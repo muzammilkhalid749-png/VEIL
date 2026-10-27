@@ -56,6 +56,19 @@ public class UserPreferences {
         if (user == null) return;
 
         SharedPreferences.Editor editor = prefs.edit();
+
+        String previousUid = prefs.getString(KEY_USER_ID, null);
+        if (user.getUserId() != null && previousUid != null && !user.getUserId().equals(previousUid)) {
+            // New / different user session: wipe old user attributes
+            editor.remove(KEY_USERNAME);
+            editor.remove(KEY_DISPLAY_NAME);
+            editor.remove(KEY_BIO);
+            editor.remove(KEY_PHOTO_URL);
+            editor.remove(KEY_AVATAR);
+            editor.remove(KEY_AVATAR_PATH);
+            editor.remove(KEY_PHONE_NUMBER);
+        }
+
         if (user.getUserId() != null && !user.getUserId().isEmpty()) {
             editor.putString(KEY_USER_ID, user.getUserId());
         }
@@ -65,11 +78,15 @@ public class UserPreferences {
         if (user.getCountryCode() != null) {
             editor.putString(KEY_COUNTRY_CODE, user.getCountryCode());
         }
-        if (user.getUsername() != null) {
-            editor.putString(KEY_USERNAME, user.getUsername());
+        if (user.getUsername() != null && !user.getUsername().trim().isEmpty()) {
+            editor.putString(KEY_USERNAME, user.getUsername().trim());
+        } else if (user.getUserId() != null && previousUid != null && !user.getUserId().equals(previousUid)) {
+            editor.remove(KEY_USERNAME);
         }
-        if (user.getDisplayName() != null) {
-            editor.putString(KEY_DISPLAY_NAME, user.getDisplayName());
+        if (user.getDisplayName() != null && !user.getDisplayName().trim().isEmpty()) {
+            editor.putString(KEY_DISPLAY_NAME, user.getDisplayName().trim());
+        } else if (user.getUserId() != null && previousUid != null && !user.getUserId().equals(previousUid)) {
+            editor.remove(KEY_DISPLAY_NAME);
         }
 
         String avatarVal = user.getAvatar();
@@ -300,12 +317,17 @@ public class UserPreferences {
             }
             if (username != null && !username.isEmpty()) {
                 pm.putString("username", username);
+            } else {
+                pm.remove("username");
             }
             if (displayName != null && !displayName.isEmpty()) {
                 pm.putString("user_name", displayName);
                 pm.putString("displayName", displayName);
             } else if (username != null && !username.isEmpty()) {
                 pm.putString("user_name", username);
+            } else {
+                pm.remove("user_name");
+                pm.remove("displayName");
             }
             if (bio != null) {
                 pm.putString("bio", bio);
@@ -336,7 +358,7 @@ public class UserPreferences {
     }
 
     public void clearUser() {
-        prefs.edit().clear().apply();
+        prefs.edit().clear().commit();
     }
 
     public void clearUserData() {

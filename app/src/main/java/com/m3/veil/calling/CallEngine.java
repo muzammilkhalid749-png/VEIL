@@ -869,6 +869,9 @@ public class CallEngine implements CallSignaling.Listener {
             if (videoEnabled) return true;
             videoEnabled = true;
             applyLocalVideo(true);
+            broadcastControl("true", CallSignal.VIDEO_STATE);
+            CallParticipant self = selfParticipant();
+            if (self != null) self.videoEnabled = true;
             audioDevice.setRoute(CallAudioRoute.SPEAKER);
             notifyRoute();
         } else {
@@ -881,6 +884,11 @@ public class CallEngine implements CallSignaling.Listener {
             if (!videoEnabled) return true;
             videoEnabled = false;
             applyLocalVideo(false);
+            broadcastControl("false", CallSignal.VIDEO_STATE);
+            CallParticipant self = selfParticipant();
+            if (self != null) self.videoEnabled = false;
+            audioDevice.setRoute(CallAudioRoute.EARPIECE);
+            notifyRoute();
         }
         notifyInfo();
         return true;
@@ -899,6 +907,9 @@ public class CallEngine implements CallSignaling.Listener {
             callType = CallType.VIDEO;
             videoEnabled = true;
             applyLocalVideo(true);
+            broadcastControl("true", CallSignal.VIDEO_STATE);
+            CallParticipant self = selfParticipant();
+            if (self != null) self.videoEnabled = true;
             audioDevice.setRoute(CallAudioRoute.SPEAKER);
             notifyRoute();
         }
@@ -923,13 +934,18 @@ public class CallEngine implements CallSignaling.Listener {
                 videoEnabled = false;
                 return;
             }
+            VideoTrack newTrack = videoDevice.getCameraTrack();
             for (Peer peer : peers.values()) {
                 if (peer.videoTx == null || peer.pc == null) continue;
-                if (peer.localVideoTrack == null) peer.localVideoTrack = videoDevice.getCameraTrack();
+                peer.localVideoTrack = newTrack;
                 if (peer.videoSender == null) peer.videoSender = peer.videoTx.getSender();
-                peer.videoTx.setDirection(RtpTransceiver.RtpTransceiverDirection.SEND_RECV);
+                try {
+                    peer.videoTx.setDirection(RtpTransceiver.RtpTransceiverDirection.SEND_RECV);
+                } catch (Throwable ignored) { }
                 if (peer.videoSender != null && peer.localVideoTrack != null) {
-                    peer.videoSender.setTrack(peer.localVideoTrack, false);
+                    try {
+                        peer.videoSender.setTrack(peer.localVideoTrack, false);
+                    } catch (Throwable ignored) { }
                     applyBitrate(peer);
                     if (config.e2ee && e2ee.isSupported()) {
                         e2ee.attachSender(CallMediaFactory.factory(), peer.videoSender, currentUserId + ":video");
@@ -938,10 +954,20 @@ public class CallEngine implements CallSignaling.Listener {
             }
         } else {
             for (Peer peer : peers.values()) {
-                if (peer.videoTx != null) {
-                    peer.videoTx.setDirection(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY);
+                if (peer.videoSender != null) {
+                    try {
+                        peer.videoSender.setTrack(null, false);
+                    } catch (Throwable ignored) { }
                 }
-                e2ee.detachParticipant(currentUserId + ":video");
+                if (peer.videoTx != null) {
+                    try {
+                        peer.videoTx.setDirection(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY);
+                    } catch (Throwable ignored) { }
+                }
+                peer.localVideoTrack = null;
+                if (config.e2ee && e2ee.isSupported()) {
+                    e2ee.detachParticipant(currentUserId + ":video");
+                }
             }
             videoDevice.stopCamera();
         }
@@ -1118,9 +1144,29 @@ public class CallEngine implements CallSignaling.Listener {
                 callType = CallType.VIDEO;
                 videoEnabled = true;
                 applyLocalVideo(true);
+                broadcastControl("true", CallSignal.VIDEO_STATE);
+                CallParticipant selfAcc = selfParticipant();
+                if (selfAcc != null) selfAcc.videoEnabled = true;
                 audioDevice.setRoute(CallAudioRoute.SPEAKER);
                 notifyRoute();
                 for (Listener l : listeners) l.onVideoUpgradeResponded(from, peerName(from), true);
+                notifyInfo();
+                break;
+            case CallSignal.VIDEO_STATE:
+                boolean remoteVideoOn = "true".equalsIgnoreCase(signal.payload);
+                updateParticipantFlag(from, false, remoteVideoOn);
+                broadcastControl(signal.payload, CallSignal.VIDEO_STATE);
+                Peer pFrom = peers.get(from);
+                if (!remoteVideoOn) {
+                    if (pFrom != null && pFrom.participant != null) {
+                        pFrom.participant.videoTrack = null;
+                    }
+                    for (Listener l : listeners) {
+                        l.onRemoteVideoTrackRemoved(from, false);
+                    }
+                } else if (pFrom != null) {
+                    scanReceivers(pFrom);
+                }
                 notifyInfo();
                 break;
             case CallSignal.VIDEO_UPGRADE_REJECT:

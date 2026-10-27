@@ -174,6 +174,58 @@ public class AuthManager {
         return null;
     }
 
+    /**
+     * Gathers all valid identity aliases associated with the local device / current user session.
+     */
+    @NonNull
+    public java.util.Set<String> getMyUserIds(@NonNull Context context) {
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        Context appCtx = context.getApplicationContext();
+        String current = getCurrentUserId(appCtx);
+        if (current != null && !current.isEmpty()) ids.add(current);
+
+        PreferenceManager pm = new PreferenceManager(appCtx);
+        String sovUid = pm.getString(KEY_SOVEREIGN_UID, null);
+        if (sovUid != null && !sovUid.isEmpty()) ids.add(sovUid);
+        String fallbackUid = pm.getString("current_user_id", null);
+        if (fallbackUid != null && !fallbackUid.isEmpty()) ids.add(fallbackUid);
+
+        UserPreferences up = new UserPreferences(appCtx);
+        String upUid = up.getUserId();
+        if (upUid != null && !upUid.isEmpty()) ids.add(upUid);
+
+        android.content.SharedPreferences prefs = appCtx.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE);
+        String p1 = prefs.getString("userId", null);
+        if (p1 != null && !p1.isEmpty()) ids.add(p1);
+        String p2 = prefs.getString("user_id", null);
+        if (p2 != null && !p2.isEmpty()) ids.add(p2);
+
+        FirebaseUser fbUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (fbUser != null && fbUser.getUid() != null && !fbUser.getUid().isEmpty()) {
+            ids.add(fbUser.getUid());
+        }
+
+        try {
+            SovereignIdentityAndDirectoryEngine engine = SovereignIdentityAndDirectoryEngine.getInstance(appCtx);
+            String engineUid = engine.getCurrentUserId();
+            if (engineUid != null && !engineUid.isEmpty()) ids.add(engineUid);
+        } catch (Throwable ignored) {}
+
+        return ids;
+    }
+
+    /**
+     * Determines whether a given UID string belongs to the local device / logged-in user.
+     */
+    public boolean isMyUserId(@NonNull Context context, @Nullable String uid) {
+        if (uid == null || uid.trim().isEmpty()) return false;
+        String clean = uid.trim();
+        for (String myId : getMyUserIds(context)) {
+            if (clean.equals(myId) || clean.equalsIgnoreCase(myId)) return true;
+        }
+        return false;
+    }
+
     public void onSessionStarted(@NonNull Context context, @NonNull FirebaseUser firebaseUser) {
         String uid = getCurrentUserId(context);
         if (uid == null || uid.isEmpty()) {

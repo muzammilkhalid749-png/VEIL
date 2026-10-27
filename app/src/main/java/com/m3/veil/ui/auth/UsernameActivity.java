@@ -139,6 +139,9 @@ public class UsernameActivity extends AppCompatActivity {
         if (uid != null && !uid.trim().isEmpty()) {
             return uid.trim();
         }
+        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+            return FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
         uid = AuthManager.getInstance().getCurrentUserId(this);
         if (uid != null && !uid.trim().isEmpty()) {
             return uid.trim();
@@ -146,9 +149,6 @@ public class UsernameActivity extends AppCompatActivity {
         uid = sovereignEngine.getCurrentUid();
         if (uid != null && !uid.trim().isEmpty()) {
             return uid.trim();
-        }
-        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            return FirebaseAuth.getInstance().getCurrentUser().getUid();
         }
         return userPreferences.getUserId();
     }
@@ -271,6 +271,18 @@ public class UsernameActivity extends AppCompatActivity {
     }
 
     private void prefillExistingProfileIfPresent() {
+        boolean isRestore = getIntent() != null && getIntent().getBooleanExtra("is_restore", false);
+        // For new signups (!isRestore), NEVER prefill usernameEditText with old session/previous user handles!
+        if (!isRestore) {
+            if (usernameEditText != null) {
+                usernameEditText.setText("");
+            }
+            if (displayNameEditText != null) {
+                displayNameEditText.setText("");
+            }
+            return;
+        }
+
         String existingUsername = userPreferences.getUsername();
         String existingDisplayName = userPreferences.getDisplayName();
 
@@ -505,6 +517,30 @@ public class UsernameActivity extends AppCompatActivity {
             currentUserId = resolveActiveUserId();
         }
         final String uid = currentUserId;
+        final String unameLower = username.toLowerCase(Locale.ROOT);
+
+        // Pre-commit authoritative check on Firestore to guarantee zero username collision
+        db.collection("usernames").document(unameLower).get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
+                        String ownerUid = task.getResult().getString("userId");
+                        if (ownerUid == null || ownerUid.isEmpty()) ownerUid = task.getResult().getString("uid");
+                        if (ownerUid != null && !ownerUid.isEmpty() && !ownerUid.equals(uid)) {
+                            // Taken by another account!
+                            setSavingState(false);
+                            verifiedAvailableUsername = null;
+                            if (continueButton != null) continueButton.setEnabled(false);
+                            updateStatusText("✗ @" + username + " is already taken by another account", R.color.colorError);
+                            Toast.makeText(UsernameActivity.this, "@" + username + " is already taken. Please choose another username.", Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                    }
+
+                    executeSaveProfile(username, displayName, uid);
+                });
+    }
+
+    private void executeSaveProfile(String username, String displayName, String uid) {
         final String pubKey = EncryptionManager.getPublicKeyString() != null
                 ? EncryptionManager.getPublicKeyString()
                 : sovereignEngine.getCurrentPublicKeyBase64();

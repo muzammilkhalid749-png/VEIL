@@ -223,7 +223,7 @@ public class OTPVerificationActivity extends AppCompatActivity {
                         if (hasExistingUsername) {
                             navigateToMain();
                         } else {
-                            navigateToUsername();
+                            navigateToUsername(uid);
                         }
                     }
 
@@ -310,7 +310,7 @@ public class OTPVerificationActivity extends AppCompatActivity {
                         if (user != null && user.getUsername() != null && !user.getUsername().isEmpty()) {
                             navigateToMain();
                         } else {
-                            navigateToUsername();
+                            navigateToUsername(currentUserId);
                         }
                     } else {
                         createUserDocumentAndNavigate();
@@ -361,7 +361,7 @@ public class OTPVerificationActivity extends AppCompatActivity {
 
         batch.commit().addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
-                navigateToUsername();
+                navigateToUsername(userId);
             } else {
                 showSnackbar(getString(R.string.error_setup_prefs));
             }
@@ -380,7 +380,15 @@ public class OTPVerificationActivity extends AppCompatActivity {
     }
 
     private void navigateToUsername() {
+        navigateToUsername(null);
+    }
+
+    private void navigateToUsername(String userId) {
         Intent intent = new Intent(this, UsernameActivity.class);
+        if (userId != null && !userId.isEmpty()) {
+            intent.putExtra("userId", userId);
+        }
+        intent.putExtra("is_restore", false);
         startActivity(intent);
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
         finish();

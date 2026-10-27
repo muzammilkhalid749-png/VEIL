@@ -51,3 +51,28 @@
 -keep class androidx.security.crypto.** { *; }
 -dontwarn com.google.crypto.tink.**
 -dontwarn com.google.errorprone.annotations.**
+
+# 6. In-house Cleanroom Firebase & Tasks Emulation Layer
+-keep class com.google.firebase.** { *; }
+-keepclassmembers class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-keepclassmembers class com.google.android.gms.** { *; }
+
+# 7. Media & CameraX Libraries
+-keep class androidx.camera.** { *; }
+-keepclassmembers class androidx.camera.** { *; }
+-dontwarn androidx.camera.**
+-keep class com.yalantis.ucrop.** { *; }
+-keepclassmembers class com.yalantis.ucrop.** { *; }
+-keep class com.burhanrashid52.photoeditor.** { *; }
+-dontwarn com.burhanrashid52.photoeditor.**
+
+# 8. ZXing QR Code Engine
+-keep class com.google.zxing.** { *; }
+-keepclassmembers class com.google.zxing.** { *; }
+-dontwarn com.google.zxing.**
+
+# 9. UI Components & Reflection
+-keep class com.github.mukeshsolanki.pinview.** { *; }
+-keep class de.hdodenhof.circleimageview.** { *; }
+-keepclassmembers enum * { *; }

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <!-- CameraX Preview View -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/cameraPreviewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Dark translucent mask around the center scanner box -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="32dp"
+            android:text="Scan QR code on your computer screen"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:shadowColor="@android:color/black"
+            android:shadowRadius="8" />
+
+        <!-- Viewfinder Box (260dp x 260dp) -->
+        <FrameLayout
+            android:id="@+id/viewFinderBox"
+            android:layout_width="260dp"
+            android:layout_height="260dp"
+            android:background="@drawable/bg_search_input">
+
+            <!-- Center pulsing scanning indicator or target corners -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:layout_gravity="center"
+                android:background="#6366F1" />
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="Open VEIL Web &gt; Log in by QR Code"
+            android:textColor="#A0AEC0"
+            android:textSize="13sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCancelScan"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginTop="32dp"
+            android:text="Cancel"
+            android:textAllCaps="false"
+            app:cornerRadius="14dp"
+            android:backgroundTint="#2D3748"
+            android:textColor="@android:color/white" />
+    </LinearLayout>
+
+</FrameLayout>

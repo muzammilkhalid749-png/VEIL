@@ -165,6 +165,8 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
                     // Valid 12-word phrase, but no @username has been claimed yet -> go to UsernameActivity
                     AuthManager.getInstance().onSovereignIdentityInitialized(RestoreAnonymousActivity.this, uid, false);
                     Intent intent = new Intent(RestoreAnonymousActivity.this, UsernameActivity.class);
+                    intent.putExtra("userId", uid);
+                    intent.putExtra("is_restore", true);
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                     startActivity(intent);
                     overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);

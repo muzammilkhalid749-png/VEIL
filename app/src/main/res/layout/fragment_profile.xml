@@ -418,6 +418,49 @@
 
                     <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorOutline" />
 
+                    <!-- Linked Devices & Web Companion -->
+                    <LinearLayout
+                        android:id="@+id/linkedDevicesSettings"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:gravity="center_vertical"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp"
+                        android:background="?attr/selectableItemBackground">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_qr_code"
+                            app:tint="@color/textSecondary" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="14dp"
+                            android:text="Linked Devices &amp; Web"
+                            android:textColor="@color/textPrimary"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:id="@+id/tvLinkedDevicesCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="QR Scanner"
+                            android:textColor="@color/colorPrimary"
+                            android:textSize="13sp"
+                            android:layout_marginEnd="8dp" />
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_arrow_forward"
+                            app:tint="@color/textSecondary" />
+                    </LinearLayout>
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorOutline" />
+
                     <!-- Notification Settings -->
                     <LinearLayout
                         android:id="@+id/notificationSettings"

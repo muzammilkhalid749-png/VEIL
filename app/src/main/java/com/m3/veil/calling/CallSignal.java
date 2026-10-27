@@ -32,6 +32,7 @@ public class CallSignal {
     public static final String SCREEN_STOP = "screen_stop";
     public static final String MUTE = "mute";
     public static final String PARTICIPANT_UPDATE = "participant_update";
+    public static final String VIDEO_STATE = "video_state";
     public static final String REACTION = "reaction";
     public static final String RAISE_HAND = "raise_hand";
     public static final String DTMF = "dtmf";

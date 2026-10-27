@@ -310,7 +310,7 @@ public class SplashActivity extends AppCompatActivity {
                 } catch (Exception ignored) {}
                 navigateToMainOrPinLock();
             } else {
-                navigateToActivity(UsernameActivity.class);
+                navigateToUsernameActivity(uid);
             }
         });
     }
@@ -380,6 +380,30 @@ public class SplashActivity extends AppCompatActivity {
             Log.e(TAG, "Failed to check PIN lock status", e);
         }
         navigateToActivity(destination);
+    }
+
+    private void navigateToUsernameActivity(String userId) {
+        if (hasNavigated || isFinishing() || isDestroyed()) return;
+        hasNavigated = true;
+
+        View rootView = splashRoot != null ? splashRoot : findViewById(android.R.id.content);
+        ObjectAnimator fadeOut = ObjectAnimator.ofFloat(rootView, "alpha", 1f, 0f);
+        fadeOut.setDuration(220);
+        fadeOut.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(android.animation.Animator animation) {
+                Intent intent = new Intent(SplashActivity.this, UsernameActivity.class);
+                if (userId != null && !userId.isEmpty()) {
+                    intent.putExtra("userId", userId);
+                }
+                intent.putExtra("is_restore", false);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(intent);
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+                finish();
+            }
+        });
+        fadeOut.start();
     }
 
     private void navigateToActivity(Class<?> targetActivity) {

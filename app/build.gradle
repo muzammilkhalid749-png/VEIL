@@ -24,6 +24,12 @@ android {
             keyAlias "androiddebugkey"
             keyPassword "android"
         }
+        releaseConfig {
+            storeFile file("${rootDir}/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
     }
 
     buildTypes {
@@ -31,7 +37,9 @@ android {
             signingConfig signingConfigs.debugConfig
         }
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
+            signingConfig signingConfigs.releaseConfig
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -93,4 +101,7 @@ dependencies {
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-video:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
+
+    // QR Code Scanning Engine (WhatsApp & Telegram Web Parity)
+    implementation 'com.google.zxing:core:3.5.3'
 }

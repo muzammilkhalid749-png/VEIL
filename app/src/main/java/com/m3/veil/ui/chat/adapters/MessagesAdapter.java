@@ -42,14 +42,31 @@ import java.util.Locale;
 
 public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
-    private static final int VIEW_TYPE_NOTICE = 0;
-    private static final int VIEW_TYPE_SENT = 1;
-    private static final int VIEW_TYPE_RECEIVED = 2;
-    private static final int VIEW_TYPE_TYPING = 3;
+    public static final int VIEW_TYPE_NOTICE = 100;
+    public static final int VIEW_TYPE_SENT = 101;
+    public static final int VIEW_TYPE_RECEIVED = 102;
+    public static final int VIEW_TYPE_TYPING = 103;
 
     private List<Message> messages;
     private String currentUserId;
+    private String recipientId;
     private SimpleDateFormat timeFormat;
+
+    public void setRecipientId(String recipientId) {
+        this.recipientId = recipientId;
+    }
+
+    public boolean isSenderMe(String senderId, Message msg) {
+        if (recipientId != null && !recipientId.isEmpty()) {
+            if (recipientId.equals(senderId)) return false;
+            if (msg != null && recipientId.equals(msg.getReceiverId())) return true;
+        }
+        if (senderId != null && !senderId.isEmpty()) {
+            if (currentUserId != null && currentUserId.equals(senderId)) return true;
+            if (com.m3.veil.manager.AuthManager.getInstance().isMyUserId(com.m3.veil.VeilApplication.getInstance(), senderId)) return true;
+        }
+        return false;
+    }
     private boolean isTyping = false;
     private int lastAnimatedPosition = -1;
 
@@ -273,11 +290,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         if (msgIndex < 0 || msgIndex >= messages.size()) {
             return VIEW_TYPE_SENT;
         }
-        if (messages.get(msgIndex).getSenderId().equals(currentUserId)) {
-            return VIEW_TYPE_SENT;
-        } else {
-            return VIEW_TYPE_RECEIVED;
-        }
+        Message msg = messages.get(msgIndex);
+        if (msg == null) return VIEW_TYPE_SENT;
+        return isSenderMe(msg.getSenderId(), msg) ? VIEW_TYPE_SENT : VIEW_TYPE_RECEIVED;
     }
 
     @NonNull
@@ -1351,6 +1366,32 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         };
                         imageMessageContainer.setOnClickListener(openPhoto);
                         if (imageCardView != null) imageCardView.setOnClickListener(openPhoto);
+
+                        final int dlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
+                        final int progress = downloadProgresses.getOrDefault(message.getId(), 0);
+                        final boolean isSending = (message.isPending() && !message.isDelivered()) || dlState == STATE_DOWNLOADING;
+
+                        if (imageDownloadOverlay != null) {
+                            if (isSending) {
+                                imageDownloadOverlay.setVisibility(View.VISIBLE);
+                                if (imageDownloadingLayout != null) imageDownloadingLayout.setVisibility(View.VISIBLE);
+                                if (imageDownloadIdleLayout != null) imageDownloadIdleLayout.setVisibility(View.GONE);
+                                if (imageDownloadRetryLayout != null) imageDownloadRetryLayout.setVisibility(View.GONE);
+                                if (imageDownloadProgress != null) {
+                                    imageDownloadProgress.setIndeterminate(progress <= 0);
+                                    if (progress > 0) imageDownloadProgress.setProgress(progress);
+                                }
+                                if (imageDownloadCancelBtn != null) {
+                                    imageDownloadCancelBtn.setOnClickListener(v -> {
+                                        if (mediaDownloadClickListener != null) {
+                                            mediaDownloadClickListener.onMediaCancelClick(message);
+                                        }
+                                    });
+                                }
+                            } else {
+                                imageDownloadOverlay.setVisibility(View.GONE);
+                            }
+                        }
                     }
                 } else if ("video".equals(message.getType())) {
                     messageText.setVisibility(View.GONE);
@@ -1440,6 +1481,34 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         videoMessageContainer.setOnClickListener(playClick);
                         if (videoPlayButtonContainer != null) videoPlayButtonContainer.setOnClickListener(playClick);
                         if (videoCardView != null) videoCardView.setOnClickListener(playClick);
+
+                        final int vDlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
+                        final int vProgress = downloadProgresses.getOrDefault(message.getId(), 0);
+                        final boolean isVideoSending = (message.isPending() && !message.isDelivered()) || vDlState == STATE_DOWNLOADING;
+
+                        if (videoDownloadOverlay != null) {
+                            if (isVideoSending) {
+                                videoDownloadOverlay.setVisibility(View.VISIBLE);
+                                if (videoDownloadingLayout != null) videoDownloadingLayout.setVisibility(View.VISIBLE);
+                                if (videoDownloadIdleLayout != null) videoDownloadIdleLayout.setVisibility(View.GONE);
+                                if (videoDownloadRetryLayout != null) videoDownloadRetryLayout.setVisibility(View.GONE);
+                                if (videoPlayButtonContainer != null) videoPlayButtonContainer.setVisibility(View.GONE);
+                                if (videoDownloadProgress != null) {
+                                    videoDownloadProgress.setIndeterminate(vProgress <= 0);
+                                    if (vProgress > 0) videoDownloadProgress.setProgress(vProgress);
+                                }
+                                if (videoDownloadCancelBtn != null) {
+                                    videoDownloadCancelBtn.setOnClickListener(v -> {
+                                        if (mediaDownloadClickListener != null) {
+                                            mediaDownloadClickListener.onMediaCancelClick(message);
+                                        }
+                                    });
+                                }
+                            } else {
+                                videoDownloadOverlay.setVisibility(View.GONE);
+                                if (videoPlayButtonContainer != null) videoPlayButtonContainer.setVisibility(View.VISIBLE);
+                            }
+                        }
                     }
                 } else if ("document".equals(message.getType())) {
                     messageText.setVisibility(View.GONE);
@@ -1472,11 +1541,32 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
                         String formattedInfo = ext + (size.isEmpty() ? "" : " • " + size);
                         documentFileSize.setText(formattedInfo);
+                        final int docDlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
+                        final int docProgress = downloadProgresses.getOrDefault(message.getId(), 0);
+                        final boolean isDocSending = (message.isPending() && !message.isDelivered()) || docDlState == STATE_DOWNLOADING;
+
+                        if (documentProgressBar != null) {
+                            if (isDocSending) {
+                                documentProgressBar.setVisibility(View.VISIBLE);
+                                documentProgressBar.setIndeterminate(docProgress <= 0);
+                                if (docProgress > 0) documentProgressBar.setProgress(docProgress);
+                                if (documentActionIcon != null) documentActionIcon.setVisibility(View.GONE);
+                            } else {
+                                documentProgressBar.setVisibility(View.GONE);
+                                if (documentActionIcon != null) {
+                                    documentActionIcon.setVisibility(View.VISIBLE);
+                                    documentActionIcon.setImageResource(R.drawable.ic_download);
+                                }
+                            }
+                        }
 
                         documentMessageContainer.setOnClickListener(v -> {
                             File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, "");
                             if (local.exists()) {
                                 FileMediaManager.openFileWithSystemViewer(itemView.getContext(), local);
+                                try {
+                                    com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).markMessageAsReadExplicitly(message);
+                                } catch (Throwable ignored) {}
                             } else {
                                 Toast.makeText(itemView.getContext(), "Document awaiting peer-to-peer WebRTC transfer", Toast.LENGTH_SHORT).show();
                             }
@@ -2057,6 +2147,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                     intent.putExtra(MediaViewerActivity.EXTRA_TIMESTAMP, time);
                                     if (hasCaption) intent.putExtra(MediaViewerActivity.EXTRA_CAPTION, message.getText());
                                     itemView.getContext().startActivity(intent);
+                                    try {
+                                        com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).markMessageAsReadExplicitly(message);
+                                    } catch (Throwable ignored) {}
                                 }
                             };
                             imageMessageContainer.setOnClickListener(openPhoto);
@@ -2185,11 +2278,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                     intent.putExtra(MediaViewerActivity.EXTRA_TIMESTAMP, time);
                                     if (hasCaption) intent.putExtra(MediaViewerActivity.EXTRA_CAPTION, message.getText());
                                     itemView.getContext().startActivity(intent);
+                                    try {
+                                        com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).markMessageAsReadExplicitly(message);
+                                    } catch (Throwable ignored) {}
                                 }
                             };
                             if (videoPlayButtonContainer != null) videoPlayButtonContainer.setOnClickListener(playClick);
                             videoMessageContainer.setOnClickListener(playClick);
                             if (videoCardView != null) videoCardView.setOnClickListener(playClick);
+
+                        
                         } else {
                             // NOT downloaded: Show blurred thumbnail + download overlay, hide play button
                             Bitmap blurred = BlurUtils.getBlurredThumbnail(itemView.getContext(), message.getThumbnail());

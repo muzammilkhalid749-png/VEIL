@@ -92,6 +92,12 @@ public class PreferenceManager {
         return sharedPreferences.getInt(key, defaultValue);
     }
 
+    public void remove(String key) {
+        if (key == null) return;
+        editor.remove(key);
+        editor.apply();
+    }
+
     public void clearAll() {
         editor.clear();
         editor.apply();

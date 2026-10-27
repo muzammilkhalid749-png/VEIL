@@ -67,58 +67,9 @@ public class AccountSettingsBottomSheet extends BottomSheetDialogFragment {
         });
 
         view.findViewById(R.id.btnActiveSessions).setOnClickListener(v -> {
-            com.google.android.material.bottomsheet.BottomSheetDialog sheet =
-                    new com.google.android.material.bottomsheet.BottomSheetDialog(requireContext());
-            android.widget.LinearLayout layout = new android.widget.LinearLayout(requireContext());
-            layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-            layout.setBackgroundResource(R.drawable.bottom_sheet_background);
-            int padH = (int) (24 * getResources().getDisplayMetrics().density);
-            int padV = (int) (16 * getResources().getDisplayMetrics().density);
-            layout.setPadding(padH, padV, padH, padV * 2);
-
-            View handle = new View(requireContext());
-            int handleW = (int) (36 * getResources().getDisplayMetrics().density);
-            int handleH = (int) (4 * getResources().getDisplayMetrics().density);
-            android.widget.LinearLayout.LayoutParams handleLp = new android.widget.LinearLayout.LayoutParams(handleW, handleH);
-            handleLp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-            handleLp.bottomMargin = (int) (16 * getResources().getDisplayMetrics().density);
-            handle.setLayoutParams(handleLp);
-            handle.setBackgroundResource(R.drawable.bg_voice_circle_incoming);
-            layout.addView(handle);
-
-            TextView tvTitle = new TextView(requireContext());
-            tvTitle.setText("📱 Active Mesh Sessions");
-            tvTitle.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
-            tvTitle.setTextSize(19);
-            tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-            layout.addView(tvTitle);
-
-            TextView tvInfo = new TextView(requireContext());
-            tvInfo.setText("• Node: VEIL Android Client (Current Device)\n• Connection: Direct P2P WebRTC SCTP DataChannels\n• Vault: 256-bit AES-GCM local SQLCipher (v3)\n• Session Security: VOPRF Authenticated & Verified");
-            tvInfo.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
-            tvInfo.setTextSize(13.5f);
-            tvInfo.setLineSpacing(4, 1.3f);
-            tvInfo.setBackgroundResource(R.drawable.bg_search_input);
-            int cPad = (int) (14 * getResources().getDisplayMetrics().density);
-            tvInfo.setPadding(cPad, cPad, cPad, cPad);
-            android.widget.LinearLayout.LayoutParams cLp = new android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-            cLp.topMargin = (int) (12 * getResources().getDisplayMetrics().density);
-            cLp.bottomMargin = (int) (18 * getResources().getDisplayMetrics().density);
-            tvInfo.setLayoutParams(cLp);
-            layout.addView(tvInfo);
-
-            com.google.android.material.button.MaterialButton btnClose =
-                    new com.google.android.material.button.MaterialButton(requireContext());
-            btnClose.setText("Close");
-            btnClose.setCornerRadius((int) (12 * getResources().getDisplayMetrics().density));
-            btnClose.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF6366F1));
-            btnClose.setTextColor(0xFFFFFFFF);
-            btnClose.setOnClickListener(bv -> sheet.dismiss());
-            layout.addView(btnClose);
-
-            sheet.setContentView(layout);
-            sheet.show();
+            dismiss();
+            LinkedDevicesBottomSheet sheet = new LinkedDevicesBottomSheet();
+            sheet.show(getParentFragmentManager(), "LinkedDevicesBottomSheet");
         });
 
         view.findViewById(R.id.btnBurnAccount).setOnClickListener(v -> {

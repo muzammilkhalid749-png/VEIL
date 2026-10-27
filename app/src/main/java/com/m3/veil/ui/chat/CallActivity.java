@@ -520,7 +520,7 @@ public class CallActivity extends AppCompatActivity {
         @Override public void onRemoteVideoTrackRemoved(String peerId, boolean screen) {
             runOnUiThread(() -> {
                 if (attachedRemoteTrack != null && remoteVideoView != null) {
-                    try { attachedRemoteTrack.removeSink(remoteVideoView); } catch (Throwable ignored) { }
+                    com.m3.veil.calling.CallVideoDevice.removeSink(remoteVideoView, attachedRemoteTrack);
                     attachedRemoteTrack = null;
                 }
                 if (remoteVideoView != null) remoteVideoView.setVisibility(View.GONE);
@@ -697,21 +697,43 @@ public class CallActivity extends AppCompatActivity {
             attachLocalVideo(engine.getParticipant(currentUserId));
         } else if (cardLocalVideo != null) {
             cardLocalVideo.setVisibility(View.GONE);
-        }
-        if (attachedRemoteTrack == null && engine != null) {
-            String peerToLookup = contactId != null ? contactId : engine.getPrimaryPeerId();
-            if (peerToLookup != null) {
-                VideoTrack remoteTrack = engine.getRemoteVideoTrack(peerToLookup);
-                if (remoteTrack != null) {
-                    attachRemoteVideo(remoteTrack);
-                }
+            if (attachedLocalTrack != null && localVideoView != null) {
+                com.m3.veil.calling.CallVideoDevice.removeSink(localVideoView, attachedLocalTrack);
+                attachedLocalTrack = null;
             }
         }
+
+        String peerToLookup = contactId != null ? contactId : (engine != null ? engine.getPrimaryPeerId() : null);
+        com.m3.veil.calling.CallParticipant remoteParticipant = (engine != null && peerToLookup != null) ? engine.getParticipant(peerToLookup) : null;
+        boolean remoteHasVideo = remoteParticipant != null && remoteParticipant.hasVideo();
+
+        if (remoteHasVideo && engine != null) {
+            org.webrtc.VideoTrack remoteTrack = remoteParticipant.renderTrack();
+            if (remoteTrack == null) remoteTrack = engine.getRemoteVideoTrack(peerToLookup);
+            if (remoteTrack != null) {
+                attachRemoteVideo(remoteTrack);
+            }
+        } else if (!remoteHasVideo) {
+            if (attachedRemoteTrack != null && remoteVideoView != null) {
+                com.m3.veil.calling.CallVideoDevice.removeSink(remoteVideoView, attachedRemoteTrack);
+                attachedRemoteTrack = null;
+            }
+            if (remoteVideoView != null) {
+                remoteVideoView.setVisibility(View.GONE);
+            }
+            if (videoScrimOverlay != null) {
+                videoScrimOverlay.setVisibility(View.GONE);
+            }
+            if (avatarContainer != null) {
+                avatarContainer.setVisibility(View.VISIBLE);
+            }
+        }
+
         if (btnSwitchCamera != null) {
             btnSwitchCamera.setVisibility(isVideoActive && !info.isScreenSharing() ? View.VISIBLE : View.GONE);
         }
         if (btnVideoMasking != null) {
-            btnVideoMasking.setVisibility(View.VISIBLE);
+            btnVideoMasking.setVisibility(isVideoActive ? View.VISIBLE : View.GONE);
             boolean maskActive = engine != null && (engine.isVideoBlurEnabled()
                     || engine.isVideoSilhouetteMode()
                     || engine.getArMaskMode() != com.m3.veil.utils.VeilArMaskRenderer.MASK_NONE);
@@ -954,6 +976,7 @@ public class CallActivity extends AppCompatActivity {
         engine.setVideoEnabled(enable);
         isVideoActive = enable;
         updateToggle(btnToggleVideo, ivToggleVideo, tvToggleVideo, isVideoActive, "Video");
+        updateUiFromEngine(engine.getCallInfo());
     }
 
     private void showVideoUpgradeConsentSheet(String peerName) {

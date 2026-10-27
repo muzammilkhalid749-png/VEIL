@@ -149,6 +149,11 @@ public class RecoveryPhraseActivity extends AppCompatActivity {
                 confirmButton.setText("I've Saved It • Continue");
                 confirmButton.setOnClickListener(v -> {
                     Intent intent = new Intent(this, UsernameActivity.class);
+                    String uid = getIntent() != null ? getIntent().getStringExtra("userId") : null;
+                    if (uid != null && !uid.isEmpty()) {
+                        intent.putExtra("userId", uid);
+                    }
+                    intent.putExtra("is_restore", false);
                     startActivity(intent);
                     overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
                     finish();

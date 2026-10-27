@@ -140,6 +140,9 @@ public class PhoneAuthActivity extends AppCompatActivity implements CountryAdapt
                 showLoading(false, true);
                 Intent intent = new Intent(PhoneAuthActivity.this, RecoveryPhraseActivity.class);
                 intent.putExtra("recovery_phrase", phrase);
+                if (uid != null && !uid.isEmpty()) {
+                    intent.putExtra("userId", uid);
+                }
                 startActivity(intent);
                 overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
                 finish();

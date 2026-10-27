@@ -487,8 +487,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
    public void scheduleTurnFallback(String peerId) {
       if (peerId != null) {
+         if (this.turnActivePeers.contains(peerId)) {
+            return;
+         }
          this.cancelTurnFallback(peerId);
          Runnable r = () -> {
+            if (this.turnActivePeers.contains(peerId)) {
+               return;
+            }
             PeerConnection pc = (PeerConnection)this.peerConnections.get(peerId);
             if (pc != null) {
                PeerConnection.IceConnectionState state = pc.iceConnectionState();
@@ -1335,13 +1341,28 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          } else if ("chat_read".equals(type)) {
             long readAt = json.optLong("readAt", System.currentTimeMillis());
             String targetChatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
-            EncryptedChatDatabase.getInstance(this.context).markOutboundMessagesAsRead(targetChatId, readAt);
-            this.mainHandler.post(() -> {
-               for(P2PEventListener l : WebRtcManager.this.listeners) {
-                  l.onAllMessagesRead(targetChatId);
+            // Watermark: newest of MY messages (timestamped by my own clock) that the peer actually has.
+            // Legacy builds don't send it -> only already-delivered, non-pending messages up to readAt qualify.
+            long readUpTo = json.optLong("readUpTo", readAt);
+            java.util.Set<String> explicitIds = new java.util.HashSet<>();
+            JSONArray idsArr = json.optJSONArray("ids");
+            if (idsArr != null) {
+               for (int i = 0; i < idsArr.length(); i++) {
+                  String rid = idsArr.optString(i, null);
+                  if (rid != null && !rid.isEmpty()) explicitIds.add(rid);
                }
-
-            });
+            }
+            final List<String> updatedReadIds = EncryptedChatDatabase.getInstance(this.context)
+                    .markOutboundMessagesReadUpTo(targetChatId, readUpTo, explicitIds, readAt);
+            if (!updatedReadIds.isEmpty()) {
+               this.mainHandler.post(() -> {
+                  for(P2PEventListener l : WebRtcManager.this.listeners) {
+                     for (String rid : updatedReadIds) {
+                        l.onMessageStatusChanged(rid, true, true);
+                     }
+                  }
+               });
+            }
          } else if ("status_viewed".equals(type)) {
             String statusId = json.optString("statusId");
             String viewerId = json.optString("viewerId", peerId);
@@ -2329,7 +2350,21 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
          // Dual-channel receipt delivery: update Firestore message document in groups & chats
          try {
-            String cId = getChatId(this.currentUserId, peerId);
+            String cId = null;
+            Message localMsg = EncryptedChatDatabase.getInstance(this.context).getMessageById(messageId);
+            if (localMsg != null && localMsg.getChatId() != null && !localMsg.getChatId().isEmpty()) {
+               cId = localMsg.getChatId();
+            }
+            if (cId == null) {
+               String myUid = this.currentUserId;
+               if (myUid == null || myUid.isEmpty()) {
+                  myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+               }
+               if (myUid == null || myUid.isEmpty()) {
+                  myUid = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context).getCurrentUserId();
+               }
+               cId = getChatId(myUid, peerId);
+            }
             java.util.Map<String, Object> upd = new java.util.HashMap<>();
             if (delivered || read) upd.put("delivered", true);
             if (read) {
@@ -2351,13 +2386,64 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
    public void sendChatReadReceipt(String peerId, String chatId) {
       if (peerId != null) {
-         String resolvedChatId = (chatId != null && !chatId.isEmpty()) ? chatId : getChatId(this.currentUserId, peerId);
+         String myUid = this.currentUserId;
+         if (myUid == null || myUid.isEmpty()) {
+            myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+         }
+         if (myUid == null || myUid.isEmpty()) {
+            myUid = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context).getCurrentUserId();
+         }
+         String resolvedChatId = (chatId != null && !chatId.isEmpty()) ? chatId : getChatId(myUid, peerId);
          long now = System.currentTimeMillis();
+
+         // Build a read watermark ONLY from the peer's messages physically present on this device.
+         // readUpTo uses the peer's own clock (message timestamps originate on the sender) -> no clock skew,
+         // and messages that never reached this device can never be reported as read.
+         long readUpTo = 0L;
+         final java.util.Set<String> readIds = new java.util.LinkedHashSet<>();
+         try {
+            List<Message> local = EncryptedChatDatabase.getInstance(this.context).getMessagesForChat(resolvedChatId);
+            if (local != null) {
+               List<Message> inbound = new ArrayList<>();
+               for (Message m : local) {
+                  if (m != null && m.getId() != null) {
+                      String sId = m.getSenderId();
+                      if (sId != null && !sId.equals(myUid) && (peerId.equals(sId) || peerId.equalsIgnoreCase(sId) || sId.contains(peerId) || peerId.contains(sId))) {
+                         inbound.add(m);
+                      }
+                   }
+               }
+               java.util.Collections.sort(inbound, (a, b) -> Long.compare(
+                       a.getTimestamp() != null ? a.getTimestamp().toDate().getTime() : 0L,
+                       b.getTimestamp() != null ? b.getTimestamp().toDate().getTime() : 0L));
+               int start = Math.max(0, inbound.size() - 100);
+               for (int i = start; i < inbound.size(); i++) {
+                  Message m = inbound.get(i);
+                  if (m != null && m.isMediaRequiringActionToRead() && !m.isRead()) {
+                      continue;
+                  }
+                  if (m != null && m.getId() != null) {
+                      readIds.add(m.getId());
+                      long ts = m.getTimestamp() != null ? m.getTimestamp().toDate().getTime() : 0L;
+                      if (ts > readUpTo) readUpTo = ts;
+                  }
+               }
+            }
+         } catch (Throwable ignored) {}
+         if (readIds.isEmpty()) {
+            return; // nothing from this peer is on the device -> nothing can be "read"
+         }
+         final long finalReadUpTo = readUpTo;
+         final JSONArray idsJson = new JSONArray();
+         for (String rid : readIds) idsJson.put(rid);
+
          this.sendJsonToPeer(peerId, () -> {
             JSONObject json = new JSONObject();
             json.put("type", "chat_read");
             json.put("chatId", resolvedChatId);
             json.put("readAt", now);
+            json.put("readUpTo", finalReadUpTo);
+            json.put("ids", idsJson);
             return json;
          });
          try {
@@ -2365,40 +2451,23 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             sig.put("type", "chat_read");
             sig.put("chatId", resolvedChatId);
             sig.put("readAt", now);
+            sig.put("readUpTo", finalReadUpTo);
+            sig.put("ids", idsJson);
             SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", sig);
          } catch (Throwable ignored) {}
          try {
+            // Firestore mirror: only flag the exact documents this device has actually displayed.
             com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
             java.util.Map<String, Object> ack = new java.util.HashMap<>();
             ack.put("delivered", true);
             ack.put("read", true);
             ack.put("readAt", now);
-            fs.collection("groups").document(resolvedChatId).collection("messages")
-                    .whereEqualTo("senderId", peerId)
-                    .get()
-                    .addOnSuccessListener(snaps -> {
-                       if (snaps != null) {
-                          for (com.google.firebase.firestore.DocumentSnapshot d : snaps.getDocuments()) {
-                             Boolean r = d.getBoolean("read");
-                             if (!Boolean.TRUE.equals(r)) {
-                                d.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
-                             }
-                          }
-                       }
-                    });
-            fs.collection("chats").document(resolvedChatId).collection("messages")
-                    .whereEqualTo("senderId", peerId)
-                    .get()
-                    .addOnSuccessListener(snaps -> {
-                       if (snaps != null) {
-                          for (com.google.firebase.firestore.DocumentSnapshot d : snaps.getDocuments()) {
-                             Boolean r = d.getBoolean("read");
-                             if (!Boolean.TRUE.equals(r)) {
-                                d.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
-                             }
-                          }
-                       }
-                    });
+            for (String rid : readIds) {
+               fs.collection("groups").document(resolvedChatId).collection("messages").document(rid)
+                       .set(ack, com.google.firebase.firestore.SetOptions.merge());
+               fs.collection("chats").document(resolvedChatId).collection("messages").document(rid)
+                       .set(ack, com.google.firebase.firestore.SetOptions.merge());
+            }
          } catch (Throwable ignored) {}
       }
    }
