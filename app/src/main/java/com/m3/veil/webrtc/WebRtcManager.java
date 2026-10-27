@@ -513,14 +513,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             if (pc != null) {
                PeerConnection.IceConnectionState state = pc.iceConnectionState();
                if (state != IceConnectionState.CONNECTED && state != IceConnectionState.COMPLETED) {
-                  Log.i("WebRtcManager", "Tier 2 Activated: Direct STUN timed out (8,000ms). Falling back to TURN TCP/443 for peer: " + peerId);
+                  Log.i("WebRtcManager", "Tier 2 Activated: Direct STUN timed out (3,000ms). Falling back to TURN TCP/443 for peer: " + peerId);
                   this.restartIceWithTurn(peerId);
                }
             }
 
          };
          this.turnFallbackRunnables.put(peerId, r);
-         this.heartbeatHandler.postDelayed(r, 8000L);
+         this.heartbeatHandler.postDelayed(r, 3000L);
       }
    }
 
@@ -541,6 +541,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             this.turnActivePeers.add(peerId);
 
             try {
+               if (pc.signalingState() != PeerConnection.SignalingState.STABLE) {
+                  return;
+               }
                Log.i("WebRtcManager", "Tier 2: Upgrading configuration to TURN Port 443 TCP/UDP for peer " + peerId);
                PeerConnection.RTCConfiguration rtcConfig = new PeerConnection.RTCConfiguration(this.getIceServers(true));
                rtcConfig.sdpSemantics = SdpSemantics.UNIFIED_PLAN;
@@ -554,6 +557,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                constraints.mandatory.add(new MediaConstraints.KeyValuePair("IceRestart", "true"));
                pc.createOffer(new SdpObserver() {
                   public void onCreateSuccess(final SessionDescription sessionDescription) {
+                     if (pc.signalingState() != PeerConnection.SignalingState.STABLE) {
+                        return;
+                     }
                      pc.setLocalDescription(new SdpObserver() {
                         public void onCreateSuccess(SessionDescription sdp) {
                         }
@@ -972,8 +978,16 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
             byte[] bytes = new byte[data.remaining()];
             data.get(bytes);
-            String payload = new String(bytes, StandardCharsets.UTF_8);
-            WebRtcManager.this.processInboundPayload(peerId, payload);
+            if (bytes.length > 0) {
+               int idx = 0;
+               while (idx < bytes.length && (bytes[idx] == ' ' || bytes[idx] == '\n' || bytes[idx] == '\r' || bytes[idx] == '\t')) {
+                  idx++;
+               }
+               if (idx < bytes.length && bytes[idx] == '{') {
+                  String payload = new String(bytes, StandardCharsets.UTF_8);
+                  WebRtcManager.this.processInboundPayload(peerId, payload);
+               }
+            }
          }
       });
    }
@@ -1168,9 +1182,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       if (peerId != null) {
          this.peerLastSeenTime.put(peerId, System.currentTimeMillis());
       }
+      if (payload == null) return;
+      String trimmedPayload = payload.trim();
+      if (!trimmedPayload.startsWith("{")) return;
 
       try {
-         JSONObject json = new JSONObject(payload);
+         JSONObject json = new JSONObject(trimmedPayload);
          String type = json.optString("type");
          if ("p2p_ping".equals(type)) {
             DataChannel dc = (DataChannel)this.dataChannels.get(peerId);
@@ -1739,12 +1756,8 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                p.put("thumbnail", message.getThumbnail());
             }
 
-            if (message.getMediaUrl() != null) {
+            if (message.getMediaUrl() != null && (message.getMediaUrl().length() <= 28000 || message.getMediaUrl().startsWith("CHUNKED:"))) {
                p.put("mediaUrl", message.getMediaUrl());
-            }
-
-            if (message.getLocalFilePath() != null) {
-               p.put("localFilePath", message.getLocalFilePath());
             }
 
             p.put("expiresAt", message.getExpiresAt() != null ? message.getExpiresAt().toDate().getTime() : 0L);
@@ -1805,7 +1818,20 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       EncryptedChatDatabase.getInstance(this.context).saveMessage(chatId, message);
       VeilFeatureManager.getInstance(this.context).addXp(10);
       this.dispatchChatPacketToPeer(chatId, peerId, message, false, chat != null ? chat.getName() : null, "direct");
-      if (callback != null) {
+      DataChannel dc = peerId != null ? this.getDataChannel(peerId) : null;
+      if (dc != null && dc.state() == State.OPEN && file != null && file.exists() && file.length() > 28000L) {
+         P2PFileTransferHelper.sendFileOverDataChannel(
+                 dc,
+                 message.getId(),
+                 file,
+                 message.getType(),
+                 message.getText(),
+                 message.isBlink(),
+                 message.getThumbnail(),
+                 message.getVoiceFilter(),
+                 callback
+         );
+      } else if (callback != null) {
          callback.onComplete(message.getId());
       }
 
@@ -1829,14 +1855,23 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       this.rtcExecutor.execute(() -> {
          try {
             Message msg = EncryptedChatDatabase.getInstance(this.context).getMessageById(messageId);
+            final String resolvedChatId = (msg != null && msg.getChatId() != null && !msg.getChatId().isEmpty())
+                    ? msg.getChatId()
+                    : (peerId != null ? getChatId(this.currentUserId, peerId) : null);
+
             if (msg != null) {
-               File localDecoded = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(this.context, msg.getChatId(), msg);
-               if (localDecoded != null && localDecoded.exists() && localDecoded.length() > 0) {
-                  EncryptedChatDatabase.getInstance(this.context).saveMessage(msg.getChatId() != null ? msg.getChatId() : getChatId(this.currentUserId, peerId), msg);
+               File localDecoded = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(this.context, resolvedChatId, msg);
+               if (localDecoded != null && localDecoded.exists() && localDecoded.length() >= 64) {
+                  EncryptedChatDatabase.getInstance(this.context).saveMessage(resolvedChatId, msg);
                   P2PFileTransferHelper.unregisterDownloadListener(messageId);
                   if (callback != null) {
                      this.mainHandler.post(() -> callback.onComplete(messageId, localDecoded));
                   }
+                  return;
+               }
+               if (msg.getMediaUrl() != null && msg.getMediaUrl().startsWith("CHUNKED:v1:") && resolvedChatId != null) {
+                  com.m3.veil.manager.VeilMessagesController.downloadChunkedMediaFromFirestore(
+                          this.context, resolvedChatId, msg, msg.getMediaUrl(), callback);
                   return;
                }
             }
@@ -1859,10 +1894,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                this.initiateConnection(peerId);
             }
 
-            // 2. Check Firestore/Nostr relay document for inline encrypted mediaUrl (allows offline download when sender closed app)
-            final String resolvedChatId = (msg != null && msg.getChatId() != null && !msg.getChatId().isEmpty())
-                    ? msg.getChatId()
-                    : (peerId != null ? getChatId(this.currentUserId, peerId) : null);
+            // 2. Check Firestore/Nostr relay document for inline or chunked encrypted mediaUrl (allows offline download when sender closed app)
             if (resolvedChatId != null && !resolvedChatId.isEmpty()) {
                com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
                fs.collection("groups").document(resolvedChatId).collection("messages").document(messageId).get()
@@ -1873,8 +1905,15 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                              Message targetMsg = msg != null ? msg : EncryptedChatDatabase.getInstance(this.context).getMessageById(messageId);
                              if (targetMsg != null) {
                                 targetMsg.setMediaUrl(remoteMediaUrl);
+                                if (remoteMediaUrl.startsWith("CHUNKED:v1:")) {
+                                   this.pendingDownloadRequests.remove(messageId);
+                                   P2PFileTransferHelper.unregisterDownloadListener(messageId);
+                                   com.m3.veil.manager.VeilMessagesController.downloadChunkedMediaFromFirestore(
+                                           this.context, resolvedChatId, targetMsg, remoteMediaUrl, callback);
+                                   return;
+                                }
                                 File f = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(this.context, resolvedChatId, targetMsg);
-                                if (f != null && f.exists() && f.length() > 0) {
+                                if (f != null && f.exists() && f.length() >= 64) {
                                    this.pendingDownloadRequests.remove(messageId);
                                    P2PFileTransferHelper.unregisterDownloadListener(messageId);
                                    EncryptedChatDatabase.getInstance(this.context).saveMessage(resolvedChatId, targetMsg);
@@ -1894,8 +1933,15 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                                         Message targetMsg = msg != null ? msg : EncryptedChatDatabase.getInstance(this.context).getMessageById(messageId);
                                         if (targetMsg != null) {
                                            targetMsg.setMediaUrl(mirrorMediaUrl);
+                                           if (mirrorMediaUrl.startsWith("CHUNKED:v1:")) {
+                                              this.pendingDownloadRequests.remove(messageId);
+                                              P2PFileTransferHelper.unregisterDownloadListener(messageId);
+                                              com.m3.veil.manager.VeilMessagesController.downloadChunkedMediaFromFirestore(
+                                                      this.context, resolvedChatId, targetMsg, mirrorMediaUrl, callback);
+                                              return;
+                                           }
                                            File f = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(this.context, resolvedChatId, targetMsg);
-                                           if (f != null && f.exists() && f.length() > 0) {
+                                           if (f != null && f.exists() && f.length() >= 64) {
                                               this.pendingDownloadRequests.remove(messageId);
                                               P2PFileTransferHelper.unregisterDownloadListener(messageId);
                                               EncryptedChatDatabase.getInstance(this.context).saveMessage(resolvedChatId, targetMsg);
@@ -3158,6 +3204,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"));
             pc.createOffer(new SimpleSdpObserver() {
                public void onCreateSuccess(final SessionDescription sessionDescription) {
+                  if (pc.signalingState() != PeerConnection.SignalingState.STABLE) {
+                     return;
+                  }
                   pc.setLocalDescription(new SimpleSdpObserver() {
                      public void onSetSuccess() {
                         SignalingClient.getInstance().sendOffer(peerId, sessionDescription.description);
@@ -3445,8 +3494,16 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             }
          }
       }
-      String text = new String(payload, StandardCharsets.UTF_8);
-      processInboundPayload(peerId, text);
+      if (payload.length > 0) {
+         int idx = 0;
+         while (idx < payload.length && (payload[idx] == ' ' || payload[idx] == '\n' || payload[idx] == '\r' || payload[idx] == '\t')) {
+            idx++;
+         }
+         if (idx < payload.length && payload[idx] == '{') {
+            String text = new String(payload, StandardCharsets.UTF_8);
+            processInboundPayload(peerId, text);
+         }
+      }
    }
 
    public Context getContext() {

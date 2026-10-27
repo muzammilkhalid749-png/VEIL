@@ -380,6 +380,9 @@ public class ChatActivity extends AppCompatActivity {
                                 m.setRead(newRead);
                                 if (delivered || read || isNetworkAvailable()) {
                                     m.setPending(false);
+                                    if (messagesAdapter != null) {
+                                        messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADED, 100);
+                                    }
                                 }
                                 messagesAdapter.notifyItemChanged(i + 1);
                                 break;
@@ -475,7 +478,10 @@ public class ChatActivity extends AppCompatActivity {
                     if (chatId != null && chatId.equals(dialogId)) {
                         runOnUiThread(() -> {
                             if (messagesAdapter != null) {
-                                messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADING, percent);
+                                int state = percent >= 100
+                                        ? MessagesAdapter.STATE_DOWNLOADED
+                                        : MessagesAdapter.STATE_DOWNLOADING;
+                                messagesAdapter.setMediaDownloadState(messageId, state, percent);
                             }
                         });
                     }
@@ -520,6 +526,9 @@ public class ChatActivity extends AppCompatActivity {
                         m.setRead(read);
                         if (delivered || read || isNetworkAvailable()) {
                             m.setPending(false);
+                            if (messagesAdapter != null) {
+                                messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADED, 100);
+                            }
                         }
                         messagesAdapter.notifyItemChanged(i + 1);
                         break;
@@ -1816,13 +1825,19 @@ public class ChatActivity extends AppCompatActivity {
             messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADING, 0);
         }
 
-        dbExecutor.execute(() -> {
+        final Context appContext = getApplicationContext();
+        final String selectedVoiceFilter = activeVoiceFilter;
+        final long vanishTimerSnap = currentVanishTimer;
+
+        new Thread(() -> {
             File decryptedFile = null;
             try {
+                File cacheDir = appContext.getExternalCacheDir() != null ? appContext.getExternalCacheDir() : appContext.getCacheDir();
                 if ("image".equals(mediaType)) {
                     BitmapFactory.Options opts = new BitmapFactory.Options();
                     opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
                     Bitmap bitmap = BitmapFactory.decodeFile(rawFile.getAbsolutePath(), opts);
+                    decryptedFile = new File(cacheDir, "dec_" + messageId + ".jpg");
                     if (bitmap != null) {
                         Bitmap thumbBitmap = Bitmap.createScaledBitmap(bitmap, 40, 40, true);
                         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -1833,10 +1848,30 @@ public class ChatActivity extends AppCompatActivity {
                         if (thumbBitmap != bitmap) {
                             thumbBitmap.recycle();
                         }
+                        // Optimize HD photo for fast P2P + inline cloud transport if larger than 280 KB
+                        if (rawFile.length() > 280 * 1024L) {
+                            int maxDim = 1280;
+                            int w = bitmap.getWidth();
+                            int h = bitmap.getHeight();
+                            Bitmap scaled = bitmap;
+                            if (w > maxDim || h > maxDim) {
+                                float ratio = Math.min((float) maxDim / w, (float) maxDim / h);
+                                scaled = Bitmap.createScaledBitmap(bitmap, Math.max(1, Math.round(w * ratio)), Math.max(1, Math.round(h * ratio)), true);
+                            }
+                            try (FileOutputStream fos = new FileOutputStream(decryptedFile)) {
+                                scaled.compress(Bitmap.CompressFormat.JPEG, 82, fos);
+                                fos.flush();
+                            }
+                            if (scaled != bitmap) {
+                                scaled.recycle();
+                            }
+                        } else {
+                            copyFile(rawFile, decryptedFile);
+                        }
                         bitmap.recycle();
+                    } else {
+                        copyFile(rawFile, decryptedFile);
                     }
-                    decryptedFile = new File(getExternalCacheDir(), "dec_" + messageId + ".jpg");
-                    copyFile(rawFile, decryptedFile);
                 } else if ("video".equals(mediaType)) {
                     try {
                         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
@@ -1854,36 +1889,48 @@ public class ChatActivity extends AppCompatActivity {
                         }
                         retriever.release();
                     } catch (Exception ignored) {}
-                    decryptedFile = new File(getExternalCacheDir(), "dec_" + messageId + ".mp4");
+                    decryptedFile = new File(cacheDir, "dec_" + messageId + ".mp4");
                     copyFile(rawFile, decryptedFile);
                 } else if ("document".equals(mediaType)) {
                     int dot = rawFile.getName().lastIndexOf(".");
                     String ext = dot != -1 ? rawFile.getName().substring(dot) : "";
-                    decryptedFile = new File(getExternalCacheDir(), "dec_" + messageId + ext);
+                    decryptedFile = new File(cacheDir, "dec_" + messageId + ext);
                     copyFile(rawFile, decryptedFile);
                 } else if ("voice".equals(mediaType)) {
-                    decryptedFile = new File(getExternalCacheDir(), "dec_" + messageId + ".m4a");
+                    decryptedFile = new File(cacheDir, "dec_" + messageId + ".m4a");
                     copyFile(rawFile, decryptedFile);
                 }
             } catch (Exception e) {
                 Log.e("ChatActivity", "Failed to cache media locally", e);
             }
 
-            File localFile = (decryptedFile != null && decryptedFile.exists()) ? decryptedFile : rawFile;
+            File localFile = (decryptedFile != null && decryptedFile.exists() && decryptedFile.length() > 0) ? decryptedFile : rawFile;
             message.setLocalFilePath(localFile.getAbsolutePath());
             message.setBlink(isBlink);
             if ("voice".equals(mediaType)) {
-                message.setVoiceFilter(activeVoiceFilter);
+                int durMs = com.m3.veil.utils.VoicePlayerManager.getInstance().getAudioDuration(appContext, message);
+                String filterBase = selectedVoiceFilter != null ? selectedVoiceFilter : "normal";
+                message.setVoiceFilter(durMs > 0 ? (filterBase + "|dur=" + durMs) : filterBase);
+                if (durMs > 0) {
+                    com.m3.veil.utils.VoicePlayerManager.getInstance().cacheDuration(messageId, durMs);
+                }
             }
-            if (currentVanishTimer > 0) {
-                long expiresMillis = System.currentTimeMillis() + currentVanishTimer;
+            if (vanishTimerSnap > 0) {
+                long expiresMillis = System.currentTimeMillis() + vanishTimerSnap;
                 message.setExpiresAt(new Timestamp(new Date(expiresMillis)));
             }
 
-            // Route through VeilMessagesController (warm cache, outbox retry, and direct P2P streaming)
-            com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, recipientId, message);
-            runOnUiThread(this::reloadMessagesFromLocalVault);
-        });
+            // Route through VeilMessagesController (warm cache, outbox retry, and direct P2P / chunked cloud streaming)
+            com.m3.veil.manager.VeilMessagesController.getInstance(appContext).sendMessage(currentLocalChat, recipientId, message);
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    if (messagesAdapter != null) {
+                        messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADED, 100);
+                    }
+                    reloadMessagesFromLocalVault();
+                }
+            });
+        }, "VeilMediaSendWorker").start();
     }
 
     private void copyFile(File src, File dst) throws IOException {

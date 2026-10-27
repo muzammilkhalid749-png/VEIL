@@ -1136,6 +1136,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     final boolean fRead = msg.isRead();
                     mMainHandler.post(() -> {
                         for (MessagesObserver obs : mObservers) {
+                            obs.onMediaTransferProgress(fDialogId, fMsgId, 100);
                             obs.onMessageStatusChanged(fDialogId, fMsgId, fDelivered, fRead);
                         }
                     });
@@ -1332,35 +1333,82 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
     public static void encodeInlineMediaForTransport(String dialogId, Message msg, @Nullable File localFile) {
         if (msg == null) return;
-        if (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()) return;
-        String mType = msg.getType();
-        boolean isVoiceOrAudio = "voice".equals(mType) || "audio".equals(mType);
+        if (msg.getMediaUrl() != null && (msg.getMediaUrl().startsWith("ENC:v1:") || msg.getMediaUrl().startsWith("CHUNKED:v1:"))) {
+            return;
+        }
         File fileToRead = localFile;
         if ((fileToRead == null || !fileToRead.exists()) && msg.getLocalFilePath() != null && !msg.getLocalFilePath().isEmpty()) {
             fileToRead = new File(msg.getLocalFilePath());
         }
-        if (fileToRead == null || !fileToRead.exists() || fileToRead.length() <= 0) return;
-        long maxInlineBytes = isVoiceOrAudio ? (600 * 1024L) : (256 * 1024L);
-        if (fileToRead.length() > maxInlineBytes) return;
+        if (fileToRead == null || !fileToRead.exists() || fileToRead.length() < 64) return;
+
+        long fileLen = fileToRead.length();
+        long maxInlineBytes = 450 * 1024L; // 450 KB inline (~2 min AAC voice note or compressed HD photo)
+        long maxChunkedBytes = 5 * 1024 * 1024L; // 5 MB chunked cloud-shadow fallback
+        if (fileLen > maxChunkedBytes) return;
+
         try {
-            byte[] bytes = new byte[(int) fileToRead.length()];
-            try ( java.io.FileInputStream fis = new java.io.FileInputStream(fileToRead) ) {
+            byte[] bytes = new byte[(int) fileLen];
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(fileToRead)) {
                 int offset = 0;
                 int read;
                 while (offset < bytes.length && (read = fis.read(bytes, offset, bytes.length - offset)) != -1) {
                     offset += read;
                 }
             }
-            String b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
             String keyScope = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
-            if (keyScope != null && !keyScope.isEmpty()) {
-                msg.setMediaUrl(EncryptionManager.encryptGroupPayload(keyScope, b64));
-            } else {
-                msg.setMediaUrl(b64);
+            if (fileLen <= maxInlineBytes) {
+                String b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+                String payload = "INLINE_B64:" + b64;
+                if (keyScope != null && !keyScope.isEmpty()) {
+                    msg.setMediaUrl(EncryptionManager.encryptGroupPayload(keyScope, payload));
+                } else {
+                    msg.setMediaUrl(payload);
+                }
+            } else if (keyScope != null && !keyScope.isEmpty() && msg.getId() != null) {
+                int chunkSize = 300 * 1024; // 300 KB raw bytes per chunk (~400 KB encrypted Base64)
+                int totalChunks = (int) ((fileLen + chunkSize - 1) / chunkSize);
+                com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+                for (int i = 0; i < totalChunks; i++) {
+                    int start = i * chunkSize;
+                    int end = (int) Math.min(fileLen, start + chunkSize);
+                    byte[] slice = java.util.Arrays.copyOfRange(bytes, start, end);
+                    String chunkB64 = android.util.Base64.encodeToString(slice, android.util.Base64.NO_WRAP);
+                    String encChunk = EncryptionManager.encryptGroupPayload(keyScope, chunkB64);
+                    Map<String, Object> chunkDoc = new HashMap<>();
+                    chunkDoc.put("index", i);
+                    chunkDoc.put("total", totalChunks);
+                    chunkDoc.put("data", encChunk);
+                    chunkDoc.put("timestampMs", System.currentTimeMillis());
+                    String docKey = msg.getId() + "_" + i;
+                    fs.collection("chats").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc);
+                    fs.collection("groups").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc);
+                }
+                msg.setMediaUrl("CHUNKED:v1:" + totalChunks + ":" + fileLen);
             }
         } catch (Throwable t) {
             Log.w(TAG, "encodeInlineMediaForTransport notice: " + t.getMessage());
         }
+    }
+
+    public static String resolveMediaExtension(Message msg) {
+        if (msg == null) return ".bin";
+        String mType = msg.getType();
+        if ("voice".equals(mType) || "audio".equals(mType)) {
+            return ".m4a";
+        } else if ("image".equals(mType)) {
+            return ".jpg";
+        } else if ("video".equals(mType)) {
+            return ".mp4";
+        } else if ("document".equals(mType) && msg.getText() != null) {
+            String raw = msg.getText();
+            String name = raw.contains("|") ? raw.split("\\|", 2)[0] : raw;
+            int dot = name.lastIndexOf('.');
+            if (dot != -1 && dot < name.length() - 1) {
+                return name.substring(dot);
+            }
+        }
+        return ".bin";
     }
 
     public static File decodeInlineMediaToFile(Context context, String dialogId, Message msg) {
@@ -1368,43 +1416,59 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         try {
             if (msg.getLocalFilePath() != null && !msg.getLocalFilePath().isEmpty()) {
                 File existing = new File(msg.getLocalFilePath());
-                if (existing.exists() && existing.length() > 0) {
+                if (existing.exists() && existing.length() >= 64) {
                     return existing;
                 }
             }
-            String mType = msg.getType();
-            String ext = ".bin";
-            if ("voice".equals(mType) || "audio".equals(mType)) {
-                ext = ".m4a";
-            } else if ("image".equals(mType)) {
-                ext = ".jpg";
-            } else if ("video".equals(mType)) {
-                ext = ".mp4";
-            }
+            String ext = resolveMediaExtension(msg);
             File targetFile = new File(context.getExternalCacheDir(), "dec_" + msg.getId() + ext);
-            if (targetFile.exists() && targetFile.length() > 0) {
-                msg.setLocalFilePath(targetFile.getAbsolutePath());
-                return targetFile;
-            }
-            String mediaUrl = msg.getMediaUrl();
-            if (mediaUrl == null || mediaUrl.isEmpty() || mediaUrl.startsWith("http")) {
-                return null;
-            }
-            String b64 = mediaUrl;
-            if (b64.startsWith("ENC:v1:")) {
-                String keyScope = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
-                if (keyScope != null && !keyScope.isEmpty()) {
-                    b64 = EncryptionManager.decryptGroupPayload(keyScope, b64);
+            if (targetFile.exists()) {
+                if (targetFile.length() >= 64) {
+                    msg.setLocalFilePath(targetFile.getAbsolutePath());
+                    return targetFile;
+                } else {
+                    targetFile.delete();
                 }
             }
-            if (b64 == null || b64.isEmpty() || b64.startsWith("ENC:v1:")) {
+            String mediaUrl = msg.getMediaUrl();
+            if (mediaUrl == null || mediaUrl.isEmpty() || mediaUrl.startsWith("http") || mediaUrl.startsWith("CHUNKED:")) {
                 return null;
             }
+            String decrypted = mediaUrl;
+            if (decrypted.startsWith("ENC:v1:")) {
+                String keyScope = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
+                if (keyScope != null && !keyScope.isEmpty()) {
+                    decrypted = EncryptionManager.decryptGroupPayload(keyScope, decrypted);
+                }
+            }
+            if (decrypted == null || decrypted.isEmpty() || decrypted.startsWith("ENC:v1:") || decrypted.startsWith("CHUNKED:")) {
+                return null;
+            }
+            String b64;
+            if (decrypted.startsWith("INLINE_B64:")) {
+                b64 = decrypted.substring("INLINE_B64:".length()).trim();
+            } else {
+                String trimmed = decrypted.trim();
+                // Reject file paths, JSON strings, or short non-media strings
+                if (trimmed.length() < 88 || trimmed.startsWith("/") || trimmed.startsWith("{") || trimmed.contains(" ")) {
+                    return null;
+                }
+                b64 = trimmed;
+            }
             byte[] decoded = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
-            if (decoded != null && decoded.length > 0) {
-                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(targetFile)) {
+            if (decoded != null && decoded.length >= 64) {
+                File tempFile = new File(context.getExternalCacheDir(), "tmp_dec_" + msg.getId() + "_" + System.nanoTime() + ".tmp");
+                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
                     fos.write(decoded);
                     fos.flush();
+                }
+                if (targetFile.exists()) targetFile.delete();
+                if (!tempFile.renameTo(targetFile)) {
+                    try (java.io.FileOutputStream fos = new java.io.FileOutputStream(targetFile)) {
+                        fos.write(decoded);
+                        fos.flush();
+                    }
+                    tempFile.delete();
                 }
                 msg.setLocalFilePath(targetFile.getAbsolutePath());
                 return targetFile;
@@ -1413,6 +1477,81 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             Log.w(TAG, "decodeInlineMediaToFile notice: " + t.getMessage());
         }
         return null;
+    }
+
+    public static void downloadChunkedMediaFromFirestore(
+            Context context,
+            String resolvedChatId,
+            Message targetMsg,
+            String chunkedHeader,
+            P2PFileTransferHelper.DownloadProgressListener callback) {
+        if (context == null || resolvedChatId == null || targetMsg == null || chunkedHeader == null || !chunkedHeader.startsWith("CHUNKED:v1:")) {
+            if (callback != null && targetMsg != null) callback.onError(targetMsg.getId(), "Unavailable");
+            return;
+        }
+        new Thread(() -> {
+            try {
+                String[] parts = chunkedHeader.split(":");
+                int totalChunks = Integer.parseInt(parts[2]);
+                if (totalChunks <= 0 || totalChunks > 64) {
+                    if (callback != null) callback.onError(targetMsg.getId(), "Invalid chunk count");
+                    return;
+                }
+                com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+                java.io.ByteArrayOutputStream combined = new java.io.ByteArrayOutputStream();
+                for (int i = 0; i < totalChunks; i++) {
+                    String docKey = targetMsg.getId() + "_" + i;
+                    com.google.firebase.firestore.DocumentSnapshot snap = com.google.android.gms.tasks.Tasks.await(
+                            fs.collection("chats").document(resolvedChatId).collection("media_chunks").document(docKey).get(),
+                            15, java.util.concurrent.TimeUnit.SECONDS);
+                    if (snap == null || !snap.exists()) {
+                        snap = com.google.android.gms.tasks.Tasks.await(
+                                fs.collection("groups").document(resolvedChatId).collection("media_chunks").document(docKey).get(),
+                                15, java.util.concurrent.TimeUnit.SECONDS);
+                    }
+                    if (snap == null || !snap.exists()) {
+                        throw new java.io.IOException("Missing media chunk " + i);
+                    }
+                    String encData = snap.getString("data");
+                    String b64Chunk = EncryptionManager.decryptGroupPayload(resolvedChatId, encData);
+                    byte[] rawSlice = android.util.Base64.decode(b64Chunk, android.util.Base64.DEFAULT);
+                    combined.write(rawSlice);
+                    final int pct = (int) (((i + 1) * 100L) / totalChunks);
+                    if (callback != null) {
+                        new Handler(Looper.getMainLooper()).post(() -> callback.onProgress(targetMsg.getId(), pct));
+                    }
+                }
+                byte[] fullBytes = combined.toByteArray();
+                if (fullBytes.length >= 64) {
+                    String ext = resolveMediaExtension(targetMsg);
+                    File targetFile = new File(context.getExternalCacheDir(), "dec_" + targetMsg.getId() + ext);
+                    File tempFile = new File(context.getExternalCacheDir(), "tmp_chunk_" + targetMsg.getId() + ".tmp");
+                    try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
+                        fos.write(fullBytes);
+                        fos.flush();
+                    }
+                    if (targetFile.exists()) targetFile.delete();
+                    if (!tempFile.renameTo(targetFile)) {
+                        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(targetFile)) {
+                            fos.write(fullBytes);
+                            fos.flush();
+                        }
+                        tempFile.delete();
+                    }
+                    targetMsg.setLocalFilePath(targetFile.getAbsolutePath());
+                    EncryptedChatDatabase.getInstance(context).saveMessage(resolvedChatId, targetMsg);
+                    if (callback != null) {
+                        new Handler(Looper.getMainLooper()).post(() -> callback.onComplete(targetMsg.getId(), targetFile));
+                    }
+                    return;
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Chunked media assembly notice: " + t.getMessage());
+            }
+            if (callback != null) {
+                new Handler(Looper.getMainLooper()).post(() -> callback.onError(targetMsg.getId(), "Connecting to peer..."));
+            }
+        }, "VeilChunkedMediaDownloader").start();
     }
 
     private boolean sendMediaP2P(String peerId, Message msg, File localFile) {
@@ -2620,8 +2759,9 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             p.put("voiceFilter", msg.getVoiceFilter());
             p.put("pollJson", msg.getPollJson());
             if (msg.getThumbnail() != null) p.put("thumbnail", msg.getThumbnail());
-            if (msg.getMediaUrl() != null) p.put("mediaUrl", msg.getMediaUrl());
-            if (msg.getLocalFilePath() != null) p.put("localFilePath", msg.getLocalFilePath());
+            if (msg.getMediaUrl() != null && (msg.getMediaUrl().length() <= 28000 || msg.getMediaUrl().startsWith("CHUNKED:"))) {
+                p.put("mediaUrl", msg.getMediaUrl());
+            }
             p.put("expiresAt", msg.getExpiresAt() != null ? msg.getExpiresAt().toDate().getTime() : 0);
             p.put("vanishTimer", msg.getVanishTimer());
             p.put("vanishMode", msg.getVanishMode());

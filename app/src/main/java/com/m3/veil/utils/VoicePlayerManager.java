@@ -113,6 +113,33 @@ public class VoicePlayerManager {
         }
     }
 
+    public void cacheDuration(String messageId, int durationMs) {
+        if (messageId != null && durationMs > 0) {
+            durationCache.put(messageId, durationMs);
+        }
+    }
+
+    public static String extractBaseVoiceFilter(String rawFilter) {
+        if (rawFilter == null || rawFilter.isEmpty()) return "normal";
+        int pipeIdx = rawFilter.indexOf('|');
+        return pipeIdx >= 0 ? rawFilter.substring(0, pipeIdx) : rawFilter;
+    }
+
+    public static int extractEmbeddedDurationMs(Message message) {
+        if (message == null) return 0;
+        String vf = message.getVoiceFilter();
+        if (vf != null && vf.contains("|dur=")) {
+            try {
+                int idx = vf.indexOf("|dur=") + 5;
+                int end = vf.indexOf('|', idx);
+                String num = end >= 0 ? vf.substring(idx, end) : vf.substring(idx);
+                int parsed = Integer.parseInt(num.trim());
+                if (parsed > 0) return parsed;
+            } catch (Exception ignored) {}
+        }
+        return 0;
+    }
+
     public void playVoiceNote(Context context, Message message, String rsaPrivateKeyString, String currentUserId) {
         if (currentlyPlayingMessageId != null && currentlyPlayingMessageId.equals(message.getId()) && mediaPlayer.isPlaying()) {
             pausePlayback();
@@ -122,28 +149,60 @@ public class VoicePlayerManager {
         File localAudio = null;
         if (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
             File f = new File(message.getLocalFilePath());
-            if (f.exists() && f.length() > 0) localAudio = f;
+            if (f.exists() && f.length() >= 64) localAudio = f;
         }
-        if (localAudio == null) {
+        if (localAudio == null && context != null) {
             File cacheDir = context.getExternalCacheDir();
             File decryptedFile = new File(cacheDir, "dec_" + message.getId() + ".m4a");
-            if (decryptedFile.exists() && decryptedFile.length() > 0) localAudio = decryptedFile;
+            if (decryptedFile.exists() && decryptedFile.length() >= 64) localAudio = decryptedFile;
         }
-        if (localAudio == null) {
+        if (localAudio == null && context != null) {
             localAudio = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(context, message.getChatId(), message);
         }
 
-        if (localAudio != null) {
-            startPlaying(message.getId(), localAudio.getAbsolutePath(), message.getVoiceFilter());
-            try {
-                com.m3.veil.manager.VeilMessagesController.getInstance(context).markMessageAsReadExplicitly(message);
-            } catch (Throwable ignored) {}
-        } else {
+        if (localAudio != null && localAudio.exists() && localAudio.length() >= 64) {
+            boolean started = startPlaying(context, message, localAudio.getAbsolutePath(), message.getVoiceFilter());
+            if (started) {
+                try {
+                    com.m3.veil.manager.VeilMessagesController.getInstance(context).markMessageAsReadExplicitly(message);
+                } catch (Throwable ignored) {}
+                return;
+            }
+        }
+
+        if (context != null && message != null && message.getId() != null) {
             Toast.makeText(context, "Downloading voice note...", Toast.LENGTH_SHORT).show();
+            String peerId = message.getSenderId();
+            com.m3.veil.webrtc.WebRtcManager.getInstance(context).requestMediaDownload(
+                    peerId,
+                    message.getId(),
+                    new com.m3.veil.webrtc.P2PFileTransferHelper.DownloadProgressListener() {
+                        @Override
+                        public void onProgress(String transferId, int percent) {}
+
+                        @Override
+                        public void onComplete(String transferId, File file) {
+                            if (file != null && file.exists() && file.length() >= 64) {
+                                message.setLocalFilePath(file.getAbsolutePath());
+                                progressHandler.post(() -> {
+                                    startPlaying(context, message, file.getAbsolutePath(), message.getVoiceFilter());
+                                    try {
+                                        com.m3.veil.manager.VeilMessagesController.getInstance(context).markMessageAsReadExplicitly(message);
+                                    } catch (Throwable ignored) {}
+                                });
+                            }
+                        }
+
+                        @Override
+                        public void onError(String transferId, String error) {}
+                    }
+            );
         }
     }
 
-    private void startPlaying(String messageId, String filePath, String voiceFilter) {
+    private boolean startPlaying(Context context, Message message, String filePath, String rawVoiceFilter) {
+        String messageId = message != null ? message.getId() : null;
+        String voiceFilter = extractBaseVoiceFilter(rawVoiceFilter);
         try {
             if (mediaPlayer.isPlaying()) {
                 mediaPlayer.stop();
@@ -152,6 +211,11 @@ public class VoicePlayerManager {
             mediaPlayer.reset();
             mediaPlayer.setDataSource(filePath);
             mediaPlayer.prepare();
+
+            int actualDur = mediaPlayer.getDuration();
+            if (messageId != null && actualDur > 0) {
+                durationCache.put(messageId, actualDur);
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 try {
@@ -184,9 +248,24 @@ public class VoicePlayerManager {
             });
 
             startProgressUpdates();
+            return true;
 
         } catch (Exception e) {
-            Log.e(TAG, "Playback failed", e);
+            Log.e(TAG, "Playback failed for " + filePath + ", self-healing corrupt cache file", e);
+            try {
+                mediaPlayer.reset();
+            } catch (Exception ignored) {}
+            // Delete corrupt dec_ cache file so it can be re-decoded or re-downloaded cleanly
+            if (filePath != null && filePath.contains("dec_")) {
+                try {
+                    File badFile = new File(filePath);
+                    if (badFile.exists()) badFile.delete();
+                } catch (Exception ignored) {}
+            }
+            if (message != null) {
+                message.setLocalFilePath(null);
+            }
+            return false;
         }
     }
 
@@ -263,19 +342,26 @@ public class VoicePlayerManager {
 
     public int getAudioDuration(Context context, Message message) {
         if (message == null || message.getId() == null) return 0;
-        if (durationCache.containsKey(message.getId())) {
-            return durationCache.get(message.getId());
+        Integer cached = durationCache.get(message.getId());
+        if (cached != null && cached > 0) {
+            return cached;
+        }
+
+        int embeddedDur = extractEmbeddedDurationMs(message);
+        if (embeddedDur > 0) {
+            durationCache.put(message.getId(), embeddedDur);
+            return embeddedDur;
         }
 
         File local = null;
         if (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
             File f = new File(message.getLocalFilePath());
-            if (f.exists() && f.length() > 0) local = f;
+            if (f.exists() && f.length() >= 64) local = f;
         }
         if (local == null && context != null) {
             File cacheDir = context.getExternalCacheDir();
             File dec = new File(cacheDir, "dec_" + message.getId() + ".m4a");
-            if (dec.exists() && dec.length() > 0) local = dec;
+            if (dec.exists() && dec.length() >= 64) local = dec;
         }
 
         if (local != null && local.exists()) {
@@ -286,10 +372,16 @@ public class VoicePlayerManager {
                 String durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
                 if (durStr != null) {
                     int duration = Integer.parseInt(durStr);
-                    durationCache.put(message.getId(), duration);
-                    return duration;
+                    if (duration > 0) {
+                        durationCache.put(message.getId(), duration);
+                        return duration;
+                    }
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                // Corrupt local dec_ file: remove so it can be re-fetched cleanly
+                if (local.getName().startsWith("dec_")) {
+                    try { local.delete(); } catch (Exception ignored) {}
+                }
             } finally {
                 if (mmr != null) {
                     try {

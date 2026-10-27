@@ -107,12 +107,7 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
         stopHeartbeat();
         String uid = resolveCurrentUid();
         if (uid == null || uid.isEmpty()) return;
-        if (context != null) {
-            try {
-                com.m3.veil.webrtc.WebRtcManager.getInstance(context).broadcastLeaving();
-            } catch (Throwable ignored) { }
-        }
-        Log.d(TAG, "App entered background -> status: offline for " + uid);
+        Log.d(TAG, "App entered background -> status: offline for " + uid + " (keeping P2P DataChannels alive for background transfers)");
 
         publishPresence(uid, false);
     }

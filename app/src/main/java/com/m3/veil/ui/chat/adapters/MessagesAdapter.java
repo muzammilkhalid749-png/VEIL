@@ -1499,9 +1499,15 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         imageMessageContainer.setOnClickListener(openPhoto);
                         if (imageCardView != null) imageCardView.setOnClickListener(openPhoto);
 
-                        final int dlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
+                        int dlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                         final int progress = downloadProgresses.getOrDefault(message.getId(), 0);
-                        final boolean isSending = (message.isPending() && !message.isDelivered()) || dlState == STATE_DOWNLOADING;
+                        if (!message.isPending() || message.isDelivered() || message.isRead() || progress >= 100) {
+                            if (dlState == STATE_DOWNLOADING) {
+                                dlState = STATE_DOWNLOADED;
+                                downloadStates.put(message.getId(), STATE_DOWNLOADED);
+                            }
+                        }
+                        final boolean isSending = (message.isPending() && !message.isDelivered() && !message.isRead()) || dlState == STATE_DOWNLOADING;
 
                         if (imageDownloadOverlay != null) {
                             if (isSending) {
@@ -1614,9 +1620,15 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         if (videoPlayButtonContainer != null) videoPlayButtonContainer.setOnClickListener(playClick);
                         if (videoCardView != null) videoCardView.setOnClickListener(playClick);
 
-                        final int vDlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
+                        int vDlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                         final int vProgress = downloadProgresses.getOrDefault(message.getId(), 0);
-                        final boolean isVideoSending = (message.isPending() && !message.isDelivered()) || vDlState == STATE_DOWNLOADING;
+                        if (!message.isPending() || message.isDelivered() || message.isRead() || vProgress >= 100) {
+                            if (vDlState == STATE_DOWNLOADING) {
+                                vDlState = STATE_DOWNLOADED;
+                                downloadStates.put(message.getId(), STATE_DOWNLOADED);
+                            }
+                        }
+                        final boolean isVideoSending = (message.isPending() && !message.isDelivered() && !message.isRead()) || vDlState == STATE_DOWNLOADING;
 
                         if (videoDownloadOverlay != null) {
                             if (isVideoSending) {
@@ -1673,9 +1685,15 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
                         String formattedInfo = ext + (size.isEmpty() ? "" : " • " + size);
                         documentFileSize.setText(formattedInfo);
-                        final int docDlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
+                        int docDlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                         final int docProgress = downloadProgresses.getOrDefault(message.getId(), 0);
-                        final boolean isDocSending = (message.isPending() && !message.isDelivered()) || docDlState == STATE_DOWNLOADING;
+                        if (!message.isPending() || message.isDelivered() || message.isRead() || docProgress >= 100) {
+                            if (docDlState == STATE_DOWNLOADING) {
+                                docDlState = STATE_DOWNLOADED;
+                                downloadStates.put(message.getId(), STATE_DOWNLOADED);
+                            }
+                        }
+                        final boolean isDocSending = (message.isPending() && !message.isDelivered() && !message.isRead()) || docDlState == STATE_DOWNLOADING;
 
                         if (documentProgressBar != null) {
                             if (isDocSending) {
