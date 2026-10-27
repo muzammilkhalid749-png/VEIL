@@ -578,7 +578,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         }
 
                         // Also initialize active vanish tasks for unexpired messages
-                        List<Message> msgs = mDatabase.getMessages(c.getId(), 50, 0);
+                        List<Message> msgs = mDatabase.getMessages(c.getId(), 200, 0);
                         CopyOnWriteArrayList<Message> msgList = new CopyOnWriteArrayList<>(msgs);
                         mDialogMessages.put(c.getId(), msgList);
                         synchronized (mMessagesByDialogs) {
@@ -657,6 +657,62 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         synchronized (mDialogs_dict) {
             return mDialogs_dict.get(dialogHash);
         }
+    }
+
+    /**
+     * 0ms lock-free retrieval of a cached dialog (never blocks on SQLCipher).
+     */
+    public Chat getCachedDialogImmediate(String dialogId) {
+        if (dialogId == null) return null;
+        Chat c = mDialogsDict.get(dialogId);
+        if (c != null) return c;
+        c = mDatabase.getCachedChatImmediate(dialogId);
+        if (c != null) {
+            mDialogsDict.put(dialogId, c);
+            synchronized (mDialogs_dict) {
+                mDialogs_dict.put(getDialogIdHash(dialogId), c);
+            }
+        }
+        return c;
+    }
+
+    /**
+     * 0ms lock-free retrieval of cached messages for a dialog (never blocks on SQLCipher).
+     * Used on Frame 1 of ChatActivity.onCreate() so messages appear instantaneously like Telegram.
+     */
+    public List<Message> getCachedMessagesImmediate(String dialogId) {
+        if (dialogId == null) return Collections.emptyList();
+        CopyOnWriteArrayList<Message> list = mDialogMessages.get(dialogId);
+        if (list != null && !list.isEmpty()) {
+            return new ArrayList<>(list);
+        }
+        List<Message> dbRamMsgs = mDatabase.getCachedMessagesImmediate(dialogId);
+        if (dbRamMsgs != null && !dbRamMsgs.isEmpty()) {
+            CopyOnWriteArrayList<Message> copy = new CopyOnWriteArrayList<>(dbRamMsgs);
+            mDialogMessages.put(dialogId, copy);
+            synchronized (mMessagesByDialogs) {
+                mMessagesByDialogs.put(getDialogIdHash(dialogId), copy);
+            }
+            return dbRamMsgs;
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * Asynchronously pre-warms a dialog and its messages into RAM on mStorageQueue.
+     */
+    public void prewarmDialog(String dialogId) {
+        if (dialogId == null) return;
+        CopyOnWriteArrayList<Message> existing = mDialogMessages.get(dialogId);
+        if (existing != null && !existing.isEmpty() && mDialogsDict.containsKey(dialogId)) {
+            return;
+        }
+        mStorageQueue.execute(() -> {
+            try {
+                getDialog(dialogId);
+                getLoadedMessages(dialogId);
+            } catch (Throwable ignored) {}
+        });
     }
 
     public Chat getDialog(String dialogId) {

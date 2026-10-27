@@ -651,28 +651,17 @@ public class ChatActivity extends AppCompatActivity {
             }
         }
 
-        // Initialize WebRTC P2P Manager & DataChannel
-        com.m3.veil.webrtc.WebRtcManager.getInstance(this).init(currentUserId);
-        if (recipientId != null && !recipientId.trim().isEmpty()
-                && !recipientId.startsWith("group_") && !recipientId.startsWith("channel_") && !recipientId.startsWith("lounge_")) {
-            com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
+        // 1. Instant 0ms RAM lookup for dialog metadata before building views
+        if (chatId != null) {
+            currentLocalChat = com.m3.veil.manager.VeilMessagesController.getInstance(this).getCachedDialogImmediate(chatId);
+            if (currentLocalChat != null) {
+                currentVanishTimer = currentLocalChat.getVanishTimer();
+                if (currentLocalChat.getVanishMode() != null) {
+                    currentVanishMode = currentLocalChat.getVanishMode();
+                }
+                isChatBlocked = currentLocalChat.isBlocked();
+            }
         }
-        com.m3.veil.webrtc.WebRtcManager.getInstance(this).addEventListener(p2pChatListener);
-        com.m3.veil.manager.VeilMessagesController.getInstance(this).addObserver(messagesControllerObserver);
-        com.m3.veil.manager.VeilMessagesController.getInstance(this).setActiveChatIdInForeground(chatId);
-
-        // Vanish engine
-        vanishHandler = new Handler(Looper.getMainLooper());
-        vanishRunnable = () -> {
-            checkAndVanishMessages();
-            vanishHandler.postDelayed(vanishRunnable, 1000);
-        };
-        vanishHandler.post(vanishRunnable);
-
-        initializeViews();
-        handleWindowInsets();
-        setupRecyclerView();
-        setupClickListeners();
 
         // Default vanish timer from privacy settings if not overridden
         android.content.SharedPreferences privacyPrefs = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE);
@@ -681,18 +670,63 @@ public class ChatActivity extends AppCompatActivity {
             currentVanishTimer = defaultVanish;
         }
 
+        com.m3.veil.manager.VeilMessagesController.getInstance(this).addObserver(messagesControllerObserver);
+        com.m3.veil.manager.VeilMessagesController.getInstance(this).setActiveChatIdInForeground(chatId);
         com.m3.veil.database.EncryptedChatDatabase.getInstance(this).addListener(localDbListener);
-        this.isP2PActive = (recipientId != null && !recipientId.trim().isEmpty())
-                && com.m3.veil.webrtc.WebRtcManager.getInstance(this).isPeerConnected(recipientId);
 
-        ensureLocalChatExists();
-        if (isNetworkAvailable() && chatId != null) {
-            com.m3.veil.manager.VeilMessagesController.getInstance(this).flushPendingOfflineMessagesOnNetworkAvailable();
+        // 2. Build views and bind pre-cached messages synchronously for instant Frame 1 render
+        initializeViews();
+        handleWindowInsets();
+        setupRecyclerView();
+        setupClickListeners();
+
+        // Apply cached chat appearance & header immediately on Frame 1
+        if (currentLocalChat != null) {
+            updateBlockedState(isChatBlocked, currentLocalChat.getBlockedBy());
         }
-        loadLocalChatSettings();
+        applyChatWallpaper();
+        updateChannelRoleComposerState();
+        updateRecipientHeader();
+        updatePresenceAndToolbarStatus();
         checkChatLockIfEnabled();
-        fetchRecipientPublicKey();
-        listenForMessages();
+
+        // Vanish engine: start first tick after 1s so Frame 1 is never delayed
+        vanishHandler = new Handler(Looper.getMainLooper());
+        vanishRunnable = () -> {
+            checkAndVanishMessages();
+            vanishHandler.postDelayed(vanishRunnable, 1000);
+        };
+        vanishHandler.postDelayed(vanishRunnable, 1000);
+
+        // Load latest messages from vault immediately if cache wasn't warm, or reconcile in background
+        if (messageList.isEmpty()) {
+            reloadMessagesFromLocalVaultImmediate();
+        } else {
+            reloadMessagesFromLocalVault();
+        }
+
+        // 3. Defer heavy WebRTC, Firestore listeners, and key lookups until after Frame 1 draws
+        Looper.myQueue().addIdleHandler(() -> {
+            if (isFinishing() || isDestroyed()) return false;
+            com.m3.veil.webrtc.WebRtcManager.getInstance(this).init(currentUserId);
+            if (recipientId != null && !recipientId.trim().isEmpty()
+                    && !recipientId.startsWith("group_") && !recipientId.startsWith("channel_") && !recipientId.startsWith("lounge_")) {
+                com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
+            }
+            com.m3.veil.webrtc.WebRtcManager.getInstance(this).addEventListener(p2pChatListener);
+            this.isP2PActive = (recipientId != null && !recipientId.trim().isEmpty())
+                    && com.m3.veil.webrtc.WebRtcManager.getInstance(this).isPeerConnected(recipientId);
+            updatePresenceAndToolbarStatus();
+
+            ensureLocalChatExists();
+            if (isNetworkAvailable() && chatId != null) {
+                com.m3.veil.manager.VeilMessagesController.getInstance(this).flushPendingOfflineMessagesOnNetworkAvailable();
+            }
+            loadLocalChatSettings();
+            fetchRecipientPublicKey();
+            listenForMessages();
+            return false;
+        });
 
         // WhatsApp Status Reply: send quoted status reply directly into this chat
         String statusReply = getIntent().getStringExtra("statusReplyText");
@@ -2169,7 +2203,7 @@ public class ChatActivity extends AppCompatActivity {
     private boolean isChatUnlocked() {
         if (isChatPinUnlocked) return true;
         if (currentLocalChat == null && chatId != null) {
-            currentLocalChat = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
+            currentLocalChat = com.m3.veil.manager.VeilMessagesController.getInstance(this).getCachedDialogImmediate(chatId);
         }
         if (currentLocalChat == null || currentLocalChat.getChatLockPin() == null || currentLocalChat.getChatLockPin().trim().isEmpty()) {
             isChatPinUnlocked = true;
@@ -2496,10 +2530,22 @@ public class ChatActivity extends AppCompatActivity {
 
     private void setupRecyclerView() {
         messageList = new ArrayList<>();
+        if (chatId != null) {
+            List<Message> cachedMsgs = com.m3.veil.manager.VeilMessagesController.getInstance(this).getCachedMessagesImmediate(chatId);
+            if (cachedMsgs != null && !cachedMsgs.isEmpty()) {
+                for (Message m : cachedMsgs) {
+                    if (m != null && m.getText() != null && m.getText().startsWith("[roulette_control:")) {
+                        continue;
+                    }
+                    if (m != null) messageList.add(m);
+                }
+            }
+        }
         messagesAdapter = new MessagesAdapter(messageList,
                 this::showReactionDialog,
                 this::showReactionDetails
         );
+        messagesAdapter.skipInitialAnimations();
         if (recipientId != null) {
             messagesAdapter.setRecipientId(recipientId);
         }
@@ -2602,19 +2648,19 @@ public class ChatActivity extends AppCompatActivity {
                 }
             }
         });
-        messagesRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        LinearLayoutManager lm = new LinearLayoutManager(this);
+        lm.setInitialPrefetchItemCount(15);
+        messagesRecyclerView.setLayoutManager(lm);
         messagesRecyclerView.setHasFixedSize(true);
-        messagesRecyclerView.setItemViewCacheSize(25);
-        RecyclerView.RecycledViewPool messagePool = new RecyclerView.RecycledViewPool();
-        messagePool.setMaxRecycledViews(com.m3.veil.ui.chat.adapters.MessagesAdapter.VIEW_TYPE_NOTICE, 10);
-        messagePool.setMaxRecycledViews(com.m3.veil.ui.chat.adapters.MessagesAdapter.VIEW_TYPE_SENT, 40);
-        messagePool.setMaxRecycledViews(com.m3.veil.ui.chat.adapters.MessagesAdapter.VIEW_TYPE_RECEIVED, 40);
-        messagePool.setMaxRecycledViews(com.m3.veil.ui.chat.adapters.MessagesAdapter.VIEW_TYPE_TYPING, 5);
-        messagesRecyclerView.setRecycledViewPool(messagePool);
+        messagesRecyclerView.setItemViewCacheSize(30);
+        messagesRecyclerView.setRecycledViewPool(com.m3.veil.VeilApplication.getSharedMessagesRecycledViewPool());
         if (messagesRecyclerView.getItemAnimator() instanceof androidx.recyclerview.widget.SimpleItemAnimator) {
             ((androidx.recyclerview.widget.SimpleItemAnimator) messagesRecyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
         }
         messagesRecyclerView.setAdapter(messagesAdapter);
+        if (!messageList.isEmpty()) {
+            messagesRecyclerView.scrollToPosition(messagesAdapter.getItemCount() - 1);
+        }
 
         messagesRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -3722,14 +3768,14 @@ public class ChatActivity extends AppCompatActivity {
 
         // Route through application-wide VeilMessagesController (optimistic UI + ratcheted encryption + outbox)
         com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, recipientId, message);
-        reloadMessagesFromLocalVault();
+        reloadMessagesFromLocalVaultImmediate();
     }
 
     private void listenForMessages() {
         if (chatId == null) return;
         if (isActivityResumed && isChatUnlocked()) {
             sendReadReceiptsForUnreadMessages();
-            com.m3.veil.database.EncryptedChatDatabase.getInstance(this).markAllAsRead(chatId, currentUserId);
+            dbExecutor.execute(() -> com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId));
         }
         reloadMessagesFromLocalVault();
 
@@ -4224,7 +4270,7 @@ public class ChatActivity extends AppCompatActivity {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus && isActivityResumed && isChatUnlocked() && chatId != null) {
             sendReadReceiptsForUnreadMessages();
-            com.m3.veil.database.EncryptedChatDatabase.getInstance(this).markAllAsRead(chatId, currentUserId);
+            dbExecutor.execute(() -> com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId));
         }
     }
     @Override
@@ -4240,15 +4286,19 @@ public class ChatActivity extends AppCompatActivity {
         presenceHandler.removeCallbacks(presenceTicker);
         presenceHandler.post(presenceTicker);
         if (currentUserId != null) {
-            com.m3.veil.webrtc.WebRtcManager.getInstance(this).fetchAndProcessOfflineInboxOnce(currentUserId);
+            dbExecutor.execute(() -> com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this).fetchAndProcessOfflineInboxOnce(currentUserId));
         }
         if (chatId != null) {
             com.m3.veil.manager.VeilMessagesController.getInstance(this).setActiveChatIdInForeground(chatId);
             if (isChatUnlocked()) {
                 sendReadReceiptsForUnreadMessages();
-                com.m3.veil.database.EncryptedChatDatabase.getInstance(this).markAllAsRead(chatId, currentUserId);
+                dbExecutor.execute(() -> com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId));
             }
-            reloadMessagesFromLocalVault();
+            if (messageList == null || messageList.isEmpty()) {
+                reloadMessagesFromLocalVaultImmediate();
+            } else {
+                reloadMessagesFromLocalVault();
+            }
         }
     }
 
@@ -4260,9 +4310,14 @@ public class ChatActivity extends AppCompatActivity {
         super.onPause();
     }
 
+    private void reloadMessagesFromLocalVaultImmediate() {
+        chatDebounceHandler.removeCallbacks(reloadVaultRunnable);
+        executeReloadMessages();
+    }
+
     private void reloadMessagesFromLocalVault() {
         chatDebounceHandler.removeCallbacks(reloadVaultRunnable);
-        chatDebounceHandler.postDelayed(reloadVaultRunnable, 45);
+        chatDebounceHandler.postDelayed(reloadVaultRunnable, 16);
     }
 
     private void executeReloadMessages() {

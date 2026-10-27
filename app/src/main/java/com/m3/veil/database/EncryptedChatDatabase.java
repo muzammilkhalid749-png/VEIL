@@ -1130,6 +1130,25 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         return getAllChats(false);
     }
 
+    /**
+     * Lock-free 0ms RAM cache lookup for a Chat dialog (modeled after Telegram MessagesController.getDialog).
+     * Never blocks on SQLCipher monitor locks so UI thread can read instantaneously during Activity startup.
+     */
+    public Chat getCachedChatImmediate(String chatId) {
+        if (chatId == null) return null;
+        return ramChatCache.get(chatId);
+    }
+
+    /**
+     * Lock-free 0ms RAM cache lookup for a dialog's messages list.
+     * Returns a defensive copy if present in RAM, or null if not yet loaded.
+     */
+    public List<Message> getCachedMessagesImmediate(String chatId) {
+        if (chatId == null) return null;
+        List<Message> cached = ramMessageListCache.get(chatId);
+        return cached != null ? new ArrayList<>(cached) : null;
+    }
+
     public synchronized List<Chat> getAllChats(boolean includeSecret) {
         deleteExpiredVanishMessages();
         List<Chat> chats = new ArrayList<>();
@@ -1147,6 +1166,9 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                         if (chat.getGroupExpiresAt() > 0 && chat.getGroupExpiresAt() <= now) {
                             deleteChat(chat.getId());
                             continue;
+                        }
+                        if (chat.getId() != null) {
+                            ramChatCache.put(chat.getId(), chat);
                         }
                         if (includeSecret || !chat.isSecret()) {
                             chats.add(chat);
@@ -1395,6 +1417,9 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     summary = text != null ? text : "";
                 }
 
+                String prevLastMsg = chat.getLastMessage();
+                long prevLastTime = chat.getLastMessageTime() != null ? chat.getLastMessageTime().toDate().getTime() : 0L;
+
                 chat.setLastMessage(summary);
                 if (timestamp > 0) {
                     chat.setLastMessageTime(new Timestamp(new Date(timestamp)));
@@ -1405,12 +1430,15 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 chat.setLastMessageRead(read);
                 chat.setLastMessagePending(pending);
 
-                // Ensure TABLE_CHATS row is synced with this surviving message
-                ContentValues cv = new ContentValues();
-                cv.put(COL_CHAT_LAST_MESSAGE, summary);
-                if (timestamp > 0) cv.put(COL_CHAT_LAST_MESSAGE_TIME, timestamp);
-                db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{chat.getId()});
+                // Only write to TABLE_CHATS when the summary or timestamp actually changed
+                if (!summary.equals(prevLastMsg) || (timestamp > 0 && timestamp != prevLastTime)) {
+                    ContentValues cv = new ContentValues();
+                    cv.put(COL_CHAT_LAST_MESSAGE, summary);
+                    if (timestamp > 0) cv.put(COL_CHAT_LAST_MESSAGE_TIME, timestamp);
+                    db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{chat.getId()});
+                }
             } else {
+                String prevLastMsg = chat.getLastMessage();
                 // No surviving messages in this chat (all messages expired or chat is empty)
                 chat.setLastMessage("");
                 chat.setLastMessageSenderId(null);
@@ -1419,9 +1447,11 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 chat.setLastMessageRead(false);
                 chat.setLastMessagePending(false);
 
-                ContentValues cv = new ContentValues();
-                cv.put(COL_CHAT_LAST_MESSAGE, "");
-                db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{chat.getId()});
+                if (prevLastMsg != null && !prevLastMsg.isEmpty()) {
+                    ContentValues cv = new ContentValues();
+                    cv.put(COL_CHAT_LAST_MESSAGE, "");
+                    db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{chat.getId()});
+                }
             }
         } catch (Exception ignored) {
         } finally {
@@ -1430,7 +1460,12 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     }
 
     public synchronized void updateChatUnreadCount(String chatId, int unreadCount) {
-        updateSingleChatColumn(chatId, COL_CHAT_UNREAD_COUNT, Math.max(0, unreadCount));
+        int clamped = Math.max(0, unreadCount);
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null) {
+            cached.setUnreadCount(clamped);
+        }
+        updateSingleChatColumn(chatId, COL_CHAT_UNREAD_COUNT, clamped);
     }
 
     public synchronized void incrementUnreadCount(String chatId) {
@@ -1481,23 +1516,33 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     }
 
     public synchronized void updateChatPinStatus(String chatId, boolean pinned) {
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null) cached.setPinned(pinned);
         updateSingleChatColumn(chatId, COL_CHAT_PINNED, pinned ? 1 : 0);
     }
 
     public synchronized void updateChatMuteStatus(String chatId, boolean muted) {
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null) cached.setMuted(muted);
         updateSingleChatColumn(chatId, COL_CHAT_MUTED, muted ? 1 : 0);
     }
 
     public synchronized void updateChatArchiveStatus(String chatId, boolean archived) {
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null) cached.setArchived(archived);
         updateSingleChatColumn(chatId, COL_CHAT_ARCHIVED, archived ? 1 : 0);
     }
 
     public synchronized void updateChatSecretStatus(String chatId, boolean secret) {
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null) cached.setSecret(secret);
         updateSingleChatColumn(chatId, COL_CHAT_SECRET, secret ? 1 : 0);
     }
 
     public synchronized void updateChatLockPin(String chatId, String pin) {
         if (chatId == null) return;
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null) cached.setChatLockPin(pin);
         SQLiteDatabase db = getEncryptedDb();
         ContentValues cv = new ContentValues();
         cv.put(COL_CHAT_LOCK_PIN, pin);
@@ -1507,6 +1552,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     public synchronized void updateChatWallpaper(String chatId, String colorHex) {
         if (chatId == null) return;
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null) cached.setWallpaperColor(colorHex);
         SQLiteDatabase db = getEncryptedDb();
         ContentValues cv = new ContentValues();
         cv.put(COL_CHAT_WALLPAPER, colorHex);
@@ -1516,6 +1563,11 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     public synchronized void updateChatPinnedMessage(String chatId, String msgId, String msgText) {
         if (chatId == null) return;
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null) {
+            cached.setPinnedMessageId(msgId);
+            cached.setPinnedMessageText(msgText);
+        }
         SQLiteDatabase db = getEncryptedDb();
         ContentValues cv = new ContentValues();
         cv.put(COL_CHAT_PINNED_MSG_ID, msgId);
@@ -1682,7 +1734,21 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         db.update(TABLE_CHATS, chatCv, COL_CHAT_ID + "=?", new String[]{chatId});
 
         ramSingleMessageCache.put(message.getId(), message);
-        ramMessageListCache.remove(chatId);
+        List<Message> cachedList = ramMessageListCache.get(chatId);
+        if (cachedList != null) {
+            boolean replaced = false;
+            for (int i = 0; i < cachedList.size(); i++) {
+                Message existing = cachedList.get(i);
+                if (existing != null && message.getId().equals(existing.getId())) {
+                    cachedList.set(i, message);
+                    replaced = true;
+                    break;
+                }
+            }
+            if (!replaced) {
+                cachedList.add(message);
+            }
+        }
         Chat cachedChat = ramChatCache.get(chatId);
         if (cachedChat != null) {
             populateLastMessageMetadata(cachedChat);
@@ -1801,6 +1867,12 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     public synchronized List<Message> getMessages(String chatId, int limit, int offset) {
         List<Message> messages = new ArrayList<>();
         if (chatId == null) return messages;
+        if (offset == 0) {
+            List<Message> cached = ramMessageListCache.get(chatId);
+            if (cached != null && !cached.isEmpty()) {
+                return new ArrayList<>(cached);
+            }
+        }
         SQLiteDatabase db = getEncryptedDb();
 
         String limitClause = offset > 0 ? offset + "," + limit : String.valueOf(limit);
@@ -1819,6 +1891,9 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             } finally {
                 cursor.close();
             }
+        }
+        if (offset == 0 && limit >= 50) {
+            ramMessageListCache.put(chatId, new CopyOnWriteArrayList<>(messages));
         }
         return messages;
     }
@@ -2190,6 +2265,15 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
         db.delete(TABLE_MESSAGES, COL_MSG_ID + "=?", new String[]{messageId});
         if (chatId != null) {
+            List<Message> cachedList = ramMessageListCache.get(chatId);
+            if (cachedList != null) {
+                for (int i = cachedList.size() - 1; i >= 0; i--) {
+                    Message m = cachedList.get(i);
+                    if (m != null && messageId.equals(m.getId())) {
+                        cachedList.remove(i);
+                    }
+                }
+            }
             updateChatLastMessageSummary(db, chatId);
             Chat cachedChat = ramChatCache.get(chatId);
             if (cachedChat != null) {
@@ -2202,6 +2286,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     public synchronized void clearChatMessages(String chatId) {
         if (chatId == null) return;
+        ramMessageListCache.remove(chatId);
         SQLiteDatabase db = getEncryptedDb();
         db.delete(TABLE_MESSAGES, COL_MSG_CHAT_ID + "=?", new String[]{chatId});
 
@@ -2354,13 +2439,22 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             if (c != null) c.close();
         }
 
+        if (affectedChatIds.isEmpty()) {
+            return;
+        }
+
         // 2. Delete expired messages from messages table
         int deleted = db.delete(TABLE_MESSAGES, COL_MSG_EXPIRES_AT + " > 0 AND " + COL_MSG_EXPIRES_AT + " <= ?",
                 new String[]{String.valueOf(now)});
 
-        // 3. For all affected chats, resync TABLE_CHATS row to the latest surviving message
+        // 3. For all affected chats, resync TABLE_CHATS row and RAM cache to the latest surviving message
         for (String chatId : affectedChatIds) {
+            ramMessageListCache.remove(chatId);
             updateChatLastMessageSummary(db, chatId);
+            Chat cachedChat = ramChatCache.get(chatId);
+            if (cachedChat != null) {
+                populateLastMessageMetadata(cachedChat);
+            }
         }
 
         if (deleted > 0) {

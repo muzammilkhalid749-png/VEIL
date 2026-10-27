@@ -37,6 +37,7 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -195,6 +196,22 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     private final java.util.Set<String> revealedSpoilers = new java.util.HashSet<>();
 
+    private static final java.util.regex.Pattern PATTERN_SPOILER = java.util.regex.Pattern.compile("\\|\\|([^|]+)\\|\\|");
+    private static final java.util.regex.Pattern PATTERN_BOLD = java.util.regex.Pattern.compile("\\*([^*]+)\\*");
+    private static final java.util.regex.Pattern PATTERN_ITALIC = java.util.regex.Pattern.compile("_([^_]+)_");
+    private static final java.util.regex.Pattern PATTERN_STRIKE = java.util.regex.Pattern.compile("~([^~]+)~");
+    private static final java.util.regex.Pattern PATTERN_CODE = java.util.regex.Pattern.compile("`([^`]+)`");
+    private static final android.util.LruCache<String, CharSequence> RICH_TEXT_CACHE = new android.util.LruCache<>(400);
+
+    private final java.util.Calendar cal1 = java.util.Calendar.getInstance();
+    private final java.util.Calendar cal2 = java.util.Calendar.getInstance();
+    private final java.util.Calendar nowCal = java.util.Calendar.getInstance();
+    private final SimpleDateFormat dateHeaderFormat = new SimpleDateFormat("dd MMMM yyyy", Locale.getDefault());
+
+    public void skipInitialAnimations() {
+        this.lastAnimatedPosition = messages != null ? messages.size() + 2 : Integer.MAX_VALUE;
+    }
+
     private CharSequence formatRichTextAndPoll(android.content.Context context, Message message) {
         if (message == null) return "";
         if (message.isBlink()) {
@@ -222,25 +239,41 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             } catch (Exception ignored) {}
         }
         String raw = message.getText() != null ? message.getText() : "";
+        boolean hasTranslation = message.getTranslatedText() != null && !message.getTranslatedText().isEmpty();
         boolean hasSpoiler = raw.contains("||") && raw.indexOf("||") != raw.lastIndexOf("||");
+        boolean hasMarkdown = raw.indexOf('*') >= 0 || raw.indexOf('_') >= 0 || raw.indexOf('~') >= 0 || raw.indexOf('`') >= 0;
+
+        // 0ms fast-path for standard plain text messages (no regex or HTML parsing needed)
+        if (!hasSpoiler && !hasMarkdown && !hasTranslation) {
+            return raw;
+        }
+
         boolean isRevealed = message.getId() != null && revealedSpoilers.contains(message.getId());
+        String cacheKey = (message.getId() != null ? message.getId() : "") + ":" + raw.hashCode() + ":" + isRevealed
+                + ":" + (hasTranslation ? message.getTranslatedText().hashCode() : 0);
+        CharSequence cachedFormatted = RICH_TEXT_CACHE.get(cacheKey);
+        if (cachedFormatted != null) {
+            return cachedFormatted;
+        }
 
         String processedRaw = raw;
         if (hasSpoiler && !isRevealed) {
-            processedRaw = raw.replaceAll("\\|\\|([^|]+)\\|\\|", "▒▒▒▒▒▒ [🕵️ Spoiler • Tap to reveal]");
+            processedRaw = PATTERN_SPOILER.matcher(raw).replaceAll("▒▒▒▒▒▒ [🕵️ Spoiler • Tap to reveal]");
         } else if (hasSpoiler) {
-            processedRaw = raw.replaceAll("\\|\\|([^|]+)\\|\\|", "$1");
+            processedRaw = PATTERN_SPOILER.matcher(raw).replaceAll("$1");
         }
 
         String html = processedRaw
-                .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                .replaceAll("\\*([^*]+)\\*", "<b>$1</b>")
-                .replaceAll("_([^_]+)_", "<i>$1</i>")
-                .replaceAll("~([^~]+)~", "<s>$1</s>")
-                .replaceAll("`([^`]+)`", "<tt>$1</tt>")
-                .replace("\n", "<br/>");
+                .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        if (hasMarkdown) {
+            html = PATTERN_BOLD.matcher(html).replaceAll("<b>$1</b>");
+            html = PATTERN_ITALIC.matcher(html).replaceAll("<i>$1</i>");
+            html = PATTERN_STRIKE.matcher(html).replaceAll("<s>$1</s>");
+            html = PATTERN_CODE.matcher(html).replaceAll("<tt>$1</tt>");
+        }
+        html = html.replace("\n", "<br/>");
 
-        if (message.getTranslatedText() != null && !message.getTranslatedText().isEmpty()) {
+        if (hasTranslation) {
             String transEscaped = message.getTranslatedText()
                     .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>");
             String lang = message.getTranslatedLang() != null ? message.getTranslatedLang().toUpperCase(Locale.ROOT) : "OFFLINE";
@@ -249,17 +282,23 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             String headerHex = isNight ? "#818CF8" : "#4F46E5";
             String bodyHex = isNight ? "#CBD5E1" : "#334155";
             html += "<br/><br/><small><font color='" + headerHex + "'>🌐 <b>[Translated — " + lang + "]</b></font></small><br/><font color='" + bodyHex + "'><i>" + transEscaped + "</i></font>";
-            return androidx.core.text.HtmlCompat.fromHtml(html, androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT);
+            CharSequence res = androidx.core.text.HtmlCompat.fromHtml(html, androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT);
+            RICH_TEXT_CACHE.put(cacheKey, res);
+            return res;
         }
 
-        if (processedRaw.contains("*") || processedRaw.contains("_") || processedRaw.contains("`") || processedRaw.contains("~")) {
-            return androidx.core.text.HtmlCompat.fromHtml(html, androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT);
+        if (hasMarkdown) {
+            CharSequence res = androidx.core.text.HtmlCompat.fromHtml(html, androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT);
+            RICH_TEXT_CACHE.put(cacheKey, res);
+            return res;
         }
+        RICH_TEXT_CACHE.put(cacheKey, processedRaw);
         return processedRaw;
     }
 
     public MessagesAdapter(List<Message> messages, OnMessageLongClickListener longClickListener, OnReactionClickListener reactionClickListener) {
         this.messages = messages;
+        this.lastAnimatedPosition = messages != null ? messages.size() + 1 : 0;
         this.currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(com.m3.veil.VeilApplication.getInstance());
         if (this.currentUserId == null || this.currentUserId.isEmpty()) {
             this.currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null 
@@ -369,11 +408,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         if (current.getTimestamp() == null || previous.getTimestamp() == null) return false;
 
-        java.util.Calendar cal1 = java.util.Calendar.getInstance();
-        cal1.setTime(current.getTimestamp().toDate());
-
-        java.util.Calendar cal2 = java.util.Calendar.getInstance();
-        cal2.setTime(previous.getTimestamp().toDate());
+        cal1.setTimeInMillis(current.getTimestamp().toDate().getTime());
+        cal2.setTimeInMillis(previous.getTimestamp().toDate().getTime());
 
         return cal1.get(java.util.Calendar.YEAR) != cal2.get(java.util.Calendar.YEAR)
                 || cal1.get(java.util.Calendar.DAY_OF_YEAR) != cal2.get(java.util.Calendar.DAY_OF_YEAR);
@@ -381,24 +417,22 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     private String formatDateHeader(com.google.firebase.Timestamp timestamp) {
         if (timestamp == null) return "";
-        java.util.Calendar msgCal = java.util.Calendar.getInstance();
-        msgCal.setTime(timestamp.toDate());
+        Date msgDate = timestamp.toDate();
+        cal1.setTimeInMillis(msgDate.getTime());
+        nowCal.setTimeInMillis(System.currentTimeMillis());
 
-        java.util.Calendar nowCal = java.util.Calendar.getInstance();
-
-        if (nowCal.get(java.util.Calendar.YEAR) == msgCal.get(java.util.Calendar.YEAR)
-                && nowCal.get(java.util.Calendar.DAY_OF_YEAR) == msgCal.get(java.util.Calendar.DAY_OF_YEAR)) {
+        if (nowCal.get(java.util.Calendar.YEAR) == cal1.get(java.util.Calendar.YEAR)
+                && nowCal.get(java.util.Calendar.DAY_OF_YEAR) == cal1.get(java.util.Calendar.DAY_OF_YEAR)) {
             return "TODAY";
         }
 
         nowCal.add(java.util.Calendar.DAY_OF_YEAR, -1);
-        if (nowCal.get(java.util.Calendar.YEAR) == msgCal.get(java.util.Calendar.YEAR)
-                && nowCal.get(java.util.Calendar.DAY_OF_YEAR) == msgCal.get(java.util.Calendar.DAY_OF_YEAR)) {
+        if (nowCal.get(java.util.Calendar.YEAR) == cal1.get(java.util.Calendar.YEAR)
+                && nowCal.get(java.util.Calendar.DAY_OF_YEAR) == cal1.get(java.util.Calendar.DAY_OF_YEAR)) {
             return "YESTERDAY";
         }
 
-        SimpleDateFormat sdf = new SimpleDateFormat("dd MMMM yyyy", Locale.getDefault());
-        return sdf.format(timestamp.toDate()).toUpperCase(Locale.getDefault());
+        return dateHeaderFormat.format(msgDate).toUpperCase(Locale.getDefault());
     }
 
     private void setAnimation(View view) {
@@ -407,7 +441,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         view.animate()
                 .alpha(1f)
                 .translationY(0f)
-                .setDuration(220)
+                .setDuration(160)
                 .start();
     }
 
@@ -463,6 +497,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     public void updateMessages(List<Message> newMessages) {
         this.messages = newMessages;
+        this.lastAnimatedPosition = newMessages != null ? newMessages.size() + 1 : 0;
         notifyDataSetChanged();
     }
     

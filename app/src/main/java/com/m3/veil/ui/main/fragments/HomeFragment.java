@@ -800,7 +800,12 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(ctx);
             String myPersonaName = VeilFeatureManager.getInstance(ctx).getActivePersona().getDisplayName();
             if (localChats != null) {
+                int prewarmIdx = 0;
                 for (Chat c : localChats) {
+                    if (c.getId() != null && prewarmIdx < 12) {
+                        com.m3.veil.manager.VeilMessagesController.getInstance(ctx).prewarmDialog(c.getId());
+                        prewarmIdx++;
+                    }
                     if (!c.isGroup() && c.getId() != null && !c.getId().startsWith("group_") && !c.getId().startsWith("channel_")) {
                         String curName = c.getName();
                         boolean needsPeerLookup = curName == null || curName.isEmpty()
@@ -1132,7 +1137,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             @Override
             public void run() {
                 if (isAdded() && getContext() != null) {
-                    EncryptedChatDatabase.getInstance(requireContext()).deleteExpiredVanishMessages();
+                    final Context appCtx = requireContext().getApplicationContext();
+                    homeExecutor.execute(() -> EncryptedChatDatabase.getInstance(appCtx).deleteExpiredVanishMessages());
                     if (vanishTickerHandler != null) {
                         vanishTickerHandler.postDelayed(this, 1000);
                     }
@@ -1153,9 +1159,13 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     public void onResume() {
         super.onResume();
         loadLocalEncryptedChats();
+        if (getContext() != null) {
+            com.m3.veil.VeilApplication.prewarmMessageViewHolders(requireContext());
+        }
         if (getContext() != null && com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(requireContext())) {
             String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
-            WebRtcManager.getInstance(requireContext()).fetchAndProcessOfflineInboxOnce(uid);
+            final Context appCtx = requireContext().getApplicationContext();
+            homeExecutor.execute(() -> WebRtcManager.getInstance(appCtx).fetchAndProcessOfflineInboxOnce(uid));
             if (groupsListenerRegistration == null) {
                 groupsListenerRegistration = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                         .collection("groups")
@@ -1657,7 +1667,10 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
     private void updateArchivedHeader() {
         if (getContext() == null || archivedRow == null) return;
-        int count = EncryptedChatDatabase.getInstance(requireContext()).getArchivedChatsCount();
+        int count = 0;
+        for (Chat c : allLocalChats) {
+            if (c != null && c.isArchived()) count++;
+        }
         if (count > 0 && "all".equals(activeFilter) && searchQuery.isEmpty()) {
             archivedRow.setVisibility(View.VISIBLE);
             archivedDivider.setVisibility(View.VISIBLE);
@@ -1724,9 +1737,18 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     }
 
     private void openChatScreen(Chat chat, boolean isPinVerified) {
-        chat.setUnreadCount(0);
-        EncryptedChatDatabase.getInstance(requireContext()).updateChatUnreadCount(chat.getId(), 0);
-        chatsAdapter.notifyDataSetChanged();
+        if (chat.getUnreadCount() > 0) {
+            chat.setUnreadCount(0);
+            int idx = displayedChats.indexOf(chat);
+            if (idx >= 0) {
+                chatsAdapter.notifyItemChanged(idx);
+            }
+            updateFilterCounts();
+        }
+        final Context appCtx = requireContext().getApplicationContext();
+        final String targetChatId = chat.getId();
+        com.m3.veil.manager.VeilMessagesController.getInstance(appCtx).prewarmDialog(targetChatId);
+        homeExecutor.execute(() -> EncryptedChatDatabase.getInstance(appCtx).updateChatUnreadCount(targetChatId, 0));
 
         Intent intent = new Intent(getContext(), ChatActivity.class);
         intent.putExtra("chatId", chat.getId());

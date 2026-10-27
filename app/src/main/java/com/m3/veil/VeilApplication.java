@@ -33,9 +33,10 @@ public class VeilApplication extends Application {
         // Telegram-grade real-time presence & lifecycle tracker
         com.m3.veil.manager.PresenceManager.getInstance().init(this);
 
-        // Preload encrypted SQLCipher database vault
+        // Preload encrypted SQLCipher database vault & warm VeilMessagesController RAM cache
         try {
             com.m3.veil.database.EncryptedChatDatabase.getInstance(this);
+            com.m3.veil.manager.VeilMessagesController.getInstance(this);
             com.m3.veil.services.VeilSchedulerDaemon.getInstance(this).start();
         } catch (Exception e) {
             android.util.Log.e("VeilApplication", "SQLCipher init error", e);
@@ -88,9 +89,61 @@ public class VeilApplication extends Application {
     }
 
     private static final androidx.recyclerview.widget.RecyclerView.RecycledViewPool sharedRecycledViewPool = new androidx.recyclerview.widget.RecyclerView.RecycledViewPool();
+    private static final androidx.recyclerview.widget.RecyclerView.RecycledViewPool sharedMessagesRecycledViewPool = new androidx.recyclerview.widget.RecyclerView.RecycledViewPool();
+    private static volatile boolean messagesPoolPrewarmed = false;
+
+    static {
+        sharedMessagesRecycledViewPool.setMaxRecycledViews(com.m3.veil.ui.chat.adapters.MessagesAdapter.VIEW_TYPE_NOTICE, 10);
+        sharedMessagesRecycledViewPool.setMaxRecycledViews(com.m3.veil.ui.chat.adapters.MessagesAdapter.VIEW_TYPE_SENT, 40);
+        sharedMessagesRecycledViewPool.setMaxRecycledViews(com.m3.veil.ui.chat.adapters.MessagesAdapter.VIEW_TYPE_RECEIVED, 40);
+        sharedMessagesRecycledViewPool.setMaxRecycledViews(com.m3.veil.ui.chat.adapters.MessagesAdapter.VIEW_TYPE_TYPING, 5);
+    }
 
     public static androidx.recyclerview.widget.RecyclerView.RecycledViewPool getSharedRecycledViewPool() {
         return sharedRecycledViewPool;
+    }
+
+    public static androidx.recyclerview.widget.RecyclerView.RecycledViewPool getSharedMessagesRecycledViewPool() {
+        return sharedMessagesRecycledViewPool;
+    }
+
+    /**
+     * Pre-inflates MessagesAdapter ViewHolders during UI idle frames (Telegram RecyclerListView pool warm-up)
+     * so opening ChatActivity requires 0ms XML layout inflation on Frame 1.
+     */
+    public static void prewarmMessageViewHolders(final android.content.Context context) {
+        if (messagesPoolPrewarmed || context == null) return;
+        messagesPoolPrewarmed = true;
+        android.os.Looper.myQueue().addIdleHandler(new android.os.MessageQueue.IdleHandler() {
+            private int step = 0;
+
+            @Override
+            public boolean queueIdle() {
+                try {
+                    android.widget.FrameLayout dummyParent = new android.widget.FrameLayout(context);
+                    com.m3.veil.ui.chat.adapters.MessagesAdapter dummyAdapter =
+                            new com.m3.veil.ui.chat.adapters.MessagesAdapter(new java.util.ArrayList<>(), null, null);
+                    if (step == 0) {
+                        androidx.recyclerview.widget.RecyclerView.ViewHolder noticeVh =
+                                dummyAdapter.createViewHolder(dummyParent, com.m3.veil.ui.chat.adapters.MessagesAdapter.VIEW_TYPE_NOTICE);
+                        sharedMessagesRecycledViewPool.putRecycledView(noticeVh);
+                    } else if (step <= 6) {
+                        androidx.recyclerview.widget.RecyclerView.ViewHolder sentVh =
+                                dummyAdapter.createViewHolder(dummyParent, com.m3.veil.ui.chat.adapters.MessagesAdapter.VIEW_TYPE_SENT);
+                        sharedMessagesRecycledViewPool.putRecycledView(sentVh);
+                        androidx.recyclerview.widget.RecyclerView.ViewHolder recvVh =
+                                dummyAdapter.createViewHolder(dummyParent, com.m3.veil.ui.chat.adapters.MessagesAdapter.VIEW_TYPE_RECEIVED);
+                        sharedMessagesRecycledViewPool.putRecycledView(recvVh);
+                    } else {
+                        return false;
+                    }
+                    step++;
+                    return step <= 6;
+                } catch (Throwable ignored) {
+                    return false;
+                }
+            }
+        });
     }
 
     public static VeilApplication getInstance() {
