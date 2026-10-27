@@ -403,7 +403,7 @@ public class VeilMeshDaemonService extends Service {
                     WebRtcManager rtc = WebRtcManager.getInstance(getCtx());
                     rtc.init(myUid);
                     if (senderId != null && !senderId.isEmpty() && !senderId.equals(myUid)) {
-                        mainHandler.post(() -> rtc.initiateConnection(senderId));
+                        rtc.initiateConnection(senderId);
                     }
                     drainOutbox();
                 }
@@ -553,7 +553,7 @@ public class VeilMeshDaemonService extends Service {
                     Long lastKnock = lastWakeKnockSentMs.get(entry.recipientId);
                     if (lastKnock == null || (now - lastKnock) > 6_000L) {
                         lastWakeKnockSentMs.put(entry.recipientId, now);
-                        mainHandler.post(() -> rtc.initiateConnection(entry.recipientId));
+                        rtc.initiateConnection(entry.recipientId);
                         sendBlindWakeKnock(entry.recipientId);
                     }
 

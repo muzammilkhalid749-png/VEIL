@@ -296,13 +296,29 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         return processedRaw;
     }
 
+    private int cachedCustomBubbleColor = 0;
+    private float cachedTextSizeSp = 15.5f;
+    private final java.util.Map<String, Message> messageByIdCache = new java.util.HashMap<>();
+    private int lastIndexedSize = -1;
+
     public MessagesAdapter(List<Message> messages, OnMessageLongClickListener longClickListener, OnReactionClickListener reactionClickListener) {
         this.messages = messages;
         this.lastAnimatedPosition = messages != null ? messages.size() + 1 : 0;
-        this.currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(com.m3.veil.VeilApplication.getInstance());
+        com.m3.veil.VeilApplication app = com.m3.veil.VeilApplication.getInstance();
+        this.currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(app);
         if (this.currentUserId == null || this.currentUserId.isEmpty()) {
             this.currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null 
                     ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
+        }
+        if (app != null) {
+            try {
+                android.content.SharedPreferences appPrefs = app.getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
+                String accent = appPrefs.getString("chat_bubble_accent", null);
+                if (accent != null && !accent.isEmpty()) {
+                    this.cachedCustomBubbleColor = android.graphics.Color.parseColor(accent);
+                }
+                this.cachedTextSizeSp = appPrefs.getFloat("chat_text_size_sp", 15.5f);
+            } catch (Exception ignored) {}
         }
         this.timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
         this.longClickListener = longClickListener;
@@ -497,16 +513,25 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     public void updateMessages(List<Message> newMessages) {
         this.messages = newMessages;
+        this.lastIndexedSize = -1;
+        this.messageByIdCache.clear();
         this.lastAnimatedPosition = newMessages != null ? newMessages.size() + 1 : 0;
         notifyDataSetChanged();
     }
     
     private Message getMessageById(String id) {
-        if (id == null) return null;
-        for (Message m : messages) {
-            if (id.equals(m.getId())) return m;
+        if (id == null || messages == null) return null;
+        if (lastIndexedSize != messages.size()) {
+            messageByIdCache.clear();
+            for (int i = 0, n = messages.size(); i < n; i++) {
+                Message m = messages.get(i);
+                if (m != null && m.getId() != null) {
+                    messageByIdCache.put(m.getId(), m);
+                }
+            }
+            lastIndexedSize = messages.size();
         }
-        return null;
+        return messageByIdCache.get(id);
     }
 
     static class NoticeViewHolder extends RecyclerView.ViewHolder {
@@ -565,40 +590,49 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     private void attachDoubleTapAndLongPress(View bubbleView, View rootItemView, Message message) {
         if (bubbleView == null) return;
-        android.view.GestureDetector detector = new android.view.GestureDetector(
-                bubbleView.getContext(),
-                new android.view.GestureDetector.SimpleOnGestureListener() {
-                    @Override
-                    public boolean onDoubleTap(android.view.MotionEvent e) {
-                        if (doubleTapReactListener != null && !"deleted".equals(message.getType())) {
-                            if (bubbleView instanceof com.m3.veil.ui.views.ChatMessageCell) {
-                                ((com.m3.veil.ui.views.ChatMessageCell) bubbleView).triggerDoubleTapHeartBurst(e.getX(), e.getY());
+        bubbleView.setTag(R.id.messageBubble, message);
+        Object existingDetector = bubbleView.getTag(R.id.messageText);
+        if (existingDetector == null) {
+            final android.view.GestureDetector detector = new android.view.GestureDetector(
+                    bubbleView.getContext(),
+                    new android.view.GestureDetector.SimpleOnGestureListener() {
+                        @Override
+                        public boolean onDoubleTap(android.view.MotionEvent e) {
+                            Object tagObj = bubbleView.getTag(R.id.messageBubble);
+                            if (!(tagObj instanceof Message)) return false;
+                            Message boundMsg = (Message) tagObj;
+                            if (doubleTapReactListener != null && !"deleted".equals(boundMsg.getType())) {
+                                if (bubbleView instanceof com.m3.veil.ui.views.ChatMessageCell) {
+                                    ((com.m3.veil.ui.views.ChatMessageCell) bubbleView).triggerDoubleTapHeartBurst(e.getX(), e.getY());
+                                }
+                                bubbleView.animate().scaleX(1.06f).scaleY(1.06f).setDuration(90)
+                                        .withEndAction(() -> bubbleView.animate().scaleX(1f).scaleY(1f).setDuration(90).start())
+                                        .start();
+                                doubleTapReactListener.onDoubleTapReact(boundMsg);
+                                return true;
                             }
-                            bubbleView.animate().scaleX(1.06f).scaleY(1.06f).setDuration(90)
-                                    .withEndAction(() -> bubbleView.animate().scaleX(1f).scaleY(1f).setDuration(90).start())
-                                    .start();
-                            doubleTapReactListener.onDoubleTapReact(message);
-                            return true;
+                            return false;
                         }
-                        return false;
-                    }
-                });
-        detector.setIsLongpressEnabled(false);
-        bubbleView.setOnTouchListener((v, event) -> {
-            detector.onTouchEvent(event);
-            return false;
-        });
+                    });
+            detector.setIsLongpressEnabled(false);
+            bubbleView.setTag(R.id.messageText, detector);
+            bubbleView.setOnTouchListener((v, event) -> {
+                detector.onTouchEvent(event);
+                return false;
+            });
 
-        View.OnLongClickListener longClick = v -> {
-            if (longClickListener != null) {
-                longClickListener.onMessageLongClick(message, rootItemView != null ? rootItemView : bubbleView);
-                return true;
+            View.OnLongClickListener longClick = v -> {
+                Object tagObj = bubbleView.getTag(R.id.messageBubble);
+                if (longClickListener != null && tagObj instanceof Message) {
+                    longClickListener.onMessageLongClick((Message) tagObj, rootItemView != null ? rootItemView : bubbleView);
+                    return true;
+                }
+                return false;
+            };
+            bubbleView.setOnLongClickListener(longClick);
+            if (rootItemView != null) {
+                rootItemView.setOnLongClickListener(longClick);
             }
-            return false;
-        };
-        bubbleView.setOnLongClickListener(longClick);
-        if (rootItemView != null) {
-            rootItemView.setOnLongClickListener(longClick);
         }
     }
 
@@ -1212,13 +1246,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 com.m3.veil.ui.views.ChatMessageCell cell = (com.m3.veil.ui.views.ChatMessageCell) messageBubble;
                 int pos = getAdapterPosition() - 1;
                 cell.setMessageObject(message, true, computeClusterPosition(pos), false);
-                try {
-                    android.content.SharedPreferences appPrefs = itemView.getContext().getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
-                    String accent = appPrefs.getString("chat_bubble_accent", null);
-                    if (accent != null && !accent.isEmpty()) {
-                        cell.setCustomBubbleColor(android.graphics.Color.parseColor(accent));
-                    }
-                } catch (Exception ignored) {}
+                if (cachedCustomBubbleColor != 0) {
+                    cell.setCustomBubbleColor(cachedCustomBubbleColor);
+                }
             }
             attachDoubleTapAndLongPress(messageBubble, itemView, message);
             
@@ -1659,13 +1689,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 
                 messageText.setTypeface(null, android.graphics.Typeface.NORMAL);
                 messageText.setTextColor(itemView.getContext().getResources().getColor(R.color.message_text_primary));
-                try {
-                    android.content.SharedPreferences appPrefs = itemView.getContext().getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
-                    float textSize = appPrefs.getFloat("chat_text_size_sp", 15.5f);
-                    if (textSize > 0 && messageText != null) {
-                        messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, textSize);
-                    }
-                } catch (Exception ignored) {}
+                if (cachedTextSizeSp > 0 && messageText != null) {
+                    messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, cachedTextSizeSp);
+                }
                 if ("call".equals(message.getType())) {
                     if (statusIcon != null) statusIcon.setVisibility(View.GONE);
                 } else {
@@ -2475,13 +2501,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 
                 messageText.setTypeface(null, android.graphics.Typeface.NORMAL);
                 messageText.setTextColor(itemView.getContext().getResources().getColor(R.color.message_text_primary));
-                try {
-                    android.content.SharedPreferences appPrefs = itemView.getContext().getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
-                    float textSize = appPrefs.getFloat("chat_text_size_sp", 15.5f);
-                    if (textSize > 0 && messageText != null) {
-                        messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, textSize);
-                    }
-                } catch (Exception ignored) {}
+                if (cachedTextSizeSp > 0 && messageText != null) {
+                    messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, cachedTextSizeSp);
+                }
                 
                 if (replyQuoteContainer != null) {
                     if (message.getReplyToMessageId() != null) {
@@ -2591,6 +2613,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     private void bindLinkPreview(String text, View container, ImageView thumb, TextView domain, TextView title, TextView desc) {
         if (container == null) return;
+        if (text == null || (!text.contains("http://") && !text.contains("https://") && !text.contains("www."))) {
+            container.setVisibility(View.GONE);
+            return;
+        }
         String url = com.m3.veil.utils.LinkPreviewHelper.extractUrl(text);
         if (url == null) {
             container.setVisibility(View.GONE);

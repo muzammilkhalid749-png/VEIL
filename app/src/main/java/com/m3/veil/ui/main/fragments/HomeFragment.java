@@ -1172,299 +1172,312 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                         .whereArrayContains("participants", uid)
                         .addSnapshotListener((snapshots, error) -> {
                             if (error != null || snapshots == null || getContext() == null) return;
-                            boolean updated = false;
-                            java.util.Set<String> deletedGroups = requireContext()
-                                    .getSharedPreferences("VeilPrefs", 0)
-                                    .getStringSet("deleted_group_ids", new java.util.HashSet<>());
-                            for (com.google.firebase.firestore.DocumentSnapshot doc : snapshots.getDocuments()) {
-                                String gId = doc.getString("groupId");
-                                if (gId == null) gId = doc.getId();
-                                if (deletedGroups != null && deletedGroups.contains(gId)) continue;
+                            final java.util.List<com.google.firebase.firestore.DocumentSnapshot> groupDocs = snapshots.getDocuments();
+                            homeExecutor.execute(() -> {
+                                if (groupDocs == null || groupDocs.isEmpty()) return;
+                                boolean updated = false;
+                                java.util.Set<String> deletedGroups = appCtx
+                                        .getSharedPreferences("VeilPrefs", 0)
+                                        .getStringSet("deleted_group_ids", new java.util.HashSet<>());
+                                for (com.google.firebase.firestore.DocumentSnapshot doc : groupDocs) {
+                                    String gId = doc.getString("groupId");
+                                    if (gId == null) gId = doc.getId();
+                                    if (deletedGroups != null && deletedGroups.contains(gId)) continue;
 
-                                String gName = doc.getString("groupName");
-                                String lastMsg = doc.getString("lastMessage");
-                                String chatType = doc.getString("type");
-                                boolean isDirectChat = "direct".equalsIgnoreCase(chatType)
-                                        || (!gId.startsWith("group_") && !gId.startsWith("channel_") && !gId.startsWith("lounge_") && gId.contains("_"));
-                                if (isDirectChat) {
-                                    chatType = "direct";
-                                } else if (chatType == null || chatType.isEmpty()) {
-                                    chatType = gId.startsWith("channel_") ? "channel" : "group";
-                                }
-                                String adminId = doc.getString("adminId");
-                                String description = doc.getString("description");
-                                String avatar = doc.getString("avatar");
-                                Boolean isPublicObj = doc.getBoolean("isPublic");
-                                String handle = doc.getString("handle");
-                                @SuppressWarnings("unchecked")
-                                java.util.List<String> parts = (java.util.List<String>) doc.get("participants");
-                                @SuppressWarnings("unchecked")
-                                java.util.List<String> adminIds = (java.util.List<String>) doc.get("adminIds");
-                                com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
-                                if (ts == null) ts = com.google.firebase.Timestamp.now();
+                                    String gName = doc.getString("groupName");
+                                    String lastMsg = doc.getString("lastMessage");
+                                    String chatType = doc.getString("type");
+                                    boolean isDirectChat = "direct".equalsIgnoreCase(chatType)
+                                            || (!gId.startsWith("group_") && !gId.startsWith("channel_") && !gId.startsWith("lounge_") && gId.contains("_"));
+                                    if (isDirectChat) {
+                                        chatType = "direct";
+                                    } else if (chatType == null || chatType.isEmpty()) {
+                                        chatType = gId.startsWith("channel_") ? "channel" : "group";
+                                    }
+                                    String adminId = doc.getString("adminId");
+                                    String description = doc.getString("description");
+                                    String avatar = doc.getString("avatar");
+                                    Boolean isPublicObj = doc.getBoolean("isPublic");
+                                    String handle = doc.getString("handle");
+                                    @SuppressWarnings("unchecked")
+                                    java.util.List<String> parts = (java.util.List<String>) doc.get("participants");
+                                    @SuppressWarnings("unchecked")
+                                    java.util.List<String> adminIds = (java.util.List<String>) doc.get("adminIds");
+                                    com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
+                                    if (ts == null) ts = com.google.firebase.Timestamp.now();
 
-                                String peerId = null;
-                                if (parts != null) {
-                                    for (String p : parts) {
-                                        if (p != null && !p.equals(uid)) {
-                                            peerId = p;
-                                            break;
-                                        }
-                                    }
-                                }
-                                if (peerId == null && gId.contains("_")) {
-                                    String[] split = gId.split("_");
-                                    if (split.length == 2) {
-                                        peerId = split[0].equals(uid) ? split[1] : split[0];
-                                    }
-                                }
-
-                                Chat existing = EncryptedChatDatabase.getInstance(requireContext()).getChat(gId);
-                                String myPersonaName = VeilFeatureManager.getInstance(requireContext()).getActivePersona().getDisplayName();
-                                String chatTitle = gName;
-                                if (isDirectChat) {
-                                    String resolvedPeerName = null;
-                                    Object pNamesObj = doc.get("participantNames");
-                                    if (pNamesObj instanceof java.util.Map && peerId != null) {
-                                        Object val = ((java.util.Map<?, ?>) pNamesObj).get(peerId);
-                                        if (val instanceof String && !((String) val).isEmpty()) {
-                                            resolvedPeerName = (String) val;
-                                        }
-                                    }
-                                    String lastSenderId = doc.getString("lastMessageSenderId");
-                                    String lastSenderName = doc.getString("lastMessageSenderName");
-                                    if ((resolvedPeerName == null || resolvedPeerName.isEmpty())
-                                            && peerId != null && peerId.equals(lastSenderId)
-                                            && lastSenderName != null && !lastSenderName.isEmpty()) {
-                                        resolvedPeerName = lastSenderName;
-                                    }
-                                    if ((resolvedPeerName == null || resolvedPeerName.isEmpty()) && existing != null) {
-                                        String exName = existing.getName();
-                                        if (exName != null && !exName.isEmpty()
-                                                && !"Direct Chat".equals(exName)
-                                                && !"Encrypted Group".equals(exName)
-                                                && !"Veil Contact".equals(exName)
-                                                && !"Veil User".equals(exName)
-                                                && !"Anonymous Peer".equals(exName)
-                                                && (myPersonaName == null || !exName.equals(myPersonaName))) {
-                                            resolvedPeerName = exName;
-                                        }
-                                    }
-                                    chatTitle = (resolvedPeerName != null && !resolvedPeerName.isEmpty()) ? resolvedPeerName : null;
-                                } else if (chatTitle == null || chatTitle.isEmpty()) {
-                                    chatTitle = "channel".equals(chatType) ? "Broadcast Channel" : "Encrypted Group";
-                                }
-
-                                if (existing == null) {
-                                    String initialTitle = chatTitle != null ? chatTitle : (isDirectChat ? "Veil Contact" : "Encrypted Group");
-                                    Chat newGroup = new Chat(
-                                            gId,
-                                            initialTitle,
-                                            lastMsg != null ? lastMsg : (isDirectChat ? "Direct chat created" : ("channel".equals(chatType) ? "Broadcast channel created" : "Group invite received")),
-                                            ts,
-                                            avatar,
-                                            0,
-                                            !isDirectChat,
-                                            false,
-                                            chatType,
-                                            parts != null ? parts : new java.util.ArrayList<>()
-                                    );
-                                    if (adminId != null) newGroup.setAdminId(adminId);
-                                    if (adminIds != null) newGroup.setAdminIds(adminIds);
-                                    if (description != null) newGroup.setDescription(description);
-                                    if (isPublicObj != null) newGroup.setPublic(isPublicObj);
-                                    if (handle != null) newGroup.setHandle(handle);
-                                    EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(newGroup);
-                                    updated = true;
-                                } else {
-                                    boolean changed = false;
-                                    if (chatTitle != null && !chatTitle.isEmpty() && !chatTitle.equals(existing.getName()) && !"Encrypted Group".equals(chatTitle)) {
-                                        existing.setName(chatTitle);
-                                        changed = true;
-                                    }
-                                    if (lastMsg != null && !lastMsg.equals(existing.getLastMessage())) {
-                                        existing.setLastMessage(lastMsg);
-                                        existing.setLastMessageTime(ts);
-                                        changed = true;
-                                    }
+                                    String peerId = null;
                                     if (parts != null) {
-                                        existing.setParticipants(parts);
-                                        changed = true;
+                                        for (String p : parts) {
+                                            if (p != null && !p.equals(uid)) {
+                                                peerId = p;
+                                                break;
+                                            }
+                                        }
                                     }
-                                    if (adminId != null) existing.setAdminId(adminId);
-                                    if (adminIds != null) existing.setAdminIds(adminIds);
-                                    if (description != null) existing.setDescription(description);
-                                    if (avatar != null) existing.setAvatar(avatar);
-                                    if (isPublicObj != null) existing.setPublic(isPublicObj);
-                                    if (handle != null) existing.setHandle(handle);
-                                    existing.setType(chatType);
-                                    existing.setGroup(!isDirectChat);
-                                    if (changed) {
-                                        EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(existing);
-                                        updated = true;
+                                    if (peerId == null && gId.contains("_")) {
+                                        String[] split = gId.split("_");
+                                        if (split.length == 2) {
+                                            peerId = split[0].equals(uid) ? split[1] : split[0];
+                                        }
                                     }
-                                }
 
-                                if (isDirectChat && peerId != null) {
-                                    final String fPeerId = peerId;
-                                    final String fGId = gId;
-                                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                            .collection("users").document(fPeerId).get()
-                                            .addOnSuccessListener(userDoc -> {
-                                                if (userDoc != null && userDoc.exists() && getContext() != null) {
-                                                    String dName = userDoc.getString("displayName");
-                                                    if (dName == null || dName.isEmpty()) dName = userDoc.getString("username");
-                                                    String uAvatar = userDoc.getString("avatar");
-                                                    if (dName != null && !dName.isEmpty()) {
-                                                        Chat c = EncryptedChatDatabase.getInstance(requireContext()).getChat(fGId);
-                                                        if (c != null) {
-                                                            boolean cChanged = false;
-                                                            if (!dName.equals(c.getName())) {
-                                                                c.setName(dName);
-                                                                cChanged = true;
-                                                            }
-                                                            if (uAvatar != null && !uAvatar.isEmpty() && !uAvatar.equals(c.getAvatar())) {
-                                                                c.setAvatar(uAvatar);
-                                                                cChanged = true;
-                                                            }
-                                                            if (cChanged) {
-                                                                EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(c);
-                                                                if (isAdded()) loadLocalEncryptedChats();
+                                    Chat existing = EncryptedChatDatabase.getInstance(appCtx).getChat(gId);
+                                    String myPersonaName = VeilFeatureManager.getInstance(appCtx).getActivePersona().getDisplayName();
+                                    String chatTitle = gName;
+                                    if (isDirectChat) {
+                                        String resolvedPeerName = null;
+                                        Object pNamesObj = doc.get("participantNames");
+                                        if (pNamesObj instanceof java.util.Map && peerId != null) {
+                                            Object val = ((java.util.Map<?, ?>) pNamesObj).get(peerId);
+                                            if (val instanceof String && !((String) val).isEmpty()) {
+                                                resolvedPeerName = (String) val;
+                                            }
+                                        }
+                                        String lastSenderId = doc.getString("lastMessageSenderId");
+                                        String lastSenderName = doc.getString("lastMessageSenderName");
+                                        if ((resolvedPeerName == null || resolvedPeerName.isEmpty())
+                                                && peerId != null && peerId.equals(lastSenderId)
+                                                && lastSenderName != null && !lastSenderName.isEmpty()) {
+                                            resolvedPeerName = lastSenderName;
+                                        }
+                                        if ((resolvedPeerName == null || resolvedPeerName.isEmpty()) && existing != null) {
+                                            String exName = existing.getName();
+                                            if (exName != null && !exName.isEmpty()
+                                                    && !"Direct Chat".equals(exName)
+                                                    && !"Encrypted Group".equals(exName)
+                                                    && !"Veil Contact".equals(exName)
+                                                    && !"Veil User".equals(exName)
+                                                    && !"Anonymous Peer".equals(exName)
+                                                    && (myPersonaName == null || !exName.equals(myPersonaName))) {
+                                                resolvedPeerName = exName;
+                                            }
+                                        }
+                                        chatTitle = (resolvedPeerName != null && !resolvedPeerName.isEmpty()) ? resolvedPeerName : null;
+                                    } else if (chatTitle == null || chatTitle.isEmpty()) {
+                                        chatTitle = "channel".equals(chatType) ? "Broadcast Channel" : "Encrypted Group";
+                                    }
+
+                                    boolean shouldSyncMessages = false;
+                                    if (existing == null) {
+                                        String initialTitle = chatTitle != null ? chatTitle : (isDirectChat ? "Veil Contact" : "Encrypted Group");
+                                        Chat newGroup = new Chat(
+                                                gId,
+                                                initialTitle,
+                                                lastMsg != null ? lastMsg : (isDirectChat ? "Direct chat created" : ("channel".equals(chatType) ? "Broadcast channel created" : "Group invite received")),
+                                                ts,
+                                                avatar,
+                                                0,
+                                                !isDirectChat,
+                                                false,
+                                                chatType,
+                                                parts != null ? parts : new java.util.ArrayList<>()
+                                        );
+                                        if (adminId != null) newGroup.setAdminId(adminId);
+                                        if (adminIds != null) newGroup.setAdminIds(adminIds);
+                                        if (description != null) newGroup.setDescription(description);
+                                        if (isPublicObj != null) newGroup.setPublic(isPublicObj);
+                                        if (handle != null) newGroup.setHandle(handle);
+                                        EncryptedChatDatabase.getInstance(appCtx).saveOrUpdateChat(newGroup);
+                                        updated = true;
+                                        shouldSyncMessages = true;
+                                    } else {
+                                        boolean changed = false;
+                                        if (chatTitle != null && !chatTitle.isEmpty() && !chatTitle.equals(existing.getName()) && !"Encrypted Group".equals(chatTitle)) {
+                                            existing.setName(chatTitle);
+                                            changed = true;
+                                        }
+                                        if (lastMsg != null && !lastMsg.equals(existing.getLastMessage())) {
+                                            existing.setLastMessage(lastMsg);
+                                            existing.setLastMessageTime(ts);
+                                            changed = true;
+                                            shouldSyncMessages = true;
+                                        }
+                                        if (parts != null) {
+                                            existing.setParticipants(parts);
+                                            changed = true;
+                                        }
+                                        if (adminId != null) existing.setAdminId(adminId);
+                                        if (adminIds != null) existing.setAdminIds(adminIds);
+                                        if (description != null) existing.setDescription(description);
+                                        if (avatar != null) existing.setAvatar(avatar);
+                                        if (isPublicObj != null) existing.setPublic(isPublicObj);
+                                        if (handle != null) existing.setHandle(handle);
+                                        existing.setType(chatType);
+                                        existing.setGroup(!isDirectChat);
+                                        if (changed) {
+                                            EncryptedChatDatabase.getInstance(appCtx).saveOrUpdateChat(existing);
+                                            updated = true;
+                                        }
+                                    }
+
+                                    if (isDirectChat && peerId != null) {
+                                        final String fPeerId = peerId;
+                                        final String fGId = gId;
+                                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                                .collection("users").document(fPeerId).get()
+                                                .addOnSuccessListener(userDoc -> {
+                                                    if (userDoc == null || !userDoc.exists()) return;
+                                                    homeExecutor.execute(() -> {
+                                                        String dName = userDoc.getString("displayName");
+                                                        if (dName == null || dName.isEmpty()) dName = userDoc.getString("username");
+                                                        String uAvatar = userDoc.getString("avatar");
+                                                        if (dName != null && !dName.isEmpty()) {
+                                                            Chat c = EncryptedChatDatabase.getInstance(appCtx).getChat(fGId);
+                                                            if (c != null) {
+                                                                boolean cChanged = false;
+                                                                if (!dName.equals(c.getName())) {
+                                                                    c.setName(dName);
+                                                                    cChanged = true;
+                                                                }
+                                                                if (uAvatar != null && !uAvatar.isEmpty() && !uAvatar.equals(c.getAvatar())) {
+                                                                    c.setAvatar(uAvatar);
+                                                                    cChanged = true;
+                                                                }
+                                                                if (cChanged) {
+                                                                    EncryptedChatDatabase.getInstance(appCtx).saveOrUpdateChat(c);
+                                                                    if (isAdded()) loadLocalEncryptedChats();
+                                                                }
                                                             }
                                                         }
+                                                    });
+                                                });
+                                    }
+
+                                    if (parts != null) {
+                                        for (String pId : parts) {
+                                            if (pId != null && !pId.equals(uid)) {
+                                                WebRtcManager.getInstance(appCtx).initiateConnection(pId);
+                                            }
+                                        }
+                                    }
+
+                                    if (!shouldSyncMessages) {
+                                        continue;
+                                    }
+
+                                    final String finalGroupId = gId;
+                                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                            .collection("groups")
+                                            .document(finalGroupId)
+                                            .collection("messages")
+                                            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                                            .limit(40)
+                                            .get()
+                                            .addOnSuccessListener(msgSnaps -> {
+                                                if (msgSnaps == null) return;
+                                                final java.util.List<com.google.firebase.firestore.DocumentSnapshot> mDocs = msgSnaps.getDocuments();
+                                                homeExecutor.execute(() -> {
+                                                    boolean anyNewMsg = false;
+                                                    for (com.google.firebase.firestore.DocumentSnapshot mDoc : mDocs) {
+                                                        try {
+                                                            String mId = mDoc.getString("id");
+                                                            if (mId == null) mId = mDoc.getId();
+                                                            com.m3.veil.model.Message existingMsg = EncryptedChatDatabase.getInstance(appCtx).getMessageById(mId);
+                                                            String mType = mDoc.getString("type");
+                                                            String mText = mDoc.getString("text");
+                                                            if (mText != null && mText.startsWith("ENC:v1:")) {
+                                                                mText = EncryptionManager.decryptGroupPayload(finalGroupId, mText);
+                                                            }
+                                                            Boolean isEditedObj = mDoc.getBoolean("edited");
+                                                            String pollJson = mDoc.getString("pollJson");
+                                                            if (pollJson != null && pollJson.startsWith("ENC:v1:")) {
+                                                                pollJson = EncryptionManager.decryptGroupPayload(finalGroupId, pollJson);
+                                                            }
+                                                            String sId = mDoc.getString("senderId");
+                                                            boolean isFromMe = uid.equals(sId);
+                                                            boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
+                                                            boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
+                                                            if (existingMsg == null) {
+                                                                String sName = mDoc.getString("senderName");
+                                                                com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
+                                                                com.m3.veil.model.Message m = new com.m3.veil.model.Message(
+                                                                        mId,
+                                                                        sId != null ? sId : "",
+                                                                        finalGroupId,
+                                                                        mText != null ? mText : "",
+                                                                        mTs,
+                                                                        mType != null ? mType : "text"
+                                                                );
+                                                                m.setChatId(finalGroupId);
+                                                                m.setSenderName(sName);
+                                                                m.setReplyToMessageId(mDoc.getString("replyToMessageId"));
+                                                                m.setReplySenderName(mDoc.getString("replySenderName"));
+                                                                m.setPollJson(pollJson);
+                                                                if (Boolean.TRUE.equals(isEditedObj)) m.setEdited(true);
+                                                                if (isFromMe) {
+                                                                    boolean hasNet = com.m3.veil.manager.VeilMessagesController.getInstance(appCtx).isNetworkConnected();
+                                                                    m.setPending(!hasNet && !docDelivered && !docRead);
+                                                                    m.setDelivered(docDelivered || docRead);
+                                                                    m.setRead(docRead);
+                                                                } else {
+                                                                    m.setPending(false);
+                                                                    m.setDelivered(true);
+                                                                    m.setRead(false);
+                                                                }
+                                                                EncryptedChatDatabase.getInstance(appCtx).saveMessage(finalGroupId, m);
+                                                                anyNewMsg = true;
+
+                                                                if (!isFromMe) {
+                                                                    java.util.Map<String, Object> ack = new java.util.HashMap<>();
+                                                                    ack.put("delivered", true);
+                                                                    mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                                                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                                                            .collection("chats").document(finalGroupId)
+                                                                            .collection("messages").document(mId)
+                                                                            .set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                                                    if (sId != null && !sId.isEmpty()) {
+                                                                        WebRtcManager.getInstance(appCtx).sendReceipt(sId, mId, true, false);
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                if (isFromMe) {
+                                                                    if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
+                                                                        EncryptedChatDatabase.getInstance(appCtx)
+                                                                                .updateMessageStatus(mId, docDelivered || docRead, docRead);
+                                                                        com.m3.veil.manager.VeilMessagesController.getInstance(appCtx)
+                                                                                .onMessageStatusChanged(mId, docDelivered || docRead, docRead);
+                                                                        anyNewMsg = true;
+                                                                    }
+                                                                } else if (!existingMsg.isDelivered() || !docDelivered) {
+                                                                    existingMsg.setDelivered(true);
+                                                                    EncryptedChatDatabase.getInstance(appCtx)
+                                                                            .updateMessageStatus(mId, true, existingMsg.isRead());
+                                                                    java.util.Map<String, Object> ack = new java.util.HashMap<>();
+                                                                    ack.put("delivered", true);
+                                                                    mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                                                    if (sId != null && !sId.isEmpty()) {
+                                                                        WebRtcManager.getInstance(appCtx).sendReceipt(sId, mId, true, existingMsg.isRead());
+                                                                    }
+                                                                }
+                                                                boolean msgChanged = false;
+                                                                if ("deleted".equals(mType) && !"deleted".equals(existingMsg.getType())) {
+                                                                    EncryptedChatDatabase.getInstance(appCtx).markMessageDeleted(finalGroupId, mId);
+                                                                    msgChanged = true;
+                                                                } else if (Boolean.TRUE.equals(isEditedObj) && mText != null && !mText.equals(existingMsg.getText())) {
+                                                                    EncryptedChatDatabase.getInstance(appCtx).updateMessageText(finalGroupId, mId, mText);
+                                                                    msgChanged = true;
+                                                                }
+                                                                if (pollJson != null && !pollJson.equals(existingMsg.getPollJson())) {
+                                                                    EncryptedChatDatabase.getInstance(appCtx).updateMessagePollJson(finalGroupId, mId, pollJson);
+                                                                    msgChanged = true;
+                                                                }
+                                                                if (msgChanged) anyNewMsg = true;
+                                                            }
+                                                        } catch (Exception docEx) {
+                                                            android.util.Log.w("HomeFragment", "Error processing group message doc: " + docEx.getMessage());
+                                                        }
                                                     }
-                                                }
+                                                    if (anyNewMsg && isAdded()) {
+                                                        loadLocalEncryptedChats();
+                                                    }
+                                                });
                                             });
                                 }
-
-                                // Establish P2P connections with group participants
-                                if (parts != null && getContext() != null) {
-                                    for (String pId : parts) {
-                                        if (pId != null && !pId.equals(uid)) {
-                                            WebRtcManager.getInstance(requireContext()).initiateConnection(pId);
-                                        }
-                                    }
+                                if (updated && isAdded()) {
+                                    loadLocalEncryptedChats();
                                 }
-
-                                // Sync recent group messages from Firestore so offline/multi-device members receive everything
-                                final String finalGroupId = gId;
-                                com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                        .collection("groups")
-                                        .document(finalGroupId)
-                                        .collection("messages")
-                                        .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                                        .limit(40)
-                                        .get()
-                                        .addOnSuccessListener(msgSnaps -> {
-                                            if (msgSnaps == null || getContext() == null) return;
-                                            boolean anyNewMsg = false;
-                                            for (com.google.firebase.firestore.DocumentSnapshot mDoc : msgSnaps.getDocuments()) {
-                                                try {
-                                                    String mId = mDoc.getString("id");
-                                                if (mId == null) mId = mDoc.getId();
-                                                com.m3.veil.model.Message existingMsg = EncryptedChatDatabase.getInstance(requireContext()).getMessageById(mId);
-                                                String mType = mDoc.getString("type");
-                                                String mText = mDoc.getString("text");
-                                                if (mText != null && mText.startsWith("ENC:v1:")) {
-                                                    mText = EncryptionManager.decryptGroupPayload(finalGroupId, mText);
-                                                }
-                                                Boolean isEditedObj = mDoc.getBoolean("edited");
-                                                String pollJson = mDoc.getString("pollJson");
-                                                if (pollJson != null && pollJson.startsWith("ENC:v1:")) {
-                                                    pollJson = EncryptionManager.decryptGroupPayload(finalGroupId, pollJson);
-                                                }
-                                                String sId = mDoc.getString("senderId");
-                                                boolean isFromMe = uid.equals(sId);
-                                                boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
-                                                boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
-                                                if (existingMsg == null) {
-                                                    String sName = mDoc.getString("senderName");
-                                                    com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
-                                                    com.m3.veil.model.Message m = new com.m3.veil.model.Message(
-                                                            mId,
-                                                            sId != null ? sId : "",
-                                                            finalGroupId,
-                                                            mText != null ? mText : "",
-                                                            mTs,
-                                                            mType != null ? mType : "text"
-                                                    );
-                                                    m.setChatId(finalGroupId);
-                                                    m.setSenderName(sName);
-                                                    m.setReplyToMessageId(mDoc.getString("replyToMessageId"));
-                                                    m.setReplySenderName(mDoc.getString("replySenderName"));
-                                                    m.setPollJson(pollJson);
-                                                    if (Boolean.TRUE.equals(isEditedObj)) m.setEdited(true);
-                                                    if (isFromMe) {
-                                                        boolean hasNet = com.m3.veil.manager.VeilMessagesController.getInstance(requireContext()).isNetworkConnected();
-                                                        m.setPending(!hasNet && !docDelivered && !docRead);
-                                                        m.setDelivered(docDelivered || docRead);
-                                                        m.setRead(docRead);
-                                                    } else {
-                                                        m.setPending(false);
-                                                        m.setDelivered(true);
-                                                        m.setRead(false);
-                                                    }
-                                                    EncryptedChatDatabase.getInstance(requireContext()).saveMessage(finalGroupId, m);
-                                                    anyNewMsg = true;
-
-                                                    if (!isFromMe) {
-                                                        java.util.Map<String, Object> ack = new java.util.HashMap<>();
-                                                        ack.put("delivered", true);
-                                                        mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
-                                                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                                                .collection("chats").document(finalGroupId)
-                                                                .collection("messages").document(mId)
-                                                                .set(ack, com.google.firebase.firestore.SetOptions.merge());
-                                                        if (sId != null && !sId.isEmpty()) {
-                                                            WebRtcManager.getInstance(requireContext()).sendReceipt(sId, mId, true, false);
-                                                        }
-                                                    }
-                                                } else {
-                                                    if (isFromMe) {
-                                                        if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
-                                                            EncryptedChatDatabase.getInstance(requireContext())
-                                                                    .updateMessageStatus(mId, docDelivered || docRead, docRead);
-                                                            com.m3.veil.manager.VeilMessagesController.getInstance(requireContext())
-                                                                    .onMessageStatusChanged(mId, docDelivered || docRead, docRead);
-                                                            anyNewMsg = true;
-                                                        }
-                                                    } else if (!existingMsg.isDelivered() || !docDelivered) {
-                                                        existingMsg.setDelivered(true);
-                                                        EncryptedChatDatabase.getInstance(requireContext())
-                                                                .updateMessageStatus(mId, true, existingMsg.isRead());
-                                                        java.util.Map<String, Object> ack = new java.util.HashMap<>();
-                                                        ack.put("delivered", true);
-                                                        mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
-                                                        if (sId != null && !sId.isEmpty()) {
-                                                            WebRtcManager.getInstance(requireContext()).sendReceipt(sId, mId, true, existingMsg.isRead());
-                                                        }
-                                                    }
-                                                    boolean msgChanged = false;
-                                                    if ("deleted".equals(mType) && !"deleted".equals(existingMsg.getType())) {
-                                                        EncryptedChatDatabase.getInstance(requireContext()).markMessageDeleted(finalGroupId, mId);
-                                                        msgChanged = true;
-                                                    } else if (Boolean.TRUE.equals(isEditedObj) && mText != null && !mText.equals(existingMsg.getText())) {
-                                                        EncryptedChatDatabase.getInstance(requireContext()).updateMessageText(finalGroupId, mId, mText);
-                                                        msgChanged = true;
-                                                    }
-                                                    if (pollJson != null && !pollJson.equals(existingMsg.getPollJson())) {
-                                                        EncryptedChatDatabase.getInstance(requireContext()).updateMessagePollJson(finalGroupId, mId, pollJson);
-                                                        msgChanged = true;
-                                                    }
-                                                    if (msgChanged) anyNewMsg = true;
-                                                }
-                                                } catch (Exception docEx) {
-                                                    android.util.Log.w("HomeFragment", "Error processing group message doc: " + docEx.getMessage());
-                                                }
-                                            }
-                                            if (anyNewMsg && isAdded()) {
-                                                loadLocalEncryptedChats();
-                                            }
-                                        });
-                            }
-                            if (updated) {
-                                loadLocalEncryptedChats();
-                            }
+                            });
                         });
             }
 
@@ -1474,150 +1487,162 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                         .whereArrayContains("participants", uid)
                         .addSnapshotListener((snapshots, error) -> {
                             if (error != null || snapshots == null || getContext() == null) return;
-                            boolean updated = false;
-                            for (com.google.firebase.firestore.DocumentSnapshot doc : snapshots.getDocuments()) {
-                                String cId = doc.getString("chatId");
-                                if (cId == null) cId = doc.getId();
-                                @SuppressWarnings("unchecked")
-                                java.util.List<String> parts = (java.util.List<String>) doc.get("participants");
-                                String peerId = null;
-                                if (parts != null) {
-                                    for (String p : parts) {
-                                        if (p != null && !p.equals(uid)) {
-                                            peerId = p;
-                                            break;
+                            final java.util.List<com.google.firebase.firestore.DocumentSnapshot> chatDocs = snapshots.getDocuments();
+                            homeExecutor.execute(() -> {
+                                if (chatDocs == null || chatDocs.isEmpty()) return;
+                                boolean updated = false;
+                                for (com.google.firebase.firestore.DocumentSnapshot doc : chatDocs) {
+                                    String cId = doc.getString("chatId");
+                                    if (cId == null) cId = doc.getId();
+                                    @SuppressWarnings("unchecked")
+                                    java.util.List<String> parts = (java.util.List<String>) doc.get("participants");
+                                    String peerId = null;
+                                    if (parts != null) {
+                                        for (String p : parts) {
+                                            if (p != null && !p.equals(uid)) {
+                                                peerId = p;
+                                                break;
+                                            }
                                         }
                                     }
-                                }
-                                if (peerId == null && cId.contains("_")) {
-                                    String[] split = cId.split("_");
-                                    if (split.length == 2) {
-                                        peerId = split[0].equals(uid) ? split[1] : split[0];
+                                    if (peerId == null && cId.contains("_")) {
+                                        String[] split = cId.split("_");
+                                        if (split.length == 2) {
+                                            peerId = split[0].equals(uid) ? split[1] : split[0];
+                                        }
                                     }
-                                }
-                                if (peerId == null) continue;
+                                    if (peerId == null) continue;
 
-                                String lastMsg = doc.getString("lastMessage");
-                                com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
-                                if (ts == null) ts = com.google.firebase.Timestamp.now();
+                                    String lastMsg = doc.getString("lastMessage");
+                                    com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
+                                    if (ts == null) ts = com.google.firebase.Timestamp.now();
 
-                                Chat existing = EncryptedChatDatabase.getInstance(requireContext()).getChat(cId);
-                                if (existing == null) {
-                                    Chat newChat = new Chat(
-                                            cId,
-                                            "Encrypted Chat",
-                                            lastMsg != null ? lastMsg : "Direct chat created",
-                                            ts,
-                                            null,
-                                            0,
-                                            false,
-                                            false,
-                                            "direct",
-                                            parts != null ? parts : new java.util.ArrayList<>()
-                                    );
-                                    EncryptedChatDatabase.getInstance(requireContext()).saveOrUpdateChat(newChat);
-                                    updated = true;
-                                }
+                                    Chat existing = EncryptedChatDatabase.getInstance(appCtx).getChat(cId);
+                                    boolean shouldSyncDirectMsgs = false;
+                                    if (existing == null) {
+                                        Chat newChat = new Chat(
+                                                cId,
+                                                "Encrypted Chat",
+                                                lastMsg != null ? lastMsg : "Direct chat created",
+                                                ts,
+                                                null,
+                                                0,
+                                                false,
+                                                false,
+                                                "direct",
+                                                parts != null ? parts : new java.util.ArrayList<>()
+                                        );
+                                        EncryptedChatDatabase.getInstance(appCtx).saveOrUpdateChat(newChat);
+                                        updated = true;
+                                        shouldSyncDirectMsgs = true;
+                                    } else if (lastMsg != null && !lastMsg.equals(existing.getLastMessage())) {
+                                        shouldSyncDirectMsgs = true;
+                                    }
 
-                                // Sync recent messages for this 1-on-1 chat
-                                final String finalChatId = cId;
-                                final String finalPeerId = peerId;
-                                com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                        .collection("chats")
-                                        .document(finalChatId)
-                                        .collection("messages")
-                                        .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                                        .limit(30)
-                                        .get()
-                                        .addOnSuccessListener(msgSnaps -> {
-                                            if (msgSnaps == null || getContext() == null) return;
-                                            boolean anyNew = false;
-                                            for (com.google.firebase.firestore.DocumentSnapshot mDoc : msgSnaps.getDocuments()) {
-                                                try {
-                                                    String mId = mDoc.getString("id");
-                                                    if (mId == null) mId = mDoc.getId();
-                                                    com.m3.veil.model.Message existingMsg = EncryptedChatDatabase.getInstance(requireContext()).getMessageById(mId);
-                                                    String mType = mDoc.getString("type");
-                                                    String mText = mDoc.getString("text");
-                                                    if (mText != null && mText.startsWith("ENC:v1:")) {
-                                                        mText = EncryptionManager.decryptGroupPayload(finalChatId, mText);
-                                                    }
-                                                    String sId = mDoc.getString("senderId");
-                                                    String sName = mDoc.getString("senderName");
-                                                    com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
-                                                    boolean isFromMe = sId != null && sId.equals(uid);
-                                                    boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
-                                                    boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
+                                    if (!shouldSyncDirectMsgs) {
+                                        continue;
+                                    }
 
-                                                    if (existingMsg == null) {
-                                                        com.m3.veil.model.Message m = new com.m3.veil.model.Message(
-                                                                mId,
-                                                                sId != null ? sId : "",
-                                                                finalPeerId,
-                                                                mText != null ? mText : "",
-                                                                mTs,
-                                                                mType != null ? mType : "text"
-                                                        );
-                                                        m.setChatId(finalChatId);
-                                                        m.setSenderName(sName);
-                                                        if (isFromMe) {
-                                                            boolean hasNet = com.m3.veil.manager.VeilMessagesController.getInstance(requireContext()).isNetworkConnected();
-                                                            m.setPending(!hasNet && !docDelivered && !docRead);
-                                                            m.setDelivered(docDelivered || docRead);
-                                                            m.setRead(docRead);
-                                                        } else {
-                                                            m.setPending(false);
-                                                            m.setDelivered(true);
-                                                            m.setRead(false);
-                                                        }
-                                                        EncryptedChatDatabase.getInstance(requireContext()).saveMessage(finalChatId, m);
+                                    final String finalChatId = cId;
+                                    final String finalPeerId = peerId;
+                                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                            .collection("chats")
+                                            .document(finalChatId)
+                                            .collection("messages")
+                                            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                                            .limit(30)
+                                            .get()
+                                            .addOnSuccessListener(msgSnaps -> {
+                                                if (msgSnaps == null) return;
+                                                final java.util.List<com.google.firebase.firestore.DocumentSnapshot> mDocs = msgSnaps.getDocuments();
+                                                homeExecutor.execute(() -> {
+                                                    boolean anyNew = false;
+                                                    for (com.google.firebase.firestore.DocumentSnapshot mDoc : mDocs) {
+                                                        try {
+                                                            String mId = mDoc.getString("id");
+                                                            if (mId == null) mId = mDoc.getId();
+                                                            com.m3.veil.model.Message existingMsg = EncryptedChatDatabase.getInstance(appCtx).getMessageById(mId);
+                                                            String mType = mDoc.getString("type");
+                                                            String mText = mDoc.getString("text");
+                                                            if (mText != null && mText.startsWith("ENC:v1:")) {
+                                                                mText = EncryptionManager.decryptGroupPayload(finalChatId, mText);
+                                                            }
+                                                            String sId = mDoc.getString("senderId");
+                                                            String sName = mDoc.getString("senderName");
+                                                            com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
+                                                            boolean isFromMe = sId != null && sId.equals(uid);
+                                                            boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
+                                                            boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
 
-                                                        // Acknowledge delivery on Firestore (both chats & groups paths) + P2P so sender sees double grey ticks immediately!
-                                                        if (!isFromMe && sId != null) {
-                                                            java.util.Map<String, Object> ack = new java.util.HashMap<>();
-                                                            ack.put("delivered", true);
-                                                            mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
-                                                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                                                    .collection("groups").document(finalChatId)
-                                                                    .collection("messages").document(mId)
-                                                                    .set(ack, com.google.firebase.firestore.SetOptions.merge());
-                                                            com.m3.veil.webrtc.WebRtcManager.getInstance(requireContext())
-                                                                    .sendReceipt(sId, mId, true, false);
-                                                        }
-                                                        anyNew = true;
-                                                    } else {
-                                                        // Sync delivery/read status back to sender's local database & VeilMessagesController
-                                                        if (isFromMe) {
-                                                            if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
-                                                                EncryptedChatDatabase.getInstance(requireContext())
-                                                                        .updateMessageStatus(mId, docDelivered || docRead, docRead);
-                                                                com.m3.veil.manager.VeilMessagesController.getInstance(requireContext())
-                                                                        .onMessageStatusChanged(mId, docDelivered || docRead, docRead);
+                                                            if (existingMsg == null) {
+                                                                com.m3.veil.model.Message m = new com.m3.veil.model.Message(
+                                                                        mId,
+                                                                        sId != null ? sId : "",
+                                                                        finalPeerId,
+                                                                        mText != null ? mText : "",
+                                                                        mTs,
+                                                                        mType != null ? mType : "text"
+                                                                );
+                                                                m.setChatId(finalChatId);
+                                                                m.setSenderName(sName);
+                                                                if (isFromMe) {
+                                                                    boolean hasNet = com.m3.veil.manager.VeilMessagesController.getInstance(appCtx).isNetworkConnected();
+                                                                    m.setPending(!hasNet && !docDelivered && !docRead);
+                                                                    m.setDelivered(docDelivered || docRead);
+                                                                    m.setRead(docRead);
+                                                                } else {
+                                                                    m.setPending(false);
+                                                                    m.setDelivered(true);
+                                                                    m.setRead(false);
+                                                                }
+                                                                EncryptedChatDatabase.getInstance(appCtx).saveMessage(finalChatId, m);
+
+                                                                if (!isFromMe && sId != null) {
+                                                                    java.util.Map<String, Object> ack = new java.util.HashMap<>();
+                                                                    ack.put("delivered", true);
+                                                                    mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                                                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                                                            .collection("groups").document(finalChatId)
+                                                                            .collection("messages").document(mId)
+                                                                            .set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                                                    com.m3.veil.webrtc.WebRtcManager.getInstance(appCtx)
+                                                                            .sendReceipt(sId, mId, true, false);
+                                                                }
                                                                 anyNew = true;
+                                                            } else {
+                                                                if (isFromMe) {
+                                                                    if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
+                                                                        EncryptedChatDatabase.getInstance(appCtx)
+                                                                                .updateMessageStatus(mId, docDelivered || docRead, docRead);
+                                                                        com.m3.veil.manager.VeilMessagesController.getInstance(appCtx)
+                                                                                .onMessageStatusChanged(mId, docDelivered || docRead, docRead);
+                                                                        anyNew = true;
+                                                                    }
+                                                                } else if (!existingMsg.isDelivered() || !docDelivered) {
+                                                                    existingMsg.setDelivered(true);
+                                                                    EncryptedChatDatabase.getInstance(appCtx)
+                                                                            .updateMessageStatus(mId, true, existingMsg.isRead());
+                                                                    java.util.Map<String, Object> ack = new java.util.HashMap<>();
+                                                                    ack.put("delivered", true);
+                                                                    mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                                                    if (sId != null && !sId.isEmpty()) {
+                                                                        com.m3.veil.webrtc.WebRtcManager.getInstance(appCtx)
+                                                                                .sendReceipt(sId, mId, true, existingMsg.isRead());
+                                                                    }
+                                                                }
                                                             }
-                                                        } else if (!existingMsg.isDelivered() || !docDelivered) {
-                                                            existingMsg.setDelivered(true);
-                                                            EncryptedChatDatabase.getInstance(requireContext())
-                                                                    .updateMessageStatus(mId, true, existingMsg.isRead());
-                                                            java.util.Map<String, Object> ack = new java.util.HashMap<>();
-                                                            ack.put("delivered", true);
-                                                            mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
-                                                            if (sId != null && !sId.isEmpty()) {
-                                                                com.m3.veil.webrtc.WebRtcManager.getInstance(requireContext())
-                                                                        .sendReceipt(sId, mId, true, existingMsg.isRead());
-                                                            }
-                                                        }
+                                                        } catch (Exception ignored) {}
                                                     }
-                                                } catch (Exception ignored) {}
-                                            }
-                                            if (anyNew && isAdded()) {
-                                                loadLocalEncryptedChats();
-                                            }
-                                        });
-                            }
-                            if (updated && isAdded()) {
-                                loadLocalEncryptedChats();
-                            }
+                                                    if (anyNew && isAdded()) {
+                                                        loadLocalEncryptedChats();
+                                                    }
+                                                });
+                                            });
+                                }
+                                if (updated && isAdded()) {
+                                    loadLocalEncryptedChats();
+                                }
+                            });
                         });
             }
         }

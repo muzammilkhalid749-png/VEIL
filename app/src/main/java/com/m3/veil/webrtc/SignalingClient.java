@@ -70,6 +70,11 @@ public class SignalingClient {
     private final Map<String, String> peerPublicKeys = new ConcurrentHashMap<>();
     private final Set<String> processedSignalIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final java.util.concurrent.ExecutorService sigExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "VeilSignalingWorker");
+        t.setDaemon(true);
+        return t;
+    });
 
     private Socket socket;
     private volatile boolean isSocketConnected = false;
@@ -218,29 +223,34 @@ public class SignalingClient {
                     if (e != null || snapshots == null) {
                         return;
                     }
-                    long now = System.currentTimeMillis();
-                    for (DocumentChange dc : snapshots.getDocumentChanges()) {
-                        if (dc.getType() == DocumentChange.Type.ADDED || dc.getType() == DocumentChange.Type.MODIFIED) {
-                            DocumentSnapshot doc = dc.getDocument();
-                            // Immediately delete the ephemeral signal document from Firestore
-                            doc.getReference().delete();
-
-                            Long ts = doc.getLong("timestamp");
-                            if (ts != null && ts > 0 && (now - ts) > Math.max(SIGNAL_MAX_AGE_MS, 120_000L)) {
-                                continue;
-                            }
-
-                            String sigId = doc.getString("signalId");
-                            if (sigId == null || sigId.isEmpty()) {
-                                sigId = doc.getId();
-                            }
-                            if (!processedSignalIds.add(sigId)) {
-                                continue;
-                            }
-
-                            handleFirestoreSignalDocument(doc);
-                        }
+                    final java.util.List<DocumentChange> docChanges = snapshots.getDocumentChanges();
+                    if (docChanges == null || docChanges.isEmpty()) {
+                        return;
                     }
+                    sigExecutor.execute(() -> {
+                        long now = System.currentTimeMillis();
+                        for (DocumentChange dc : docChanges) {
+                            if (dc.getType() == DocumentChange.Type.ADDED || dc.getType() == DocumentChange.Type.MODIFIED) {
+                                DocumentSnapshot doc = dc.getDocument();
+                                doc.getReference().delete();
+
+                                Long ts = doc.getLong("timestamp");
+                                if (ts != null && ts > 0 && (now - ts) > Math.max(SIGNAL_MAX_AGE_MS, 120_000L)) {
+                                    continue;
+                                }
+
+                                String sigId = doc.getString("signalId");
+                                if (sigId == null || sigId.isEmpty()) {
+                                    sigId = doc.getId();
+                                }
+                                if (!processedSignalIds.add(sigId)) {
+                                    continue;
+                                }
+
+                                handleFirestoreSignalDocument(doc);
+                            }
+                        }
+                    });
                 });
     }
 
@@ -356,80 +366,83 @@ public class SignalingClient {
     }
 
     private void dispatchIncomingSignal(String type, String from, JSONObject data) {
-        SignalingListener target = this.listener != null ? this.listener : this.webRtcManager;
+        final SignalingListener target = this.listener != null ? this.listener : this.webRtcManager;
         if (target == null || type == null || from == null) {
             return;
         }
-        switch (type) {
-            case "offer": {
-                String sdp = data.optString("sdp", null);
-                if (sdp != null && !sdp.isEmpty()) {
-                    target.onOfferReceived(from, sdp);
+        sigExecutor.execute(() -> {
+            switch (type) {
+                case "offer": {
+                    String sdp = data.optString("sdp", null);
+                    if (sdp != null && !sdp.isEmpty()) {
+                        target.onOfferReceived(from, sdp);
+                    }
+                    break;
                 }
-                break;
-            }
-            case "answer": {
-                String sdp = data.optString("sdp", null);
-                if (sdp != null && !sdp.isEmpty()) {
-                    target.onAnswerReceived(from, sdp);
+                case "answer": {
+                    String sdp = data.optString("sdp", null);
+                    if (sdp != null && !sdp.isEmpty()) {
+                        target.onAnswerReceived(from, sdp);
+                    }
+                    break;
                 }
-                break;
-            }
-            case "candidate": {
-                String sdpMid = data.optString("sdpMid", "0");
-                int sdpMLineIndex = data.optInt("sdpMLineIndex", 0);
-                String sdp = data.optString("sdp", null);
-                if (sdp != null && !sdp.isEmpty()) {
-                    IceCandidate candidate = new IceCandidate(sdpMid, sdpMLineIndex, sdp);
-                    target.onIceCandidateReceived(from, candidate);
+                case "candidate": {
+                    String sdpMid = data.optString("sdpMid", "0");
+                    int sdpMLineIndex = data.optInt("sdpMLineIndex", 0);
+                    String sdp = data.optString("sdp", null);
+                    if (sdp != null && !sdp.isEmpty()) {
+                        IceCandidate candidate = new IceCandidate(sdpMid, sdpMLineIndex, sdp);
+                        target.onIceCandidateReceived(from, candidate);
+                    }
+                    break;
                 }
-                break;
-            }
-            case "wake_up": {
-                String chatId = data.optString("chatId", WebRtcManager.getChatId(this.currentUserId, from));
-                target.onWakeUpReceived(from, chatId);
-                break;
-            }
-            case "peer_online": {
-                target.onPeerOnline(from);
-                break;
-            }
-            case "call_invite": {
-                String callId = data.optString("callId", UUID.randomUUID().toString());
-                String callerName = data.optString("callerName", "Peer");
-                String callType = data.optString("callType", "audio");
-                target.onCallInviteReceived(from, callId, callerName, callType);
-                break;
-            }
-            case "call_ringing": {
-                String callId = data.optString("callId", "");
-                target.onCallRingingReceived(from, callId);
-                break;
-            }
-            case "call_accept": {
-                String callId = data.optString("callId", "");
-                target.onCallAcceptReceived(from, callId);
-                break;
-            }
-            case "call_reject": {
-                String callId = data.optString("callId", "");
-                String reason = data.optString("reason", "declined");
-                target.onCallRejectReceived(from, callId, reason);
-                break;
-            }
-            case "call_end": {
-                String callId = data.optString("callId", "");
-                target.onCallEndReceived(from, callId);
-                break;
-            }
-            case "p2p_action": {
-                String payloadStr = data.optString("payload", data.toString());
-                if (this.webRtcManager != null && payloadStr != null && !payloadStr.isEmpty()) {
-                    this.webRtcManager.processInboundPayload(from, payloadStr);
+                case "wake_up": {
+                    String chatId = data.optString("chatId", WebRtcManager.getChatId(this.currentUserId, from));
+                    target.onWakeUpReceived(from, chatId);
+                    break;
                 }
-                break;
+                case "peer_online": {
+                    target.onPeerOnline(from);
+                    break;
+                }
+                case "call_invite": {
+                    String callId = data.optString("callId", UUID.randomUUID().toString());
+                    String callerName = data.optString("callerName", "Peer");
+                    String callType = data.optString("callType", "audio");
+                    target.onCallInviteReceived(from, callId, callerName, callType);
+                    break;
+                }
+                case "call_ringing": {
+                    String callId = data.optString("callId", "");
+                    target.onCallRingingReceived(from, callId);
+                    break;
+                }
+                case "call_accept": {
+                    String callId = data.optString("callId", "");
+                    target.onCallAcceptReceived(from, callId);
+                    break;
+                }
+                case "call_reject": {
+                    String callId = data.optString("callId", "");
+                    String reason = data.optString("reason", "declined");
+                    target.onCallRejectReceived(from, callId, reason);
+                    break;
+                }
+                case "call_end": {
+                    String callId = data.optString("callId", "");
+                    target.onCallEndReceived(from, callId);
+                    break;
+                }
+                case "p2p_action":
+                case "p2p_chat": {
+                    String payloadStr = data.optString("payload", data.toString());
+                    if (this.webRtcManager != null && payloadStr != null && !payloadStr.isEmpty()) {
+                        this.webRtcManager.processInboundPayload(from, payloadStr);
+                    }
+                    break;
+                }
             }
-        }
+        });
     }
 
     /**

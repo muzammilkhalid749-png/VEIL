@@ -1929,7 +1929,7 @@ public class SovereignIdentityAndDirectoryEngine {
                                         final String fType = sigType;
                                         final String fFrom = fromUid;
                                         final JSONObject fPayload = payload;
-                                        mMainHandler.post(() -> {
+                                        mExecutor.execute(() -> {
                                             for (OnSignalReceivedListener l : mSignalListeners) {
                                                 try {
                                                     l.onSignal(fType, fFrom, fPayload);

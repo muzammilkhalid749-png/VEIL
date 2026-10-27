@@ -101,8 +101,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    private final Map<String, List<IceCandidate>> pendingIceCandidates = new ConcurrentHashMap<>();
    private final Map<String, Long> lastOfferTimestamp = new ConcurrentHashMap<>();
    private final List<P2PEventListener> listeners = Collections.synchronizedList(new ArrayList<>());
+   private final Set<String> connectedNotifiedPeers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+   private final java.util.concurrent.ExecutorService rtcExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+      Thread t = new Thread(r, "VeilRtcWorker");
+      t.setDaemon(true);
+      return t;
+   });
    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-   private final Handler heartbeatHandler = new Handler(Looper.getMainLooper());
+   private final Handler heartbeatHandler;
    private ListenerRegistration inboxListener;
    private AudioSource localAudioSource;
    private AudioTrack localAudioTrack;
@@ -170,6 +176,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
    private WebRtcManager(Context context) {
       this.context = context;
+      android.os.HandlerThread hbThread = new android.os.HandlerThread("VeilRtcHeartbeat");
+      hbThread.setDaemon(true);
+      hbThread.start();
+      this.heartbeatHandler = new Handler(hbThread.getLooper());
       this.initializePeerConnectionFactory();
       SignalingClient.getInstance().setListener(this);
       TurnCredentialManager.getInstance(context).probeAllNodesAsync();
@@ -210,7 +220,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          }
          this.initializedUserId = userId;
          SignalingClient.getInstance().init(userId);
-         this.mainHandler.post(() -> {
+         this.rtcExecutor.execute(() -> {
             try {
                com.m3.veil.calling.CallEngine.getInstance(this.context).init(userId);
             } catch (Throwable ignored) {}
@@ -882,17 +892,19 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             if (dataChannel.state() == State.OPEN) {
                WebRtcManager.this.peerLastSeenTime.put(peerId, System.currentTimeMillis());
                WebRtcManager.this.cancelTurnFallback(peerId);
-               SignalingClient.getInstance().pruneSignalingForPeer(peerId);
                if (lane == 1 || !WebRtcManager.this.dataChannels.containsKey(peerId)) {
                   WebRtcManager.this.dataChannels.put(peerId, dataChannel);
                }
-               WebRtcManager.this.mainHandler.post(() -> {
-                  for(P2PEventListener l : WebRtcManager.this.listeners) {
-                     l.onPeerConnected(peerId);
-                  }
-               });
-               VeilMeshDaemonService.getInstance(WebRtcManager.this.context).flushOutboxForPeer(peerId);
+               if (WebRtcManager.this.connectedNotifiedPeers.add(peerId)) {
+                  SignalingClient.getInstance().pruneSignalingForPeer(peerId);
+                  WebRtcManager.this.mainHandler.post(() -> {
+                     for(P2PEventListener l : WebRtcManager.this.listeners) {
+                        l.onPeerConnected(peerId);
+                     }
+                  });
+               }
                if (lane == 1) {
+                  VeilMeshDaemonService.getInstance(WebRtcManager.this.context).flushOutboxForPeer(peerId);
                   WebRtcManager.this.syncVeilBoardGossipWithPeer(peerId, dataChannel);
                }
             } else if (dataChannel.state() == State.CLOSED) {
@@ -900,12 +912,13 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                if (hub == null || !hub.isConnected()) {
                   WebRtcManager.this.peerLastSeenTime.remove(peerId);
                   WebRtcManager.this.dataChannels.remove(peerId);
-                  WebRtcManager.this.mainHandler.post(() -> {
-                     for(P2PEventListener l : WebRtcManager.this.listeners) {
-                        l.onPeerDisconnected(peerId);
-                     }
-
-                  });
+                  if (WebRtcManager.this.connectedNotifiedPeers.remove(peerId)) {
+                     WebRtcManager.this.mainHandler.post(() -> {
+                        for(P2PEventListener l : WebRtcManager.this.listeners) {
+                           l.onPeerDisconnected(peerId);
+                        }
+                     });
+                  }
                }
             }
 
@@ -2993,35 +3006,40 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          if (this.isPeerConnected(peerId)) {
             return;
          }
-         PeerConnection existing = (PeerConnection)this.peerConnections.get(peerId);
-         Long lastOffer = (Long)this.lastOfferTimestamp.get(peerId);
-         long now = System.currentTimeMillis();
-         if (existing != null) {
-            PeerConnection.SignalingState sigState = existing.signalingState();
-            PeerConnection.IceConnectionState iceState = existing.iceConnectionState();
-            if (iceState == IceConnectionState.CONNECTED || iceState == IceConnectionState.COMPLETED) {
+         this.rtcExecutor.execute(() -> {
+            if (this.isPeerConnected(peerId)) {
                return;
             }
-            if ((sigState == SignalingState.HAVE_LOCAL_OFFER || sigState == SignalingState.HAVE_REMOTE_OFFER || iceState == IceConnectionState.CHECKING)
-                    && lastOffer != null && (now - lastOffer) < 5000L) {
-               return;
+            PeerConnection existing = (PeerConnection)this.peerConnections.get(peerId);
+            Long lastOffer = (Long)this.lastOfferTimestamp.get(peerId);
+            long now = System.currentTimeMillis();
+            if (existing != null) {
+               PeerConnection.SignalingState sigState = existing.signalingState();
+               PeerConnection.IceConnectionState iceState = existing.iceConnectionState();
+               if (iceState == IceConnectionState.CONNECTED || iceState == IceConnectionState.COMPLETED) {
+                  return;
+               }
+               if ((sigState == SignalingState.HAVE_LOCAL_OFFER || sigState == SignalingState.HAVE_REMOTE_OFFER || iceState == IceConnectionState.CHECKING)
+                       && lastOffer != null && (now - lastOffer) < 5000L) {
+                  return;
+               }
             }
-         }
-         this.lastOfferTimestamp.put(peerId, now);
-         this.scheduleTurnFallback(peerId);
-         final PeerConnection pc = this.getOrCreatePeerConnection(peerId, true);
-         MediaConstraints sdpConstraints = new MediaConstraints();
-         sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
-         sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"));
-         pc.createOffer(new SimpleSdpObserver() {
-            public void onCreateSuccess(final SessionDescription sessionDescription) {
-               pc.setLocalDescription(new SimpleSdpObserver() {
-                  public void onSetSuccess() {
-                     SignalingClient.getInstance().sendOffer(peerId, sessionDescription.description);
-                  }
-               }, sessionDescription);
-            }
-         }, sdpConstraints);
+            this.lastOfferTimestamp.put(peerId, now);
+            this.scheduleTurnFallback(peerId);
+            final PeerConnection pc = this.getOrCreatePeerConnection(peerId, true);
+            MediaConstraints sdpConstraints = new MediaConstraints();
+            sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
+            sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"));
+            pc.createOffer(new SimpleSdpObserver() {
+               public void onCreateSuccess(final SessionDescription sessionDescription) {
+                  pc.setLocalDescription(new SimpleSdpObserver() {
+                     public void onSetSuccess() {
+                        SignalingClient.getInstance().sendOffer(peerId, sessionDescription.description);
+                     }
+                  }, sessionDescription);
+               }
+            }, sdpConstraints);
+         });
       }
    }
 

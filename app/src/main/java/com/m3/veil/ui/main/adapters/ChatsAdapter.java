@@ -33,6 +33,14 @@ public class ChatsAdapter extends RecyclerView.Adapter<ChatsAdapter.ChatViewHold
         this.listener = listener;
         String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(com.m3.veil.VeilApplication.getInstance());
         this.currentUserId = uid != null ? uid : "";
+        setHasStableIds(true);
+    }
+
+    @Override
+    public long getItemId(int position) {
+        if (chatList == null || position < 0 || position >= chatList.size()) return RecyclerView.NO_ID;
+        Chat c = chatList.get(position);
+        return (c != null && c.getId() != null) ? (long) c.getId().hashCode() : position;
     }
 
     @NonNull

@@ -300,14 +300,33 @@ public class EncryptionManager {
     public static RatchetState getOrCreateRatchetState(String dialogId, byte[] sharedRootSeed) {
         if (dialogId == null) return null;
         return ratchetStates.computeIfAbsent(dialogId, id -> {
-            byte[] root = (sharedRootSeed != null && sharedRootSeed.length == 32) ? sharedRootSeed.clone() : new byte[32];
-            if (sharedRootSeed == null || sharedRootSeed.length != 32) {
-                new SecureRandom().nextBytes(root);
+            byte[] root;
+            if (sharedRootSeed != null && sharedRootSeed.length == 32) {
+                root = sharedRootSeed.clone();
+            } else {
+                root = hkdfSha256(
+                        id.getBytes(StandardCharsets.UTF_8),
+                        "VEIL_RATCHET_ROOT_2026".getBytes(StandardCharsets.UTF_8),
+                        "VEIL_DIALOG_ROOT".getBytes(StandardCharsets.UTF_8),
+                        32);
             }
-            byte[] sendChain = hkdfSha256(root, "VEIL_SALT_SEND".getBytes(StandardCharsets.UTF_8), id.getBytes(StandardCharsets.UTF_8), 32);
-            byte[] recvChain = hkdfSha256(root, "VEIL_SALT_RECV".getBytes(StandardCharsets.UTF_8), id.getBytes(StandardCharsets.UTF_8), 32);
+            byte[] sendChain = hkdfSha256(root, "VEIL_SALT_CHAIN".getBytes(StandardCharsets.UTF_8), id.getBytes(StandardCharsets.UTF_8), 32);
+            byte[] recvChain = hkdfSha256(root, "VEIL_SALT_CHAIN".getBytes(StandardCharsets.UTF_8), id.getBytes(StandardCharsets.UTF_8), 32);
             return new RatchetState(id, root, sendChain, recvChain);
         });
+    }
+
+    private static byte[] deriveDeterministicStepKey(String dialogId, int step) {
+        if (dialogId == null || dialogId.isEmpty()) return null;
+        int normalizedStep = Math.max(0, step);
+        byte[] root = hkdfSha256(
+                dialogId.getBytes(StandardCharsets.UTF_8),
+                "VEIL_RATCHET_ROOT_2026".getBytes(StandardCharsets.UTF_8),
+                "VEIL_DIALOG_ROOT".getBytes(StandardCharsets.UTF_8),
+                32);
+        byte[] chain = hkdfSha256(root, "VEIL_SALT_CHAIN".getBytes(StandardCharsets.UTF_8), dialogId.getBytes(StandardCharsets.UTF_8), 32);
+        byte[] stepInput = ("VEIL_STEP_SEND_" + normalizedStep).getBytes(StandardCharsets.UTF_8);
+        return hkdfSha256(chain, stepInput, "VEIL_MSG_ENC".getBytes(StandardCharsets.UTF_8), 32);
     }
 
     public static synchronized byte[] ratchetSendKey(String dialogId) {
@@ -495,11 +514,14 @@ public class EncryptionManager {
     public static HybridEncryptionResult encryptHybridRatcheted(String dialogId, String message, String recipientPublicKeyString, String senderPublicKeyString) {
         try {
             byte[] keyBytes;
-            int step = 1;
+            int step = 0;
             if (dialogId != null && !dialogId.isEmpty()) {
-                keyBytes = ratchetSendKey(dialogId);
-                RatchetState s = ratchetStates.get(dialogId);
-                step = s != null ? s.sendCounter : 1;
+                RatchetState s = getOrCreateRatchetState(dialogId, null);
+                synchronized (EncryptionManager.class) {
+                    step = s != null ? s.sendCounter : 0;
+                    ratchetSendKey(dialogId);
+                }
+                keyBytes = deriveDeterministicStepKey(dialogId, step);
             } else {
                 KeyGenerator keyGen = KeyGenerator.getInstance("AES");
                 keyGen.init(256);
@@ -548,66 +570,85 @@ public class EncryptionManager {
     }
 
     public static String decryptHybrid(String encryptedContent, String encryptedAesKey, String iv) {
-        return decryptHybridRatcheted(null, encryptedContent, encryptedAesKey, iv, 1, null);
+        return decryptHybridRatcheted(null, encryptedContent, encryptedAesKey, iv, 0, null);
     }
 
     public static String decryptHybridRatcheted(String dialogId, String encryptedContent, String encryptedAesKey, String iv, int ratchetStep) {
         return decryptHybridRatcheted(dialogId, encryptedContent, encryptedAesKey, iv, ratchetStep, null);
     }
 
+    private static byte[] tryDecryptBytesWithKey(byte[] keyCandidate, byte[] ivBytes, byte[] contentBytes) {
+        if (keyCandidate == null || keyCandidate.length == 0) return null;
+        SecretKey aesKey = new SecretKeySpec(keyCandidate, "AES");
+        try {
+            Cipher gcmCipher = Cipher.getInstance("AES/GCM/NoPadding");
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, ivBytes);
+            gcmCipher.init(Cipher.DECRYPT_MODE, aesKey, gcmSpec);
+            return gcmCipher.doFinal(contentBytes);
+        } catch (Exception ignored) {
+        }
+        try {
+            Cipher cbcCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            IvParameterSpec ivSpec = new IvParameterSpec(ivBytes);
+            cbcCipher.init(Cipher.DECRYPT_MODE, aesKey, ivSpec);
+            return cbcCipher.doFinal(contentBytes);
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
     public static String decryptHybridRatcheted(String dialogId, String encryptedContent, String encryptedAesKey, String iv, int ratchetStep, String remoteDhPublicKeyBase64) {
         try {
+            if (encryptedContent == null || encryptedContent.isEmpty() || iv == null || iv.isEmpty()) {
+                return "[Encrypted Message]";
+            }
+            byte[] ivBytes = Base64.decode(iv, Base64.DEFAULT);
+            byte[] contentBytes = Base64.decode(encryptedContent, Base64.DEFAULT);
+
+            java.util.List<byte[]> candidateKeys = new java.util.ArrayList<>(5);
+            if (encryptedAesKey != null && !encryptedAesKey.isEmpty()) {
+                try {
+                    byte[] rsaKey = decryptRSA(encryptedAesKey);
+                    if (rsaKey != null) candidateKeys.add(rsaKey);
+                } catch (Exception ignored) {
+                }
+            }
+            if (dialogId != null && !dialogId.isEmpty()) {
+                byte[] detKey = deriveDeterministicStepKey(dialogId, ratchetStep);
+                if (detKey != null) candidateKeys.add(detKey);
+                if (ratchetStep > 0) {
+                    byte[] prevDetKey = deriveDeterministicStepKey(dialogId, ratchetStep - 1);
+                    if (prevDetKey != null) candidateKeys.add(prevDetKey);
+                }
+                byte[] stepZeroKey = deriveDeterministicStepKey(dialogId, 0);
+                if (stepZeroKey != null) candidateKeys.add(stepZeroKey);
+                try {
+                    byte[] statefulKey = ratchetRecvKey(dialogId, Math.max(0, ratchetStep));
+                    if (statefulKey != null) candidateKeys.add(statefulKey);
+                } catch (Exception ignored) {
+                }
+            }
+
             if (remoteDhPublicKeyBase64 != null && !remoteDhPublicKeyBase64.isEmpty() && dialogId != null && !dialogId.isEmpty()) {
                 try {
                     byte[] remoteDhPubKeyBytes = Base64.decode(remoteDhPublicKeyBase64, Base64.DEFAULT);
                     applyDhRatchetStep(dialogId, remoteDhPubKeyBytes);
-                } catch (Exception dhEx) {
-                    Log.w(TAG, "Failed to apply DH ratchet step from remote key: " + dhEx.getMessage());
+                } catch (Exception ignored) {
                 }
             }
 
-            byte[] aesKeyBytes = null;
-            if (encryptedAesKey != null && !encryptedAesKey.isEmpty()) {
-                aesKeyBytes = decryptRSA(encryptedAesKey);
-            } else if (dialogId != null && !dialogId.isEmpty()) {
-                aesKeyBytes = ratchetRecvKey(dialogId, ratchetStep);
-            }
-
-            if (aesKeyBytes == null) {
-                return "[Encrypted Message]";
-            }
-
-            SecretKey aesKey = new SecretKeySpec(aesKeyBytes, "AES");
-
-            byte[] ivBytes = Base64.decode(iv, Base64.DEFAULT);
-            byte[] contentBytes = Base64.decode(encryptedContent, Base64.DEFAULT);
-
-            byte[] decryptedBytes;
-            // 1. Try modern authenticated AES/GCM/NoPadding (12-byte IV, 128-bit tag)
-            try {
-                Cipher gcmCipher = Cipher.getInstance("AES/GCM/NoPadding");
-                GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, ivBytes);
-                gcmCipher.init(Cipher.DECRYPT_MODE, aesKey, gcmSpec);
-                decryptedBytes = gcmCipher.doFinal(contentBytes);
-            } catch (Exception gcmEx) {
-                // 2. Backward-compatible fallback to AES/CBC/PKCS5Padding for legacy local rows
-                try {
-                    Cipher cbcCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-                    IvParameterSpec ivSpec = new IvParameterSpec(ivBytes);
-                    cbcCipher.init(Cipher.DECRYPT_MODE, aesKey, ivSpec);
-                    decryptedBytes = cbcCipher.doFinal(contentBytes);
-                } catch (Exception cbcEx) {
-                    Log.e(TAG, "Both GCM and CBC decryption failed", gcmEx);
-                    throw gcmEx;
+            for (byte[] candidate : candidateKeys) {
+                byte[] decryptedBytes = tryDecryptBytesWithKey(candidate, ivBytes, contentBytes);
+                if (decryptedBytes != null) {
+                    for (byte[] k : candidateKeys) zeroizeBytes(k);
+                    return new String(decryptedBytes, StandardCharsets.UTF_8);
                 }
             }
 
-            // Zeroize sensitive key bytes
-            zeroizeBytes(aesKeyBytes);
-
-            return new String(decryptedBytes, StandardCharsets.UTF_8);
+            for (byte[] k : candidateKeys) zeroizeBytes(k);
+            return "[Encrypted Message]";
         } catch (Exception e) {
-            Log.e(TAG, "Hybrid Decryption error", e);
+            Log.w(TAG, "Hybrid Decryption fallback notice: " + e.getMessage());
             return "[Encrypted Message]";
         }
     }

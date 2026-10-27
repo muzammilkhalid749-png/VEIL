@@ -112,28 +112,27 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // Initialize P2P WebRTC & Auth Session (Firebase or Sovereign)
-        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
-            String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
-            if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
-                com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this,
-                        com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser());
-            } else {
-                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
-                        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getLocalManifest();
-                if (manifest != null) {
-                    com.m3.veil.manager.AuthManager.getInstance().onSovereignSessionStarted(this, manifest);
-                } else if (uid != null) {
-                    com.m3.veil.webrtc.WebRtcManager.getInstance(this).init(uid);
-                    try {
-                        com.m3.veil.calling.CallEngine.getInstance(this).init(uid);
-                    } catch (Throwable ignored) {}
+        // Defer P2P WebRTC & Auth Session initialization until after Frame 1 renders
+        android.os.Looper.myQueue().addIdleHandler(() -> {
+            if (!isDestroyed() && com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(MainActivity.this)) {
+                String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(MainActivity.this);
+                if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                    com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(MainActivity.this,
+                            com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser());
+                } else {
+                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(MainActivity.this).getLocalManifest();
+                    if (manifest != null) {
+                        com.m3.veil.manager.AuthManager.getInstance().onSovereignSessionStarted(MainActivity.this, manifest);
+                    } else if (uid != null) {
+                        com.m3.veil.webrtc.WebRtcManager.getInstance(MainActivity.this).init(uid);
+                    }
                 }
+                com.m3.veil.services.VeilMeshDaemonService.start(MainActivity.this);
             }
-            com.m3.veil.services.VeilMeshDaemonService.start(this);
-        }
-
-        WebRtcManager.getInstance(this).addEventListener(globalCallListener);
+            WebRtcManager.getInstance(MainActivity.this).addEventListener(globalCallListener);
+            return false;
+        });
 
         // Handle incoming notification intent
         handleNotificationIntent(getIntent());
@@ -219,7 +218,7 @@ public class MainActivity extends AppCompatActivity {
     private void setupViewPager() {
         MainPagerAdapter pagerAdapter = new MainPagerAdapter(this);
         viewPager.setAdapter(pagerAdapter);
-        viewPager.setOffscreenPageLimit(4);
+        viewPager.setOffscreenPageLimit(1);
         viewPager.setUserInputEnabled(false);
     }
 
@@ -277,9 +276,26 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void setToolbarTitleSafely(CharSequence newTitle) {
+        if (toolbarTitle == null || newTitle == null) return;
+        CharSequence current = toolbarTitle.getText();
+        if (current != null && current.toString().contentEquals(newTitle)) {
+            return;
+        }
+        if (toolbarTitle.isInLayout()) {
+            toolbarTitle.post(() -> {
+                if (toolbarTitle != null) {
+                    toolbarTitle.setText(newTitle);
+                }
+            });
+        } else {
+            toolbarTitle.setText(newTitle);
+        }
+    }
+
     public void refreshActivePersonaToolbarBadge() {
         if (toolbarTitle != null && viewPager != null && viewPager.getCurrentItem() == 0) {
-            toolbarTitle.setText(R.string.app_name);
+            setToolbarTitleSafely(getString(R.string.app_name));
         }
     }
 
@@ -360,7 +376,7 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 if (appLogo != null) appLogo.setVisibility(android.view.View.VISIBLE);
-                toolbarTitle.setText(R.string.app_name);
+                setToolbarTitleSafely(getString(R.string.app_name));
                 if (searchButton != null) {
                     searchButton.setVisibility(android.view.View.GONE);
                 }
@@ -375,7 +391,7 @@ public class MainActivity extends AppCompatActivity {
 
             case 1: // Discover (Moments & Confessions)
                 if (appLogo != null) appLogo.setVisibility(android.view.View.GONE);
-                toolbarTitle.setText("Discover");
+                setToolbarTitleSafely("Discover");
                 if (searchButton != null) {
                     searchButton.setVisibility(android.view.View.VISIBLE);
                     searchButton.setOnClickListener(v -> {
@@ -394,7 +410,7 @@ public class MainActivity extends AppCompatActivity {
 
             case 2: // Calls
                 if (appLogo != null) appLogo.setVisibility(android.view.View.GONE);
-                toolbarTitle.setText("Calls");
+                setToolbarTitleSafely("Calls");
                 if (searchButton != null) {
                     searchButton.setVisibility(android.view.View.GONE);
                 }
@@ -409,7 +425,7 @@ public class MainActivity extends AppCompatActivity {
 
             case 3: // Settings & Profile
                 if (appLogo != null) appLogo.setVisibility(android.view.View.GONE);
-                toolbarTitle.setText("Settings & Profile");
+                setToolbarTitleSafely("Settings & Profile");
                 if (searchButton != null) {
                     searchButton.setVisibility(android.view.View.GONE);
                 }

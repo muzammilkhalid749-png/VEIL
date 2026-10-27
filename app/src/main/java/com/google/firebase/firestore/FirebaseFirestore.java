@@ -104,6 +104,14 @@ public class FirebaseFirestore {
     private final ConcurrentHashMap<String, QuerySubContext> pendingQuerySubs = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<String> pendingOutboundEvents = new CopyOnWriteArrayList<>();
     private final AtomicInteger subCounter = new AtomicInteger(1);
+    private final Set<String> seenNostrEventIds = Collections.synchronizedSet(
+            Collections.newSetFromMap(new java.util.LinkedHashMap<String, Boolean>(1024, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+                    return size() > 4000;
+                }
+            }));
+    private final ConcurrentHashMap<String, Long> lastTagQueryMs = new ConcurrentHashMap<>();
 
     private static final class QuerySubContext {
         final CountDownLatch firstEoseLatch = new CountDownLatch(1);
@@ -253,6 +261,10 @@ public class FirebaseFirestore {
 
     private void processIncomingNostrDocEvent(JSONObject eventObj) {
         try {
+            String evId = eventObj.optString("id", "");
+            if (evId != null && !evId.isEmpty() && !seenNostrEventIds.add(evId)) {
+                return;
+            }
             String content = eventObj.optString("content", "");
             if (content == null || content.isEmpty() || !content.startsWith("{")) return;
 
@@ -360,7 +372,13 @@ public class FirebaseFirestore {
 
     private void queryNostrByTagBlocking(String tagValue, int limit, long timeoutMs) {
         ensureNostrPoolConnected();
-        String subId = "q_" + subCounter.incrementAndGet() + "_" + (System.currentTimeMillis() % 10000);
+        long now = System.currentTimeMillis();
+        Long lastQ = lastTagQueryMs.get(tagValue);
+        if (lastQ != null && (now - lastQ) < 15000L && !relaySockets.isEmpty()) {
+            return;
+        }
+        lastTagQueryMs.put(tagValue, now);
+        String subId = "q_" + subCounter.incrementAndGet() + "_" + (now % 10000);
         QuerySubContext ctx = new QuerySubContext();
         pendingQuerySubs.put(subId, ctx);
 
@@ -697,18 +715,20 @@ public class FirebaseFirestore {
         ScheduledFuture<?> future = pollExecutor.scheduleWithFixedDelay(() -> {
             getDocumentAsync(normPath).addOnSuccessListener(snap -> {
                 if (snap == null) return;
-                String sig = snap.exists() + ":" + String.valueOf(snap.getData());
-                String prev = lastHash.put(normPath, sig);
-                if (prev == null || !prev.equals(sig)) {
-                    mainHandler.post(() -> {
-                        try {
-                            listener.onEvent(snap, null);
-                        } catch (Exception ignored) {
-                        }
-                    });
-                }
+                ioExecutor.execute(() -> {
+                    String sig = snap.exists() + ":" + String.valueOf(snap.getData());
+                    String prev = lastHash.put(normPath, sig);
+                    if (prev == null || !prev.equals(sig)) {
+                        mainHandler.post(() -> {
+                            try {
+                                listener.onEvent(snap, null);
+                            } catch (Exception ignored) {
+                            }
+                        });
+                    }
+                });
             });
-        }, 0, 2200, TimeUnit.MILLISECONDS);
+        }, 0, 15000, TimeUnit.MILLISECONDS);
 
         return () -> {
             future.cancel(false);
@@ -734,8 +754,10 @@ public class FirebaseFirestore {
 
         final Map<String, Map<String, Object>> knownDocs = new ConcurrentHashMap<>();
         final boolean[] firstRun = {true};
+        final java.util.concurrent.atomic.AtomicBoolean evalQueued = new java.util.concurrent.atomic.AtomicBoolean(false);
 
-        final Runnable evaluateAndEmit = () -> {
+        final Runnable evaluateOnWorker = () -> {
+            evalQueued.set(false);
             QuerySnapshot querySnap = buildLocalQuerySnapshot(normCollection, filters, orderByField, orderDirection, limitCount);
             List<DocumentSnapshot> currentDocs = querySnap.getDocuments();
             List<DocumentChange> changes = new ArrayList<>();
@@ -783,12 +805,18 @@ public class FirebaseFirestore {
             }
         };
 
+        final Runnable evaluateAndEmit = () -> {
+            if (evalQueued.compareAndSet(false, true)) {
+                ioExecutor.execute(evaluateOnWorker);
+            }
+        };
+
         collectionWakeListeners.computeIfAbsent(normCollection, k -> new CopyOnWriteArrayList<>()).add(evaluateAndEmit);
 
         ScheduledFuture<?> future = pollExecutor.scheduleWithFixedDelay(() -> {
             queryCollectionAsync(normCollection, filters, orderByField, orderDirection, limitCount)
                     .addOnSuccessListener(querySnap -> evaluateAndEmit.run());
-        }, 0, 2200, TimeUnit.MILLISECONDS);
+        }, 0, 15000, TimeUnit.MILLISECONDS);
 
         return () -> {
             future.cancel(false);
