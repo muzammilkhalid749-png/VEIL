@@ -117,6 +117,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     private final java.util.Map<String, Integer> downloadStates = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Map<String, Integer> downloadProgresses = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<String> autoTriggeredVoiceDownloads = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private volatile String pendingAutoPlayMessageId = null;
 
     private OnMessageLongClickListener longClickListener;
     private OnReactionClickListener reactionClickListener;
@@ -132,11 +134,35 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         this.mediaDownloadClickListener = listener;
     }
 
+    public boolean isAutoTriggeredVoiceDownload(String messageId) {
+        return messageId != null && autoTriggeredVoiceDownloads.contains(messageId);
+    }
+
+    public void clearAutoTriggeredVoiceDownload(String messageId) {
+        if (messageId != null) autoTriggeredVoiceDownloads.remove(messageId);
+    }
+
     public void setMediaDownloadState(String messageId, int state, int progress) {
         if (messageId == null) return;
         downloadStates.put(messageId, state);
         if (progress >= 0) downloadProgresses.put(messageId, progress);
         notifyItemChangedByMessageId(messageId);
+        if (state == STATE_DOWNLOADED && messageId.equals(pendingAutoPlayMessageId)) {
+            pendingAutoPlayMessageId = null;
+            new Handler(Looper.getMainLooper()).post(() -> {
+                if (messages == null) return;
+                for (int i = 0; i < messages.size(); i++) {
+                    Message m = messages.get(i);
+                    if (m != null && messageId.equals(m.getId()) && "voice".equals(m.getType())) {
+                        Context ctx = com.m3.veil.VeilApplication.getInstance();
+                        if (ctx != null) {
+                            VoicePlayerManager.getInstance().playVoiceNote(ctx, m, null, currentUserId);
+                        }
+                        break;
+                    }
+                }
+            });
+        }
     }
 
     public int getMediaDownloadState(String messageId) {
@@ -323,6 +349,47 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         this.timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
         this.longClickListener = longClickListener;
         this.reactionClickListener = reactionClickListener;
+        VoicePlayerManager.getInstance().setOnVoiceCompletionQueueListener(this::handleVoiceNoteCompletedAutoPlayNext);
+    }
+
+    private void handleVoiceNoteCompletedAutoPlayNext(String completedMessageId) {
+        if (completedMessageId == null || messages == null) return;
+        new Handler(Looper.getMainLooper()).post(() -> {
+            if (messages == null) return;
+            int completedIdx = -1;
+            for (int i = 0; i < messages.size(); i++) {
+                Message m = messages.get(i);
+                if (m != null && completedMessageId.equals(m.getId())) {
+                    completedIdx = i;
+                    break;
+                }
+            }
+            if (completedIdx < 0 || completedIdx + 1 >= messages.size()) return;
+            Message nextMsg = messages.get(completedIdx + 1);
+            if (nextMsg == null || !"voice".equals(nextMsg.getType()) || nextMsg.isBlink()) {
+                return;
+            }
+            Context ctx = com.m3.veil.VeilApplication.getInstance();
+            if (ctx == null) return;
+
+            File localAudio = FileMediaManager.getDecryptedFile(ctx, nextMsg, ".m4a");
+            boolean hasLocal = (localAudio != null && localAudio.exists() && localAudio.length() > 0)
+                    || (nextMsg.getLocalFilePath() != null && new File(nextMsg.getLocalFilePath()).exists());
+            if (!hasLocal) {
+                File inlineAudio = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(ctx, nextMsg.getChatId(), nextMsg);
+                if (inlineAudio != null && inlineAudio.exists() && inlineAudio.length() > 0) {
+                    hasLocal = true;
+                }
+            }
+            if (hasLocal) {
+                VoicePlayerManager.getInstance().playVoiceNote(ctx, nextMsg, null, currentUserId);
+            } else if (nextMsg.getId() != null) {
+                pendingAutoPlayMessageId = nextMsg.getId();
+                if (mediaDownloadClickListener != null) {
+                    mediaDownloadClickListener.onMediaDownloadClick(nextMsg);
+                }
+            }
+        });
     }
 
     public void setTyping(boolean typing) {
@@ -2057,6 +2124,26 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         File localAudio = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".m4a");
                         boolean hasLocal = (localAudio != null && localAudio.exists() && localAudio.length() > 0)
                                 || (message.getLocalFilePath() != null && new File(message.getLocalFilePath()).exists());
+                        if (!hasLocal && message.getMediaUrl() != null && !message.getMediaUrl().isEmpty()) {
+                            File inlineAudio = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(itemView.getContext(), message.getChatId(), message);
+                            if (inlineAudio != null && inlineAudio.exists() && inlineAudio.length() > 0) {
+                                localAudio = inlineAudio;
+                                hasLocal = true;
+                            }
+                        }
+
+                        // Always auto-download incoming voice messages without requiring manual tap
+                        if (!hasLocal && message.getId() != null) {
+                            int currentState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
+                            if (currentState == STATE_IDLE && autoTriggeredVoiceDownloads.add(message.getId()) && mediaDownloadClickListener != null) {
+                                downloadStates.put(message.getId(), STATE_DOWNLOADING);
+                                itemView.post(() -> {
+                                    if (mediaDownloadClickListener != null) {
+                                        mediaDownloadClickListener.onMediaDownloadClick(message);
+                                    }
+                                });
+                            }
+                        }
 
                         final int voiceDownloadState = hasLocal ? STATE_DOWNLOADED : downloadStates.getOrDefault(message.getId(), STATE_IDLE);
 
@@ -2089,12 +2176,15 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 boolean isPlaying = VoicePlayerManager.getInstance().isPlaying(message.getId());
                                 voiceActionButton.setImageResource(isPlaying ? R.drawable.ic_pause : R.drawable.ic_play_arrow);
                                 voiceActionButton.setVisibility(View.VISIBLE);
-                                voiceActionButton.setOnClickListener(v -> VoicePlayerManager.getInstance().playVoiceNote(
-                                    itemView.getContext(),
-                                    message,
-                                    null,
-                                    currentUserId
-                                ));
+                                voiceActionButton.setOnClickListener(v -> {
+                                    pendingAutoPlayMessageId = null;
+                                    VoicePlayerManager.getInstance().playVoiceNote(
+                                        itemView.getContext(),
+                                        message,
+                                        null,
+                                        currentUserId
+                                    );
+                                });
                             }
                             if (voiceProgressBar != null) voiceProgressBar.setVisibility(View.GONE);
 
@@ -2142,6 +2232,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 voiceActionButton.setImageResource(voiceDownloadState == STATE_RETRY ? R.drawable.ic_undo : R.drawable.ic_download);
                                 voiceActionButton.setVisibility(View.VISIBLE);
                                 voiceActionButton.setOnClickListener(v -> {
+                                    pendingAutoPlayMessageId = message.getId();
+                                    clearAutoTriggeredVoiceDownload(message.getId());
                                     if (mediaDownloadClickListener != null) {
                                         if (voiceDownloadState == STATE_RETRY) {
                                             mediaDownloadClickListener.onMediaRetryClick(message);

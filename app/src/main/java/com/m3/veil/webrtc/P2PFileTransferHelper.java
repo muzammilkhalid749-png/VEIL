@@ -332,6 +332,7 @@ public class P2PFileTransferHelper {
                 byte[] buffer = VeilBufferPool.borrowByteArray16k();
                 int chunksSent = 0;
 
+                int lastReportedProgress = -1;
                 try {
                     for (int chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
                         // If resuming, skip chunks already possessed by recipient
@@ -345,7 +346,7 @@ public class P2PFileTransferHelper {
                         if (dataChannel.bufferedAmount() > maxBuf) {
                             while (dataChannel.bufferedAmount() > resumeBuf) {
                                 try {
-                                    Thread.sleep(8);
+                                    Thread.sleep(2);
                                 } catch (InterruptedException ignored) {}
                             }
                         }
@@ -355,24 +356,19 @@ public class P2PFileTransferHelper {
                         int bytesRead = raf.read(buffer);
                         if (bytesRead <= 0) break;
 
-                        // Encode chunk into binary VeilPacket without extra array copy
+                        // Encode chunk into binary VeilPacket without extra array or Base64/JSON copy
                         byte[] chunkPayload = buildBinaryChunkPayload(transferId, chunkIndex, buffer, 0, bytesRead);
                         VeilPacket chunkPacket = new VeilPacket(VeilPacket.LANE_MEDIA, VeilPacket.TYPE_FILE_CHUNK, chunkPayload);
-
-                        // Also prepare fallback JSON representation
-                        JSONObject fallbackChunk = new JSONObject();
-                        fallbackChunk.put("action", "FILE_CHUNK");
-                        fallbackChunk.put("transferId", transferId);
-                        fallbackChunk.put("chunkIndex", chunkIndex);
-                        fallbackChunk.put("data", Base64.encodeToString(buffer, 0, bytesRead, Base64.NO_WRAP));
-
-                        sendPacketOrFallback(dataChannel, chunkPacket, fallbackChunk.toString());
+                        sendPacketOrFallback(dataChannel, chunkPacket, null);
                         chunksSent++;
 
                         final int progress = (int) (((double) (chunkIndex + 1) / totalChunks) * 100);
-                        mainHandler.post(() -> {
-                            if (callback != null) callback.onProgress(progress);
-                        });
+                        if (progress != lastReportedProgress) {
+                            lastReportedProgress = progress;
+                            mainHandler.post(() -> {
+                                if (callback != null) callback.onProgress(progress);
+                            });
+                        }
                     }
                 } finally {
                     VeilBufferPool.recycleByteArray(buffer);
@@ -411,9 +407,11 @@ public class P2PFileTransferHelper {
             byte[] bytes = packet.serialize();
             dataChannel.send(new DataChannel.Buffer(ByteBuffer.wrap(bytes), false));
         } catch (Throwable t) {
-            // Fallback to text JSON
-            byte[] fallbackBytes = fallbackJson.getBytes(StandardCharsets.UTF_8);
-            dataChannel.send(new DataChannel.Buffer(ByteBuffer.wrap(fallbackBytes), false));
+            // Fallback to text JSON if provided
+            if (fallbackJson != null) {
+                byte[] fallbackBytes = fallbackJson.getBytes(StandardCharsets.UTF_8);
+                dataChannel.send(new DataChannel.Buffer(ByteBuffer.wrap(fallbackBytes), false));
+            }
         }
     }
 

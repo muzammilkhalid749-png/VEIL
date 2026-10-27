@@ -69,8 +69,8 @@ public class SignalingClient {
     private WebRtcManager webRtcManager;
     private final Map<String, String> peerPublicKeys = new ConcurrentHashMap<>();
     private final Set<String> processedSignalIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final java.util.concurrent.ExecutorService sigExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+    private final Map<String, Long> lastPruneByPeerMs = new ConcurrentHashMap<>();
+    private final java.util.concurrent.ScheduledExecutorService sigExecutor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "VeilSignalingWorker");
         t.setDaemon(true);
         return t;
@@ -256,13 +256,18 @@ public class SignalingClient {
 
     public void pruneSignalingForPeer(String peerId) {
         if (peerId == null || this.currentUserId == null) return;
+        long now = System.currentTimeMillis();
+        Long prev = lastPruneByPeerMs.put(peerId, now);
+        if (prev != null && (now - prev) < 10_000L) {
+            return;
+        }
         try {
             this.db.collection("users")
                     .document(this.currentUserId)
                     .collection("signals")
                     .limit(50)
                     .get()
-                    .addOnSuccessListener(snapshots -> {
+                    .addOnSuccessListener(sigExecutor, snapshots -> {
                         if (snapshots == null) return;
                         for (DocumentSnapshot doc : snapshots.getDocuments()) {
                             String from = doc.getString("from");
@@ -281,7 +286,7 @@ public class SignalingClient {
                 .collection("signals")
                 .limit(50)
                 .get()
-                .addOnSuccessListener(snapshots -> {
+                .addOnSuccessListener(sigExecutor, snapshots -> {
                     if (snapshots == null) return;
                     long cutoff = System.currentTimeMillis() - SIGNAL_MAX_AGE_MS;
                     for (DocumentSnapshot doc : snapshots.getDocuments()) {
@@ -328,7 +333,7 @@ public class SignalingClient {
             processDecryptedJson(from, type, encryptedPayload, cachedKey, fallbackDoc);
         } else {
             this.db.collection("users").document(from).get()
-                    .addOnSuccessListener(userDoc -> {
+                    .addOnSuccessListener(sigExecutor, userDoc -> {
                         String pubKey = userDoc != null ? userDoc.getString("publicKey") : null;
                         if (pubKey != null && !pubKey.isEmpty()) {
                             this.peerPublicKeys.put(from, pubKey);
@@ -337,7 +342,7 @@ public class SignalingClient {
                             fallbackPlainDispatch(from, type, fallbackDoc);
                         }
                     })
-                    .addOnFailureListener(err -> fallbackPlainDispatch(from, type, fallbackDoc));
+                    .addOnFailureListener(sigExecutor, err -> fallbackPlainDispatch(from, type, fallbackDoc));
         }
     }
 
@@ -472,8 +477,8 @@ public class SignalingClient {
                 .document(signalId)
                 .set(signalDoc);
 
-        // Auto-purge ephemeral signal document after TTL so zero trace stays in Firestore
-        this.mainHandler.postDelayed(() -> {
+        // Auto-purge ephemeral signal document after TTL on background worker so zero trace stays in Firestore
+        this.sigExecutor.schedule(() -> {
             try {
                 this.db.collection("users")
                         .document(toUserId)
@@ -481,7 +486,7 @@ public class SignalingClient {
                         .document(signalId)
                         .delete();
             } catch (Exception ignored) {}
-        }, 45_000L);
+        }, 45_000L, java.util.concurrent.TimeUnit.MILLISECONDS);
 
         // Blind FCM Wake Knock for sleeping peers
         if (triggerWakeKnock) {
@@ -529,7 +534,7 @@ public class SignalingClient {
                     .document(knockId)
                     .set(knock);
 
-            this.mainHandler.postDelayed(() -> {
+            this.sigExecutor.schedule(() -> {
                 try {
                     this.db.collection("users")
                             .document(toUserId)
@@ -537,7 +542,7 @@ public class SignalingClient {
                             .document(knockId)
                             .delete();
                 } catch (Exception ignored) {}
-            }, 30_000L);
+            }, 30_000L, java.util.concurrent.TimeUnit.MILLISECONDS);
         } catch (Exception ignored) {}
     }
 

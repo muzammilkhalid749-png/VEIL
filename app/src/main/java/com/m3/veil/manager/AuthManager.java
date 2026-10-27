@@ -287,6 +287,10 @@ public class AuthManager {
      */
     public void onSovereignIdentityInitialized(@NonNull Context context, @NonNull String uid, boolean hasProfile) {
         Context appCtx = context.getApplicationContext();
+        if (uid.equals(cachedCurrentUserId) && Boolean.TRUE.equals(cachedLoggedInState)) {
+            FirebaseAuth.getInstance().setCurrentUserUid(uid);
+            return;
+        }
         cachedCurrentUserId = uid;
         cachedLoggedInState = true;
         cachedMyUserIds.add(uid);

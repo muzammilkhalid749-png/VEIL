@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class AudioRecorderHelper {
 
     private static final String TAG = "AudioRecorderHelper";
-    private static final int SAMPLE_RATE = 44100;
+    private static final int SAMPLE_RATE = 16000;
     private static final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
     private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
 
@@ -61,6 +61,7 @@ public class AudioRecorderHelper {
     /**
      * Starts voice note recording.
      * When activeVoiceFilter is non-natural, uses real-time PCM processing via AudioRecord.
+     * When activeVoiceFilter is NATURAL, uses hardware AAC 32kbps @ 16kHz (~4 KB/sec) for ultra-fast P2P & offline sync.
      */
     public synchronized void startRecording(String filePath) {
         outputFile = new File(filePath);
@@ -72,13 +73,15 @@ public class AudioRecorderHelper {
             return;
         }
 
-        // Natural voice: try PCM recording first, fallback to MediaRecorder
+        // Natural voice: prefer hardware AAC 32kbps (22x smaller than PCM), fallback to 16kHz PCM
         try {
-            startPcmRecording(filePath);
+            if (startMediaRecorder(filePath)) {
+                return;
+            }
         } catch (Throwable t) {
-            Log.w(TAG, "PCM recording failed, falling back to MediaRecorder: " + t.getMessage());
-            startMediaRecorder(filePath);
+            Log.w(TAG, "Hardware AAC MediaRecorder failed, falling back to 16kHz PCM: " + t.getMessage());
         }
+        startPcmRecording(filePath);
     }
 
     private void startPcmRecording(String filePath) {
@@ -152,19 +155,29 @@ public class AudioRecorderHelper {
         }
     }
 
-    private void startMediaRecorder(String filePath) {
+    private boolean startMediaRecorder(String filePath) {
         outputFile = new File(filePath);
         legacyMediaRecorder = new MediaRecorder();
         try {
             legacyMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
             legacyMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
             legacyMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            legacyMediaRecorder.setAudioChannels(1);
+            legacyMediaRecorder.setAudioSamplingRate(16000);
+            legacyMediaRecorder.setAudioEncodingBitRate(32000);
             legacyMediaRecorder.setOutputFile(outputFile.getAbsolutePath());
             legacyMediaRecorder.prepare();
             legacyMediaRecorder.start();
-        } catch (IOException e) {
+            isRecording.set(true);
+            isPaused.set(false);
+            return true;
+        } catch (Exception e) {
             Log.e(TAG, "Legacy MediaRecorder recording failed", e);
-            stopRecording();
+            try {
+                legacyMediaRecorder.release();
+            } catch (Throwable ignored) {}
+            legacyMediaRecorder = null;
+            return false;
         }
     }
 

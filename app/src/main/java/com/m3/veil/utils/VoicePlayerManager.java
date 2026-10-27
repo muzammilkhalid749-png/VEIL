@@ -38,11 +38,20 @@ public class VoicePlayerManager {
     // Callbacks to update UI in adapter
     private Map<String, PlaybackListener> listeners = new HashMap<>();
     private Map<String, Integer> durationCache = new HashMap<>();
+    private OnVoiceCompletionQueueListener completionQueueListener;
 
     public interface PlaybackListener {
         void onStateChanged(boolean isPlaying);
         void onProgressUpdate(int currentPosition, int maxDuration);
         default void onSpeedChanged(float speed) {}
+    }
+
+    public interface OnVoiceCompletionQueueListener {
+        void onVoiceNoteCompleted(String completedMessageId);
+    }
+
+    public void setOnVoiceCompletionQueueListener(OnVoiceCompletionQueueListener listener) {
+        this.completionQueueListener = listener;
     }
 
     public static synchronized VoicePlayerManager getInstance() {
@@ -120,6 +129,9 @@ public class VoicePlayerManager {
             File decryptedFile = new File(cacheDir, "dec_" + message.getId() + ".m4a");
             if (decryptedFile.exists() && decryptedFile.length() > 0) localAudio = decryptedFile;
         }
+        if (localAudio == null) {
+            localAudio = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(context, message.getChatId(), message);
+        }
 
         if (localAudio != null) {
             startPlaying(message.getId(), localAudio.getAbsolutePath(), message.getVoiceFilter());
@@ -127,7 +139,7 @@ public class VoicePlayerManager {
                 com.m3.veil.manager.VeilMessagesController.getInstance(context).markMessageAsReadExplicitly(message);
             } catch (Throwable ignored) {}
         } else {
-            Toast.makeText(context, "Voice note awaiting peer-to-peer WebRTC transfer", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "Downloading voice note...", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -160,10 +172,14 @@ public class VoicePlayerManager {
             notifyStateChanged(messageId, true);
 
             mediaPlayer.setOnCompletionListener(mp -> {
-                notifyStateChanged(currentlyPlayingMessageId, false);
+                String completedId = currentlyPlayingMessageId;
+                notifyStateChanged(completedId, false);
                 currentlyPlayingMessageId = null;
                 if (progressHandler != null && progressRunnable != null) {
                     progressHandler.removeCallbacks(progressRunnable);
+                }
+                if (completedId != null && completionQueueListener != null) {
+                    completionQueueListener.onVoiceNoteCompleted(completedId);
                 }
             });
 

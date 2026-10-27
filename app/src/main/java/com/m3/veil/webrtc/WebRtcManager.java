@@ -100,6 +100,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    private final Map<String, Long> peerLastSeenTime = new ConcurrentHashMap<>();
    private final Map<String, List<IceCandidate>> pendingIceCandidates = new ConcurrentHashMap<>();
    private final Map<String, Long> lastOfferTimestamp = new ConcurrentHashMap<>();
+   private final Map<String, Long> lastReadWatermarkSent = new ConcurrentHashMap<>();
+   private final Map<String, Long> lastReadReceiptTimeMs = new ConcurrentHashMap<>();
+   private final Map<String, Long> lastGossipSyncTimeMs = new ConcurrentHashMap<>();
    private final List<P2PEventListener> listeners = Collections.synchronizedList(new ArrayList<>());
    private final Set<String> connectedNotifiedPeers = Collections.newSetFromMap(new ConcurrentHashMap<>());
    private final java.util.concurrent.ExecutorService rtcExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
@@ -259,7 +262,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
    public void syncAllPendingMessages() {
       if (this.currentUserId != null) {
-         (new Thread(() -> {
+         this.rtcExecutor.execute(() -> {
             try {
                VeilMeshDaemonService daemon = VeilMeshDaemonService.getInstance(this.context);
                if (daemon != null) {
@@ -268,8 +271,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             } catch (Exception e) {
                Log.e("WebRtcManager", "Error syncing pending messages", e);
             }
-
-         })).start();
+         });
       }
    }
 
@@ -913,6 +915,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                if (lane == 1) {
                   VeilMeshDaemonService.getInstance(WebRtcManager.this.context).flushOutboxForPeer(peerId);
                   WebRtcManager.this.syncVeilBoardGossipWithPeer(peerId, dataChannel);
+                  WebRtcManager.this.flushPendingDownloadRequestsForPeer(peerId, dataChannel);
                }
             } else if (dataChannel.state() == State.CLOSED) {
                PeerChannelHub hub = (PeerChannelHub)WebRtcManager.this.peerHubs.get(peerId);
@@ -1310,6 +1313,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
             if (mediaUrl != null && !mediaUrl.isEmpty()) {
                message.setMediaUrl(mediaUrl);
+               com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(this.context, chatId, message);
             }
 
             long msgVanishTimer = p.optLong("vanishTimer", existingChat != null ? existingChat.getVanishTimer() : 0L);
@@ -1807,30 +1811,127 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
    }
 
-   public void requestMediaDownload(String peerId, String messageId, P2PFileTransferHelper.DownloadProgressListener callback) {
-      if (messageId != null) {
-         DataChannel dc = peerId != null ? (DataChannel)this.dataChannels.get(peerId) : null;
-         if (callback != null) {
-            P2PFileTransferHelper.registerDownloadListener(messageId, callback);
-         }
+   private final Map<String, String> pendingDownloadRequests = new ConcurrentHashMap<>();
 
-         if (dc != null && dc.state() == State.OPEN) {
-            P2PFileTransferHelper.requestFile(dc, messageId);
-         } else {
-            if (peerId != null) {
+   private void flushPendingDownloadRequestsForPeer(String peerId, DataChannel dc) {
+      if (peerId == null || dc == null || dc.state() != State.OPEN) return;
+      for (Map.Entry<String, String> entry : this.pendingDownloadRequests.entrySet()) {
+         if (peerId.equals(entry.getValue())) {
+            String msgId = entry.getKey();
+            this.pendingDownloadRequests.remove(msgId);
+            P2PFileTransferHelper.requestFile(dc, msgId);
+         }
+      }
+   }
+
+   public void requestMediaDownload(String peerId, String messageId, P2PFileTransferHelper.DownloadProgressListener callback) {
+      if (messageId == null) return;
+      this.rtcExecutor.execute(() -> {
+         try {
+            Message msg = EncryptedChatDatabase.getInstance(this.context).getMessageById(messageId);
+            if (msg != null) {
+               File localDecoded = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(this.context, msg.getChatId(), msg);
+               if (localDecoded != null && localDecoded.exists() && localDecoded.length() > 0) {
+                  EncryptedChatDatabase.getInstance(this.context).saveMessage(msg.getChatId() != null ? msg.getChatId() : getChatId(this.currentUserId, peerId), msg);
+                  P2PFileTransferHelper.unregisterDownloadListener(messageId);
+                  if (callback != null) {
+                     this.mainHandler.post(() -> callback.onComplete(messageId, localDecoded));
+                  }
+                  return;
+               }
+            }
+
+            if (callback != null) {
+               P2PFileTransferHelper.registerDownloadListener(messageId, callback);
+            }
+
+            DataChannel dc = peerId != null ? (DataChannel)this.dataChannels.get(peerId) : null;
+            if (dc != null && dc.state() == State.OPEN) {
+               this.pendingDownloadRequests.remove(messageId);
+               P2PFileTransferHelper.requestFile(dc, messageId);
+               return;
+            }
+
+            // Peer is offline or not yet connected over WebRTC:
+            // 1. Queue request so it fires automatically if WebRTC connects
+            if (peerId != null && !peerId.isEmpty()) {
+               this.pendingDownloadRequests.put(messageId, peerId);
                this.initiateConnection(peerId);
+            }
+
+            // 2. Check Firestore/Nostr relay document for inline encrypted mediaUrl (allows offline download when sender closed app)
+            final String resolvedChatId = (msg != null && msg.getChatId() != null && !msg.getChatId().isEmpty())
+                    ? msg.getChatId()
+                    : (peerId != null ? getChatId(this.currentUserId, peerId) : null);
+            if (resolvedChatId != null && !resolvedChatId.isEmpty()) {
+               com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+               fs.collection("groups").document(resolvedChatId).collection("messages").document(messageId).get()
+                       .addOnCompleteListener(this.rtcExecutor, task -> {
+                          com.google.firebase.firestore.DocumentSnapshot doc = task.isSuccessful() ? task.getResult() : null;
+                          String remoteMediaUrl = (doc != null && doc.exists()) ? doc.getString("mediaUrl") : null;
+                          if (remoteMediaUrl != null && !remoteMediaUrl.isEmpty()) {
+                             Message targetMsg = msg != null ? msg : EncryptedChatDatabase.getInstance(this.context).getMessageById(messageId);
+                             if (targetMsg != null) {
+                                targetMsg.setMediaUrl(remoteMediaUrl);
+                                File f = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(this.context, resolvedChatId, targetMsg);
+                                if (f != null && f.exists() && f.length() > 0) {
+                                   this.pendingDownloadRequests.remove(messageId);
+                                   P2PFileTransferHelper.unregisterDownloadListener(messageId);
+                                   EncryptedChatDatabase.getInstance(this.context).saveMessage(resolvedChatId, targetMsg);
+                                   if (callback != null) {
+                                      this.mainHandler.post(() -> callback.onComplete(messageId, f));
+                                   }
+                                   return;
+                                }
+                             }
+                          }
+                          // Also check chats/{chatId}/messages/{messageId} mirror
+                          fs.collection("chats").document(resolvedChatId).collection("messages").document(messageId).get()
+                                  .addOnCompleteListener(this.rtcExecutor, mirrorTask -> {
+                                     com.google.firebase.firestore.DocumentSnapshot mDoc = mirrorTask.isSuccessful() ? mirrorTask.getResult() : null;
+                                     String mirrorMediaUrl = (mDoc != null && mDoc.exists()) ? mDoc.getString("mediaUrl") : null;
+                                     if (mirrorMediaUrl != null && !mirrorMediaUrl.isEmpty()) {
+                                        Message targetMsg = msg != null ? msg : EncryptedChatDatabase.getInstance(this.context).getMessageById(messageId);
+                                        if (targetMsg != null) {
+                                           targetMsg.setMediaUrl(mirrorMediaUrl);
+                                           File f = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(this.context, resolvedChatId, targetMsg);
+                                           if (f != null && f.exists() && f.length() > 0) {
+                                              this.pendingDownloadRequests.remove(messageId);
+                                              P2PFileTransferHelper.unregisterDownloadListener(messageId);
+                                              EncryptedChatDatabase.getInstance(this.context).saveMessage(resolvedChatId, targetMsg);
+                                              if (callback != null) {
+                                                 this.mainHandler.post(() -> callback.onComplete(messageId, f));
+                                              }
+                                              return;
+                                           }
+                                        }
+                                     }
+                                     DataChannel nowDc = peerId != null ? (DataChannel)this.dataChannels.get(peerId) : null;
+                                     if (nowDc != null && nowDc.state() == State.OPEN) {
+                                        this.pendingDownloadRequests.remove(messageId);
+                                        P2PFileTransferHelper.requestFile(nowDc, messageId);
+                                     } else if (callback != null) {
+                                        this.mainHandler.post(() -> callback.onError(messageId, "Connecting to peer..."));
+                                     }
+                                  });
+                       });
+               return;
             }
 
             if (callback != null) {
                this.mainHandler.post(() -> callback.onError(messageId, "Connecting to peer..."));
             }
+         } catch (Throwable t) {
+            if (callback != null) {
+               this.mainHandler.post(() -> callback.onError(messageId, "Connecting to peer..."));
+            }
          }
-
-      }
+      });
    }
 
    public void cancelMediaDownload(String peerId, String messageId) {
       if (messageId != null) {
+         this.pendingDownloadRequests.remove(messageId);
          DataChannel dc = peerId != null ? (DataChannel)this.dataChannels.get(peerId) : null;
          P2PFileTransferHelper.unregisterDownloadListener(messageId);
          if (dc != null && dc.state() == State.OPEN) {
@@ -2109,8 +2210,13 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    }
 
    private void syncVeilBoardGossipWithPeer(String peerId, DataChannel dc) {
-      if (dc != null && dc.state() == State.OPEN) {
-         (new Thread(() -> {
+      if (dc != null && dc.state() == State.OPEN && peerId != null) {
+         long now = System.currentTimeMillis();
+         Long lastSync = this.lastGossipSyncTimeMs.put(peerId, now);
+         if (lastSync != null && (now - lastSync) < 60_000L) {
+            return;
+         }
+         this.rtcExecutor.execute(() -> {
             try {
                List<Post> localPosts = EncryptedChatDatabase.getInstance(this.context).getAllPosts();
                if (localPosts.isEmpty()) {
@@ -2131,8 +2237,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                dc.send(new DataChannel.Buffer(ByteBuffer.wrap(bytes), false));
             } catch (Exception var7) {
             }
-
-         })).start();
+         });
       }
    }
 
@@ -2244,7 +2349,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
    private void flushPendingMessages(String peerId, DataChannel dc) {
       if (dc != null && dc.state() == State.OPEN && peerId != null) {
-         (new Thread(() -> {
+         this.rtcExecutor.execute(() -> {
             try {
                List<Message> pending = EncryptedChatDatabase.getInstance(this.context).getPendingMessages(peerId);
                if (pending == null || pending.isEmpty()) {
@@ -2294,8 +2399,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             } catch (Exception e) {
                Log.e("WebRtcManager", "Error flushing pending messages for " + peerId, e);
             }
-
-         })).start();
+         });
       }
    }
 
@@ -2417,12 +2521,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          }
          String resolvedChatId = (chatId != null && !chatId.isEmpty()) ? chatId : getChatId(myUid, peerId);
          long now = System.currentTimeMillis();
+         long prevWatermark = this.lastReadWatermarkSent.getOrDefault(resolvedChatId, 0L);
+         long lastSentMs = this.lastReadReceiptTimeMs.getOrDefault(resolvedChatId, 0L);
 
-         // Build a read watermark ONLY from the peer's messages physically present on this device.
-         // readUpTo uses the peer's own clock (message timestamps originate on the sender) -> no clock skew,
-         // and messages that never reached this device can never be reported as read.
          long readUpTo = 0L;
          final java.util.Set<String> readIds = new java.util.LinkedHashSet<>();
+         final java.util.List<String> newlyReadFirestoreIds = new java.util.ArrayList<>();
          try {
             List<Message> local = EncryptedChatDatabase.getInstance(this.context).getMessagesForChat(resolvedChatId);
             if (local != null) {
@@ -2438,7 +2542,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                java.util.Collections.sort(inbound, (a, b) -> Long.compare(
                        a.getTimestamp() != null ? a.getTimestamp().toDate().getTime() : 0L,
                        b.getTimestamp() != null ? b.getTimestamp().toDate().getTime() : 0L));
-               int start = Math.max(0, inbound.size() - 100);
+               int start = Math.max(0, inbound.size() - 30);
                for (int i = start; i < inbound.size(); i++) {
                   Message m = inbound.get(i);
                   if (m != null && m.isMediaRequiringActionToRead() && !m.isRead()) {
@@ -2448,13 +2552,22 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                       readIds.add(m.getId());
                       long ts = m.getTimestamp() != null ? m.getTimestamp().toDate().getTime() : 0L;
                       if (ts > readUpTo) readUpTo = ts;
+                      if (!m.isRead() || ts > prevWatermark) {
+                          newlyReadFirestoreIds.add(m.getId());
+                      }
                   }
                }
             }
          } catch (Throwable ignored) {}
          if (readIds.isEmpty()) {
-            return; // nothing from this peer is on the device -> nothing can be "read"
+            return;
          }
+         if (newlyReadFirestoreIds.isEmpty() && readUpTo <= prevWatermark && (now - lastSentMs) < 10_000L) {
+            return;
+         }
+         this.lastReadWatermarkSent.put(resolvedChatId, Math.max(prevWatermark, readUpTo));
+         this.lastReadReceiptTimeMs.put(resolvedChatId, now);
+
          final long finalReadUpTo = readUpTo;
          final JSONArray idsJson = new JSONArray();
          for (String rid : readIds) idsJson.put(rid);
@@ -2468,29 +2581,31 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             json.put("ids", idsJson);
             return json;
          });
-         try {
-            JSONObject sig = new JSONObject();
-            sig.put("type", "chat_read");
-            sig.put("chatId", resolvedChatId);
-            sig.put("readAt", now);
-            sig.put("readUpTo", finalReadUpTo);
-            sig.put("ids", idsJson);
-            SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", sig);
-         } catch (Throwable ignored) {}
-         try {
-            // Firestore mirror: only flag the exact documents this device has actually displayed.
-            com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
-            java.util.Map<String, Object> ack = new java.util.HashMap<>();
-            ack.put("delivered", true);
-            ack.put("read", true);
-            ack.put("readAt", now);
-            for (String rid : readIds) {
-               fs.collection("groups").document(resolvedChatId).collection("messages").document(rid)
-                       .set(ack, com.google.firebase.firestore.SetOptions.merge());
-               fs.collection("chats").document(resolvedChatId).collection("messages").document(rid)
-                       .set(ack, com.google.firebase.firestore.SetOptions.merge());
-            }
-         } catch (Throwable ignored) {}
+         if (!newlyReadFirestoreIds.isEmpty()) {
+            try {
+               JSONObject sig = new JSONObject();
+               sig.put("type", "chat_read");
+               sig.put("chatId", resolvedChatId);
+               sig.put("readAt", now);
+               sig.put("readUpTo", finalReadUpTo);
+               sig.put("ids", idsJson);
+               SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", sig);
+            } catch (Throwable ignored) {}
+            try {
+               com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+               java.util.Map<String, Object> ack = new java.util.HashMap<>();
+               ack.put("delivered", true);
+               ack.put("read", true);
+               ack.put("readAt", now);
+               String targetCol = (resolvedChatId.startsWith("group_") || resolvedChatId.startsWith("channel_")) ? "groups" : "chats";
+               int maxSync = Math.min(10, newlyReadFirestoreIds.size());
+               for (int i = newlyReadFirestoreIds.size() - maxSync; i < newlyReadFirestoreIds.size(); i++) {
+                  String rid = newlyReadFirestoreIds.get(i);
+                  fs.collection(targetCol).document(resolvedChatId).collection("messages").document(rid)
+                          .set(ack, com.google.firebase.firestore.SetOptions.merge());
+               }
+            } catch (Throwable ignored) {}
+         }
       }
    }
 

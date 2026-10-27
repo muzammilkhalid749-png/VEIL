@@ -76,8 +76,20 @@ public class FirebaseFirestore {
 
     private static final FirebaseFirestore INSTANCE = new FirebaseFirestore();
 
-    private final ExecutorService ioExecutor = Executors.newCachedThreadPool();
-    private final ScheduledExecutorService pollExecutor = Executors.newScheduledThreadPool(8);
+    private final ExecutorService ioExecutor = new java.util.concurrent.ThreadPoolExecutor(
+            4, 8, 30L, TimeUnit.SECONDS,
+            new java.util.concurrent.LinkedBlockingQueue<>(1024),
+            r -> {
+                Thread t = new Thread(r, "VeilFirestoreIO");
+                t.setDaemon(true);
+                return t;
+            },
+            new java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy());
+    private final ScheduledExecutorService pollExecutor = Executors.newScheduledThreadPool(2, r -> {
+        Thread t = new Thread(r, "VeilFirestorePoll");
+        t.setDaemon(true);
+        return t;
+    });
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final OkHttpClient httpClient = new OkHttpClient.Builder()
             .connectTimeout(4, TimeUnit.SECONDS)
@@ -346,7 +358,7 @@ public class FirebaseFirestore {
             long createdAtSec = lastCreatedAtSecByPath.compute(normPath,
                     (k, prev) -> prev == null ? nowSec : Math.max(nowSec, prev + 1L));
 
-            byte[] seckey32 = sha256Bytes("veil_fs_doc_v3:" + normPath);
+            byte[] seckey32 = NOSTR_TRANSPORT_SECKEY;
             List<String[]> tags = new ArrayList<>(3);
             tags.add(new String[]{"d", normPath});
             tags.add(new String[]{"t", collectionTagFor(normCol)});
@@ -571,8 +583,10 @@ public class FirebaseFirestore {
             notifyDocumentListeners(normPath, new DocumentSnapshot(extractDocId(normPath), normPath, Collections.emptyMap(), false));
             notifyCollectionWakeListeners(extractParentCollection(normPath));
 
-            // Publish replaceable tombstone to Nostr relays so deleted signals/docs do not reappear
-            publishNostrDocument(normPath, null, true);
+            // Publish replaceable tombstone to Nostr relays for persistent documents (skip ephemeral signals)
+            if (!normPath.contains("/signals/") && !normPath.contains("/mesh_signals/")) {
+                publishNostrDocument(normPath, null, true);
+            }
 
             if (isFirestoreRestAvailable()) {
                 try {
@@ -1087,7 +1101,9 @@ public class FirebaseFirestore {
     private static final BigInteger TWO = BigInteger.valueOf(2L);
     private static final BigInteger THREE = BigInteger.valueOf(3L);
 
+    private static final byte[] NOSTR_TRANSPORT_SECKEY = sha256Bytes("veil_fs_doc_v3_transport_master");
     private static final ConcurrentHashMap<String, BigInteger[]> pubkeyPointCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Integer, Object[]> schnorrNoncePool = new ConcurrentHashMap<>();
 
     private static BigInteger[] pointAdd(BigInteger[] p1, BigInteger[] p2) {
         if (p1 == null) return p2;
@@ -1283,13 +1299,18 @@ public class FirebaseFirestore {
         }
         String idHex = bytesToHex(idBytes);
 
-        byte[] dBytes = toBytes32(d);
-        byte[] k0Hash = taggedHash("BIP0340/nonce", concat(dBytes, pkBytes, idBytes));
-        BigInteger k0 = new BigInteger(1, k0Hash).mod(SECP_N);
-        if (k0.signum() == 0) k0 = BigInteger.ONE;
-        BigInteger[] R = pointMul(SECP_G, k0);
-        BigInteger k = R[1].testBit(0) ? SECP_N.subtract(k0) : k0;
-        byte[] rBytes = toBytes32(R[0]);
+        int slot = (idBytes[0] & 0x07);
+        Object[] nonceEntry = schnorrNoncePool.computeIfAbsent(slot, idx -> {
+            byte[] seed = sha256Bytes("veil_bip340_nonce_slot_v2_" + idx);
+            BigInteger k0 = new BigInteger(1, seed).mod(SECP_N);
+            if (k0.signum() == 0) k0 = BigInteger.ONE;
+            BigInteger[] R = pointMul(SECP_G, k0);
+            BigInteger kEven = R[1].testBit(0) ? SECP_N.subtract(k0) : k0;
+            byte[] rB = toBytes32(R[0]);
+            return new Object[]{kEven, rB};
+        });
+        BigInteger k = (BigInteger) nonceEntry[0];
+        byte[] rBytes = (byte[]) nonceEntry[1];
 
         byte[] eHash = taggedHash("BIP0340/challenge", concat(rBytes, pkBytes, idBytes));
         BigInteger e = new BigInteger(1, eHash).mod(SECP_N);

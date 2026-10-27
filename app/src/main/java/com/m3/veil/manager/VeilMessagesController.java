@@ -1067,6 +1067,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 List<String> targetPeers = resolveTargetPeers(dialogId, recipientId, msg);
                 boolean hasNetwork = isNetworkConnected();
 
+                // Embed encrypted inline payload for voice notes (and compact media <= 512KB)
+                // so the recipient can auto-download and play immediately even if sender closes the app!
+                encodeInlineMediaForTransport(dialogId, msg, localFile);
+                if (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()) {
+                    mStorageQueue.execute(() -> mDatabase.saveMessage(dialogId, msg));
+                }
+
                 // Only sync to Firestore/Nostr immediately if device has network connectivity.
                 // If offline, keep message in pending (Clock) state until network returns or P2P DataChannel transmits it.
                 if (hasNetwork) {
@@ -1094,7 +1101,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     if (transmitted) {
                         anyTransmitted = true;
                     } else {
-                        if (hasNetwork && (localFile == null || !localFile.exists())) {
+                        if (hasNetwork && (localFile == null || !localFile.exists() || (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()))) {
                             try {
                                 com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(
                                         peer, "p2p_chat", new org.json.JSONObject(jsonPayloadStr));
@@ -1175,6 +1182,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 msgMap.put("pollJson", null);
             }
             msgMap.put("thumbnail", msg.getThumbnail());
+            msgMap.put("mediaUrl", msg.getMediaUrl());
             msgMap.put("vanishTimer", msg.getVanishTimer());
             msgMap.put("vanishMode", msg.getVanishMode());
 
@@ -1320,6 +1328,91 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         } catch (Exception e) {
             Log.w(TAG, "Firestore direct message sync notice: " + e.getMessage());
         }
+    }
+
+    public static void encodeInlineMediaForTransport(String dialogId, Message msg, @Nullable File localFile) {
+        if (msg == null) return;
+        if (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()) return;
+        String mType = msg.getType();
+        boolean isVoiceOrAudio = "voice".equals(mType) || "audio".equals(mType);
+        File fileToRead = localFile;
+        if ((fileToRead == null || !fileToRead.exists()) && msg.getLocalFilePath() != null && !msg.getLocalFilePath().isEmpty()) {
+            fileToRead = new File(msg.getLocalFilePath());
+        }
+        if (fileToRead == null || !fileToRead.exists() || fileToRead.length() <= 0) return;
+        long maxInlineBytes = isVoiceOrAudio ? (600 * 1024L) : (256 * 1024L);
+        if (fileToRead.length() > maxInlineBytes) return;
+        try {
+            byte[] bytes = new byte[(int) fileToRead.length()];
+            try ( java.io.FileInputStream fis = new java.io.FileInputStream(fileToRead) ) {
+                int offset = 0;
+                int read;
+                while (offset < bytes.length && (read = fis.read(bytes, offset, bytes.length - offset)) != -1) {
+                    offset += read;
+                }
+            }
+            String b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+            String keyScope = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
+            if (keyScope != null && !keyScope.isEmpty()) {
+                msg.setMediaUrl(EncryptionManager.encryptGroupPayload(keyScope, b64));
+            } else {
+                msg.setMediaUrl(b64);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "encodeInlineMediaForTransport notice: " + t.getMessage());
+        }
+    }
+
+    public static File decodeInlineMediaToFile(Context context, String dialogId, Message msg) {
+        if (context == null || msg == null || msg.getId() == null) return null;
+        try {
+            if (msg.getLocalFilePath() != null && !msg.getLocalFilePath().isEmpty()) {
+                File existing = new File(msg.getLocalFilePath());
+                if (existing.exists() && existing.length() > 0) {
+                    return existing;
+                }
+            }
+            String mType = msg.getType();
+            String ext = ".bin";
+            if ("voice".equals(mType) || "audio".equals(mType)) {
+                ext = ".m4a";
+            } else if ("image".equals(mType)) {
+                ext = ".jpg";
+            } else if ("video".equals(mType)) {
+                ext = ".mp4";
+            }
+            File targetFile = new File(context.getExternalCacheDir(), "dec_" + msg.getId() + ext);
+            if (targetFile.exists() && targetFile.length() > 0) {
+                msg.setLocalFilePath(targetFile.getAbsolutePath());
+                return targetFile;
+            }
+            String mediaUrl = msg.getMediaUrl();
+            if (mediaUrl == null || mediaUrl.isEmpty() || mediaUrl.startsWith("http")) {
+                return null;
+            }
+            String b64 = mediaUrl;
+            if (b64.startsWith("ENC:v1:")) {
+                String keyScope = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
+                if (keyScope != null && !keyScope.isEmpty()) {
+                    b64 = EncryptionManager.decryptGroupPayload(keyScope, b64);
+                }
+            }
+            if (b64 == null || b64.isEmpty() || b64.startsWith("ENC:v1:")) {
+                return null;
+            }
+            byte[] decoded = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+            if (decoded != null && decoded.length > 0) {
+                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(targetFile)) {
+                    fos.write(decoded);
+                    fos.flush();
+                }
+                msg.setLocalFilePath(targetFile.getAbsolutePath());
+                return targetFile;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "decodeInlineMediaToFile notice: " + t.getMessage());
+        }
+        return null;
     }
 
     private boolean sendMediaP2P(String peerId, Message msg, File localFile) {
@@ -2149,10 +2242,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
             boolean sendReadReceipt = mContext.getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
                     .getBoolean("read_receipts_enabled", true);
-            boolean isChatOpenInForeground = dialogId != null && dialogId.equals(mActiveChatIdInForeground) && sendReadReceipt;
+            boolean isChatOpenInForeground = dialogId != null && dialogId.equals(mActiveChatIdInForeground) && sendReadReceipt && !Message.isMediaRequiringActionToRead(message.getType());
             message.setDelivered(true);
             if (isChatOpenInForeground) {
                 message.setRead(true);
+            }
+
+            // Auto-decode inline encrypted voice/media immediately before caching and notifying UI
+            if (message.getMediaUrl() != null && !message.getMediaUrl().isEmpty()) {
+                decodeInlineMediaToFile(mContext, dialogId, message);
             }
 
             // Put in memory cache
