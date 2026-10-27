@@ -106,7 +106,13 @@ public class EncryptionManager {
         }
     }
 
-    public static void generateKeyPair() {
+    private static volatile String sCachedPublicKeyString = null;
+    private static volatile PrivateKey sCachedPrivateKey = null;
+
+    public static synchronized void generateKeyPair() {
+        if (sCachedPublicKeyString != null && sCachedPrivateKey != null) {
+            return;
+        }
         try {
             KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
             keyStore.load(null);
@@ -126,18 +132,34 @@ public class EncryptionManager {
                 keyPairGenerator.generateKeyPair();
                 Log.d(TAG, "Key pair generated successfully");
             }
+            java.security.cert.Certificate cert = keyStore.getCertificate(KEY_ALIAS);
+            if (cert != null && cert.getPublicKey() != null) {
+                sCachedPublicKeyString = Base64.encodeToString(cert.getPublicKey().getEncoded(), Base64.NO_WRAP);
+            }
+            KeyStore.Entry entry = keyStore.getEntry(KEY_ALIAS, null);
+            if (entry instanceof KeyStore.PrivateKeyEntry) {
+                sCachedPrivateKey = ((KeyStore.PrivateKeyEntry) entry).getPrivateKey();
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error generating key pair", e);
         }
     }
 
     public static String getPublicKeyString() {
+        String cached = sCachedPublicKeyString;
+        if (cached != null && !cached.isEmpty()) {
+            return cached;
+        }
         try {
             generateKeyPair();
+            if (sCachedPublicKeyString != null) {
+                return sCachedPublicKeyString;
+            }
             KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
             keyStore.load(null);
             PublicKey publicKey = keyStore.getCertificate(KEY_ALIAS).getPublicKey();
-            return Base64.encodeToString(publicKey.getEncoded(), Base64.NO_WRAP);
+            sCachedPublicKeyString = Base64.encodeToString(publicKey.getEncoded(), Base64.NO_WRAP);
+            return sCachedPublicKeyString;
         } catch (Exception e) {
             Log.e(TAG, "Error getting public key", e);
             return null;
@@ -408,9 +430,13 @@ public class EncryptionManager {
     private static byte[] decryptRSA(String encryptedData) throws Exception {
         byte[] encryptedBytes = Base64.decode(encryptedData, Base64.DEFAULT);
 
-        KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
-        keyStore.load(null);
-        PrivateKey privateKey = (PrivateKey) keyStore.getKey(KEY_ALIAS, null);
+        PrivateKey privateKey = sCachedPrivateKey;
+        if (privateKey == null) {
+            KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+            keyStore.load(null);
+            privateKey = (PrivateKey) keyStore.getKey(KEY_ALIAS, null);
+            sCachedPrivateKey = privateKey;
+        }
 
         try {
             Cipher cipher = Cipher.getInstance(RSA_OAEP_TRANSFORMATION);

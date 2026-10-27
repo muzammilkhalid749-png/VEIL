@@ -204,6 +204,51 @@ public class ChatActivity extends AppCompatActivity {
     private final java.util.concurrent.ExecutorService dbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
     private final Handler chatDebounceHandler = new Handler(Looper.getMainLooper());
     private final Runnable reloadVaultRunnable = this::executeReloadMessages;
+    private final java.util.concurrent.ConcurrentLinkedQueue<Message> pendingUiMessageBuffer = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private volatile boolean isUiBufferFlushScheduled = false;
+
+    private final Runnable flushUiMessageBufferRunnable = new Runnable() {
+        @Override
+        public void run() {
+            isUiBufferFlushScheduled = false;
+            if (isFinishing() || isDestroyed() || messageList == null || messagesAdapter == null) return;
+            List<Message> batch = new ArrayList<>();
+            Message m;
+            while ((m = pendingUiMessageBuffer.poll()) != null) {
+                boolean exists = false;
+                for (int i = messageList.size() - 1; i >= 0; i--) {
+                    Message existing = messageList.get(i);
+                    if (existing != null && java.util.Objects.equals(existing.getId(), m.getId())) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    batch.add(m);
+                }
+            }
+            if (!batch.isEmpty()) {
+                int prevCount = messageList.size();
+                messageList.addAll(batch);
+                if (prevCount > 0) {
+                    messagesAdapter.notifyItemChanged(prevCount);
+                }
+                messagesAdapter.notifyItemRangeInserted(prevCount + 1, batch.size());
+                if (messagesRecyclerView != null) {
+                    messagesRecyclerView.scrollToPosition(messagesAdapter.getItemCount() - 1);
+                }
+            }
+        }
+    };
+
+    private void enqueueBufferedUiMessage(Message msg) {
+        if (msg == null) return;
+        pendingUiMessageBuffer.offer(msg);
+        if (!isUiBufferFlushScheduled) {
+            isUiBufferFlushScheduled = true;
+            chatDebounceHandler.postDelayed(flushUiMessageBufferRunnable, 16);
+        }
+    }
 
     private final com.m3.veil.database.EncryptedChatDatabase.DatabaseChangeListener localDbListener =
             new com.m3.veil.database.EncryptedChatDatabase.DatabaseChangeListener() {
@@ -698,12 +743,8 @@ public class ChatActivity extends AppCompatActivity {
         };
         vanishHandler.postDelayed(vanishRunnable, 1000);
 
-        // Load latest messages from vault immediately if cache wasn't warm, or reconcile in background
-        if (messageList.isEmpty()) {
-            reloadMessagesFromLocalVaultImmediate();
-        } else {
-            reloadMessagesFromLocalVault();
-        }
+        // Always reconcile with vault asynchronously (16ms VSync window) so Frame 1 draws immediately
+        reloadMessagesFromLocalVault();
 
         // 3. Defer heavy WebRTC, Firestore listeners, and key lookups until after Frame 1 draws
         Looper.myQueue().addIdleHandler(() -> {
@@ -3766,9 +3807,11 @@ public class ChatActivity extends AppCompatActivity {
             updateBlinkModeChipUI();
         }
 
+        // Optimistic zero-latency UI insertion into frame buffer before background dispatch
+        enqueueBufferedUiMessage(message);
+
         // Route through application-wide VeilMessagesController (optimistic UI + ratcheted encryption + outbox)
         com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, recipientId, message);
-        reloadMessagesFromLocalVaultImmediate();
     }
 
     private void listenForMessages() {
@@ -4305,11 +4348,7 @@ public class ChatActivity extends AppCompatActivity {
                 sendReadReceiptsForUnreadMessages();
                 dbExecutor.execute(() -> com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId));
             }
-            if (messageList == null || messageList.isEmpty()) {
-                reloadMessagesFromLocalVaultImmediate();
-            } else {
-                reloadMessagesFromLocalVault();
-            }
+            reloadMessagesFromLocalVault();
         }
     }
 

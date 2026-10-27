@@ -137,12 +137,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                if (lastSeen != null && now - lastSeen > 30000L) {
                   Log.d("WebRtcManager", "Peer " + peerId + " heartbeat dead-man timed out (" + (now - lastSeen) + "ms) -> disconnecting");
                   WebRtcManager.this.closePeerConnection(peerId);
-                  WebRtcManager.this.mainHandler.post(() -> {
-                     for(P2PEventListener l : WebRtcManager.this.listeners) {
-                        l.onPeerDisconnected(peerId);
-                     }
+                  if (WebRtcManager.this.connectedNotifiedPeers.remove(peerId)) {
+                     WebRtcManager.this.mainHandler.post(() -> {
+                        for(P2PEventListener l : WebRtcManager.this.listeners) {
+                           l.onPeerDisconnected(peerId);
+                        }
 
-                  });
+                     });
+                  }
                } else {
                   try {
                      VeilPacket pingPacket = new VeilPacket((byte)0, (short)1, new byte[0]);
@@ -516,7 +518,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
          };
          this.turnFallbackRunnables.put(peerId, r);
-         this.mainHandler.postDelayed(r, 8000L);
+         this.heartbeatHandler.postDelayed(r, 8000L);
       }
    }
 
@@ -524,7 +526,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       if (peerId != null) {
          Runnable r = (Runnable)this.turnFallbackRunnables.remove(peerId);
          if (r != null) {
-            this.mainHandler.removeCallbacks(r);
+            this.heartbeatHandler.removeCallbacks(r);
          }
 
       }
@@ -704,12 +706,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      WebRtcManager.this.restartIceWithTurn(peerId);
                   } else {
                      WebRtcManager.this.cancelTurnFallback(peerId);
-                     WebRtcManager.this.mainHandler.post(() -> {
-                        for(P2PEventListener l : WebRtcManager.this.listeners) {
-                           l.onPeerDisconnected(peerId);
-                        }
+                     if (WebRtcManager.this.connectedNotifiedPeers.remove(peerId)) {
+                        WebRtcManager.this.mainHandler.post(() -> {
+                           for(P2PEventListener l : WebRtcManager.this.listeners) {
+                              l.onPeerDisconnected(peerId);
+                           }
 
-                     });
+                        });
+                     }
                      WebRtcManager.this.peerConnections.remove(peerId);
                      WebRtcManager.this.dataChannels.remove(peerId);
                      PeerChannelHub hub = (PeerChannelHub)WebRtcManager.this.peerHubs.remove(peerId);
@@ -718,12 +722,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      }
                   }
                } else if (state == IceConnectionState.DISCONNECTED || state == IceConnectionState.CLOSED) {
-                  WebRtcManager.this.mainHandler.post(() -> {
-                     for(P2PEventListener l : WebRtcManager.this.listeners) {
-                        l.onPeerDisconnected(peerId);
-                     }
+                  if (WebRtcManager.this.connectedNotifiedPeers.remove(peerId)) {
+                     WebRtcManager.this.mainHandler.post(() -> {
+                        for(P2PEventListener l : WebRtcManager.this.listeners) {
+                           l.onPeerDisconnected(peerId);
+                        }
 
-                  });
+                     });
+                  }
                   if (state == IceConnectionState.CLOSED) {
                      WebRtcManager.this.cancelTurnFallback(peerId);
                      WebRtcManager.this.peerConnections.remove(peerId);
@@ -736,9 +742,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                }
             } else {
                WebRtcManager.this.cancelTurnFallback(peerId);
+               final boolean firstConnect = WebRtcManager.this.connectedNotifiedPeers.add(peerId);
                WebRtcManager.this.mainHandler.post(() -> {
                   for(P2PEventListener l : WebRtcManager.this.listeners) {
-                     l.onPeerConnected(peerId);
+                     if (firstConnect) {
+                        l.onPeerConnected(peerId);
+                     }
                      l.onCallEstablished(peerId);
                   }
 
@@ -774,14 +783,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          }
 
          public void onRemoveStream(MediaStream mediaStream) {
+            WebRtcManager.this.rtcExecutor.execute(() -> {
+               WebRtcManager.this.stopCallAudioHardware(peerId);
+            });
             WebRtcManager.this.mainHandler.post(() -> {
                for(P2PEventListener l : WebRtcManager.this.listeners) {
                   l.onRemoteVideoTrackRemoved(peerId);
-               }
-
-               WebRtcManager.this.stopCallAudioHardware(peerId);
-
-               for(P2PEventListener l : WebRtcManager.this.listeners) {
                   l.onCallEnded(peerId);
                }
 
@@ -1642,12 +1649,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          } else {
             Log.d("WebRtcManager", "Peer " + peerId + " reported peer_leaving -> closing P2P DataChannel");
             this.closePeerConnection(peerId);
-            this.mainHandler.post(() -> {
-               for(P2PEventListener l : WebRtcManager.this.listeners) {
-                  l.onPeerDisconnected(peerId);
-               }
+            if (this.connectedNotifiedPeers.remove(peerId)) {
+               this.mainHandler.post(() -> {
+                  for(P2PEventListener l : WebRtcManager.this.listeners) {
+                     l.onPeerDisconnected(peerId);
+                  }
 
-            });
+               });
+            }
          }
       } catch (Exception e) {
          Log.e("WebRtcManager", "Error parsing inbound DataChannel payload", e);
@@ -2889,7 +2898,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             } else if (this.processedCallInvites.contains(callId)) {
                Log.d("WebRtcManager", "Duplicate invite ignored for callId: " + callId);
             } else {
-               this.mainHandler.post(() -> {
+               this.rtcExecutor.execute(() -> {
                   if (!this.terminatedCallIds.contains(callId)) {
                      if (!CallActivity.isCallActive && (this.activeCallId == null || this.activeCallId.equals(callId))) {
                         this.processedCallInvites.add(callId);
@@ -2907,27 +2916,29 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                         SignalingClient.getInstance().sendCallRinging(fromUserId, callId);
                         this.getOrCreatePeerConnection(fromUserId, false);
 
-                        for(P2PEventListener l : WebRtcManager.this.listeners) {
-                           l.onIncomingCall(fromUserId, callerName, callType, callId);
-                        }
-
-                        if (!CallActivity.isCallActive) {
-                           Intent callIntent = new Intent(this.context, CallActivity.class);
-                           callIntent.addFlags(805306368);
-                           callIntent.putExtra("extra_contact_id", fromUserId);
-                           callIntent.putExtra("extra_contact_name", callerName);
-                           callIntent.putExtra("extra_call_type", callType);
-                           callIntent.putExtra("extra_call_id", callId);
-                           callIntent.putExtra("extra_is_incoming", true);
-
-                           try {
-                              this.context.startActivity(callIntent);
-                           } catch (Exception e) {
-                              Log.e("WebRtcManager", "Failed to launch incoming CallActivity", e);
+                        this.mainHandler.post(() -> {
+                           for(P2PEventListener l : WebRtcManager.this.listeners) {
+                              l.onIncomingCall(fromUserId, callerName, callType, callId);
                            }
-                        }
 
-                        this.showIncomingCallNotification(fromUserId, callerName, callType, callId);
+                           if (!CallActivity.isCallActive) {
+                              Intent callIntent = new Intent(this.context, CallActivity.class);
+                              callIntent.addFlags(805306368);
+                              callIntent.putExtra("extra_contact_id", fromUserId);
+                              callIntent.putExtra("extra_contact_name", callerName);
+                              callIntent.putExtra("extra_call_type", callType);
+                              callIntent.putExtra("extra_call_id", callId);
+                              callIntent.putExtra("extra_is_incoming", true);
+
+                              try {
+                                 this.context.startActivity(callIntent);
+                              } catch (Exception e) {
+                                 Log.e("WebRtcManager", "Failed to launch incoming CallActivity", e);
+                              }
+                           }
+
+                           this.showIncomingCallNotification(fromUserId, callerName, callType, callId);
+                        });
                      } else {
                         SignalingClient.getInstance().sendCallReject(fromUserId, callId, "busy");
                      }
@@ -2970,7 +2981,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          }
       }
 
-      this.stopCallAudioHardware(fromUserId);
+      this.rtcExecutor.execute(() -> this.stopCallAudioHardware(fromUserId));
       this.mainHandler.post(() -> {
          this.dismissIncomingCallNotification();
 
@@ -2990,7 +3001,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          }
       }
 
-      this.stopCallAudioHardware(fromUserId);
+      this.rtcExecutor.execute(() -> this.stopCallAudioHardware(fromUserId));
       this.mainHandler.post(() -> {
          this.dismissIncomingCallNotification();
 

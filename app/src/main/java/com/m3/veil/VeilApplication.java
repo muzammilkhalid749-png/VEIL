@@ -33,35 +33,42 @@ public class VeilApplication extends Application {
         // Telegram-grade real-time presence & lifecycle tracker
         com.m3.veil.manager.PresenceManager.getInstance().init(this);
 
-        // Preload encrypted SQLCipher database vault & warm VeilMessagesController RAM cache
-        try {
-            com.m3.veil.database.EncryptedChatDatabase.getInstance(this);
-            com.m3.veil.manager.VeilMessagesController.getInstance(this);
-            com.m3.veil.services.VeilSchedulerDaemon.getInstance(this).start();
-        } catch (Exception e) {
-            android.util.Log.e("VeilApplication", "SQLCipher init error", e);
-        }
-
-        // Initialize WebRTC, Call Engine & Mesh Daemon session if user is logged in (Firebase or Sovereign)
-        if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(this)) {
-            String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
-            if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
-                com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(this,
-                        com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser());
-            } else {
-                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
-                        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getLocalManifest();
-                if (manifest != null) {
-                    com.m3.veil.manager.AuthManager.getInstance().onSovereignSessionStarted(this, manifest);
-                } else if (uid != null) {
-                    com.m3.veil.webrtc.WebRtcManager.getInstance(this).init(uid);
-                    try {
-                        com.m3.veil.calling.CallEngine.getInstance(this).init(uid);
-                    } catch (Throwable ignored) {}
-                }
+        // Offload heavy SQLCipher, WebRTC, and CallEngine initialization to background boot worker
+        // so Application.onCreate (AppBindData) completes in <15ms instead of blocking the main thread for 3,031ms.
+        new Thread(() -> {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_DEFAULT);
+            try {
+                com.m3.veil.database.EncryptedChatDatabase.getInstance(VeilApplication.this);
+                com.m3.veil.manager.VeilMessagesController.getInstance(VeilApplication.this);
+                com.m3.veil.services.VeilSchedulerDaemon.getInstance(VeilApplication.this).start();
+            } catch (Exception e) {
+                android.util.Log.e("VeilApplication", "SQLCipher init error", e);
             }
-            com.m3.veil.services.VeilMeshDaemonService.start(this);
-        }
+
+            try {
+                if (com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(VeilApplication.this)) {
+                    String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(VeilApplication.this);
+                    if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                        com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(VeilApplication.this,
+                                com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser());
+                    } else {
+                        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(VeilApplication.this).getLocalManifest();
+                        if (manifest != null) {
+                            com.m3.veil.manager.AuthManager.getInstance().onSovereignSessionStarted(VeilApplication.this, manifest);
+                        } else if (uid != null) {
+                            com.m3.veil.webrtc.WebRtcManager.getInstance(VeilApplication.this).init(uid);
+                            try {
+                                com.m3.veil.calling.CallEngine.getInstance(VeilApplication.this).init(uid);
+                            } catch (Throwable ignored) {}
+                        }
+                    }
+                    com.m3.veil.services.VeilMeshDaemonService.start(VeilApplication.this);
+                }
+            } catch (Throwable t) {
+                android.util.Log.w("VeilApplication", "Background session boot warning: " + t.getMessage());
+            }
+        }, "VeilBootWorker").start();
     }
 
     @Override

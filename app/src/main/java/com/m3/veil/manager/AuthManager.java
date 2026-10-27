@@ -53,6 +53,9 @@ public class AuthManager {
     private static volatile AuthManager instance;
     private final ExecutorService authExecutor = Executors.newSingleThreadExecutor();
     private volatile boolean isLoggingOut = false;
+    private volatile String cachedCurrentUserId = null;
+    private volatile Boolean cachedLoggedInState = null;
+    private final java.util.Set<String> cachedMyUserIds = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
     public interface ProfileRestoreCallback {
         void onResult(boolean hasCompleteProfile, @Nullable User restoredUser);
@@ -75,14 +78,20 @@ public class AuthManager {
      * Authoritative check for whether an authenticated Sovereign or Phone session is active.
      */
     public boolean isLoggedIn(@NonNull Context context) {
+        if (Boolean.TRUE.equals(cachedLoggedInState) && cachedCurrentUserId != null && !cachedCurrentUserId.isEmpty()) {
+            return true;
+        }
         Context appCtx = context.getApplicationContext();
         String uid = getCurrentUserId(appCtx);
         if (uid == null || uid.trim().isEmpty()) {
+            cachedLoggedInState = false;
             return false;
         }
         PreferenceManager pm = new PreferenceManager(appCtx);
         UserPreferences up = new UserPreferences(appCtx);
-        return Boolean.TRUE.equals(pm.getBoolean(KEY_SOVEREIGN_LOGGED_IN, false)) || up.isLoggedIn();
+        boolean active = Boolean.TRUE.equals(pm.getBoolean(KEY_SOVEREIGN_LOGGED_IN, false)) || up.isLoggedIn();
+        cachedLoggedInState = active;
+        return active;
     }
 
     /**
@@ -137,22 +146,32 @@ public class AuthManager {
      */
     @Nullable
     public String getCurrentUserId(@NonNull Context context) {
+        String fastUid = cachedCurrentUserId;
+        if (fastUid != null && !fastUid.isEmpty()) {
+            return fastUid;
+        }
         Context appCtx = context.getApplicationContext();
 
         PreferenceManager pm = new PreferenceManager(appCtx);
         String sovUid = pm.getString(KEY_SOVEREIGN_UID, null);
         if (sovUid != null && !sovUid.trim().isEmpty()) {
-            FirebaseAuth.getInstance().setCurrentUserUid(sovUid.trim());
-            return sovUid.trim();
+            String clean = sovUid.trim();
+            cachedCurrentUserId = clean;
+            cachedMyUserIds.add(clean);
+            FirebaseAuth.getInstance().setCurrentUserUid(clean);
+            return clean;
         }
 
         UserPreferences up = new UserPreferences(appCtx);
         String upUid = up.getUserId();
         if (upUid != null && !upUid.trim().isEmpty()) {
-            pm.putString(KEY_SOVEREIGN_UID, upUid.trim());
+            String clean = upUid.trim();
+            cachedCurrentUserId = clean;
+            cachedMyUserIds.add(clean);
+            pm.putString(KEY_SOVEREIGN_UID, clean);
             pm.putBoolean(KEY_SOVEREIGN_LOGGED_IN, true);
-            FirebaseAuth.getInstance().setCurrentUserUid(upUid.trim());
-            return upUid.trim();
+            FirebaseAuth.getInstance().setCurrentUserUid(clean);
+            return clean;
         }
 
         try {
@@ -160,11 +179,14 @@ public class AuthManager {
             if (engine.isIdentityInitialized()) {
                 String engineUid = engine.getCurrentUid();
                 if (engineUid != null && !engineUid.trim().isEmpty()) {
-                    pm.putString(KEY_SOVEREIGN_UID, engineUid.trim());
+                    String clean = engineUid.trim();
+                    cachedCurrentUserId = clean;
+                    cachedMyUserIds.add(clean);
+                    pm.putString(KEY_SOVEREIGN_UID, clean);
                     pm.putBoolean(KEY_SOVEREIGN_LOGGED_IN, true);
-                    up.updateUserField("userId", engineUid.trim());
-                    FirebaseAuth.getInstance().setCurrentUserUid(engineUid.trim());
-                    return engineUid.trim();
+                    up.updateUserField("userId", clean);
+                    FirebaseAuth.getInstance().setCurrentUserUid(clean);
+                    return clean;
                 }
             }
         } catch (Exception e) {
@@ -179,6 +201,9 @@ public class AuthManager {
      */
     @NonNull
     public java.util.Set<String> getMyUserIds(@NonNull Context context) {
+        if (!cachedMyUserIds.isEmpty() && cachedCurrentUserId != null) {
+            return cachedMyUserIds;
+        }
         java.util.Set<String> ids = new java.util.HashSet<>();
         Context appCtx = context.getApplicationContext();
         String current = getCurrentUserId(appCtx);
@@ -211,15 +236,24 @@ public class AuthManager {
             if (engineUid != null && !engineUid.isEmpty()) ids.add(engineUid);
         } catch (Throwable ignored) {}
 
-        return ids;
+        cachedMyUserIds.addAll(ids);
+        return cachedMyUserIds;
     }
 
     /**
      * Determines whether a given UID string belongs to the local device / logged-in user.
+     * O(1) lock-free RAM check — zero Keystore / SharedPreferences IPC during RecyclerView scrolling.
      */
     public boolean isMyUserId(@NonNull Context context, @Nullable String uid) {
         if (uid == null || uid.trim().isEmpty()) return false;
         String clean = uid.trim();
+        String fastUid = cachedCurrentUserId;
+        if (fastUid != null && (clean.equals(fastUid) || clean.equalsIgnoreCase(fastUid))) {
+            return true;
+        }
+        if (cachedMyUserIds.contains(clean)) {
+            return true;
+        }
         for (String myId : getMyUserIds(context)) {
             if (clean.equals(myId) || clean.equalsIgnoreCase(myId)) return true;
         }
@@ -253,6 +287,9 @@ public class AuthManager {
      */
     public void onSovereignIdentityInitialized(@NonNull Context context, @NonNull String uid, boolean hasProfile) {
         Context appCtx = context.getApplicationContext();
+        cachedCurrentUserId = uid;
+        cachedLoggedInState = true;
+        cachedMyUserIds.add(uid);
         PreferenceManager pm = new PreferenceManager(appCtx);
         pm.putBoolean(KEY_SOVEREIGN_LOGGED_IN, true);
         pm.putString(KEY_SOVEREIGN_UID, uid);
@@ -282,6 +319,9 @@ public class AuthManager {
      */
     public void onSovereignPhoneSessionStarted(@NonNull Context context, @NonNull String uid, @NonNull String phoneNumber) {
         Context appCtx = context.getApplicationContext();
+        cachedCurrentUserId = uid;
+        cachedLoggedInState = true;
+        cachedMyUserIds.add(uid);
         PreferenceManager pm = new PreferenceManager(appCtx);
         pm.putBoolean(KEY_SOVEREIGN_LOGGED_IN, true);
         pm.putString(KEY_SOVEREIGN_UID, uid);
@@ -305,26 +345,28 @@ public class AuthManager {
     }
 
     private void initRealtimeEngines(@NonNull Context appCtx, @NonNull String uid) {
-        try {
-            SovereignIdentityAndDirectoryEngine.getInstance(appCtx).ensureCurrentUserPublished();
-        } catch (Throwable t) {
-            Log.w(TAG, "ensureCurrentUserPublished notice: " + t.getMessage());
-        }
-        try {
-            WebRtcManager.getInstance(appCtx).init(uid);
-        } catch (Throwable t) {
-            Log.w(TAG, "WebRtcManager init notice: " + t.getMessage());
-        }
-        try {
-            CallEngine.getInstance(appCtx).init(uid);
-        } catch (Throwable t) {
-            Log.w(TAG, "CallEngine init notice: " + t.getMessage());
-        }
-        try {
-            VeilMeshDaemonService.start(appCtx);
-        } catch (Throwable t) {
-            Log.w(TAG, "VeilMeshDaemonService start notice: " + t.getMessage());
-        }
+        authExecutor.execute(() -> {
+            try {
+                SovereignIdentityAndDirectoryEngine.getInstance(appCtx).ensureCurrentUserPublished();
+            } catch (Throwable t) {
+                Log.w(TAG, "ensureCurrentUserPublished notice: " + t.getMessage());
+            }
+            try {
+                WebRtcManager.getInstance(appCtx).init(uid);
+            } catch (Throwable t) {
+                Log.w(TAG, "WebRtcManager init notice: " + t.getMessage());
+            }
+            try {
+                CallEngine.getInstance(appCtx).init(uid);
+            } catch (Throwable t) {
+                Log.w(TAG, "CallEngine init notice: " + t.getMessage());
+            }
+            try {
+                VeilMeshDaemonService.start(appCtx);
+            } catch (Throwable t) {
+                Log.w(TAG, "VeilMeshDaemonService start notice: " + t.getMessage());
+            }
+        });
     }
 
     /**
@@ -557,6 +599,10 @@ public class AuthManager {
                 } catch (Exception e) {
                     Log.e(TAG, "Error wiping SovereignIdentityAndDirectoryEngine", e);
                 }
+
+                cachedCurrentUserId = null;
+                cachedLoggedInState = false;
+                cachedMyUserIds.clear();
 
                 try {
                     new UserPreferences(appContext).clearUserData();

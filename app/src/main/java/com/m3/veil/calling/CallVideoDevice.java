@@ -37,7 +37,7 @@ public class CallVideoDevice {
 
     private final Context context;
     private final EglBase eglBase;
-    private final CameraEnumerator enumerator;
+    private volatile CameraEnumerator enumerator;
     private final CameraEvents cameraEvents = new CameraEvents();
 
     private CameraVideoCapturer cameraCapturer;
@@ -75,21 +75,32 @@ public class CallVideoDevice {
     public CallVideoDevice(Context context, EglBase eglBase) {
         this.context = context.getApplicationContext();
         this.eglBase = eglBase;
-        CameraEnumerator chosen;
-        try {
-            chosen = Camera2Enumerator.isSupported(context)
-                    ? new Camera2Enumerator(context) : new Camera1Enumerator(true);
-        } catch (Throwable t) {
-            chosen = new Camera1Enumerator(true);
+    }
+
+    private CameraEnumerator getEnumerator() {
+        if (enumerator == null) {
+            synchronized (this) {
+                if (enumerator == null) {
+                    CameraEnumerator chosen;
+                    try {
+                        chosen = Camera2Enumerator.isSupported(context)
+                                ? new Camera2Enumerator(context) : new Camera1Enumerator(true);
+                    } catch (Throwable t) {
+                        chosen = new Camera1Enumerator(true);
+                    }
+                    enumerator = chosen;
+                }
+            }
         }
-        this.enumerator = chosen;
+        return enumerator;
     }
 
     // ---- camera --------------------------------------------------------------
 
     public boolean hasCamera() {
         try {
-            return enumerator.getDeviceNames() != null && enumerator.getDeviceNames().length > 0;
+            CameraEnumerator camEnum = getEnumerator();
+            return camEnum.getDeviceNames() != null && camEnum.getDeviceNames().length > 0;
         } catch (Throwable t) {
             return false;
         }
@@ -130,28 +141,29 @@ public class CallVideoDevice {
                 targetHeight = perf.getVideoHeight();
                 targetFps = perf.getVideoFps();
             }
-            String[] names = enumerator.getDeviceNames();
+            CameraEnumerator camEnum = getEnumerator();
+            String[] names = camEnum.getDeviceNames();
             if (names == null || names.length == 0) return false;
             if (currentCameraName == null || !contains(names, currentCameraName)) {
                 currentCameraName = null;
                 for (String name : names) {
-                    if (enumerator.isFrontFacing(name)) { currentCameraName = name; break; }
+                    if (camEnum.isFrontFacing(name)) { currentCameraName = name; break; }
                 }
                 if (currentCameraName == null) {
                     for (String name : names) {
-                        if (enumerator.isBackFacing(name)) { currentCameraName = name; break; }
+                        if (camEnum.isBackFacing(name)) { currentCameraName = name; break; }
                     }
                 }
                 if (currentCameraName == null) currentCameraName = names[0];
             }
-            frontCamera = enumerator.isFrontFacing(currentCameraName);
+            frontCamera = camEnum.isFrontFacing(currentCameraName);
             width = targetWidth;
             height = targetHeight;
             fps = targetFps;
 
             cameraHelper = SurfaceTextureHelper.create("VeilCameraThread", eglBase.getEglBaseContext());
             cameraSource = CallMediaFactory.createVideoSource(false);
-            cameraCapturer = enumerator.createCapturer(currentCameraName, cameraEvents);
+            cameraCapturer = camEnum.createCapturer(currentCameraName, cameraEvents);
             if (cameraCapturer == null) return false;
             cameraCapturer.initialize(cameraHelper, context, createAnonymizingObserver(cameraSource.getCapturerObserver()));
             cameraCapturer.startCapture(width, height, fps);

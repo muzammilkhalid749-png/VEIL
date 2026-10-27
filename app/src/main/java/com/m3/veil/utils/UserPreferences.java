@@ -29,27 +29,56 @@ public class UserPreferences {
     private static final String KEY_IS_LOGGED_IN = "isLoggedIn";
     private static final String KEY_LAST_UPDATED = "lastUpdated";
 
+    private static volatile SharedPreferences sCachedPrefs;
+    private static final Object PREF_LOCK = new Object();
+    private static volatile String sCachedUserId;
+    private static volatile String sCachedUsername;
+    private static volatile String sCachedDisplayName;
+    private static volatile Boolean sCachedLoggedIn;
+
     private final SharedPreferences prefs;
     private final Context appContext;
 
     public UserPreferences(Context context) {
         this.appContext = context.getApplicationContext();
-        SharedPreferences resolvedPrefs = null;
-        try {
-            String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(
-                    androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
-            resolvedPrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
-                    "encrypted_" + PREF_NAME,
-                    masterKeyAlias,
-                    this.appContext,
-                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            );
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to initialize EncryptedSharedPreferences, falling back to standard", e);
-            resolvedPrefs = this.appContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        this.prefs = getOrCreateSharedPrefs(this.appContext);
+    }
+
+    private static SharedPreferences getOrCreateSharedPrefs(Context appContext) {
+        SharedPreferences local = sCachedPrefs;
+        if (local != null) {
+            return local;
         }
-        this.prefs = resolvedPrefs;
+        synchronized (PREF_LOCK) {
+            local = sCachedPrefs;
+            if (local != null) {
+                return local;
+            }
+            SharedPreferences resolvedPrefs;
+            try {
+                String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(
+                        androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
+                resolvedPrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
+                        "encrypted_" + PREF_NAME,
+                        masterKeyAlias,
+                        appContext,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to initialize EncryptedSharedPreferences, falling back to standard", e);
+                resolvedPrefs = appContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+            }
+            sCachedPrefs = resolvedPrefs;
+            return resolvedPrefs;
+        }
+    }
+
+    public static void invalidateMemoryCache() {
+        sCachedUserId = null;
+        sCachedUsername = null;
+        sCachedDisplayName = null;
+        sCachedLoggedIn = null;
     }
 
     public void saveUser(User user) {
@@ -67,10 +96,12 @@ public class UserPreferences {
             editor.remove(KEY_AVATAR);
             editor.remove(KEY_AVATAR_PATH);
             editor.remove(KEY_PHONE_NUMBER);
+            invalidateMemoryCache();
         }
 
         if (user.getUserId() != null && !user.getUserId().isEmpty()) {
             editor.putString(KEY_USER_ID, user.getUserId());
+            sCachedUserId = user.getUserId();
         }
         if (user.getPhoneNumber() != null) {
             editor.putString(KEY_PHONE_NUMBER, user.getPhoneNumber());
@@ -80,13 +111,17 @@ public class UserPreferences {
         }
         if (user.getUsername() != null && !user.getUsername().trim().isEmpty()) {
             editor.putString(KEY_USERNAME, user.getUsername().trim());
+            sCachedUsername = user.getUsername().trim();
         } else if (user.getUserId() != null && previousUid != null && !user.getUserId().equals(previousUid)) {
             editor.remove(KEY_USERNAME);
+            sCachedUsername = null;
         }
         if (user.getDisplayName() != null && !user.getDisplayName().trim().isEmpty()) {
             editor.putString(KEY_DISPLAY_NAME, user.getDisplayName().trim());
+            sCachedDisplayName = user.getDisplayName().trim();
         } else if (user.getUserId() != null && previousUid != null && !user.getUserId().equals(previousUid)) {
             editor.remove(KEY_DISPLAY_NAME);
+            sCachedDisplayName = null;
         }
 
         String avatarVal = user.getAvatar();
@@ -119,6 +154,7 @@ public class UserPreferences {
         editor.putBoolean(KEY_IS_ONLINE, user.isOnline());
         editor.putBoolean(KEY_HAS_PREMIUM, user.isHasPremium());
         editor.putBoolean(KEY_IS_LOGGED_IN, true);
+        sCachedLoggedIn = Boolean.TRUE;
         editor.putLong(KEY_LAST_UPDATED, System.currentTimeMillis());
         editor.apply();
 
@@ -134,13 +170,9 @@ public class UserPreferences {
     public User getCurrentUser() {
         if (!isLoggedIn()) return null;
 
-        String uid = prefs.getString(KEY_USER_ID, null);
+        String uid = getUserId();
         if (uid == null || uid.trim().isEmpty()) {
-            PreferenceManager pm = new PreferenceManager(appContext);
-            uid = pm.getString("sovereign_uid", null);
-            if (uid == null || uid.trim().isEmpty()) {
-                return null;
-            }
+            return null;
         }
 
         User user = new User();
@@ -191,8 +223,10 @@ public class UserPreferences {
             case "userId":
                 String uid = value != null ? String.valueOf(value) : null;
                 editor.putString(KEY_USER_ID, uid);
+                sCachedUserId = uid;
                 if (uid != null) {
                     editor.putBoolean(KEY_IS_LOGGED_IN, true);
+                    sCachedLoggedIn = Boolean.TRUE;
                     pm.putString("sovereign_uid", uid);
                     pm.putString("userId", uid);
                 }
@@ -200,6 +234,7 @@ public class UserPreferences {
             case "username":
                 String uname = value != null ? String.valueOf(value) : null;
                 editor.putString(KEY_USERNAME, uname);
+                sCachedUsername = uname;
                 if (uname != null) {
                     pm.putString("username", uname);
                 }
@@ -207,6 +242,7 @@ public class UserPreferences {
             case "displayName":
                 String dname = value != null ? String.valueOf(value) : null;
                 editor.putString(KEY_DISPLAY_NAME, dname);
+                sCachedDisplayName = dname;
                 if (dname != null) {
                     pm.putString("user_name", dname);
                     pm.putString("displayName", dname);
@@ -275,12 +311,16 @@ public class UserPreferences {
         if (userId != null && !userId.isEmpty()) {
             editor.putString(KEY_USER_ID, userId);
             editor.putBoolean(KEY_IS_LOGGED_IN, true);
+            sCachedUserId = userId;
+            sCachedLoggedIn = Boolean.TRUE;
         }
         if (username != null && !username.isEmpty()) {
             editor.putString(KEY_USERNAME, username);
+            sCachedUsername = username;
         }
         if (displayName != null && !displayName.isEmpty()) {
             editor.putString(KEY_DISPLAY_NAME, displayName);
+            sCachedDisplayName = displayName;
         }
         if (bio != null) {
             editor.putString(KEY_BIO, bio);
@@ -340,10 +380,25 @@ public class UserPreferences {
     }
 
     public boolean isLoggedIn() {
+        Boolean cached = sCachedLoggedIn;
+        if (cached != null && cached) return true;
+        String uid = sCachedUserId;
+        if (uid != null && !uid.trim().isEmpty()) {
+            sCachedLoggedIn = Boolean.TRUE;
+            return true;
+        }
         boolean flag = prefs.getBoolean(KEY_IS_LOGGED_IN, false);
-        if (flag) return true;
-        String uid = prefs.getString(KEY_USER_ID, null);
-        return uid != null && !uid.trim().isEmpty();
+        if (flag) {
+            sCachedLoggedIn = Boolean.TRUE;
+            return true;
+        }
+        uid = prefs.getString(KEY_USER_ID, null);
+        boolean res = uid != null && !uid.trim().isEmpty();
+        if (res) {
+            sCachedUserId = uid;
+            sCachedLoggedIn = Boolean.TRUE;
+        }
+        return res;
     }
 
     public boolean hasUsername() {
@@ -358,6 +413,7 @@ public class UserPreferences {
     }
 
     public void clearUser() {
+        invalidateMemoryCache();
         prefs.edit().clear().commit();
     }
 
@@ -370,12 +426,25 @@ public class UserPreferences {
     }
 
     public String getUsername() {
-        return prefs.getString(KEY_USERNAME, null);
+        String cached = sCachedUsername;
+        if (cached != null && !cached.trim().isEmpty()) {
+            return cached;
+        }
+        String un = prefs.getString(KEY_USERNAME, null);
+        if (un != null && !un.trim().isEmpty()) {
+            sCachedUsername = un;
+        }
+        return un;
     }
 
     public String getDisplayName() {
+        String cached = sCachedDisplayName;
+        if (cached != null && !cached.trim().isEmpty()) {
+            return cached;
+        }
         String dn = prefs.getString(KEY_DISPLAY_NAME, null);
         if (dn != null && !dn.trim().isEmpty()) {
+            sCachedDisplayName = dn;
             return dn;
         }
         return getUsername();
@@ -398,13 +467,22 @@ public class UserPreferences {
     }
 
     public String getUserId() {
+        String cached = sCachedUserId;
+        if (cached != null && !cached.trim().isEmpty()) {
+            return cached;
+        }
         String uid = prefs.getString(KEY_USER_ID, null);
         if (uid != null && !uid.trim().isEmpty()) {
+            sCachedUserId = uid;
             return uid;
         }
         try {
             PreferenceManager pm = new PreferenceManager(appContext);
-            return pm.getString("sovereign_uid", null);
+            uid = pm.getString("sovereign_uid", null);
+            if (uid != null && !uid.trim().isEmpty()) {
+                sCachedUserId = uid;
+            }
+            return uid;
         } catch (Exception e) {
             return null;
         }

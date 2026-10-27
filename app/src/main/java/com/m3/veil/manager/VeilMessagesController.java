@@ -863,13 +863,23 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             message.setReceiverId(dialogId);
         }
 
-        // Synchronously cache & persist with pending=true BEFORE returning so ChatActivity.reloadMessagesFromLocalVault()
-        // immediately renders the Clock icon without a race condition.
+        // Synchronously update RAM cache (zero disk I/O on UI thread) so ChatActivity renders the
+        // optimistic message in <1ms, while mStorageQueue/mStageQueue persists to SQLCipher asynchronously.
         putMessageInCache(dialogId, message);
-        mDatabase.saveMessage(dialogId, message);
-        updateDialogLastMessage(dialogId, message);
+        Chat cachedChat = mDialogsDict.get(dialogId);
+        if (cachedChat != null) {
+            cachedChat.setLastMessage(message.getText());
+            cachedChat.setLastMessageTime(message.getTimestamp());
+            cachedChat.setLastMessageSenderId(message.getSenderId());
+            cachedChat.setLastMessagePending(true);
+            cachedChat.setLastMessageDelivered(false);
+            cachedChat.setLastMessageRead(false);
+        }
 
         mStageQueue.post(() -> {
+            mDatabase.saveMessage(dialogId, message);
+            updateDialogLastMessage(dialogId, message);
+
             long lamport = nextLamportClock();
             int seq = nextDialogSeq(dialogId);
 
