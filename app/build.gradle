@@ -60,6 +60,7 @@ android {
 secrets {
     propertiesFileName = ".env"
     defaultPropertiesFileName = ".env.example"
+    ignoreList.add("VITE_.*")
 }
 
 dependencies {
