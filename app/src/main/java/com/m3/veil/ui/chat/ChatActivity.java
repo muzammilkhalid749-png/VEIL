@@ -378,7 +378,7 @@ public class ChatActivity extends AppCompatActivity {
                                 boolean newRead = m.isRead() || read;
                                 m.setDelivered(m.isDelivered() || delivered || newRead);
                                 m.setRead(newRead);
-                                if (delivered || read || isNetworkAvailable()) {
+                                if (delivered || read) {
                                     m.setPending(false);
                                     if (messagesAdapter != null) {
                                         messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADED, 100);
@@ -475,13 +475,16 @@ public class ChatActivity extends AppCompatActivity {
 
                 @Override
                 public void onMediaTransferProgress(String dialogId, String messageId, int percent) {
-                    if (chatId != null && chatId.equals(dialogId)) {
+                    if (dialogId == null || (chatId != null && chatId.equals(dialogId))) {
                         runOnUiThread(() -> {
                             if (messagesAdapter != null) {
                                 int state = percent >= 100
                                         ? MessagesAdapter.STATE_DOWNLOADED
                                         : MessagesAdapter.STATE_DOWNLOADING;
                                 messagesAdapter.setMediaDownloadState(messageId, state, percent);
+                            }
+                            if (percent >= 100) {
+                                reloadMessagesFromLocalVault();
                             }
                         });
                     }
@@ -1867,9 +1870,23 @@ public class ChatActivity extends AppCompatActivity {
             updateBlinkModeChipUI();
         }
 
-        if (messagesAdapter != null) {
-            messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADING, 0);
+        message.setLocalFilePath(rawFile.getAbsolutePath());
+        message.setBlink(isBlink);
+        if (currentVanishTimer > 0) {
+            long expiresMillis = System.currentTimeMillis() + currentVanishTimer;
+            message.setExpiresAt(new Timestamp(new Date(expiresMillis)));
         }
+
+        // Optimistically display the media bubble and 1% progress ring at 0ms on the UI thread
+        if (messagesAdapter != null) {
+            messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADING, 1);
+        }
+        messageList.add(message);
+        if (messagesAdapter != null) {
+            messagesAdapter.notifyItemInserted(messageList.size());
+            messagesRecyclerView.scrollToPosition(messagesAdapter.getItemCount() - 1);
+        }
+        com.m3.veil.manager.VeilMessagesController.notifyGlobalMediaTransferProgress(chatId, messageId, 1);
 
         final Context appContext = getApplicationContext();
         final String selectedVoiceFilter = activeVoiceFilter;
@@ -1911,11 +1928,11 @@ public class ChatActivity extends AppCompatActivity {
                             if (scaled != bitmap) {
                                 scaled.recycle();
                             }
-                        } else {
+                        } else if (!rawFile.getAbsolutePath().equals(decryptedFile.getAbsolutePath())) {
                             copyFile(rawFile, decryptedFile);
                         }
                         bitmap.recycle();
-                    } else {
+                    } else if (!rawFile.getAbsolutePath().equals(decryptedFile.getAbsolutePath())) {
                         copyFile(rawFile, decryptedFile);
                     }
                 } else if ("video".equals(mediaType)) {
@@ -1936,15 +1953,29 @@ public class ChatActivity extends AppCompatActivity {
                         retriever.release();
                     } catch (Exception ignored) {}
                     decryptedFile = new File(cacheDir, "dec_" + messageId + ".mp4");
-                    copyFile(rawFile, decryptedFile);
+                    if (!rawFile.getAbsolutePath().equals(decryptedFile.getAbsolutePath())) {
+                        if (rawFile.getParentFile() != null && rawFile.getParentFile().equals(cacheDir) && rawFile.renameTo(decryptedFile)) {
+                            // Zero-copy fast rename inside cacheDir
+                        } else {
+                            copyFile(rawFile, decryptedFile);
+                        }
+                    }
                 } else if ("document".equals(mediaType)) {
                     int dot = rawFile.getName().lastIndexOf(".");
                     String ext = dot != -1 ? rawFile.getName().substring(dot) : "";
                     decryptedFile = new File(cacheDir, "dec_" + messageId + ext);
-                    copyFile(rawFile, decryptedFile);
+                    if (!rawFile.getAbsolutePath().equals(decryptedFile.getAbsolutePath())) {
+                        if (rawFile.getParentFile() != null && rawFile.getParentFile().equals(cacheDir) && rawFile.renameTo(decryptedFile)) {
+                            // Zero-copy fast rename inside cacheDir
+                        } else {
+                            copyFile(rawFile, decryptedFile);
+                        }
+                    }
                 } else if ("voice".equals(mediaType)) {
                     decryptedFile = new File(cacheDir, "dec_" + messageId + ".m4a");
-                    copyFile(rawFile, decryptedFile);
+                    if (!rawFile.getAbsolutePath().equals(decryptedFile.getAbsolutePath())) {
+                        copyFile(rawFile, decryptedFile);
+                    }
                 }
             } catch (Exception e) {
                 Log.e("ChatActivity", "Failed to cache media locally", e);
@@ -1966,17 +1997,15 @@ public class ChatActivity extends AppCompatActivity {
                 message.setExpiresAt(new Timestamp(new Date(expiresMillis)));
             }
 
+            com.m3.veil.manager.VeilMessagesController.notifyGlobalMediaTransferProgress(chatId, messageId, 5);
             // Route through VeilMessagesController (warm cache, outbox retry, and direct P2P / chunked cloud streaming)
             com.m3.veil.manager.VeilMessagesController.getInstance(appContext).sendMessage(currentLocalChat, isGroupChatContext() ? null : recipientId, message);
             runOnUiThread(() -> {
                 if (!isFinishing() && !isDestroyed()) {
-                    if (messagesAdapter != null) {
-                        messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADED, 100);
-                    }
                     reloadMessagesFromLocalVault();
                 }
             });
-        }, "VeilMediaSendWorker").start();
+        }, "VeilMediaSendWorker-" + messageId).start();
     }
 
     private void copyFile(File src, File dst) throws IOException {
@@ -2930,6 +2959,7 @@ public class ChatActivity extends AppCompatActivity {
 
         ItemTouchHelper.SimpleCallback touchHelperCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT | ItemTouchHelper.LEFT) {
             private boolean hasTriggeredHaptic = false;
+            private int pendingReplyPosition = RecyclerView.NO_POSITION;
             private final android.graphics.Paint circlePaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
             private android.graphics.drawable.Drawable replyIcon = null;
 
@@ -2944,7 +2974,8 @@ public class ChatActivity extends AppCompatActivity {
 
             @Override
             public float getSwipeThreshold(@NonNull RecyclerView.ViewHolder viewHolder) {
-                return 0.16f;
+                // Return MAX_VALUE so ItemTouchHelper never dismisses the row and always springs dX smoothly back to 0f on release
+                return Float.MAX_VALUE;
             }
 
             @Override
@@ -2964,12 +2995,7 @@ public class ChatActivity extends AppCompatActivity {
 
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
-                int position = viewHolder.getAdapterPosition();
-                if (position > 0 && position <= messageList.size()) {
-                    replyToMessage(messageList.get(position - 1));
-                }
-                hasTriggeredHaptic = false;
-                messagesAdapter.notifyItemChanged(position);
+                // Handled during finger release in onChildDraw / clearView so the bubble never stays stuck off-center
             }
 
             @Override
@@ -2982,14 +3008,14 @@ public class ChatActivity extends AppCompatActivity {
                 }
 
                 float density = recyclerView.getContext().getResources().getDisplayMetrics().density;
-                float maxDx = 72f * density;
-                float triggerThreshold = 46f * density;
+                float maxDx = 68f * density;
+                float triggerThreshold = 44f * density;
 
                 float translationX = dX;
                 if (translationX > maxDx) {
-                    translationX = maxDx + (translationX - maxDx) * 0.15f;
+                    translationX = maxDx + (translationX - maxDx) * 0.12f;
                 } else if (translationX < -maxDx) {
-                    translationX = -maxDx + (translationX + maxDx) * 0.15f;
+                    translationX = -maxDx + (translationX + maxDx) * 0.12f;
                 }
 
                 View bubble = null;
@@ -3001,20 +3027,33 @@ public class ChatActivity extends AppCompatActivity {
 
                 if (bubble != null) {
                     bubble.setTranslationX(translationX);
+                    viewHolder.itemView.setTranslationX(0f);
                 } else {
                     viewHolder.itemView.setTranslationX(translationX);
                 }
 
                 float absDx = Math.abs(translationX);
-                if (absDx > 0) {
-                    float progress = Math.min(1.0f, absDx / triggerThreshold);
-                    if (progress >= 1.0f && !hasTriggeredHaptic && isCurrentlyActive) {
+                if (isCurrentlyActive) {
+                    if (absDx >= triggerThreshold && !hasTriggeredHaptic) {
                         viewHolder.itemView.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
                         hasTriggeredHaptic = true;
-                    } else if (progress < 0.6f && !isCurrentlyActive) {
+                        pendingReplyPosition = viewHolder.getAdapterPosition();
+                    } else if (absDx < triggerThreshold * 0.75f && hasTriggeredHaptic) {
                         hasTriggeredHaptic = false;
+                        pendingReplyPosition = RecyclerView.NO_POSITION;
                     }
+                } else if (hasTriggeredHaptic && pendingReplyPosition != RecyclerView.NO_POSITION) {
+                    final int replyPos = pendingReplyPosition;
+                    hasTriggeredHaptic = false;
+                    pendingReplyPosition = RecyclerView.NO_POSITION;
+                    if (replyPos > 0 && replyPos <= messageList.size()) {
+                        final Message targetMsg = messageList.get(replyPos - 1);
+                        recyclerView.post(() -> replyToMessage(targetMsg));
+                    }
+                }
 
+                if (absDx > 4f * density) {
+                    float progress = Math.min(1.0f, absDx / triggerThreshold);
                     circlePaint.setColor(getResources().getColor(R.color.veil_accent));
                     circlePaint.setAlpha((int) (255 * progress));
 
@@ -3058,10 +3097,11 @@ public class ChatActivity extends AppCompatActivity {
                 }
                 if (bubble != null) {
                     bubble.setTranslationX(0f);
-                } else {
-                    viewHolder.itemView.setTranslationX(0f);
                 }
+                viewHolder.itemView.setTranslationX(0f);
                 hasTriggeredHaptic = false;
+                pendingReplyPosition = RecyclerView.NO_POSITION;
+                recyclerView.invalidate();
             }
         };
         new ItemTouchHelper(touchHelperCallback).attachToRecyclerView(messagesRecyclerView);

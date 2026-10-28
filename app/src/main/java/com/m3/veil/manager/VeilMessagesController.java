@@ -108,6 +108,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     private final Handler mStageQueue;
     private final ExecutorService mStorageQueue;
     private final ExecutorService mCryptoQueue;
+    private final ExecutorService mMediaTransferQueue;
     private final ScheduledExecutorService mScheduler;
     private final Handler mMainHandler;
 
@@ -345,7 +346,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
         this.mCryptoQueue = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "VeilCryptoQueue");
-            t.setPriority(Thread.NORM_PRIORITY);
+            t.setPriority(Thread.NORM_PRIORITY + 1);
+            return t;
+        });
+
+        this.mMediaTransferQueue = Executors.newFixedThreadPool(4, r -> {
+            Thread t = new Thread(r, "VeilMediaTransferQueue");
+            t.setPriority(Thread.NORM_PRIORITY - 1);
             return t;
         });
 
@@ -1079,15 +1086,27 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             }
         });
 
+        final boolean isMediaMsg = (localFile != null && localFile.exists() && localFile.length() > 0L)
+                || (msg.getType() != null && !"text".equals(msg.getType()) && !"poll".equals(msg.getType())
+                    && !"location".equals(msg.getType()) && !"contact".equals(msg.getType()) && !"call".equals(msg.getType()));
+
         // 3. Notify UI observers that message was placed in sent queue
         runOnUI(() -> {
             for (MessagesObserver obs : mObservers) {
                 obs.onMessageSent(dialogId, msg);
+                if (isMediaMsg) {
+                    obs.onMediaTransferProgress(dialogId, msg.getId(), 1);
+                }
             }
         });
+        if (isMediaMsg) {
+            updateMediaTransferNotification(msg, dialogId, msg.getId(), 1);
+        }
 
-        // 4. Encrypt payload on cryptoQueue and fan out to all target peers (1:1 or Group/Channel)
-        mCryptoQueue.execute(() -> {
+        // 4. Route fast text/control messages on mCryptoQueue (0ms queue latency)
+        // and heavy media file encoding/streaming on dedicated 4-thread mMediaTransferQueue
+        ExecutorService targetExecutor = (localFile != null && localFile.exists()) ? mMediaTransferQueue : mCryptoQueue;
+        targetExecutor.execute(() -> {
             try {
                 Chat chat = getDialog(dialogId);
                 if (chat == null) chat = mDatabase.getChat(dialogId);
@@ -1097,9 +1116,18 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 List<String> targetPeers = resolveTargetPeers(dialogId, recipientId, msg);
                 boolean hasNetwork = isNetworkConnected();
 
-                // Embed encrypted inline payload for voice notes (and compact media <= 450KB)
-                // or chunked payload (up to 15MB when online) so the recipient can auto-download
-                // and play immediately even if sender closes the app!
+                // Stream over WebRTC P2P DataChannel immediately if peer is connected (zero delay!)
+                boolean anyTransmittedP2P = false;
+                if (hasNetwork && localFile != null && localFile.exists()) {
+                    for (String peer : targetPeers) {
+                        if (sendMediaP2P(peer, msg, localFile)) {
+                            anyTransmittedP2P = true;
+                        }
+                    }
+                }
+
+                // Embed encrypted inline payload (<= 450KB) or chunked payload (up to 64MB when online)
+                // so the recipient can download even if sender closes the app or receiver is currently offline.
                 if (hasNetwork || (localFile != null && localFile.exists() && localFile.length() <= 450 * 1024L)) {
                     encodeInlineMediaForTransport(dialogId, msg, localFile);
                     if (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()) {
@@ -1107,8 +1135,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     }
                 }
 
-                // Only sync to Firestore/Nostr immediately if device has network connectivity.
-                // If offline, keep message in pending (Clock) state until network returns or P2P DataChannel transmits it.
+                // Sync to Firestore/Nostr if device has network connectivity.
                 if (hasNetwork) {
                     if (isGroup && dialogId != null) {
                         syncGroupOrChannelMessageToFirestore(chat, dialogId, msg);
@@ -1118,13 +1145,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 }
 
                 String jsonPayloadStr = buildJsonFallbackString(dialogId, msg);
-                boolean anyTransmitted = false;
+                boolean anyTransmitted = anyTransmittedP2P;
 
                 for (String peer : targetPeers) {
                     boolean transmitted = false;
                     if (hasNetwork) {
                         if (localFile != null && localFile.exists()) {
-                            transmitted = sendMediaP2P(peer, msg, localFile);
+                            transmitted = anyTransmittedP2P || WebRtcManager.getInstance(mContext).isPeerConnected(peer);
                         } else {
                             VeilPacket pkt = new VeilPacket(VeilPacket.LANE_MSG, VeilPacket.TYPE_CHAT_MESSAGE, jsonPayloadStr);
                             transmitted = WebRtcManager.getInstance(mContext).sendPacket(peer, pkt);
@@ -1168,9 +1195,11 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     final String fMsgId = msg.getId();
                     final boolean fDelivered = msg.isDelivered();
                     final boolean fRead = msg.isRead();
+                    if (!anyTransmittedP2P) {
+                        notifyGlobalMediaTransferProgress(fDialogId, fMsgId, 100);
+                    }
                     mMainHandler.post(() -> {
                         for (MessagesObserver obs : mObservers) {
-                            obs.onMediaTransferProgress(fDialogId, fMsgId, 100);
                             obs.onMessageStatusChanged(fDialogId, fMsgId, fDelivered, fRead);
                         }
                     });
@@ -1368,7 +1397,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
     public static void encodeInlineMediaForTransport(String dialogId, Message msg, @Nullable File localFile) {
         if (msg == null) return;
-        if (msg.getMediaUrl() != null && (msg.getMediaUrl().startsWith("ENC:v") || msg.getMediaUrl().startsWith("CHUNKED:v1:"))) {
+        if (msg.getMediaUrl() != null && msg.getMediaUrl().startsWith("ENC:v")) {
             return;
         }
         File fileToRead = localFile;
@@ -1379,12 +1408,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
         long fileLen = fileToRead.length();
         long maxInlineBytes = 450 * 1024L; // 450 KB inline (~2 min AAC voice note or compressed HD photo)
-        long maxChunkedBytes = 15 * 1024 * 1024L; // 15 MB chunked zero-knowledge cloud-shadow fallback
+        long maxChunkedBytes = 64 * 1024 * 1024L; // 64 MB chunked zero-knowledge cloud-shadow fallback
         if (fileLen > maxChunkedBytes) return;
 
         try {
             String keyScope = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
             if (fileLen <= maxInlineBytes) {
+                notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 18);
                 byte[] bytes = new byte[(int) fileLen];
                 try (java.io.FileInputStream fis = new java.io.FileInputStream(fileToRead)) {
                     int offset = 0;
@@ -1393,6 +1423,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         offset += read;
                     }
                 }
+                try { Thread.sleep(45L); } catch (InterruptedException ignored) {}
+                notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 52);
                 String b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
                 String payload = "INLINE_B64:" + b64;
                 if (keyScope != null && !keyScope.isEmpty()) {
@@ -1400,12 +1432,16 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 } else {
                     msg.setMediaUrl(payload);
                 }
+                try { Thread.sleep(45L); } catch (InterruptedException ignored) {}
+                notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 88);
             } else if (keyScope != null && !keyScope.isEmpty() && msg.getId() != null) {
-                int chunkSize = 300 * 1024; // 300 KB raw bytes per chunk (~400 KB encrypted Base64)
+                int chunkSize = 300 * 1024; // 300 KB raw bytes per chunk
                 int totalChunks = (int) ((fileLen + chunkSize - 1) / chunkSize);
                 com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
                 byte[] sliceBuffer = new byte[chunkSize];
-                notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 1);
+                notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 5);
+                List<com.google.android.gms.tasks.Task<?>> pendingBatch = new ArrayList<>();
+                int uploadedChunks = 0;
                 try (java.io.FileInputStream fis = new java.io.FileInputStream(fileToRead)) {
                     for (int i = 0; i < totalChunks; i++) {
                         int expected = (int) Math.min(chunkSize, fileLen - ((long) i * chunkSize));
@@ -1423,19 +1459,28 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         chunkDoc.put("data", encChunk);
                         chunkDoc.put("timestampMs", System.currentTimeMillis());
                         String docKey = msg.getId() + "_" + i;
-                        com.google.android.gms.tasks.Task<?> tChat = fs.collection("chats").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc);
-                        com.google.android.gms.tasks.Task<?> tGroup = fs.collection("groups").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc);
-                        try {
-                            com.google.android.gms.tasks.Tasks.await(tChat, 10, java.util.concurrent.TimeUnit.SECONDS);
-                        } catch (Exception ignored) {}
-                        try {
-                            com.google.android.gms.tasks.Tasks.await(tGroup, 10, java.util.concurrent.TimeUnit.SECONDS);
-                        } catch (Exception ignored) {}
-                        int pct = (int) (((i + 1) * 100L) / totalChunks);
+                        pendingBatch.add(fs.collection("chats").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc));
+                        if (keyScope.startsWith("group_") || keyScope.startsWith("channel_") || keyScope.startsWith("lounge_")) {
+                            pendingBatch.add(fs.collection("groups").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc));
+                        }
+                        if (pendingBatch.size() >= 3 || i == totalChunks - 1) {
+                            for (com.google.android.gms.tasks.Task<?> batchTask : pendingBatch) {
+                                try {
+                                    com.google.android.gms.tasks.Tasks.await(
+                                            batchTask,
+                                            10, java.util.concurrent.TimeUnit.SECONDS);
+                                } catch (Exception ignored) {}
+                            }
+                            pendingBatch.clear();
+                        }
+                        uploadedChunks++;
+                        int pct = Math.min(98, (int) (((i + 1) * 95L) / totalChunks) + 3);
                         notifyGlobalMediaTransferProgress(keyScope, msg.getId(), pct);
                     }
                 }
-                msg.setMediaUrl("CHUNKED:v1:" + totalChunks + ":" + fileLen);
+                if (uploadedChunks == totalChunks && totalChunks > 0) {
+                    msg.setMediaUrl("CHUNKED:v1:" + totalChunks + ":" + fileLen);
+                }
                 notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 100);
             }
         } catch (Throwable t) {
@@ -1443,14 +1488,364 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         }
     }
 
+    /**
+     * Strips any legacy "doc_<timestamp>_" prefix and "|<size>" suffix so documents always display
+     * and save with their clean original filename.
+     */
+    public static String cleanDocumentFileName(@Nullable String rawTextOrName) {
+        if (rawTextOrName == null || rawTextOrName.trim().isEmpty()) {
+            return "Document";
+        }
+        String name = rawTextOrName.trim();
+        int pipeIdx = name.indexOf('|');
+        if (pipeIdx != -1) {
+            name = name.substring(0, pipeIdx).trim();
+        }
+        int slashIdx = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
+        if (slashIdx != -1 && slashIdx < name.length() - 1) {
+            name = name.substring(slashIdx + 1);
+        }
+        if (name.startsWith("doc_")) {
+            int secondUnderscore = name.indexOf('_', 4);
+            if (secondUnderscore > 4 && secondUnderscore < name.length() - 1) {
+                boolean allDigits = true;
+                for (int i = 4; i < secondUnderscore; i++) {
+                    if (!Character.isDigit(name.charAt(i))) {
+                        allDigits = false;
+                        break;
+                    }
+                }
+                if (allDigits) {
+                    name = name.substring(secondUnderscore + 1);
+                }
+            }
+        }
+        return name.isEmpty() ? "Document" : name;
+    }
+
+    /**
+     * Evaluates whether incoming media of {@code mediaType} should auto-download in {@code dialogId}.
+     * Strictly honors:
+     * 1. Per-chat toggle ("VeilChatSpecificPrefs" -> "auto_media_" + dialogId).
+     * 2. Global Wi-Fi / Mobile Data toggles ("veil_storage_prefs" -> "auto_download_wifi", "auto_download_cellular").
+     */
+    public static boolean shouldAutoDownloadMedia(@Nullable Context context, @Nullable String dialogId, @Nullable String mediaType) {
+        if (context == null) return false;
+        try {
+            android.content.SharedPreferences chatPrefs =
+                    context.getSharedPreferences("VeilChatSpecificPrefs", Context.MODE_PRIVATE);
+            if (dialogId != null && !dialogId.isEmpty() && chatPrefs.contains("auto_media_" + dialogId)) {
+                boolean perChatAllowed = chatPrefs.getBoolean("auto_media_" + dialogId, true);
+                if (!perChatAllowed) {
+                    return false;
+                }
+            }
+
+            android.content.SharedPreferences storagePrefs =
+                    context.getSharedPreferences("veil_storage_prefs", Context.MODE_PRIVATE);
+            boolean wifiAuto = storagePrefs.getBoolean("auto_download_wifi", true);
+            boolean cellularAuto = storagePrefs.getBoolean("auto_download_cellular", false);
+
+            if (!wifiAuto && !cellularAuto) {
+                return false;
+            }
+
+            android.net.ConnectivityManager cm =
+                    (android.net.ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                android.net.Network activeNet = cm.getActiveNetwork();
+                if (activeNet != null) {
+                    android.net.NetworkCapabilities caps = cm.getNetworkCapabilities(activeNet);
+                    if (caps != null) {
+                        if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+                                || caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                            return wifiAuto;
+                        }
+                        if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                            return cellularAuto;
+                        }
+                    }
+                }
+            }
+            return wifiAuto;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Returns whether downloaded media for {@code dialogId} should be visible in the phone's Gallery
+     * and File Manager (Downloads/Pictures/Movies).
+     */
+    public static boolean isMediaVisibilityEnabled(@Nullable Context context, @Nullable String dialogId) {
+        if (context == null) return true;
+        try {
+            android.content.SharedPreferences chatPrefs =
+                    context.getSharedPreferences("VeilChatSpecificPrefs", Context.MODE_PRIVATE);
+            if (dialogId != null && !dialogId.isEmpty() && chatPrefs.contains("media_visibility_" + dialogId)) {
+                return chatPrefs.getBoolean("media_visibility_" + dialogId, true);
+            }
+            android.content.SharedPreferences storagePrefs =
+                    context.getSharedPreferences("veil_storage_prefs", Context.MODE_PRIVATE);
+            return storagePrefs.getBoolean("media_visibility_global", true);
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    public static void setMediaVisibilityEnabled(@Nullable Context context, @Nullable String dialogId, boolean enabled) {
+        if (context == null || dialogId == null || dialogId.isEmpty()) return;
+        context.getSharedPreferences("VeilChatSpecificPrefs", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("media_visibility_" + dialogId, enabled)
+                .apply();
+    }
+
+    /**
+     * Exports downloaded photo/video/document to public MediaStore (Gallery / File Manager Downloads)
+     * ONLY when Media Visibility is enabled for this chat and message is not view-once Blink.
+     */
+    public static void exportMediaToPublicStorageIfAllowed(
+            @Nullable Context context,
+            @Nullable String dialogId,
+            @Nullable Message msg,
+            @Nullable File localFile) {
+        if (context == null || msg == null || localFile == null || !localFile.exists() || localFile.length() < 64) {
+            return;
+        }
+        try {
+            File extCache = context.getExternalCacheDir();
+            if (extCache != null && extCache.exists()) {
+                File noMedia = new File(extCache, ".nomedia");
+                if (!noMedia.exists()) {
+                    try { noMedia.createNewFile(); } catch (Exception ignored) {}
+                }
+            }
+            if (msg.isBlink() || msg.getExpiresAt() != null) {
+                return;
+            }
+            String resolvedChatId = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
+            if (!isMediaVisibilityEnabled(context, resolvedChatId)) {
+                return;
+            }
+            android.content.SharedPreferences exportedPrefs =
+                    context.getSharedPreferences("veil_exported_media", Context.MODE_PRIVATE);
+            String exportKey = "exp_" + msg.getId();
+            if (exportedPrefs.getBoolean(exportKey, false)) {
+                return;
+            }
+
+            String type = msg.getType() != null ? msg.getType() : "";
+            android.content.ContentResolver resolver = context.getContentResolver();
+            if ("image".equals(type)) {
+                String dispName = "Veil_IMG_" + System.currentTimeMillis() + ".jpg";
+                android.content.ContentValues values = new android.content.ContentValues();
+                values.put(MediaStore.Images.Media.DISPLAY_NAME, dispName);
+                values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    values.put(MediaStore.Images.Media.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/Veil");
+                    values.put(MediaStore.Images.Media.IS_PENDING, 1);
+                }
+                Uri uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                if (uri != null) {
+                    try (java.io.InputStream in = new java.io.FileInputStream(localFile);
+                         java.io.OutputStream out = resolver.openOutputStream(uri)) {
+                        if (out != null) {
+                            byte[] buf = new byte[16384];
+                            int r;
+                            while ((r = in.read(buf)) != -1) out.write(buf, 0, r);
+                            out.flush();
+                        }
+                    }
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        values.clear();
+                        values.put(MediaStore.Images.Media.IS_PENDING, 0);
+                        resolver.update(uri, values, null, null);
+                    }
+                    exportedPrefs.edit().putBoolean(exportKey, true).apply();
+                }
+            } else if ("video".equals(type)) {
+                String dispName = "Veil_VID_" + System.currentTimeMillis() + ".mp4";
+                android.content.ContentValues values = new android.content.ContentValues();
+                values.put(MediaStore.Video.Media.DISPLAY_NAME, dispName);
+                values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    values.put(MediaStore.Video.Media.RELATIVE_PATH, android.os.Environment.DIRECTORY_MOVIES + "/Veil");
+                    values.put(MediaStore.Video.Media.IS_PENDING, 1);
+                }
+                Uri uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
+                if (uri != null) {
+                    try (java.io.InputStream in = new java.io.FileInputStream(localFile);
+                         java.io.OutputStream out = resolver.openOutputStream(uri)) {
+                        if (out != null) {
+                            byte[] buf = new byte[16384];
+                            int r;
+                            while ((r = in.read(buf)) != -1) out.write(buf, 0, r);
+                            out.flush();
+                        }
+                    }
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        values.clear();
+                        values.put(MediaStore.Video.Media.IS_PENDING, 0);
+                        resolver.update(uri, values, null, null);
+                    }
+                    exportedPrefs.edit().putBoolean(exportKey, true).apply();
+                }
+            } else if ("document".equals(type)) {
+                String cleanName = cleanDocumentFileName(msg.getText());
+                String ext = "";
+                int dot = cleanName.lastIndexOf('.');
+                if (dot != -1 && dot < cleanName.length() - 1) {
+                    ext = cleanName.substring(dot + 1).toLowerCase(java.util.Locale.ROOT);
+                }
+                String mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+                if (mime == null || mime.isEmpty()) mime = "application/octet-stream";
+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    android.content.ContentValues values = new android.content.ContentValues();
+                    values.put(MediaStore.Downloads.DISPLAY_NAME, cleanName);
+                    values.put(MediaStore.Downloads.MIME_TYPE, mime);
+                    values.put(MediaStore.Downloads.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/Veil");
+                    values.put(MediaStore.Downloads.IS_PENDING, 1);
+                    Uri uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                    if (uri != null) {
+                        try (java.io.InputStream in = new java.io.FileInputStream(localFile);
+                             java.io.OutputStream out = resolver.openOutputStream(uri)) {
+                            if (out != null) {
+                                byte[] buf = new byte[16384];
+                                int r;
+                                while ((r = in.read(buf)) != -1) out.write(buf, 0, r);
+                                out.flush();
+                            }
+                        }
+                        values.clear();
+                        values.put(MediaStore.Downloads.IS_PENDING, 0);
+                        resolver.update(uri, values, null, null);
+                        exportedPrefs.edit().putBoolean(exportKey, true).apply();
+                    }
+                } else {
+                    File dlDir = new File(android.os.Environment.getExternalStoragePublicDirectory(
+                            android.os.Environment.DIRECTORY_DOWNLOADS), "Veil");
+                    if (!dlDir.exists()) dlDir.mkdirs();
+                    File outDoc = new File(dlDir, cleanName);
+                    try (java.io.InputStream in = new java.io.FileInputStream(localFile);
+                         java.io.OutputStream out = new java.io.FileOutputStream(outDoc)) {
+                        byte[] buf = new byte[16384];
+                        int r;
+                        while ((r = in.read(buf)) != -1) out.write(buf, 0, r);
+                        out.flush();
+                    }
+                    android.media.MediaScannerConnection.scanFile(
+                            context, new String[]{outDoc.getAbsolutePath()}, new String[]{mime}, null);
+                    exportedPrefs.edit().putBoolean(exportKey, true).apply();
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "exportMediaToPublicStorageIfAllowed notice: " + t.getMessage());
+        }
+    }
+
+    private static final String MEDIA_NOTIFICATION_CHANNEL_ID = "veil_media_transfer_channel";
+    private static final ConcurrentHashMap<String, Integer> sHighestMediaProgress = new ConcurrentHashMap<>();
+
     public static void notifyGlobalMediaTransferProgress(String dialogId, String messageId, int percent) {
         VeilMessagesController ctrl = sInstance;
-        if (ctrl == null || dialogId == null || messageId == null) return;
+        if (ctrl == null || messageId == null) return;
+        Message cachedMsg = ctrl.getMessage(messageId);
+        final String resolvedDialogId = (dialogId != null && !dialogId.isEmpty())
+                ? dialogId
+                : (cachedMsg != null && cachedMsg.getChatId() != null ? cachedMsg.getChatId() : "");
+
+        if (percent >= 0 && percent < 100) {
+            Integer prev = sHighestMediaProgress.get(messageId);
+            if (prev != null && percent < prev && prev < 100) {
+                percent = prev;
+            } else {
+                sHighestMediaProgress.put(messageId, percent);
+            }
+        } else if (percent >= 100 || percent < 0) {
+            sHighestMediaProgress.remove(messageId);
+        }
+
+        final int finalPercent = percent;
+        ctrl.updateMediaTransferNotification(cachedMsg, resolvedDialogId, messageId, finalPercent);
         ctrl.runOnUI(() -> {
             for (MessagesObserver obs : ctrl.mObservers) {
-                obs.onMediaTransferProgress(dialogId, messageId, percent);
+                obs.onMediaTransferProgress(resolvedDialogId, messageId, finalPercent);
             }
         });
+    }
+
+    private void updateMediaTransferNotification(@Nullable Message msg, String dialogId, String messageId, int percent) {
+        if (mContext == null || messageId == null) return;
+        try {
+            android.app.NotificationManager nm =
+                    (android.app.NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                android.app.NotificationChannel channel = nm.getNotificationChannel(MEDIA_NOTIFICATION_CHANNEL_ID);
+                if (channel == null) {
+                    channel = new android.app.NotificationChannel(
+                            MEDIA_NOTIFICATION_CHANNEL_ID,
+                            "Media Transfers",
+                            android.app.NotificationManager.IMPORTANCE_LOW);
+                    channel.setDescription("Live progress for encrypted photo, video, and document transfers");
+                    channel.setSound(null, null);
+                    channel.enableVibration(false);
+                    nm.createNotificationChannel(channel);
+                }
+            }
+
+            int notifId = 40000 + Math.abs(messageId.hashCode() % 10000);
+            if (percent < 0) {
+                nm.cancel(notifId);
+                return;
+            }
+
+            String myId = getCurrentUserId();
+            boolean isSending = msg != null && msg.getSenderId() != null
+                    && (msg.getSenderId().equals(myId) || com.m3.veil.manager.AuthManager.getInstance().isMyUserId(mContext, msg.getSenderId()));
+            String typeLabel = "Media";
+            if (msg != null && msg.getType() != null) {
+                String t = msg.getType();
+                if ("video".equals(t)) typeLabel = "Video";
+                else if ("image".equals(t)) typeLabel = "Photo";
+                else if ("document".equals(t)) typeLabel = "Document (" + cleanDocumentFileName(msg.getText()) + ")";
+                else if ("voice".equals(t) || "audio".equals(t)) typeLabel = "Voice note";
+            }
+
+            if (percent >= 100) {
+                androidx.core.app.NotificationCompat.Builder doneBuilder =
+                        new androidx.core.app.NotificationCompat.Builder(mContext, MEDIA_NOTIFICATION_CHANNEL_ID)
+                                .setSmallIcon(isSending ? android.R.drawable.stat_sys_upload_done : android.R.drawable.stat_sys_download_done)
+                                .setContentTitle(isSending ? (typeLabel + " sent") : (typeLabel + " downloaded"))
+                                .setContentText("100% • Encrypted transfer complete")
+                                .setProgress(0, 0, false)
+                                .setOngoing(false)
+                                .setAutoCancel(true)
+                                .setTimeoutAfter(2500L)
+                                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_LOW);
+                nm.notify(notifId, doneBuilder.build());
+                mMainHandler.postDelayed(() -> {
+                    try {
+                        nm.cancel(notifId);
+                    } catch (Throwable ignored) {}
+                }, 2600L);
+            } else {
+                int clamped = Math.max(1, Math.min(99, percent));
+                androidx.core.app.NotificationCompat.Builder progBuilder =
+                        new androidx.core.app.NotificationCompat.Builder(mContext, MEDIA_NOTIFICATION_CHANNEL_ID)
+                                .setSmallIcon(isSending ? android.R.drawable.stat_sys_upload : android.R.drawable.stat_sys_download)
+                                .setContentTitle((isSending ? "Sending " : "Downloading ") + typeLabel + "...")
+                                .setContentText(clamped + "%")
+                                .setProgress(100, clamped, false)
+                                .setOngoing(true)
+                                .setOnlyAlertOnce(true)
+                                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_LOW);
+                nm.notify(notifId, progBuilder.build());
+            }
+        } catch (Throwable ignored) {}
     }
 
     public static String resolveMediaExtension(Message msg) {
@@ -1463,8 +1858,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         } else if ("video".equals(mType)) {
             return ".mp4";
         } else if ("document".equals(mType) && msg.getText() != null) {
-            String raw = msg.getText();
-            String name = raw.contains("|") ? raw.split("\\|", 2)[0] : raw;
+            String name = cleanDocumentFileName(msg.getText());
             int dot = name.lastIndexOf('.');
             if (dot != -1 && dot < name.length() - 1) {
                 return name.substring(dot);
@@ -1490,6 +1884,25 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     return targetFile;
                 } else {
                     targetFile.delete();
+                }
+            }
+            // Check if a P2P staged file already arrived while auto-download was disabled
+            File stagedFile = new File(context.getExternalCacheDir(), "staged_" + msg.getId() + ext);
+            if (stagedFile.exists() && stagedFile.length() >= 64) {
+                if (!stagedFile.renameTo(targetFile)) {
+                    try (java.io.FileInputStream fis = new java.io.FileInputStream(stagedFile);
+                         java.io.FileOutputStream fos = new java.io.FileOutputStream(targetFile)) {
+                        byte[] buf = new byte[16384];
+                        int r;
+                        while ((r = fis.read(buf)) != -1) fos.write(buf, 0, r);
+                        fos.flush();
+                    }
+                    stagedFile.delete();
+                }
+                if (targetFile.exists() && targetFile.length() >= 64) {
+                    msg.setLocalFilePath(targetFile.getAbsolutePath());
+                    exportMediaToPublicStorageIfAllowed(context, dialogId, msg, targetFile);
+                    return targetFile;
                 }
             }
             String mediaUrl = msg.getMediaUrl();
@@ -1533,6 +1946,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     tempFile.delete();
                 }
                 msg.setLocalFilePath(targetFile.getAbsolutePath());
+                exportMediaToPublicStorageIfAllowed(context, dialogId, msg, targetFile);
                 return targetFile;
             }
         } catch (Throwable t) {
@@ -1562,9 +1976,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             msg.setLocalFilePath(cachedDec.getAbsolutePath());
             return cachedDec;
         }
+        String resolvedChatId = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
+        // Strictly enforce user's Auto-Download settings (per-chat + Wi-Fi/Cellular)!
+        if (!shouldAutoDownloadMedia(context, resolvedChatId, msg.getType())) {
+            return null;
+        }
         String mediaUrl = msg.getMediaUrl();
         if (mediaUrl == null || mediaUrl.isEmpty()) return null;
-        String resolvedChatId = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
         if (mediaUrl.startsWith("CHUNKED:v1:")) {
             if (resolvedChatId != null && !resolvedChatId.isEmpty()) {
                 downloadChunkedMediaFromFirestore(context.getApplicationContext(), resolvedChatId, msg, mediaUrl,
@@ -1607,6 +2025,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         if (existingTarget.exists() && existingTarget.length() >= 64) {
             targetMsg.setLocalFilePath(existingTarget.getAbsolutePath());
             EncryptedChatDatabase.getInstance(context).saveMessage(resolvedChatId, targetMsg);
+            exportMediaToPublicStorageIfAllowed(context, resolvedChatId, targetMsg, existingTarget);
             notifyGlobalMediaTransferProgress(resolvedChatId, targetMsg.getId(), 100);
             if (callback != null) {
                 new Handler(Looper.getMainLooper()).post(() -> callback.onComplete(targetMsg.getId(), existingTarget));
@@ -1621,8 +2040,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             try {
                 String[] parts = chunkedHeader.split(":");
                 int totalChunks = Integer.parseInt(parts[2]);
-                if (totalChunks <= 0 || totalChunks > 80) {
-                    if (callback != null) callback.onError(targetMsg.getId(), "Invalid chunk count");
+                if (totalChunks <= 0 || totalChunks > 250) {
+                    if (callback != null) {
+                        new Handler(Looper.getMainLooper()).post(() -> callback.onError(targetMsg.getId(), "Invalid chunk count"));
+                    }
                     return;
                 }
                 com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
@@ -1701,6 +2122,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     checkpointDir.delete();
                     targetMsg.setLocalFilePath(targetFile.getAbsolutePath());
                     EncryptedChatDatabase.getInstance(context).saveMessage(resolvedChatId, targetMsg);
+                    exportMediaToPublicStorageIfAllowed(context, resolvedChatId, targetMsg, targetFile);
                     notifyGlobalMediaTransferProgress(resolvedChatId, targetMsg.getId(), 100);
                     if (callback != null) {
                         new Handler(Looper.getMainLooper()).post(() -> callback.onComplete(targetMsg.getId(), targetFile));
@@ -1731,21 +2153,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     new P2PFileTransferHelper.FileTransferCallback() {
                         @Override
                         public void onProgress(int percent) {
-                            runOnUI(() -> {
-                                for (MessagesObserver obs : mObservers) {
-                                    obs.onMediaTransferProgress(msg.getChatId(), msg.getId(), percent);
-                                }
-                            });
+                            notifyGlobalMediaTransferProgress(msg.getChatId(), msg.getId(), percent);
                         }
 
                         @Override
                         public void onComplete(String transferId) {
                             Log.d(TAG, "P2P media stream complete for message: " + msg.getId());
-                            runOnUI(() -> {
-                                for (MessagesObserver obs : mObservers) {
-                                    obs.onMediaTransferProgress(msg.getChatId(), msg.getId(), 100);
-                                }
-                            });
+                            notifyGlobalMediaTransferProgress(msg.getChatId(), msg.getId(), 100);
                         }
 
                         @Override

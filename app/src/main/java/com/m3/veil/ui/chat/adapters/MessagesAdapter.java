@@ -735,6 +735,34 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
     }
 
+    private void bindCircularOverlayPercent(View downloadingLayout, View cancelBtn, int progress) {
+        if (!(downloadingLayout instanceof FrameLayout)) return;
+        FrameLayout frame = (FrameLayout) downloadingLayout;
+        Object existingTag = frame.getTag(R.id.messageText);
+        TextView pctView;
+        if (existingTag instanceof TextView) {
+            pctView = (TextView) existingTag;
+        } else {
+            pctView = new TextView(frame.getContext());
+            pctView.setTextColor(0xFFFFFFFF);
+            pctView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10.5f);
+            pctView.setTypeface(null, android.graphics.Typeface.BOLD);
+            pctView.setGravity(android.view.Gravity.CENTER);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.Gravity.CENTER);
+            frame.addView(pctView, lp);
+            frame.setTag(R.id.messageText, pctView);
+        }
+        int clamped = Math.max(1, Math.min(99, progress > 0 ? progress : 1));
+        pctView.setText(clamped + "%");
+        pctView.setVisibility(View.VISIBLE);
+        if (cancelBtn != null) {
+            cancelBtn.setVisibility(View.GONE);
+        }
+    }
+
     private void attachDoubleTapAndLongPress(View bubbleView, View rootItemView, Message message) {
         if (bubbleView == null) return;
         bubbleView.setTag(R.id.messageBubble, message);
@@ -1648,30 +1676,35 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
                         int dlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                         final int progress = downloadProgresses.getOrDefault(message.getId(), 0);
-                        if (!message.isPending() || message.isDelivered() || message.isRead() || progress >= 100) {
+                        if (progress >= 100 || message.isRead() || (dlState != STATE_DOWNLOADING && (!message.isPending() || message.isDelivered()))) {
                             if (dlState == STATE_DOWNLOADING) {
                                 dlState = STATE_DOWNLOADED;
                                 downloadStates.put(message.getId(), STATE_DOWNLOADED);
                             }
                         }
-                        final boolean isSending = (message.isPending() && !message.isDelivered() && !message.isRead()) || dlState == STATE_DOWNLOADING;
+                        final boolean isSending = (message.isPending() && !message.isDelivered() && !message.isRead())
+                                || (dlState == STATE_DOWNLOADING && progress < 100);
 
                         if (imageDownloadOverlay != null) {
                             if (isSending) {
+                                int shownPct = Math.max(1, Math.min(99, progress > 0 ? progress : 1));
                                 imageDownloadOverlay.setVisibility(View.VISIBLE);
-                                if (imageDownloadingLayout != null) imageDownloadingLayout.setVisibility(View.VISIBLE);
-                                if (imageDownloadIdleLayout != null) imageDownloadIdleLayout.setVisibility(View.GONE);
-                                if (imageDownloadRetryLayout != null) imageDownloadRetryLayout.setVisibility(View.GONE);
-                                if (imageDownloadProgress != null) {
-                                    imageDownloadProgress.setIndeterminate(progress <= 0);
-                                    if (progress > 0) imageDownloadProgress.setProgress(progress);
-                                }
-                                if (imageDownloadCancelBtn != null) {
-                                    imageDownloadCancelBtn.setOnClickListener(v -> {
+                                if (imageDownloadingLayout != null) {
+                                    imageDownloadingLayout.setVisibility(View.VISIBLE);
+                                    bindCircularOverlayPercent(imageDownloadingLayout, imageDownloadCancelBtn, shownPct);
+                                    imageDownloadingLayout.setOnClickListener(v -> {
                                         if (mediaDownloadClickListener != null) {
                                             mediaDownloadClickListener.onMediaCancelClick(message);
                                         }
                                     });
+                                }
+                                if (imageDownloadIdleLayout != null) imageDownloadIdleLayout.setVisibility(View.GONE);
+                                if (imageDownloadRetryLayout != null) imageDownloadRetryLayout.setVisibility(View.GONE);
+                                if (imageDownloadProgress != null) {
+                                    imageDownloadProgress.setIndeterminate(true);
+                                }
+                                if (imageTimeText != null) {
+                                    imageTimeText.setText(shownPct + "% • " + time);
                                 }
                             } else {
                                 imageDownloadOverlay.setVisibility(View.GONE);
@@ -1785,31 +1818,37 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
                         int vDlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                         final int vProgress = downloadProgresses.getOrDefault(message.getId(), 0);
-                        if (!message.isPending() || message.isDelivered() || message.isRead() || vProgress >= 100) {
+                        if (vProgress >= 100 || message.isRead() || (vDlState != STATE_DOWNLOADING && (!message.isPending() || message.isDelivered()))) {
                             if (vDlState == STATE_DOWNLOADING) {
                                 vDlState = STATE_DOWNLOADED;
                                 downloadStates.put(message.getId(), STATE_DOWNLOADED);
                             }
                         }
-                        final boolean isVideoSending = (message.isPending() && !message.isDelivered() && !message.isRead()) || vDlState == STATE_DOWNLOADING;
+                        final boolean isVideoSending = (message.isPending() && !message.isDelivered() && !message.isRead())
+                                || (vDlState == STATE_DOWNLOADING && vProgress < 100);
 
                         if (videoDownloadOverlay != null) {
                             if (isVideoSending) {
+                                int shownPct = Math.max(1, Math.min(99, vProgress > 0 ? vProgress : 1));
                                 videoDownloadOverlay.setVisibility(View.VISIBLE);
-                                if (videoDownloadingLayout != null) videoDownloadingLayout.setVisibility(View.VISIBLE);
-                                if (videoDownloadIdleLayout != null) videoDownloadIdleLayout.setVisibility(View.GONE);
-                                if (videoDownloadRetryLayout != null) videoDownloadRetryLayout.setVisibility(View.GONE);
-                                if (videoPlayButtonContainer != null) videoPlayButtonContainer.setVisibility(View.GONE);
-                                if (videoDownloadProgress != null) {
-                                    videoDownloadProgress.setIndeterminate(vProgress <= 0);
-                                    if (vProgress > 0) videoDownloadProgress.setProgress(vProgress);
-                                }
-                                if (videoDownloadCancelBtn != null) {
-                                    videoDownloadCancelBtn.setOnClickListener(v -> {
+                                if (videoDownloadingLayout != null) {
+                                    videoDownloadingLayout.setVisibility(View.VISIBLE);
+                                    bindCircularOverlayPercent(videoDownloadingLayout, videoDownloadCancelBtn, shownPct);
+                                    videoDownloadingLayout.setOnClickListener(v -> {
                                         if (mediaDownloadClickListener != null) {
                                             mediaDownloadClickListener.onMediaCancelClick(message);
                                         }
                                     });
+                                }
+                                if (videoDownloadIdleLayout != null) videoDownloadIdleLayout.setVisibility(View.GONE);
+                                if (videoDownloadRetryLayout != null) videoDownloadRetryLayout.setVisibility(View.GONE);
+                                if (videoPlayButtonContainer != null) videoPlayButtonContainer.setVisibility(View.GONE);
+                                if (videoDownloadProgress != null) {
+                                    videoDownloadProgress.setIndeterminate(true);
+                                }
+                                if (videoDurationText != null) {
+                                    String durStr = dur > 0 ? VoicePlayerManager.formatDuration(dur) : "0:30";
+                                    videoDurationText.setText(shownPct + "% • " + durStr);
                                 }
                             } else {
                                 videoDownloadOverlay.setVisibility(View.GONE);
@@ -1831,12 +1870,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             name = p[0];
                             size = p[1];
                         }
-                        documentFileName.setText(name);
+                        final String cleanName = com.m3.veil.manager.VeilMessagesController.cleanDocumentFileName(name);
+                        documentFileName.setText(cleanName);
 
                         String ext = "DOC";
-                        int dot = name.lastIndexOf(".");
-                        if (dot != -1) {
-                            ext = name.substring(dot + 1).toUpperCase(Locale.ROOT);
+                        int dot = cleanName.lastIndexOf(".");
+                        if (dot != -1 && dot < cleanName.length() - 1) {
+                            ext = cleanName.substring(dot + 1).toUpperCase(Locale.ROOT);
                             if (ext.length() > 4) ext = ext.substring(0, 4);
                         }
 
@@ -1848,50 +1888,54 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             int badgeColor = FileMediaManager.getDocumentBadgeColor(ext);
                             documentIconContainer.setBackgroundTintList(android.content.res.ColorStateList.valueOf(badgeColor));
                         }
+                        if (size.isEmpty()) {
+                            String fallbackSize = message.getFormattedMediaSize();
+                            if (!fallbackSize.isEmpty()) size = fallbackSize;
+                        }
                         String formattedInfo = ext + (size.isEmpty() ? "" : " • " + size);
                         documentFileSize.setText(formattedInfo);
                         int docDlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                         final int docProgress = downloadProgresses.getOrDefault(message.getId(), 0);
-                        if (!message.isPending() || message.isDelivered() || message.isRead() || docProgress >= 100) {
+                        if (docProgress >= 100 || message.isRead() || (docDlState != STATE_DOWNLOADING && (!message.isPending() || message.isDelivered()))) {
                             if (docDlState == STATE_DOWNLOADING) {
                                 docDlState = STATE_DOWNLOADED;
                                 downloadStates.put(message.getId(), STATE_DOWNLOADED);
                             }
                         }
-                        final boolean isDocSending = (message.isPending() && !message.isDelivered() && !message.isRead()) || docDlState == STATE_DOWNLOADING;
+                        final boolean isDocSending = (message.isPending() && !message.isDelivered() && !message.isRead())
+                                || (docDlState == STATE_DOWNLOADING && docProgress < 100);
 
                         if (documentProgressBar != null) {
                             if (isDocSending) {
+                                int shownPct = Math.max(1, Math.min(99, docProgress > 0 ? docProgress : 1));
                                 documentProgressBar.setVisibility(View.VISIBLE);
-                                documentProgressBar.setIndeterminate(docProgress <= 0);
-                                if (docProgress > 0) {
-                                    documentProgressBar.setProgress(docProgress);
-                                    documentFileSize.setText(formattedInfo + " • " + docProgress + "%");
-                                }
+                                documentProgressBar.setIndeterminate(false);
+                                documentProgressBar.setMax(100);
+                                documentProgressBar.setProgress(shownPct);
+                                documentFileSize.setText(formattedInfo + " • Sending " + shownPct + "%");
                                 if (documentActionIcon != null) documentActionIcon.setVisibility(View.GONE);
                             } else {
                                 documentProgressBar.setVisibility(View.GONE);
                                 if (documentActionIcon != null) {
                                     documentActionIcon.setVisibility(View.VISIBLE);
-                                    documentActionIcon.setImageResource(R.drawable.ic_download);
+                                    documentActionIcon.setImageResource(R.drawable.ic_check);
                                 }
                             }
                         }
 
-                        documentMessageContainer.setOnClickListener(v -> {
+                        View.OnClickListener openSentDocClick = v -> {
                             File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, "");
                             if (local == null || !local.exists() || local.length() == 0) {
                                 local = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(itemView.getContext(), message.getChatId(), message);
                             }
                             if (local != null && local.exists() && local.length() > 0) {
-                                FileMediaManager.openFileWithSystemViewer(itemView.getContext(), local);
-                                try {
-                                    com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).markMessageAsReadExplicitly(message);
-                                } catch (Throwable ignored) {}
+                                FileMediaManager.openDocumentWithOriginalName(itemView.getContext(), local, cleanName);
                             } else if (mediaDownloadClickListener != null) {
                                 mediaDownloadClickListener.onMediaDownloadClick(message);
                             }
-                        });
+                        };
+                        documentMessageContainer.setOnClickListener(openSentDocClick);
+                        if (documentActionIcon != null) documentActionIcon.setOnClickListener(openSentDocClick);
                     }
                 } else if ("location".equals(message.getType())) {
                     ensureLocationViews();
@@ -2557,8 +2601,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
 
                         File localImg = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".jpg");
-                        boolean hasLocalImg = (localImg != null && localImg.exists() && localImg.length() > 0)
-                                || (message.getLocalFilePath() != null && new File(message.getLocalFilePath()).exists());
+                        boolean hasLocalImg = (localImg != null && localImg.exists() && localImg.length() >= 64 && !localImg.getName().startsWith("staged_"));
 
                         final int imgDownloadState = hasLocalImg ? STATE_DOWNLOADED : downloadStates.getOrDefault(message.getId(), STATE_IDLE);
 
@@ -2618,20 +2661,24 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                         });
                                     }
                                 } else if (imgDownloadState == STATE_DOWNLOADING) {
+                                    int progress = downloadProgresses.getOrDefault(message.getId(), 0);
+                                    int shownPct = Math.max(1, Math.min(99, progress > 0 ? progress : 1));
                                     if (imageDownloadIdleLayout != null) imageDownloadIdleLayout.setVisibility(View.GONE);
-                                    if (imageDownloadingLayout != null) imageDownloadingLayout.setVisibility(View.VISIBLE);
-                                    if (imageDownloadRetryLayout != null) imageDownloadRetryLayout.setVisibility(View.GONE);
-                                    if (imageDownloadProgress != null) {
-                                        int progress = downloadProgresses.getOrDefault(message.getId(), 0);
-                                        imageDownloadProgress.setIndeterminate(progress <= 0);
-                                        if (progress > 0) imageDownloadProgress.setProgress(progress);
-                                    }
-                                    if (imageDownloadCancelBtn != null) {
-                                        imageDownloadCancelBtn.setOnClickListener(v -> {
+                                    if (imageDownloadingLayout != null) {
+                                        imageDownloadingLayout.setVisibility(View.VISIBLE);
+                                        bindCircularOverlayPercent(imageDownloadingLayout, imageDownloadCancelBtn, shownPct);
+                                        imageDownloadingLayout.setOnClickListener(v -> {
                                             if (mediaDownloadClickListener != null) {
                                                 mediaDownloadClickListener.onMediaCancelClick(message);
                                             }
                                         });
+                                    }
+                                    if (imageDownloadRetryLayout != null) imageDownloadRetryLayout.setVisibility(View.GONE);
+                                    if (imageDownloadProgress != null) {
+                                        imageDownloadProgress.setIndeterminate(true);
+                                    }
+                                    if (imageTimeText != null) {
+                                        imageTimeText.setText(shownPct + "% • " + time);
                                     }
                                 } else if (imgDownloadState == STATE_RETRY) {
                                     if (imageDownloadIdleLayout != null) imageDownloadIdleLayout.setVisibility(View.GONE);
@@ -2690,8 +2737,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
 
                         File localVid = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".mp4");
-                        boolean hasLocalVid = (localVid != null && localVid.exists() && localVid.length() > 0)
-                                || (message.getLocalFilePath() != null && new File(message.getLocalFilePath()).exists());
+                        boolean hasLocalVid = (localVid != null && localVid.exists() && localVid.length() >= 64 && !localVid.getName().startsWith("staged_"));
 
                         final int vidDownloadState = hasLocalVid ? STATE_DOWNLOADED : downloadStates.getOrDefault(message.getId(), STATE_IDLE);
 
@@ -2768,20 +2814,25 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                         });
                                     }
                                 } else if (vidDownloadState == STATE_DOWNLOADING) {
+                                    int progress = downloadProgresses.getOrDefault(message.getId(), 0);
+                                    int shownPct = Math.max(1, Math.min(99, progress > 0 ? progress : 1));
                                     if (videoDownloadIdleLayout != null) videoDownloadIdleLayout.setVisibility(View.GONE);
-                                    if (videoDownloadingLayout != null) videoDownloadingLayout.setVisibility(View.VISIBLE);
-                                    if (videoDownloadRetryLayout != null) videoDownloadRetryLayout.setVisibility(View.GONE);
-                                    if (videoDownloadProgress != null) {
-                                        int progress = downloadProgresses.getOrDefault(message.getId(), 0);
-                                        videoDownloadProgress.setIndeterminate(progress <= 0);
-                                        if (progress > 0) videoDownloadProgress.setProgress(progress);
-                                    }
-                                    if (videoDownloadCancelBtn != null) {
-                                        videoDownloadCancelBtn.setOnClickListener(v -> {
+                                    if (videoDownloadingLayout != null) {
+                                        videoDownloadingLayout.setVisibility(View.VISIBLE);
+                                        bindCircularOverlayPercent(videoDownloadingLayout, videoDownloadCancelBtn, shownPct);
+                                        videoDownloadingLayout.setOnClickListener(v -> {
                                             if (mediaDownloadClickListener != null) {
                                                 mediaDownloadClickListener.onMediaCancelClick(message);
                                             }
                                         });
+                                    }
+                                    if (videoDownloadRetryLayout != null) videoDownloadRetryLayout.setVisibility(View.GONE);
+                                    if (videoDownloadProgress != null) {
+                                        videoDownloadProgress.setIndeterminate(true);
+                                    }
+                                    if (videoDurationText != null) {
+                                        String durStr = dur > 0 ? VoicePlayerManager.formatDuration(dur) : "0:30";
+                                        videoDurationText.setText(shownPct + "% • " + durStr);
                                     }
                                 } else if (vidDownloadState == STATE_RETRY) {
                                     if (videoDownloadIdleLayout != null) videoDownloadIdleLayout.setVisibility(View.GONE);
@@ -2814,12 +2865,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             name = p[0];
                             size = p[1];
                         }
-                        documentFileName.setText(name);
+                        final String cleanName = com.m3.veil.manager.VeilMessagesController.cleanDocumentFileName(name);
+                        documentFileName.setText(cleanName);
 
                         String ext = "DOC";
-                        int dot = name.lastIndexOf(".");
-                        if (dot != -1) {
-                            ext = name.substring(dot + 1).toUpperCase(Locale.ROOT);
+                        int dot = cleanName.lastIndexOf(".");
+                        if (dot != -1 && dot < cleanName.length() - 1) {
+                            ext = cleanName.substring(dot + 1).toUpperCase(Locale.ROOT);
                             if (ext.length() > 4) ext = ext.substring(0, 4);
                         }
 
@@ -2831,15 +2883,20 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             int badgeColor = FileMediaManager.getDocumentBadgeColor(ext);
                             documentIconContainer.setBackgroundTintList(android.content.res.ColorStateList.valueOf(badgeColor));
                         }
-                        String formattedInfo = ext + (size.isEmpty() ? "" : " • " + size);
+                        if (size.isEmpty()) {
+                            String fallbackSize = message.getFormattedMediaSize();
+                            if (!fallbackSize.isEmpty()) size = fallbackSize;
+                        }
+                        final String formattedInfo = ext + (size.isEmpty() ? "" : " • " + size);
                         documentFileSize.setText(formattedInfo);
 
                         File localDoc = FileMediaManager.getDecryptedFile(itemView.getContext(), message, "");
-                        boolean hasLocalDoc = (localDoc != null && localDoc.exists() && localDoc.length() > 0)
-                                || (message.getLocalFilePath() != null && new File(message.getLocalFilePath()).exists());
-                        if (!hasLocalDoc && message.getMediaUrl() != null && !message.getMediaUrl().isEmpty() && !message.getMediaUrl().startsWith("CHUNKED:")) {
+                        boolean hasLocalDoc = (localDoc != null && localDoc.exists() && localDoc.length() >= 64 && !localDoc.getName().startsWith("staged_"));
+                        if (!hasLocalDoc
+                                && com.m3.veil.manager.VeilMessagesController.shouldAutoDownloadMedia(itemView.getContext(), message.getChatId(), "document")
+                                && message.getMediaUrl() != null && !message.getMediaUrl().isEmpty() && !message.getMediaUrl().startsWith("CHUNKED:")) {
                             File inlineDoc = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(itemView.getContext(), message.getChatId(), message);
-                            if (inlineDoc != null && inlineDoc.exists() && inlineDoc.length() > 0) {
+                            if (inlineDoc != null && inlineDoc.exists() && inlineDoc.length() >= 64) {
                                 localDoc = inlineDoc;
                                 hasLocalDoc = true;
                             }
@@ -2850,17 +2907,23 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
                         if (documentProgressBar != null) {
                             if (docDownloadState == STATE_DOWNLOADING) {
+                                int shownPct = Math.max(1, Math.min(99, docProgress > 0 ? docProgress : 1));
                                 documentProgressBar.setVisibility(View.VISIBLE);
-                                documentProgressBar.setIndeterminate(docProgress <= 0);
-                                if (docProgress > 0) {
-                                    documentProgressBar.setProgress(docProgress);
-                                    documentFileSize.setText(formattedInfo + " • " + docProgress + "%");
-                                } else {
-                                    documentFileSize.setText(formattedInfo + " • Downloading...");
-                                }
+                                documentProgressBar.setIndeterminate(false);
+                                documentProgressBar.setMax(100);
+                                documentProgressBar.setProgress(shownPct);
+                                documentFileSize.setText(formattedInfo + " • Downloading " + shownPct + "%");
                                 if (documentActionIcon != null) documentActionIcon.setVisibility(View.GONE);
+                            } else if (docDownloadState == STATE_DOWNLOADED) {
+                                documentProgressBar.setVisibility(View.GONE);
+                                documentFileSize.setText(formattedInfo + " • Downloaded");
+                                if (documentActionIcon != null) {
+                                    documentActionIcon.setVisibility(View.VISIBLE);
+                                    documentActionIcon.setImageResource(R.drawable.ic_check);
+                                }
                             } else {
                                 documentProgressBar.setVisibility(View.GONE);
+                                documentFileSize.setText(formattedInfo + (docDownloadState == STATE_RETRY ? " • Tap to retry" : " • Tap to download"));
                                 if (documentActionIcon != null) {
                                     documentActionIcon.setVisibility(View.VISIBLE);
                                     documentActionIcon.setImageResource(docDownloadState == STATE_RETRY ? R.drawable.ic_undo : R.drawable.ic_download);
@@ -2868,13 +2931,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                         }
 
-                        documentMessageContainer.setOnClickListener(v -> {
-                            File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, "");
-                            if (local == null || !local.exists() || local.length() == 0) {
-                                local = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(itemView.getContext(), message.getChatId(), message);
-                            }
-                            if (local != null && local.exists() && local.length() > 0) {
-                                FileMediaManager.openFileWithSystemViewer(itemView.getContext(), local);
+                        View.OnClickListener docClick = v -> {
+                            File existingLocal = FileMediaManager.getDecryptedFile(itemView.getContext(), message, "");
+                            if (existingLocal != null && existingLocal.exists() && existingLocal.length() >= 64 && !existingLocal.getName().startsWith("staged_")) {
+                                com.m3.veil.manager.VeilMessagesController.exportMediaToPublicStorageIfAllowed(
+                                        itemView.getContext(), message.getChatId(), message, existingLocal);
+                                FileMediaManager.openDocumentWithOriginalName(itemView.getContext(), existingLocal, cleanName);
                                 try {
                                     com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).markMessageAsReadExplicitly(message);
                                 } catch (Throwable ignored) {}
@@ -2885,7 +2947,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                     mediaDownloadClickListener.onMediaDownloadClick(message);
                                 }
                             }
-                        });
+                        };
+                        documentMessageContainer.setOnClickListener(docClick);
+                        if (documentActionIcon != null) documentActionIcon.setOnClickListener(docClick);
                     }
                 } else if ("location".equals(message.getType())) {
                     ensureLocationViews();

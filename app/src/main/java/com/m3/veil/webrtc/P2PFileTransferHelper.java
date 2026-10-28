@@ -47,13 +47,13 @@ public class P2PFileTransferHelper {
 
     private static final String TAG = "P2PFileTransferHelper";
     public static final int CHUNK_SIZE = 16384; // 16 KB per chunk (Telegram parity)
-    private static final long MAX_BUFFER_AMOUNT = 256 * 1024; // 256 KB default backpressure ceiling
-    private static final long RESUME_BUFFER_AMOUNT = 64 * 1024; // 64 KB resume threshold
+    private static final long MAX_BUFFER_AMOUNT = 1024 * 1024; // 1 MB high-speed sliding window ceiling
+    private static final long RESUME_BUFFER_AMOUNT = 256 * 1024; // 256 KB resume threshold
 
     private static long getMaxBufferAmount() {
         try {
             int parallelChunks = com.m3.veil.utils.VeilPerformanceController.getInstance().getMaxParallelFileTransferChunks();
-            return (long) parallelChunks * CHUNK_SIZE * 4L;
+            return Math.max(MAX_BUFFER_AMOUNT, (long) parallelChunks * CHUNK_SIZE * 8L);
         } catch (Throwable t) {
             return MAX_BUFFER_AMOUNT;
         }
@@ -110,6 +110,7 @@ public class P2PFileTransferHelper {
         public String blurHash;
         public long totalBytes;
         public int totalChunks;
+        public int lastReportedPercent = -1;
         public BitSet receivedBitSet;
         public File tempFile;
         public RandomAccessFile raf;
@@ -327,12 +328,16 @@ public class P2PFileTransferHelper {
                 VeilPacket metaPacket = new VeilPacket(VeilPacket.LANE_MEDIA, VeilPacket.TYPE_FILE_META, startJson.toString());
                 sendPacketOrFallback(dataChannel, metaPacket, startJson.toString());
 
+                mainHandler.post(() -> {
+                    if (callback != null) callback.onProgress(1);
+                });
+
                 // 2. Stream Chunks using RandomAccessFile (supports selective resumption)
                 raf = new RandomAccessFile(file, "r");
                 byte[] buffer = VeilBufferPool.borrowByteArray16k();
                 int chunksSent = 0;
 
-                int lastReportedProgress = -1;
+                int lastReportedProgress = 1;
                 try {
                     for (int chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
                         // If resuming, skip chunks already possessed by recipient
@@ -342,13 +347,17 @@ public class P2PFileTransferHelper {
 
                         // Sliding-window backpressure: wait until buffer drains below resume threshold
                         long maxBuf = getMaxBufferAmount();
-                        long resumeBuf = Math.max(CHUNK_SIZE, maxBuf / 4);
+                        long resumeBuf = Math.max(CHUNK_SIZE * 4L, maxBuf / 2);
                         if (dataChannel.bufferedAmount() > maxBuf) {
-                            while (dataChannel.bufferedAmount() > resumeBuf) {
+                            while (dataChannel.state() == DataChannel.State.OPEN && dataChannel.bufferedAmount() > resumeBuf) {
                                 try {
-                                    Thread.sleep(2);
+                                    Thread.sleep(1);
                                 } catch (InterruptedException ignored) {}
                             }
+                        }
+
+                        if (dataChannel.state() != DataChannel.State.OPEN) {
+                            throw new IOException("DataChannel closed during P2P file stream");
                         }
 
                         long offset = (long) chunkIndex * CHUNK_SIZE;
@@ -362,8 +371,8 @@ public class P2PFileTransferHelper {
                         sendPacketOrFallback(dataChannel, chunkPacket, null);
                         chunksSent++;
 
-                        final int progress = (int) (((double) (chunkIndex + 1) / totalChunks) * 100);
-                        if (progress != lastReportedProgress) {
+                        final int progress = Math.max(1, (int) (((double) (chunkIndex + 1) / totalChunks) * 100));
+                        if (progress > lastReportedProgress) {
                             lastReportedProgress = progress;
                             mainHandler.post(() -> {
                                 if (callback != null) callback.onProgress(progress);
@@ -382,7 +391,10 @@ public class P2PFileTransferHelper {
                 sendPacketOrFallback(dataChannel, endPacket, endJson.toString());
 
                 mainHandler.post(() -> {
-                    if (callback != null) callback.onComplete(transferId);
+                    if (callback != null) {
+                        callback.onProgress(100);
+                        callback.onComplete(transferId);
+                    }
                 });
 
             } catch (Exception e) {
@@ -538,6 +550,16 @@ public class P2PFileTransferHelper {
                 record.status = "IN_PROGRESS";
                 record.peerId = peerId;
                 EncryptedChatDatabase.getInstance(context).saveOrUpdateFileTransfer(record);
+
+                try {
+                    com.m3.veil.model.Message cMsg = com.m3.veil.manager.VeilMessagesController.getInstance(context).getMessage(transferId);
+                    String cDialogId = cMsg != null ? cMsg.getChatId() : null;
+                    if (downloadListeners.containsKey(transferId)
+                            || com.m3.veil.manager.VeilMessagesController.shouldAutoDownloadMedia(context, cDialogId, mediaType)) {
+                        com.m3.veil.manager.VeilMessagesController.getInstance(context)
+                                .notifyGlobalMediaTransferProgress(cDialogId, transferId, 1);
+                    }
+                } catch (Throwable ignored) {}
             }
         } catch (Exception e) {
             Log.e(TAG, "Error handling FILE_START", e);
@@ -600,7 +622,7 @@ public class P2PFileTransferHelper {
                 transfer.receivedBitSet.set(chunkIndex);
 
                 int receivedCount = transfer.receivedBitSet.cardinality();
-                final int percent = (int) (((double) receivedCount / transfer.totalChunks) * 100);
+                final int percent = Math.max(1, (int) (((double) receivedCount / transfer.totalChunks) * 100));
 
                 // Update BitSet in DB periodically every 8 chunks or on progress update
                 if (chunkIndex % 8 == 0 || receivedCount == transfer.totalChunks) {
@@ -617,9 +639,20 @@ public class P2PFileTransferHelper {
                     );
                 }
 
-                DownloadProgressListener dl = downloadListeners.get(transferId);
-                if (dl != null) {
-                    mainHandler.post(() -> dl.onProgress(transferId, percent));
+                if (percent > transfer.lastReportedPercent) {
+                    transfer.lastReportedPercent = percent;
+                    DownloadProgressListener dl = downloadListeners.get(transferId);
+                    if (dl != null) {
+                        mainHandler.post(() -> dl.onProgress(transferId, percent));
+                    }
+                    try {
+                        com.m3.veil.model.Message cMsg = com.m3.veil.manager.VeilMessagesController.getInstance(context).getMessage(transferId);
+                        String cDialogId = cMsg != null ? cMsg.getChatId() : null;
+                        if (dl != null || com.m3.veil.manager.VeilMessagesController.shouldAutoDownloadMedia(context, cDialogId, transfer.mediaType)) {
+                            com.m3.veil.manager.VeilMessagesController.getInstance(context)
+                                    .notifyGlobalMediaTransferProgress(cDialogId, transferId, percent);
+                        }
+                    } catch (Throwable ignored) {}
                 }
 
                 if (receivedCount >= transfer.totalChunks) {
@@ -658,18 +691,53 @@ public class P2PFileTransferHelper {
             }
         } catch (Exception ignored) {}
 
-        // Ensure file is moved to long-term storage
-        File destDir = new File(context.getExternalFilesDir(null), "VeilMedia");
-        if (!destDir.exists()) destDir.mkdirs();
-        File completedFile = new File(destDir, transfer.fileName);
+        String ext = "";
+        if ("image".equals(transfer.mediaType)) {
+            ext = ".jpg";
+        } else if ("video".equals(transfer.mediaType)) {
+            ext = ".mp4";
+        } else if ("voice".equals(transfer.mediaType) || "audio".equals(transfer.mediaType)) {
+            ext = ".m4a";
+        } else if (transfer.fileName != null) {
+            String cleanName = com.m3.veil.manager.VeilMessagesController.cleanDocumentFileName(transfer.fileName);
+            int dot = cleanName.lastIndexOf('.');
+            if (dot != -1 && dot < cleanName.length() - 1) {
+                ext = cleanName.substring(dot);
+            }
+        }
+
+        com.m3.veil.model.Message cachedMsg = null;
+        try {
+            cachedMsg = com.m3.veil.manager.VeilMessagesController.getInstance(context).getMessage(transfer.transferId);
+            if (cachedMsg == null) {
+                cachedMsg = EncryptedChatDatabase.getInstance(context).getMessageById(transfer.transferId);
+            }
+        } catch (Throwable ignored) {}
+        String resolvedChatId = cachedMsg != null ? cachedMsg.getChatId() : null;
+        boolean hasExplicitUserDownload = downloadListeners.containsKey(transfer.transferId);
+        boolean allowAutoSave = hasExplicitUserDownload
+                || com.m3.veil.manager.VeilMessagesController.shouldAutoDownloadMedia(context, resolvedChatId, transfer.mediaType);
+
+        String targetPrefix = allowAutoSave ? "dec_" : "staged_";
+        File targetDest = new File(context.getExternalCacheDir(), targetPrefix + transfer.transferId + ext);
         try {
             if (transfer.tempFile.exists()) {
-                if (completedFile.exists()) completedFile.delete();
-                transfer.tempFile.renameTo(completedFile);
+                if (targetDest.exists()) targetDest.delete();
+                if (!transfer.tempFile.renameTo(targetDest)) {
+                    try (FileInputStream in = new FileInputStream(transfer.tempFile);
+                         FileOutputStream out = new FileOutputStream(targetDest)) {
+                        byte[] buf = new byte[16384];
+                        int r;
+                        while ((r = in.read(buf)) != -1) {
+                            out.write(buf, 0, r);
+                        }
+                    }
+                    transfer.tempFile.delete();
+                }
             }
         } catch (Exception ignored) {}
 
-        final File finalFile = completedFile.exists() ? completedFile : transfer.tempFile;
+        final File finalFile = targetDest.exists() ? targetDest : transfer.tempFile;
 
         // Update database record to COMPLETED
         EncryptedChatDatabase.getInstance(context).updateFileTransferBitSet(
@@ -683,6 +751,21 @@ public class P2PFileTransferHelper {
                 transfer.totalChunks,
                 transfer.totalChunks
         );
+
+        try {
+            if (cachedMsg != null && finalFile != null && finalFile.exists()) {
+                cachedMsg.setMediaSize(finalFile.length());
+                if (allowAutoSave) {
+                    cachedMsg.setLocalFilePath(finalFile.getAbsolutePath());
+                    com.m3.veil.manager.VeilMessagesController.exportMediaToPublicStorageIfAllowed(
+                            context, resolvedChatId, cachedMsg, finalFile);
+                }
+            }
+            if (allowAutoSave) {
+                com.m3.veil.manager.VeilMessagesController.getInstance(context)
+                        .notifyGlobalMediaTransferProgress(resolvedChatId, transfer.transferId, 100);
+            }
+        } catch (Throwable ignored) {}
 
         DownloadProgressListener dl = downloadListeners.remove(transfer.transferId);
         if (dl != null) {

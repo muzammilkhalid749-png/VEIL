@@ -518,15 +518,24 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          }
          this.cancelTurnFallback(peerId);
          Runnable r = () -> {
+            this.turnFallbackRunnables.remove(peerId);
             if (this.turnActivePeers.contains(peerId)) {
                return;
             }
             PeerConnection pc = (PeerConnection)this.peerConnections.get(peerId);
             if (pc != null) {
                PeerConnection.IceConnectionState state = pc.iceConnectionState();
-               if (state != IceConnectionState.CONNECTED
-                       && state != IceConnectionState.COMPLETED
-                       && state != IceConnectionState.CHECKING) {
+               PeerConnection.SignalingState sigState = pc.signalingState();
+               if (state == IceConnectionState.CONNECTED
+                       || state == IceConnectionState.COMPLETED
+                       || state == IceConnectionState.CHECKING) {
+                  return;
+               }
+               // Mark peer in turnActivePeers so we do not loop every 12s for offline peers
+               this.turnActivePeers.add(peerId);
+               if (sigState == PeerConnection.SignalingState.STABLE
+                       || state == IceConnectionState.DISCONNECTED
+                       || state == IceConnectionState.FAILED) {
                   Log.i("WebRtcManager", "Tier 2 Activated: Direct STUN timed out (12,000ms). Falling back to TURN TCP/443 for peer: " + peerId);
                   this.restartIceWithTurn(peerId);
                }
@@ -553,6 +562,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          final PeerConnection pc = (PeerConnection)this.peerConnections.get(peerId);
          if (pc != null) {
             try {
+               this.turnActivePeers.add(peerId);
                PeerConnection.IceConnectionState iceState = pc.iceConnectionState();
                if (pc.signalingState() != PeerConnection.SignalingState.STABLE
                        || iceState == IceConnectionState.CONNECTED
@@ -560,7 +570,6 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                        || iceState == IceConnectionState.CHECKING) {
                   return;
                }
-               this.turnActivePeers.add(peerId);
                Log.i("WebRtcManager", "Tier 2: Upgrading configuration to TURN Port 443 TCP/UDP for peer " + peerId);
                PeerConnection.RTCConfiguration rtcConfig = new PeerConnection.RTCConfiguration(this.getIceServers(true));
                rtcConfig.sdpSemantics = SdpSemantics.UNIFIED_PLAN;
@@ -1152,10 +1161,81 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                String messageContent = caption != null && !caption.trim().isEmpty() ? caption.trim() : fileName;
                Message fileMsg = existing != null ? existing : new Message(transferId, peerId, this.currentUserId, messageContent, Timestamp.now(), mediaType);
                fileMsg.setChatId(chatId);
-               fileMsg.setLocalFilePath(file.getAbsolutePath());
+               if (file != null && file.exists()) {
+                  fileMsg.setMediaSize(file.length());
+               }
                fileMsg.setDelivered(true);
                fileMsg.setRead(false);
+
+               boolean isStagedOnly = file != null && file.getName().startsWith("staged_");
+               boolean allowAutoSave = !isStagedOnly
+                       && com.m3.veil.manager.VeilMessagesController.shouldAutoDownloadMedia(this.context, chatId, mediaType);
+
+               if (fileMsg.getThumbnail() == null || fileMsg.getThumbnail().isEmpty()) {
+                  String thumbSourcePath = (file != null && file.exists()) ? file.getAbsolutePath() : fileMsg.getLocalFilePath();
+                  if (thumbSourcePath != null) {
+                     if ("image".equals(mediaType)) {
+                        try {
+                           Bitmap bitmap = BitmapFactory.decodeFile(thumbSourcePath);
+                           if (bitmap != null) {
+                              Bitmap thumbBitmap = Bitmap.createScaledBitmap(bitmap, 40, 40, true);
+                              ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                              thumbBitmap.compress(CompressFormat.JPEG, 40, baos);
+                              fileMsg.setThumbnail(Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP));
+                           }
+                        } catch (Exception ignored) {}
+                     } else if ("video".equals(mediaType)) {
+                        try {
+                           MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+                           retriever.setDataSource(thumbSourcePath);
+                           Bitmap frame = retriever.getFrameAtTime();
+                           if (frame != null) {
+                              Bitmap thumb = Bitmap.createScaledBitmap(frame, 60, 60, true);
+                              ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                              thumb.compress(CompressFormat.JPEG, 40, baos);
+                              fileMsg.setThumbnail(Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP));
+                           }
+                           retriever.release();
+                        } catch (Exception ignored) {}
+                     }
+                  }
+               }
+
+               if (allowAutoSave && file != null && file.exists()) {
+                  try {
+                     String ext = "";
+                     if ("image".equals(mediaType)) {
+                        ext = ".jpg";
+                     } else if ("video".equals(mediaType)) {
+                        ext = ".mp4";
+                     } else if ("voice".equals(mediaType) || "audio".equals(mediaType)) {
+                        ext = ".m4a";
+                     } else if (fileName != null) {
+                        String cleanName = com.m3.veil.manager.VeilMessagesController.cleanDocumentFileName(fileName);
+                        int dot = cleanName.lastIndexOf('.');
+                        if (dot != -1 && dot < cleanName.length() - 1) {
+                           ext = cleanName.substring(dot);
+                        }
+                     }
+                     File standardDec = new File(this.context.getExternalCacheDir(), "dec_" + transferId + ext);
+                     if (!standardDec.exists() && file.exists()) {
+                        copyFile(file, standardDec);
+                     }
+                     if (standardDec.exists()) {
+                        fileMsg.setLocalFilePath(standardDec.getAbsolutePath());
+                        com.m3.veil.manager.VeilMessagesController.exportMediaToPublicStorageIfAllowed(
+                                this.context, chatId, fileMsg, standardDec);
+                     }
+                  } catch (Exception ignored) {}
+               }
+
                EncryptedChatDatabase.getInstance(this.context).saveMessage(chatId, fileMsg);
+               if (allowAutoSave) {
+                  try {
+                     com.m3.veil.manager.VeilMessagesController.getInstance(this.context)
+                             .notifyGlobalMediaTransferProgress(chatId, transferId, 100);
+                  } catch (Throwable ignored) {}
+               }
                this.sendReceipt(peerId, transferId, true, false);
                this.mainHandler.post(() -> {
                   for(P2PEventListener l : WebRtcManager.this.listeners) {
@@ -1354,7 +1434,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
             if (mediaUrl != null && !mediaUrl.isEmpty()) {
                message.setMediaUrl(mediaUrl);
-               com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(this.context, chatId, message);
+               if (com.m3.veil.manager.VeilMessagesController.shouldAutoDownloadMedia(this.context, chatId, msgType)) {
+                  com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(this.context, chatId, message);
+               }
             }
 
             long msgVanishTimer = p.optLong("vanishTimer", existingChat != null ? existingChat.getVanishTimer() : 0L);
@@ -1530,6 +1612,18 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      EncryptedChatDatabase.getInstance(this.context).saveOrUpdateChat(chat);
                   } else if ("pin_msg".equals(setting)) {
                      EncryptedChatDatabase.getInstance(this.context).updateChatPinnedMessage(chatId, json.optString("msgId", (String)null), json.optString("msgText", (String)null));
+                  } else if ("theme_wallpaper".equals(setting)) {
+                     String hex = json.optString("themeColorHex", "");
+                     if (!hex.isEmpty()) {
+                        chat.setThemeColorHex(hex);
+                        EncryptedChatDatabase.getInstance(this.context).saveOrUpdateChat(chat);
+                        this.context.getSharedPreferences("VeilChatSpecificPrefs", Context.MODE_PRIVATE)
+                                .edit()
+                                .putString("wallpaper_" + chatId, hex)
+                                .putInt("wallpaper_dim_" + chatId, json.optInt("wallpaperDim", 20))
+                                .putBoolean("wallpaper_pattern_" + chatId, json.optBoolean("wallpaperPattern", true))
+                                .apply();
+                     }
                   }
                }
             } else if ("group_event".equals(type)) {
@@ -1616,60 +1710,70 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      String messageContent = caption != null && !caption.trim().isEmpty() ? caption.trim() : fileName;
                      Message fileMsg = existing != null ? existing : new Message(transferId, peerId, this.currentUserId, messageContent, Timestamp.now(), mediaType);
                      fileMsg.setChatId(chatId);
-                     fileMsg.setLocalFilePath(file.getAbsolutePath());
+                     if (file != null && file.exists()) {
+                        fileMsg.setMediaSize(file.length());
+                     }
                      fileMsg.setDelivered(true);
                      fileMsg.setRead(false);
 
-                     try {
-                        String ext = "";
+                     boolean isStagedOnly = file != null && file.getName().startsWith("staged_");
+                     boolean allowAutoSave = !isStagedOnly
+                             && com.m3.veil.manager.VeilMessagesController.shouldAutoDownloadMedia(this.context, chatId, mediaType);
+
+                     String thumbSource = (file != null && file.exists()) ? file.getAbsolutePath() : fileMsg.getLocalFilePath();
+                     if (thumbSource != null && (fileMsg.getThumbnail() == null || fileMsg.getThumbnail().isEmpty())) {
                         if ("image".equals(mediaType)) {
-                           ext = ".jpg";
+                           try {
+                              Bitmap bitmap = BitmapFactory.decodeFile(thumbSource);
+                              if (bitmap != null) {
+                                 Bitmap thumbBitmap = Bitmap.createScaledBitmap(bitmap, 40, 40, true);
+                                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                                 thumbBitmap.compress(CompressFormat.JPEG, 40, baos);
+                                 fileMsg.setThumbnail(Base64.encodeToString(baos.toByteArray(), 0));
+                              }
+                           } catch (Exception ignored) {}
                         } else if ("video".equals(mediaType)) {
-                           ext = ".mp4";
-                        } else if ("voice".equals(mediaType)) {
-                           ext = ".m4a";
-                        } else if ("document".equals(mediaType)) {
-                           int dot = fileName.lastIndexOf(".");
-                           if (dot != -1) {
-                              ext = fileName.substring(dot);
-                           }
+                           try {
+                              MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+                              retriever.setDataSource(thumbSource);
+                              Bitmap frame = retriever.getFrameAtTime();
+                              if (frame != null) {
+                                 Bitmap thumb = Bitmap.createScaledBitmap(frame, 60, 60, true);
+                                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                                 thumb.compress(CompressFormat.JPEG, 40, baos);
+                                 fileMsg.setThumbnail(Base64.encodeToString(baos.toByteArray(), 0));
+                              }
+                              retriever.release();
+                           } catch (Exception ignored) {}
                         }
-
-                        File standardDec = new File(this.context.getExternalCacheDir(), "dec_" + transferId + ext);
-                        if (!standardDec.exists()) {
-                           copyFile(file, standardDec);
-                        }
-
-                        fileMsg.setLocalFilePath(standardDec.getAbsolutePath());
-                     } catch (Exception var17) {
                      }
 
-                     if ("image".equals(mediaType)) {
+                     if (allowAutoSave && file != null && file.exists()) {
                         try {
-                           Bitmap bitmap = BitmapFactory.decodeFile(fileMsg.getLocalFilePath());
-                           if (bitmap != null) {
-                              Bitmap thumbBitmap = Bitmap.createScaledBitmap(bitmap, 40, 40, true);
-                              ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                              thumbBitmap.compress(CompressFormat.JPEG, 40, baos);
-                              fileMsg.setThumbnail(Base64.encodeToString(baos.toByteArray(), 0));
-                           }
-                        } catch (Exception var16) {
-                        }
-                     } else if ("video".equals(mediaType)) {
-                        try {
-                           MediaMetadataRetriever retriever = new MediaMetadataRetriever();
-                           retriever.setDataSource(fileMsg.getLocalFilePath());
-                           Bitmap frame = retriever.getFrameAtTime();
-                           if (frame != null) {
-                              Bitmap thumb = Bitmap.createScaledBitmap(frame, 60, 60, true);
-                              ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                              thumb.compress(CompressFormat.JPEG, 40, baos);
-                              fileMsg.setThumbnail(Base64.encodeToString(baos.toByteArray(), 0));
+                           String ext = "";
+                           if ("image".equals(mediaType)) {
+                              ext = ".jpg";
+                           } else if ("video".equals(mediaType)) {
+                              ext = ".mp4";
+                           } else if ("voice".equals(mediaType)) {
+                              ext = ".m4a";
+                           } else if ("document".equals(mediaType) && fileName != null) {
+                              String cleanName = com.m3.veil.manager.VeilMessagesController.cleanDocumentFileName(fileName);
+                              int dot = cleanName.lastIndexOf(".");
+                              if (dot != -1 && dot < cleanName.length() - 1) {
+                                 ext = cleanName.substring(dot);
+                              }
                            }
 
-                           retriever.release();
-                        } catch (Exception var15) {
-                        }
+                           File standardDec = new File(this.context.getExternalCacheDir(), "dec_" + transferId + ext);
+                           if (!standardDec.exists()) {
+                              copyFile(file, standardDec);
+                           }
+
+                           fileMsg.setLocalFilePath(standardDec.getAbsolutePath());
+                           com.m3.veil.manager.VeilMessagesController.exportMediaToPublicStorageIfAllowed(
+                                   this.context, chatId, fileMsg, standardDec);
+                        } catch (Exception ignored) {}
                      }
 
                      EncryptedChatDatabase.getInstance(this.context).saveMessage(chatId, fileMsg);
@@ -1873,8 +1977,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
               chat != null ? chat.getName() : null,
               chat != null && chat.getType() != null ? chat.getType() : (isGroup ? "group" : "direct")
       );
-      DataChannel dc = peerId != null ? this.getDataChannel(peerId) : null;
-      if (dc != null && dc.state() == State.OPEN && file != null && file.exists() && file.length() > 28000L) {
+      PeerChannelHub hub = peerId != null ? (PeerChannelHub)this.peerHubs.get(peerId) : null;
+      DataChannel dc = hub != null ? hub.getChannelForLane(VeilPacket.LANE_MEDIA) : null;
+      if (dc == null || dc.state() != State.OPEN) {
+         dc = peerId != null ? this.getDataChannel(peerId) : null;
+      }
+      if (dc != null && dc.state() == State.OPEN && file != null && file.exists() && file.length() > 0L) {
          P2PFileTransferHelper.sendFileOverDataChannel(
                  dc,
                  message.getId(),
@@ -1915,9 +2023,21 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                     : (peerId != null ? getChatId(this.currentUserId, peerId) : null);
 
             if (msg != null) {
+               if (callback != null) {
+                  this.mainHandler.post(() -> callback.onProgress(messageId, 18));
+               }
+               com.m3.veil.manager.VeilMessagesController.notifyGlobalMediaTransferProgress(resolvedChatId, messageId, 18);
                File localDecoded = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(this.context, resolvedChatId, msg);
                if (localDecoded != null && localDecoded.exists() && localDecoded.length() >= 64) {
+                  if (callback != null) {
+                     this.mainHandler.post(() -> callback.onProgress(messageId, 72));
+                  }
+                  com.m3.veil.manager.VeilMessagesController.notifyGlobalMediaTransferProgress(resolvedChatId, messageId, 72);
+                  try { Thread.sleep(60L); } catch (InterruptedException ignored) {}
                   EncryptedChatDatabase.getInstance(this.context).saveMessage(resolvedChatId, msg);
+                  com.m3.veil.manager.VeilMessagesController.exportMediaToPublicStorageIfAllowed(
+                          this.context, resolvedChatId, msg, localDecoded);
+                  com.m3.veil.manager.VeilMessagesController.notifyGlobalMediaTransferProgress(resolvedChatId, messageId, 100);
                   P2PFileTransferHelper.unregisterDownloadListener(messageId);
                   if (callback != null) {
                      this.mainHandler.post(() -> callback.onComplete(messageId, localDecoded));
@@ -1925,8 +2045,34 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   return;
                }
                if (msg.getMediaUrl() != null && msg.getMediaUrl().startsWith("CHUNKED:v1:") && resolvedChatId != null) {
+                  final Message fMsg = msg;
                   com.m3.veil.manager.VeilMessagesController.downloadChunkedMediaFromFirestore(
-                          this.context, resolvedChatId, msg, msg.getMediaUrl(), callback);
+                          this.context, resolvedChatId, fMsg, fMsg.getMediaUrl(),
+                          new P2PFileTransferHelper.DownloadProgressListener() {
+                             @Override
+                             public void onProgress(String transferId, int progress) {
+                                if (callback != null) callback.onProgress(transferId, progress);
+                             }
+
+                             @Override
+                             public void onComplete(String transferId, File downloadedFile) {
+                                if (callback != null) callback.onComplete(transferId, downloadedFile);
+                             }
+
+                             @Override
+                             public void onError(String transferId, String error) {
+                                // Fallback to direct P2P DataChannel if chunked cloud slices aren't ready yet
+                                if (callback != null) {
+                                   P2PFileTransferHelper.registerDownloadListener(messageId, callback);
+                                }
+                                DataChannel fallbackDc = peerId != null ? (DataChannel)WebRtcManager.this.dataChannels.get(peerId) : null;
+                                if (fallbackDc != null && fallbackDc.state() == State.OPEN) {
+                                   P2PFileTransferHelper.requestFile(fallbackDc, messageId);
+                                } else if (callback != null) {
+                                   WebRtcManager.this.mainHandler.post(() -> callback.onError(transferId, error));
+                                }
+                             }
+                          });
                   return;
                }
             }

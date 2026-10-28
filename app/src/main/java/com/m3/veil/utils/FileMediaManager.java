@@ -29,7 +29,7 @@ public class FileMediaManager {
         if (message == null || context == null) return null;
         if (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
             File local = new File(message.getLocalFilePath());
-            if (local.exists() && local.length() > 0) {
+            if (local.exists() && local.length() > 0 && !local.getName().startsWith("staged_")) {
                 return local;
             }
         }
@@ -107,6 +107,35 @@ public class FileMediaManager {
         }
     }
 
+    public static void openDocumentWithOriginalName(Context context, File file, String rawDisplayFileName) {
+        if (file == null || !file.exists()) {
+            Toast.makeText(context, "File is not downloaded yet", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        File fileToOpen = file;
+        String cleanName = com.m3.veil.manager.VeilMessagesController.cleanDocumentFileName(rawDisplayFileName);
+        if (cleanName != null && !cleanName.isEmpty() && ! "Document".equals(cleanName)) {
+            try {
+                File openDir = new File(context.getExternalCacheDir(), "open_docs");
+                if (!openDir.exists()) openDir.mkdirs();
+                File namedCopy = new File(openDir, cleanName);
+                if (!namedCopy.exists() || namedCopy.length() != file.length()) {
+                    try (java.io.FileInputStream in = new java.io.FileInputStream(file);
+                         java.io.FileOutputStream out = new java.io.FileOutputStream(namedCopy)) {
+                        byte[] buf = new byte[16384];
+                        int r;
+                        while ((r = in.read(buf)) != -1) out.write(buf, 0, r);
+                        out.flush();
+                    }
+                }
+                if (namedCopy.exists() && namedCopy.length() > 0) {
+                    fileToOpen = namedCopy;
+                }
+            } catch (Exception ignored) {}
+        }
+        openFileWithSystemViewer(context, fileToOpen);
+    }
+
     public static void openFileWithSystemViewer(Context context, File file) {
         if (file == null || !file.exists()) {
             Toast.makeText(context, "File does not exist", Toast.LENGTH_SHORT).show();
@@ -118,7 +147,7 @@ public class FileMediaManager {
             intent.setDataAndType(uri, getMimeType(file.getName()));
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            context.startActivity(Intent.createChooser(intent, "Open file with"));
+            context.startActivity(Intent.createChooser(intent, "Open " + file.getName()));
         } catch (ActivityNotFoundException e) {
             Toast.makeText(context, "No app found to open this file", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
@@ -209,22 +238,35 @@ public class FileMediaManager {
             case "gz":
                 return 0xFF8B5CF6; // Purple
             case "apk":
-                return 0xFF059669; // Teal
+                return 0xFF059669; // Emerald Teal
+            case "mp4":
+            case "mkv":
+            case "mov":
+            case "avi":
+            case "webm":
+                return 0xFF6366F1; // Indigo
+            case "jpg":
+            case "jpeg":
+            case "png":
+            case "webp":
+            case "gif":
+                return 0xFF0EA5E9; // Sky Blue
             case "mp3":
             case "wav":
             case "aac":
             case "flac":
+            case "m4a":
                 return 0xFFEC4899; // Pink
             default:
                 return 0xFF64748B; // Slate
         }
     }
 
-    private static String getMimeType(String filename) {
+    public static String getMimeType(String filename) {
         String extension = "";
         int i = filename.lastIndexOf('.');
         if (i > 0) {
-            extension = filename.substring(i + 1).toLowerCase();
+            extension = filename.substring(i + 1).toLowerCase(java.util.Locale.ROOT);
         }
         android.webkit.MimeTypeMap mime = android.webkit.MimeTypeMap.getSingleton();
         String type = mime.getMimeTypeFromExtension(extension);

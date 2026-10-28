@@ -340,11 +340,30 @@ public class WhatsAppDocumentPickerSheet extends BottomSheetDialogFragment {
             case "PPT":
             case "PPTX":
             case "TXT":
+            case "RTF":
+            case "MD":
             case "CSV":
             case "ZIP":
             case "RAR":
+            case "7Z":
+            case "TAR":
+            case "GZ":
             case "APK":
+            case "AAB":
+            case "OBB":
             case "JSON":
+            case "XML":
+            case "HTML":
+            case "MP4":
+            case "MKV":
+            case "MOV":
+            case "MP3":
+            case "M4A":
+            case "WAV":
+            case "JPG":
+            case "JPEG":
+            case "PNG":
+            case "WEBP":
                 return true;
             default:
                 return false;
