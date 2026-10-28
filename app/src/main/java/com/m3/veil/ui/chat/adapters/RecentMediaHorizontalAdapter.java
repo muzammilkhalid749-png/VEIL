@@ -33,7 +33,11 @@ public class RecentMediaHorizontalAdapter extends RecyclerView.Adapter<RecentMed
 
     private final List<GalleryMediaItem> items;
     private final OnRecentMediaClickListener listener;
-    private final ExecutorService executor = Executors.newFixedThreadPool(3);
+    private static final ExecutorService executor = Executors.newFixedThreadPool(3, r -> {
+        Thread t = new Thread(r, "VeilRecentMediaThumb");
+        t.setDaemon(true);
+        return t;
+    });
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private static final LruCache<Uri, Bitmap> sThumbCache = new LruCache<>(100);
 
@@ -54,7 +58,7 @@ public class RecentMediaHorizontalAdapter extends RecyclerView.Adapter<RecentMed
     public void onBindViewHolder(@NonNull RecentViewHolder holder, int position) {
         GalleryMediaItem item = items.get(position);
 
-        holder.ivThumb.setImageBitmap(null);
+        holder.ivThumb.setImageDrawable(null);
         holder.ivThumb.setTag(item.getUri());
         holder.ivVideoIcon.setVisibility(item.isVideo() ? View.VISIBLE : View.GONE);
 

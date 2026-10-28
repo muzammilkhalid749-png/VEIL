@@ -189,7 +189,13 @@ public class VeilSchedulerDaemon {
             PendingIntent pi = PendingIntent.getBroadcast(mContext, 7701, intent, flags);
 
             long nextTrigger = Math.max(triggerAtMillis, System.currentTimeMillis() + 15_000L);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (mAlarmManager.canScheduleExactAlarms()) {
+                    mAlarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextTrigger, pi);
+                } else {
+                    mAlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextTrigger, pi);
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 mAlarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextTrigger, pi);
             } else {
                 mAlarmManager.setExact(AlarmManager.RTC_WAKEUP, nextTrigger, pi);

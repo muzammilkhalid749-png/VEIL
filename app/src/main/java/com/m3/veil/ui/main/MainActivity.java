@@ -114,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Defer P2P WebRTC & Auth Session initialization until after Frame 1 renders
         android.os.Looper.myQueue().addIdleHandler(() -> {
+            com.m3.veil.ui.chat.adapters.MessagesAdapter.prewarmViewPool(MainActivity.this);
             if (!isDestroyed() && com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(MainActivity.this)) {
                 String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(MainActivity.this);
                 if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {

@@ -340,6 +340,65 @@ public class VoicePlayerManager {
         }
     }
 
+    private final java.util.concurrent.ExecutorService durationExecutor =
+            java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+                Thread t = new Thread(r, "VeilAudioDurationPool");
+                t.setPriority(Thread.NORM_PRIORITY - 1);
+                t.setDaemon(true);
+                return t;
+            });
+    private final java.util.Set<String> pendingDurationLookups =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+
+    public interface DurationCallback {
+        void onDurationLoaded(int durationMs);
+    }
+
+    /**
+     * 0ms lock-free main-thread duration lookup. Never opens files or creates MediaMetadataRetriever.
+     */
+    public int getCachedAudioDuration(Message message) {
+        if (message == null || message.getId() == null) return 0;
+        Integer cached = durationCache.get(message.getId());
+        if (cached != null && cached > 0) {
+            return cached;
+        }
+        int embeddedDur = extractEmbeddedDurationMs(message);
+        if (embeddedDur > 0) {
+            durationCache.put(message.getId(), embeddedDur);
+            return embeddedDur;
+        }
+        return 0;
+    }
+
+    /**
+     * Asynchronously extracts audio/video duration on a background worker thread so RecyclerView
+     * binding never blocks the UI thread on MediaMetadataRetriever Binder IPC.
+     */
+    public void loadAudioDurationAsync(final Context context, final Message message, final DurationCallback callback) {
+        if (message == null || message.getId() == null) return;
+        int fast = getCachedAudioDuration(message);
+        if (fast > 0) {
+            if (callback != null) callback.onDurationLoaded(fast);
+            return;
+        }
+        final String msgId = message.getId();
+        if (!pendingDurationLookups.add(msgId)) {
+            return;
+        }
+        final Context appCtx = context != null ? context.getApplicationContext() : null;
+        durationExecutor.execute(() -> {
+            try {
+                int dur = getAudioDuration(appCtx, message);
+                if (dur > 0 && callback != null) {
+                    progressHandler.post(() -> callback.onDurationLoaded(dur));
+                }
+            } finally {
+                pendingDurationLookups.remove(msgId);
+            }
+        });
+    }
+
     public int getAudioDuration(Context context, Message message) {
         if (message == null || message.getId() == null) return 0;
         Integer cached = durationCache.get(message.getId());
@@ -360,7 +419,8 @@ public class VoicePlayerManager {
         }
         if (local == null && context != null) {
             File cacheDir = context.getExternalCacheDir();
-            File dec = new File(cacheDir, "dec_" + message.getId() + ".m4a");
+            String ext = "video".equals(message.getType()) ? ".mp4" : ".m4a";
+            File dec = new File(cacheDir, "dec_" + message.getId() + ext);
             if (dec.exists() && dec.length() >= 64) local = dec;
         }
 

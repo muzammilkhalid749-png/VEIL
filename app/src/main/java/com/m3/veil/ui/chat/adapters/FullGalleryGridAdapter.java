@@ -40,7 +40,11 @@ public class FullGalleryGridAdapter extends RecyclerView.Adapter<FullGalleryGrid
     private final List<GalleryMediaItem> items;
     private final List<GalleryMediaItem> selectedItems = new ArrayList<>();
     private final OnGalleryInteractionListener listener;
-    private final ExecutorService executor = Executors.newFixedThreadPool(4);
+    private static final ExecutorService executor = Executors.newFixedThreadPool(4, r -> {
+        Thread t = new Thread(r, "VeilFullGalleryThumb");
+        t.setDaemon(true);
+        return t;
+    });
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private static final LruCache<Uri, Bitmap> sThumbCache = new LruCache<>(300);
 
@@ -61,7 +65,7 @@ public class FullGalleryGridAdapter extends RecyclerView.Adapter<FullGalleryGrid
     public void onBindViewHolder(@NonNull MediaGridViewHolder holder, int position) {
         GalleryMediaItem item = items.get(position);
 
-        holder.ivThumb.setImageBitmap(null);
+        holder.ivThumb.setImageDrawable(null);
         holder.ivThumb.setTag(item.getUri());
 
         loadThumbnailAsync(item.getUri(), holder.ivThumb);

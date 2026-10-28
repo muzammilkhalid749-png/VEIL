@@ -385,11 +385,11 @@ public class TurnCredentialManager {
     private volatile long mLastProbeTimestampMs = 0L;
 
     /**
-     * Triggers asynchronous ping measurement across all relay nodes (debounced by 30s).
+     * Triggers asynchronous ping measurement across all relay nodes (debounced by 15m).
      */
     public void probeAllNodesAsync() {
         long now = SystemClock.elapsedRealtime();
-        if (mLastProbeTimestampMs > 0L && (now - mLastProbeTimestampMs) < 30_000L) {
+        if (mLastProbeTimestampMs > 0L && (now - mLastProbeTimestampMs) < 15 * 60 * 1000L) {
             return;
         }
         if (!mIsProbing.compareAndSet(false, true)) {

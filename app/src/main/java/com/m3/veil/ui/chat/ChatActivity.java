@@ -2881,8 +2881,7 @@ public class ChatActivity extends AppCompatActivity {
         lm.setInitialPrefetchItemCount(15);
         messagesRecyclerView.setLayoutManager(lm);
         messagesRecyclerView.setHasFixedSize(true);
-        messagesRecyclerView.setItemViewCacheSize(30);
-        messagesRecyclerView.setRecycledViewPool(com.m3.veil.VeilApplication.getSharedMessagesRecycledViewPool());
+        messagesRecyclerView.setItemViewCacheSize(24);
         if (messagesRecyclerView.getItemAnimator() instanceof androidx.recyclerview.widget.SimpleItemAnimator) {
             ((androidx.recyclerview.widget.SimpleItemAnimator) messagesRecyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
         }
@@ -2890,6 +2889,7 @@ public class ChatActivity extends AppCompatActivity {
         if (!messageList.isEmpty()) {
             messagesRecyclerView.scrollToPosition(messagesAdapter.getItemCount() - 1);
         }
+        MessagesAdapter.prewarmViewPool(this);
 
         messagesRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -4788,6 +4788,8 @@ public class ChatActivity extends AppCompatActivity {
                         && messageList.get(newCount - 1).getSenderId() != null
                         && messageList.get(newCount - 1).getSenderId().equals(currentUserId);
 
+                boolean hasZeroVisualDiff = isSameCountDiff && changedIndices != null && changedIndices.isEmpty();
+
                 if (messagesAdapter != null) {
                     if (prevCount == 0) {
                         messagesAdapter.skipInitialAnimations();
@@ -4823,7 +4825,7 @@ public class ChatActivity extends AppCompatActivity {
                         } else {
                             messagesRecyclerView.scrollToPosition(messagesAdapter.getItemCount() - 1);
                         }
-                    } else if (!messageList.isEmpty()) {
+                    } else if (!messageList.isEmpty() && !hasZeroVisualDiff) {
                         if (prevCount == 0 || wasAtBottom || lastIsOutgoing) {
                             newMessagesWhileScrolledUp = 0;
                             TextView tvUnreadBadge = findViewById(R.id.tvScrollUnreadBadge);
@@ -7525,6 +7527,13 @@ public class ChatActivity extends AppCompatActivity {
             vanishHandler.removeCallbacks(vanishRunnable);
         }
         chatDebounceHandler.removeCallbacks(reloadVaultRunnable);
+        if (messagesRecyclerView != null) {
+            for (int i = 0, n = messagesRecyclerView.getChildCount(); i < n; i++) {
+                MessagesAdapter.detachContextFromView(messagesRecyclerView.getChildAt(i));
+            }
+            messagesRecyclerView.setAdapter(null);
+        }
+        MessagesAdapter.prewarmViewPool(getApplicationContext());
         dbExecutor.shutdown();
         com.m3.veil.webrtc.WebRtcManager.getInstance(this).removeEventListener(p2pChatListener);
         if (networkCallback != null) {

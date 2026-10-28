@@ -419,6 +419,84 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         return isSenderMe(msg.getSenderId(), msg) ? VIEW_TYPE_SENT : VIEW_TYPE_RECEIVED;
     }
 
+    private static final int MAX_PREINFLATED_POOL_SIZE = 16;
+    private static final java.util.concurrent.ConcurrentLinkedQueue<View> PREINFLATED_SENT_VIEWS = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private static final java.util.concurrent.ConcurrentLinkedQueue<View> PREINFLATED_RECEIVED_VIEWS = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private static final java.util.concurrent.atomic.AtomicBoolean IS_PREWARMING = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static final java.util.concurrent.ExecutorService PREWARM_EXECUTOR = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "VeilViewPrewarmer");
+        t.setDaemon(true);
+        t.setPriority(Thread.NORM_PRIORITY - 1);
+        return t;
+    });
+
+    public static void prewarmViewPool(final Context context) {
+        if (context == null) return;
+        final Context appCtx = context.getApplicationContext();
+        if (PREINFLATED_SENT_VIEWS.size() >= MAX_PREINFLATED_POOL_SIZE
+                && PREINFLATED_RECEIVED_VIEWS.size() >= MAX_PREINFLATED_POOL_SIZE) {
+            return;
+        }
+        if (!IS_PREWARMING.compareAndSet(false, true)) {
+            return;
+        }
+        PREWARM_EXECUTOR.execute(() -> {
+            try {
+                android.content.MutableContextWrapper dummyGroupCtx = new android.content.MutableContextWrapper(appCtx);
+                android.view.ContextThemeWrapper dummyThemed = new android.view.ContextThemeWrapper(dummyGroupCtx, R.style.Theme_VEIL);
+                FrameLayout dummyParent = new FrameLayout(dummyThemed);
+                while (PREINFLATED_SENT_VIEWS.size() < MAX_PREINFLATED_POOL_SIZE) {
+                    android.content.MutableContextWrapper itemMutable = new android.content.MutableContextWrapper(appCtx);
+                    android.view.ContextThemeWrapper itemThemed = new android.view.ContextThemeWrapper(itemMutable, R.style.Theme_VEIL);
+                    View v = LayoutInflater.from(itemThemed).inflate(R.layout.item_message_sent, dummyParent, false);
+                    v.setTag(R.id.dateHeaderContainer, itemMutable);
+                    PREINFLATED_SENT_VIEWS.offer(v);
+                }
+                while (PREINFLATED_RECEIVED_VIEWS.size() < MAX_PREINFLATED_POOL_SIZE) {
+                    android.content.MutableContextWrapper itemMutable = new android.content.MutableContextWrapper(appCtx);
+                    android.view.ContextThemeWrapper itemThemed = new android.view.ContextThemeWrapper(itemMutable, R.style.Theme_VEIL);
+                    View v = LayoutInflater.from(itemThemed).inflate(R.layout.item_message_received, dummyParent, false);
+                    v.setTag(R.id.dateHeaderContainer, itemMutable);
+                    PREINFLATED_RECEIVED_VIEWS.offer(v);
+                }
+            } catch (Throwable ignored) {
+            } finally {
+                IS_PREWARMING.set(false);
+            }
+        });
+    }
+
+    private static View obtainPreinflatedView(@NonNull ViewGroup parent, int layoutResId, java.util.concurrent.ConcurrentLinkedQueue<View> pool) {
+        Context activityContext = parent.getContext();
+        View cached = pool.poll();
+        if (pool.size() < MAX_PREINFLATED_POOL_SIZE / 2) {
+            prewarmViewPool(activityContext);
+        }
+        if (cached != null && cached.getParent() == null) {
+            Object tag = cached.getTag(R.id.dateHeaderContainer);
+            if (tag instanceof android.content.MutableContextWrapper) {
+                ((android.content.MutableContextWrapper) tag).setBaseContext(activityContext);
+                return cached;
+            }
+        }
+        android.content.MutableContextWrapper itemMutable = new android.content.MutableContextWrapper(activityContext);
+        android.view.ContextThemeWrapper itemThemed = new android.view.ContextThemeWrapper(itemMutable, R.style.Theme_VEIL);
+        View inflated = LayoutInflater.from(itemThemed).inflate(layoutResId, parent, false);
+        inflated.setTag(R.id.dateHeaderContainer, itemMutable);
+        return inflated;
+    }
+
+    public static void detachContextFromView(View view) {
+        if (view == null) return;
+        Object tag = view.getTag(R.id.dateHeaderContainer);
+        if (tag instanceof android.content.MutableContextWrapper) {
+            Context appCtx = view.getContext().getApplicationContext();
+            if (appCtx != null) {
+                ((android.content.MutableContextWrapper) tag).setBaseContext(appCtx);
+            }
+        }
+    }
+
     @NonNull
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -429,10 +507,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_typing_indicator, parent, false);
             return new TypingIndicatorViewHolder(view);
         } else if (viewType == VIEW_TYPE_SENT) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_message_sent, parent, false);
+            View view = obtainPreinflatedView(parent, R.layout.item_message_sent, PREINFLATED_SENT_VIEWS);
             return new SentMessageViewHolder(view);
         } else {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_message_received, parent, false);
+            View view = obtainPreinflatedView(parent, R.layout.item_message_received, PREINFLATED_RECEIVED_VIEWS);
             return new ReceivedMessageViewHolder(view);
         }
     }
@@ -1175,16 +1253,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         ImageView videoDownloadCancelBtn;
         LinearLayout videoDownloadRetryLayout;
 
+        private boolean hasVisibleMediaContainer = false;
+
         public SentMessageViewHolder(@NonNull View itemView) {
             super(itemView);
             dateHeaderContainer = itemView.findViewById(R.id.dateHeaderContainer);
             dateHeaderText = itemView.findViewById(R.id.dateHeaderText);
             messageText = itemView.findViewById(R.id.messageText);
-            linkPreviewContainer = itemView.findViewById(R.id.linkPreviewContainer);
-            ivLinkThumb = itemView.findViewById(R.id.ivLinkThumb);
-            tvLinkDomain = itemView.findViewById(R.id.tvLinkDomain);
-            tvLinkTitle = itemView.findViewById(R.id.tvLinkTitle);
-            tvLinkDesc = itemView.findViewById(R.id.tvLinkDesc);
             timeText = itemView.findViewById(R.id.timeText);
             statusIcon = itemView.findViewById(R.id.statusIcon);
             reactionsText = itemView.findViewById(R.id.reactionsText);
@@ -1193,97 +1268,142 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             replyQuoteText = itemView.findViewById(R.id.replyQuoteText);
             messageBubble = itemView.findViewById(R.id.messageBubble);
             bubbleInfoContainer = itemView.findViewById(R.id.bubbleInfoContainer);
-            
-            voiceMessageContainer = itemView.findViewById(R.id.voiceMessageContainer);
-            voiceActionButton = itemView.findViewById(R.id.voiceActionButton);
-            voiceProgressBar = itemView.findViewById(R.id.voiceProgressBar);
-            voiceWaveformView = itemView.findViewById(R.id.voiceWaveformView);
-            voiceDurationText = itemView.findViewById(R.id.voiceDurationText);
-            voiceSpeedButton = itemView.findViewById(R.id.voiceSpeedButton);
-            voiceMicBadge = itemView.findViewById(R.id.voiceMicBadge);
-            voiceLine = itemView.findViewById(R.id.voiceLine);
-            voiceSeekBar = itemView.findViewById(R.id.voiceSeekBar);
-            
-            imageMessageContainer = itemView.findViewById(R.id.imageMessageContainer);
-            imageCardView = itemView.findViewById(R.id.imageCardView);
-            messageImage = itemView.findViewById(R.id.messageImage);
-            imageProgressBar = itemView.findViewById(R.id.imageProgressBar);
-            imageOverlayPill = itemView.findViewById(R.id.imageOverlayPill);
-            imageTimeText = itemView.findViewById(R.id.imageTimeText);
-            imageStatusIcon = itemView.findViewById(R.id.imageStatusIcon);
-            imageCaptionText = itemView.findViewById(R.id.imageCaptionText);
-
-            videoMessageContainer = itemView.findViewById(R.id.videoMessageContainer);
-            videoCardView = itemView.findViewById(R.id.videoCardView);
-            messageVideoThumbnail = itemView.findViewById(R.id.messageVideoThumbnail);
-            videoPlayButtonContainer = itemView.findViewById(R.id.videoPlayButtonContainer);
-            videoPlayIcon = itemView.findViewById(R.id.videoPlayIcon);
-            videoProgressBar = itemView.findViewById(R.id.videoProgressBar);
-            videoOverlayPill = itemView.findViewById(R.id.videoOverlayPill);
-            videoTimeText = itemView.findViewById(R.id.videoTimeText);
-            videoStatusIcon = itemView.findViewById(R.id.videoStatusIcon);
-            videoDurationContainer = itemView.findViewById(R.id.videoDurationContainer);
-            videoDurationText = itemView.findViewById(R.id.videoDurationText);
-            videoCaptionText = itemView.findViewById(R.id.videoCaptionText);
-
-            documentMessageContainer = itemView.findViewById(R.id.documentMessageContainer);
-            documentIconContainer = itemView.findViewById(R.id.documentIconContainer);
-            documentExtensionBadge = itemView.findViewById(R.id.documentExtensionBadge);
-            documentFileName = itemView.findViewById(R.id.documentFileName);
-            documentFileSize = itemView.findViewById(R.id.documentFileSize);
-            documentActionIcon = itemView.findViewById(R.id.documentActionIcon);
-            documentProgressBar = itemView.findViewById(R.id.documentProgressBar);
-
-            locationMessageContainer = itemView.findViewById(R.id.locationMessageContainer);
-            locationTitle = itemView.findViewById(R.id.locationTitle);
-            locationSubtitle = itemView.findViewById(R.id.locationSubtitle);
-
-            contactMessageContainer = itemView.findViewById(R.id.contactMessageContainer);
-            contactName = itemView.findViewById(R.id.contactName);
-            contactPhone = itemView.findViewById(R.id.contactPhone);
-            contactAction = itemView.findViewById(R.id.contactAction);
-            contactActionMessage = itemView.findViewById(R.id.contactActionMessage);
-            contactActionSave = itemView.findViewById(R.id.contactActionSave);
-
-            pollMessageContainer = itemView.findViewById(R.id.pollMessageContainer);
-            pollQuestionText = itemView.findViewById(R.id.pollQuestionText);
-            pollOptionsLinearLayout = itemView.findViewById(R.id.pollOptionsLinearLayout);
-            pollTotalVotesText = itemView.findViewById(R.id.pollTotalVotesText);
-
-            blinkMessageContainer = itemView.findViewById(R.id.blinkMessageContainer);
-            blinkBadgeIcon = itemView.findViewById(R.id.blinkBadgeIcon);
-            blinkProgressBar = itemView.findViewById(R.id.blinkProgressBar);
-            blinkTitleText = itemView.findViewById(R.id.blinkTitleText);
-            blinkSubtitleText = itemView.findViewById(R.id.blinkSubtitleText);
-
-            imageDownloadOverlay = itemView.findViewById(R.id.imageDownloadOverlay);
-            imageDownloadIdleLayout = itemView.findViewById(R.id.imageDownloadIdleLayout);
-            imageDownloadSizeText = itemView.findViewById(R.id.imageDownloadSizeText);
-            imageDownloadingLayout = itemView.findViewById(R.id.imageDownloadingLayout);
-            imageDownloadProgress = itemView.findViewById(R.id.imageDownloadProgress);
-            imageDownloadCancelBtn = itemView.findViewById(R.id.imageDownloadCancelBtn);
-            imageDownloadRetryLayout = itemView.findViewById(R.id.imageDownloadRetryLayout);
-
-            videoDownloadOverlay = itemView.findViewById(R.id.videoDownloadOverlay);
-            videoDownloadIdleLayout = itemView.findViewById(R.id.videoDownloadIdleLayout);
-            videoDownloadSizeText = itemView.findViewById(R.id.videoDownloadSizeText);
-            videoDownloadingLayout = itemView.findViewById(R.id.videoDownloadingLayout);
-            videoDownloadProgress = itemView.findViewById(R.id.videoDownloadProgress);
-            videoDownloadCancelBtn = itemView.findViewById(R.id.videoDownloadCancelBtn);
-            videoDownloadRetryLayout = itemView.findViewById(R.id.videoDownloadRetryLayout);
-
-            callMessageContainer = itemView.findViewById(R.id.callMessageContainer);
-            callIconContainer = itemView.findViewById(R.id.callIconContainer);
-            callIcon = itemView.findViewById(R.id.callIcon);
-            callTitleText = itemView.findViewById(R.id.callTitleText);
-            callSubtitleText = itemView.findViewById(R.id.callSubtitleText);
-
             tvStarredBadge = itemView.findViewById(R.id.tvStarredBadge);
             tvVanishBadge = itemView.findViewById(R.id.tvVanishBadge);
             tvEditedBadge = itemView.findViewById(R.id.tvEditedBadge);
         }
 
+        private void ensureLinkPreviewViews() {
+            if (linkPreviewContainer == null) {
+                linkPreviewContainer = itemView.findViewById(R.id.linkPreviewContainer);
+                ivLinkThumb = itemView.findViewById(R.id.ivLinkThumb);
+                tvLinkDomain = itemView.findViewById(R.id.tvLinkDomain);
+                tvLinkTitle = itemView.findViewById(R.id.tvLinkTitle);
+                tvLinkDesc = itemView.findViewById(R.id.tvLinkDesc);
+            }
+        }
+
+        private void ensureVoiceViews() {
+            if (voiceMessageContainer == null) {
+                voiceMessageContainer = itemView.findViewById(R.id.voiceMessageContainer);
+                voiceActionButton = itemView.findViewById(R.id.voiceActionButton);
+                voiceProgressBar = itemView.findViewById(R.id.voiceProgressBar);
+                voiceWaveformView = itemView.findViewById(R.id.voiceWaveformView);
+                voiceDurationText = itemView.findViewById(R.id.voiceDurationText);
+                voiceSpeedButton = itemView.findViewById(R.id.voiceSpeedButton);
+                voiceMicBadge = itemView.findViewById(R.id.voiceMicBadge);
+                voiceLine = itemView.findViewById(R.id.voiceLine);
+                voiceSeekBar = itemView.findViewById(R.id.voiceSeekBar);
+            }
+        }
+
+        private void ensureImageViews() {
+            if (imageMessageContainer == null) {
+                imageMessageContainer = itemView.findViewById(R.id.imageMessageContainer);
+                imageCardView = itemView.findViewById(R.id.imageCardView);
+                messageImage = itemView.findViewById(R.id.messageImage);
+                imageProgressBar = itemView.findViewById(R.id.imageProgressBar);
+                imageOverlayPill = itemView.findViewById(R.id.imageOverlayPill);
+                imageTimeText = itemView.findViewById(R.id.imageTimeText);
+                imageStatusIcon = itemView.findViewById(R.id.imageStatusIcon);
+                imageCaptionText = itemView.findViewById(R.id.imageCaptionText);
+                imageDownloadOverlay = itemView.findViewById(R.id.imageDownloadOverlay);
+                imageDownloadIdleLayout = itemView.findViewById(R.id.imageDownloadIdleLayout);
+                imageDownloadSizeText = itemView.findViewById(R.id.imageDownloadSizeText);
+                imageDownloadingLayout = itemView.findViewById(R.id.imageDownloadingLayout);
+                imageDownloadProgress = itemView.findViewById(R.id.imageDownloadProgress);
+                imageDownloadCancelBtn = itemView.findViewById(R.id.imageDownloadCancelBtn);
+                imageDownloadRetryLayout = itemView.findViewById(R.id.imageDownloadRetryLayout);
+            }
+        }
+
+        private void ensureVideoViews() {
+            if (videoMessageContainer == null) {
+                videoMessageContainer = itemView.findViewById(R.id.videoMessageContainer);
+                videoCardView = itemView.findViewById(R.id.videoCardView);
+                messageVideoThumbnail = itemView.findViewById(R.id.messageVideoThumbnail);
+                videoPlayButtonContainer = itemView.findViewById(R.id.videoPlayButtonContainer);
+                videoPlayIcon = itemView.findViewById(R.id.videoPlayIcon);
+                videoProgressBar = itemView.findViewById(R.id.videoProgressBar);
+                videoOverlayPill = itemView.findViewById(R.id.videoOverlayPill);
+                videoTimeText = itemView.findViewById(R.id.videoTimeText);
+                videoStatusIcon = itemView.findViewById(R.id.videoStatusIcon);
+                videoDurationContainer = itemView.findViewById(R.id.videoDurationContainer);
+                videoDurationText = itemView.findViewById(R.id.videoDurationText);
+                videoCaptionText = itemView.findViewById(R.id.videoCaptionText);
+                videoDownloadOverlay = itemView.findViewById(R.id.videoDownloadOverlay);
+                videoDownloadIdleLayout = itemView.findViewById(R.id.videoDownloadIdleLayout);
+                videoDownloadSizeText = itemView.findViewById(R.id.videoDownloadSizeText);
+                videoDownloadingLayout = itemView.findViewById(R.id.videoDownloadingLayout);
+                videoDownloadProgress = itemView.findViewById(R.id.videoDownloadProgress);
+                videoDownloadCancelBtn = itemView.findViewById(R.id.videoDownloadCancelBtn);
+                videoDownloadRetryLayout = itemView.findViewById(R.id.videoDownloadRetryLayout);
+            }
+        }
+
+        private void ensureDocumentViews() {
+            if (documentMessageContainer == null) {
+                documentMessageContainer = itemView.findViewById(R.id.documentMessageContainer);
+                documentIconContainer = itemView.findViewById(R.id.documentIconContainer);
+                documentExtensionBadge = itemView.findViewById(R.id.documentExtensionBadge);
+                documentFileName = itemView.findViewById(R.id.documentFileName);
+                documentFileSize = itemView.findViewById(R.id.documentFileSize);
+                documentActionIcon = itemView.findViewById(R.id.documentActionIcon);
+                documentProgressBar = itemView.findViewById(R.id.documentProgressBar);
+            }
+        }
+
+        private void ensureLocationViews() {
+            if (locationMessageContainer == null) {
+                locationMessageContainer = itemView.findViewById(R.id.locationMessageContainer);
+                locationTitle = itemView.findViewById(R.id.locationTitle);
+                locationSubtitle = itemView.findViewById(R.id.locationSubtitle);
+            }
+        }
+
+        private void ensureContactViews() {
+            if (contactMessageContainer == null) {
+                contactMessageContainer = itemView.findViewById(R.id.contactMessageContainer);
+                contactName = itemView.findViewById(R.id.contactName);
+                contactPhone = itemView.findViewById(R.id.contactPhone);
+                contactAction = itemView.findViewById(R.id.contactAction);
+                contactActionMessage = itemView.findViewById(R.id.contactActionMessage);
+                contactActionSave = itemView.findViewById(R.id.contactActionSave);
+            }
+        }
+
+        private void ensurePollViews() {
+            if (pollMessageContainer == null) {
+                pollMessageContainer = itemView.findViewById(R.id.pollMessageContainer);
+                pollQuestionText = itemView.findViewById(R.id.pollQuestionText);
+                pollOptionsLinearLayout = itemView.findViewById(R.id.pollOptionsLinearLayout);
+                pollTotalVotesText = itemView.findViewById(R.id.pollTotalVotesText);
+            }
+        }
+
+        private void ensureBlinkViews() {
+            if (blinkMessageContainer == null) {
+                blinkMessageContainer = itemView.findViewById(R.id.blinkMessageContainer);
+                blinkBadgeIcon = itemView.findViewById(R.id.blinkBadgeIcon);
+                blinkProgressBar = itemView.findViewById(R.id.blinkProgressBar);
+                blinkTitleText = itemView.findViewById(R.id.blinkTitleText);
+                blinkSubtitleText = itemView.findViewById(R.id.blinkSubtitleText);
+            }
+        }
+
+        private void ensureCallViews() {
+            if (callMessageContainer == null) {
+                callMessageContainer = itemView.findViewById(R.id.callMessageContainer);
+                callIconContainer = itemView.findViewById(R.id.callIconContainer);
+                callIcon = itemView.findViewById(R.id.callIcon);
+                callTitleText = itemView.findViewById(R.id.callTitleText);
+                callSubtitleText = itemView.findViewById(R.id.callSubtitleText);
+            }
+        }
+
         private void hideAllMediaContainers() {
+            if (!hasVisibleMediaContainer) return;
+            hasVisibleMediaContainer = false;
             if (linkPreviewContainer != null) linkPreviewContainer.setVisibility(View.GONE);
             if (voiceMessageContainer != null) voiceMessageContainer.setVisibility(View.GONE);
             if (imageMessageContainer != null) imageMessageContainer.setVisibility(View.GONE);
@@ -1332,6 +1452,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 if (replyQuoteContainer != null) replyQuoteContainer.setVisibility(View.GONE);
             } else if (message.isBlink()) {
                 hideAllMediaContainers();
+                ensureBlinkViews();
+                hasVisibleMediaContainer = true;
                 messageText.setVisibility(View.GONE);
                 if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                 statusIcon.setVisibility(View.VISIBLE);
@@ -1350,6 +1472,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 hideAllMediaContainers();
 
                 if ("voice".equals(message.getType()) || "audio".equals(message.getType())) {
+                    ensureVoiceViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     if (voiceMessageContainer != null) {
@@ -1375,9 +1499,17 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             });
                         }
 
-                        int totalMs = VoicePlayerManager.getInstance().getAudioDuration(itemView.getContext(), message);
+                        int totalMs = VoicePlayerManager.getInstance().getCachedAudioDuration(message);
                         if (voiceDurationText != null) {
                             voiceDurationText.setText(totalMs > 0 ? VoicePlayerManager.formatDuration(totalMs) : "0:00");
+                        }
+                        if (totalMs <= 0) {
+                            final String boundMsgId = message.getId();
+                            VoicePlayerManager.getInstance().loadAudioDurationAsync(itemView.getContext(), message, durationMs -> {
+                                if (durationMs > 0 && voiceDurationText != null && boundMsgId != null && boundMsgId.equals(message.getId())) {
+                                    voiceDurationText.setText(VoicePlayerManager.formatDuration(durationMs));
+                                }
+                            });
                         }
 
                         if (voiceSpeedButton != null) {
@@ -1413,7 +1545,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                     }
                                     if (!isPlaying && voiceWaveformView != null) {
                                         voiceWaveformView.setProgress(0f);
-                                        int dur = VoicePlayerManager.getInstance().getAudioDuration(itemView.getContext(), message);
+                                        int dur = VoicePlayerManager.getInstance().getCachedAudioDuration(message);
                                         if (voiceDurationText != null) {
                                             voiceDurationText.setText(dur > 0 ? VoicePlayerManager.formatDuration(dur) : "0:00");
                                         }
@@ -1445,6 +1577,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
                     }
                 } else if ("image".equals(message.getType())) {
+                    ensureImageViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);
@@ -1478,10 +1612,14 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 BitmapFactory.Options opts = new BitmapFactory.Options();
                                 opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
                                 Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length, opts);
-                                messageImage.setImageBitmap(decodedByte);
+                                if (decodedByte != null) {
+                                    messageImage.setImageBitmap(decodedByte);
+                                } else {
+                                    messageImage.setImageDrawable(null);
+                                }
                             }
                         } else {
-                            messageImage.setImageBitmap(null);
+                            messageImage.setImageDrawable(null);
                         }
 
                         ImageLoader.loadImage(
@@ -1541,6 +1679,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
                     }
                 } else if ("video".equals(message.getType())) {
+                    ensureVideoViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (videoMessageContainer != null) {
                         videoMessageContainer.setVisibility(View.VISIBLE);
@@ -1565,9 +1705,17 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.GONE);
                         }
 
-                        int dur = VoicePlayerManager.getInstance().getAudioDuration(itemView.getContext(), message);
+                        int dur = VoicePlayerManager.getInstance().getCachedAudioDuration(message);
                         if (videoDurationText != null) {
                             videoDurationText.setText(dur > 0 ? VoicePlayerManager.formatDuration(dur) : "0:30");
+                        }
+                        if (dur <= 0) {
+                            final String boundVidId = message.getId();
+                            VoicePlayerManager.getInstance().loadAudioDurationAsync(itemView.getContext(), message, durationMs -> {
+                                if (durationMs > 0 && videoDurationText != null && boundVidId != null && boundVidId.equals(message.getId())) {
+                                    videoDurationText.setText(VoicePlayerManager.formatDuration(durationMs));
+                                }
+                            });
                         }
 
                         if (message.getThumbnail() != null && !message.getThumbnail().isEmpty()) {
@@ -1580,9 +1728,15 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                     BitmapFactory.Options opts = new BitmapFactory.Options();
                                     opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
                                     Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length, opts);
-                                    messageVideoThumbnail.setImageBitmap(decodedByte);
+                                    if (decodedByte != null) {
+                                        messageVideoThumbnail.setImageBitmap(decodedByte);
+                                    } else {
+                                        messageVideoThumbnail.setImageDrawable(null);
+                                    }
                                 } catch (Exception ignored) {}
                             }
+                        } else {
+                            messageVideoThumbnail.setImageDrawable(null);
                         }
 
                         View.OnClickListener playClick = v -> {
@@ -1664,6 +1818,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
                     }
                 } else if ("document".equals(message.getType())) {
+                    ensureDocumentViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (documentMessageContainer != null) {
                         documentMessageContainer.setVisibility(View.VISIBLE);
@@ -1738,9 +1894,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         });
                     }
                 } else if ("location".equals(message.getType())) {
+                    ensureLocationViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     bindLocationCard(message, locationMessageContainer, locationTitle, locationSubtitle);
                 } else if ("contact".equals(message.getType())) {
+                    ensureContactViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (contactMessageContainer != null) {
                         contactMessageContainer.setVisibility(View.VISIBLE);
@@ -1760,10 +1920,14 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         contactMessageContainer.setOnClickListener(dialClick);
                     }
                 } else if ("poll".equals(message.getType())) {
+                    ensurePollViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     bindPollCard(message, pollMessageContainer, pollQuestionText, pollOptionsLinearLayout, pollTotalVotesText);
                 } else if ("call".equals(message.getType())) {
+                    ensureCallViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     bindCallCard(message, callMessageContainer, callIconContainer, callIcon, callTitleText, callSubtitleText, true);
@@ -1772,7 +1936,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageText.setVisibility(View.VISIBLE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
-                    bindLinkPreview(message.getText(), linkPreviewContainer, ivLinkThumb, tvLinkDomain, tvLinkTitle, tvLinkDesc);
+                    String rawMsgTxt = message.getText();
+                    if (rawMsgTxt != null && (rawMsgTxt.contains("http://") || rawMsgTxt.contains("https://") || rawMsgTxt.contains("www."))) {
+                        ensureLinkPreviewViews();
+                        hasVisibleMediaContainer = true;
+                        bindLinkPreview(rawMsgTxt, linkPreviewContainer, ivLinkThumb, tvLinkDomain, tvLinkTitle, tvLinkDesc);
+                    }
                     if (message.getText() != null && message.getText().contains("||") && message.getId() != null) {
                         messageText.setOnClickListener(v -> {
                             if (revealedSpoilers.contains(message.getId())) {
@@ -1983,22 +2152,14 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         ImageView videoDownloadCancelBtn;
         LinearLayout videoDownloadRetryLayout;
 
+        private boolean hasVisibleMediaContainer = false;
+
         public ReceivedMessageViewHolder(@NonNull View itemView) {
             super(itemView);
             dateHeaderContainer = itemView.findViewById(R.id.dateHeaderContainer);
             dateHeaderText = itemView.findViewById(R.id.dateHeaderText);
             senderNameText = itemView.findViewById(R.id.senderNameText);
             messageText = itemView.findViewById(R.id.messageText);
-            linkPreviewContainer = itemView.findViewById(R.id.linkPreviewContainer);
-            ivLinkThumb = itemView.findViewById(R.id.ivLinkThumb);
-            tvLinkDomain = itemView.findViewById(R.id.tvLinkDomain);
-            tvLinkTitle = itemView.findViewById(R.id.tvLinkTitle);
-            tvLinkDesc = itemView.findViewById(R.id.tvLinkDesc);
-            linkPreviewContainer = itemView.findViewById(R.id.linkPreviewContainer);
-            ivLinkThumb = itemView.findViewById(R.id.ivLinkThumb);
-            tvLinkDomain = itemView.findViewById(R.id.tvLinkDomain);
-            tvLinkTitle = itemView.findViewById(R.id.tvLinkTitle);
-            tvLinkDesc = itemView.findViewById(R.id.tvLinkDesc);
             timeText = itemView.findViewById(R.id.timeText);
             reactionsText = itemView.findViewById(R.id.reactionsText);
             replyQuoteContainer = itemView.findViewById(R.id.replyQuoteContainer);
@@ -2006,95 +2167,140 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             replyQuoteText = itemView.findViewById(R.id.replyQuoteText);
             messageBubble = itemView.findViewById(R.id.messageBubble);
             bubbleInfoContainer = itemView.findViewById(R.id.bubbleInfoContainer);
-            
-            voiceMessageContainer = itemView.findViewById(R.id.voiceMessageContainer);
-            voiceActionButton = itemView.findViewById(R.id.voiceActionButton);
-            voiceProgressBar = itemView.findViewById(R.id.voiceProgressBar);
-            voiceWaveformView = itemView.findViewById(R.id.voiceWaveformView);
-            voiceDurationText = itemView.findViewById(R.id.voiceDurationText);
-            voiceSpeedButton = itemView.findViewById(R.id.voiceSpeedButton);
-            voiceMicBadge = itemView.findViewById(R.id.voiceMicBadge);
-            voiceLine = itemView.findViewById(R.id.voiceLine);
-            voiceSeekBar = itemView.findViewById(R.id.voiceSeekBar);
-            
-            imageMessageContainer = itemView.findViewById(R.id.imageMessageContainer);
-            imageCardView = itemView.findViewById(R.id.imageCardView);
-            messageImage = itemView.findViewById(R.id.messageImage);
-            imageProgressBar = itemView.findViewById(R.id.imageProgressBar);
-            imageOverlayPill = itemView.findViewById(R.id.imageOverlayPill);
-            imageTimeText = itemView.findViewById(R.id.imageTimeText);
-            imageCaptionText = itemView.findViewById(R.id.imageCaptionText);
-
-            videoMessageContainer = itemView.findViewById(R.id.videoMessageContainer);
-            videoCardView = itemView.findViewById(R.id.videoCardView);
-            messageVideoThumbnail = itemView.findViewById(R.id.messageVideoThumbnail);
-            videoPlayButtonContainer = itemView.findViewById(R.id.videoPlayButtonContainer);
-            videoPlayIcon = itemView.findViewById(R.id.videoPlayIcon);
-            videoProgressBar = itemView.findViewById(R.id.videoProgressBar);
-            videoOverlayPill = itemView.findViewById(R.id.videoOverlayPill);
-            videoTimeText = itemView.findViewById(R.id.videoTimeText);
-            videoDurationContainer = itemView.findViewById(R.id.videoDurationContainer);
-            videoDurationText = itemView.findViewById(R.id.videoDurationText);
-            videoCaptionText = itemView.findViewById(R.id.videoCaptionText);
-
-            documentMessageContainer = itemView.findViewById(R.id.documentMessageContainer);
-            documentIconContainer = itemView.findViewById(R.id.documentIconContainer);
-            documentExtensionBadge = itemView.findViewById(R.id.documentExtensionBadge);
-            documentFileName = itemView.findViewById(R.id.documentFileName);
-            documentFileSize = itemView.findViewById(R.id.documentFileSize);
-            documentActionIcon = itemView.findViewById(R.id.documentActionIcon);
-            documentProgressBar = itemView.findViewById(R.id.documentProgressBar);
-
-            locationMessageContainer = itemView.findViewById(R.id.locationMessageContainer);
-            locationTitle = itemView.findViewById(R.id.locationTitle);
-            locationSubtitle = itemView.findViewById(R.id.locationSubtitle);
-
-            contactMessageContainer = itemView.findViewById(R.id.contactMessageContainer);
-            contactName = itemView.findViewById(R.id.contactName);
-            contactPhone = itemView.findViewById(R.id.contactPhone);
-            contactAction = itemView.findViewById(R.id.contactAction);
-            contactActionMessage = itemView.findViewById(R.id.contactActionMessage);
-            contactActionSave = itemView.findViewById(R.id.contactActionSave);
-
-            pollMessageContainer = itemView.findViewById(R.id.pollMessageContainer);
-            pollQuestionText = itemView.findViewById(R.id.pollQuestionText);
-            pollOptionsLinearLayout = itemView.findViewById(R.id.pollOptionsLinearLayout);
-            pollTotalVotesText = itemView.findViewById(R.id.pollTotalVotesText);
-
-            blinkMessageContainer = itemView.findViewById(R.id.blinkMessageContainer);
-            blinkBadgeIcon = itemView.findViewById(R.id.blinkBadgeIcon);
-            blinkProgressBar = itemView.findViewById(R.id.blinkProgressBar);
-            blinkTitleText = itemView.findViewById(R.id.blinkTitleText);
-            blinkSubtitleText = itemView.findViewById(R.id.blinkSubtitleText);
-
-            imageDownloadOverlay = itemView.findViewById(R.id.imageDownloadOverlay);
-            imageDownloadIdleLayout = itemView.findViewById(R.id.imageDownloadIdleLayout);
-            imageDownloadSizeText = itemView.findViewById(R.id.imageDownloadSizeText);
-            imageDownloadingLayout = itemView.findViewById(R.id.imageDownloadingLayout);
-            imageDownloadProgress = itemView.findViewById(R.id.imageDownloadProgress);
-            imageDownloadCancelBtn = itemView.findViewById(R.id.imageDownloadCancelBtn);
-            imageDownloadRetryLayout = itemView.findViewById(R.id.imageDownloadRetryLayout);
-
-            videoDownloadOverlay = itemView.findViewById(R.id.videoDownloadOverlay);
-            videoDownloadIdleLayout = itemView.findViewById(R.id.videoDownloadIdleLayout);
-            videoDownloadSizeText = itemView.findViewById(R.id.videoDownloadSizeText);
-            videoDownloadingLayout = itemView.findViewById(R.id.videoDownloadingLayout);
-            videoDownloadProgress = itemView.findViewById(R.id.videoDownloadProgress);
-            videoDownloadCancelBtn = itemView.findViewById(R.id.videoDownloadCancelBtn);
-            videoDownloadRetryLayout = itemView.findViewById(R.id.videoDownloadRetryLayout);
-
-            callMessageContainer = itemView.findViewById(R.id.callMessageContainer);
-            callIconContainer = itemView.findViewById(R.id.callIconContainer);
-            callIcon = itemView.findViewById(R.id.callIcon);
-            callTitleText = itemView.findViewById(R.id.callTitleText);
-            callSubtitleText = itemView.findViewById(R.id.callSubtitleText);
-
             tvStarredBadge = itemView.findViewById(R.id.tvStarredBadge);
             tvVanishBadge = itemView.findViewById(R.id.tvVanishBadge);
             tvEditedBadge = itemView.findViewById(R.id.tvEditedBadge);
         }
 
+        private void ensureLinkPreviewViews() {
+            if (linkPreviewContainer == null) {
+                linkPreviewContainer = itemView.findViewById(R.id.linkPreviewContainer);
+                ivLinkThumb = itemView.findViewById(R.id.ivLinkThumb);
+                tvLinkDomain = itemView.findViewById(R.id.tvLinkDomain);
+                tvLinkTitle = itemView.findViewById(R.id.tvLinkTitle);
+                tvLinkDesc = itemView.findViewById(R.id.tvLinkDesc);
+            }
+        }
+
+        private void ensureVoiceViews() {
+            if (voiceMessageContainer == null) {
+                voiceMessageContainer = itemView.findViewById(R.id.voiceMessageContainer);
+                voiceActionButton = itemView.findViewById(R.id.voiceActionButton);
+                voiceProgressBar = itemView.findViewById(R.id.voiceProgressBar);
+                voiceWaveformView = itemView.findViewById(R.id.voiceWaveformView);
+                voiceDurationText = itemView.findViewById(R.id.voiceDurationText);
+                voiceSpeedButton = itemView.findViewById(R.id.voiceSpeedButton);
+                voiceMicBadge = itemView.findViewById(R.id.voiceMicBadge);
+                voiceLine = itemView.findViewById(R.id.voiceLine);
+                voiceSeekBar = itemView.findViewById(R.id.voiceSeekBar);
+            }
+        }
+
+        private void ensureImageViews() {
+            if (imageMessageContainer == null) {
+                imageMessageContainer = itemView.findViewById(R.id.imageMessageContainer);
+                imageCardView = itemView.findViewById(R.id.imageCardView);
+                messageImage = itemView.findViewById(R.id.messageImage);
+                imageProgressBar = itemView.findViewById(R.id.imageProgressBar);
+                imageOverlayPill = itemView.findViewById(R.id.imageOverlayPill);
+                imageTimeText = itemView.findViewById(R.id.imageTimeText);
+                imageCaptionText = itemView.findViewById(R.id.imageCaptionText);
+                imageDownloadOverlay = itemView.findViewById(R.id.imageDownloadOverlay);
+                imageDownloadIdleLayout = itemView.findViewById(R.id.imageDownloadIdleLayout);
+                imageDownloadSizeText = itemView.findViewById(R.id.imageDownloadSizeText);
+                imageDownloadingLayout = itemView.findViewById(R.id.imageDownloadingLayout);
+                imageDownloadProgress = itemView.findViewById(R.id.imageDownloadProgress);
+                imageDownloadCancelBtn = itemView.findViewById(R.id.imageDownloadCancelBtn);
+                imageDownloadRetryLayout = itemView.findViewById(R.id.imageDownloadRetryLayout);
+            }
+        }
+
+        private void ensureVideoViews() {
+            if (videoMessageContainer == null) {
+                videoMessageContainer = itemView.findViewById(R.id.videoMessageContainer);
+                videoCardView = itemView.findViewById(R.id.videoCardView);
+                messageVideoThumbnail = itemView.findViewById(R.id.messageVideoThumbnail);
+                videoPlayButtonContainer = itemView.findViewById(R.id.videoPlayButtonContainer);
+                videoPlayIcon = itemView.findViewById(R.id.videoPlayIcon);
+                videoProgressBar = itemView.findViewById(R.id.videoProgressBar);
+                videoOverlayPill = itemView.findViewById(R.id.videoOverlayPill);
+                videoTimeText = itemView.findViewById(R.id.videoTimeText);
+                videoDurationContainer = itemView.findViewById(R.id.videoDurationContainer);
+                videoDurationText = itemView.findViewById(R.id.videoDurationText);
+                videoCaptionText = itemView.findViewById(R.id.videoCaptionText);
+                videoDownloadOverlay = itemView.findViewById(R.id.videoDownloadOverlay);
+                videoDownloadIdleLayout = itemView.findViewById(R.id.videoDownloadIdleLayout);
+                videoDownloadSizeText = itemView.findViewById(R.id.videoDownloadSizeText);
+                videoDownloadingLayout = itemView.findViewById(R.id.videoDownloadingLayout);
+                videoDownloadProgress = itemView.findViewById(R.id.videoDownloadProgress);
+                videoDownloadCancelBtn = itemView.findViewById(R.id.videoDownloadCancelBtn);
+                videoDownloadRetryLayout = itemView.findViewById(R.id.videoDownloadRetryLayout);
+            }
+        }
+
+        private void ensureDocumentViews() {
+            if (documentMessageContainer == null) {
+                documentMessageContainer = itemView.findViewById(R.id.documentMessageContainer);
+                documentIconContainer = itemView.findViewById(R.id.documentIconContainer);
+                documentExtensionBadge = itemView.findViewById(R.id.documentExtensionBadge);
+                documentFileName = itemView.findViewById(R.id.documentFileName);
+                documentFileSize = itemView.findViewById(R.id.documentFileSize);
+                documentActionIcon = itemView.findViewById(R.id.documentActionIcon);
+                documentProgressBar = itemView.findViewById(R.id.documentProgressBar);
+            }
+        }
+
+        private void ensureLocationViews() {
+            if (locationMessageContainer == null) {
+                locationMessageContainer = itemView.findViewById(R.id.locationMessageContainer);
+                locationTitle = itemView.findViewById(R.id.locationTitle);
+                locationSubtitle = itemView.findViewById(R.id.locationSubtitle);
+            }
+        }
+
+        private void ensureContactViews() {
+            if (contactMessageContainer == null) {
+                contactMessageContainer = itemView.findViewById(R.id.contactMessageContainer);
+                contactName = itemView.findViewById(R.id.contactName);
+                contactPhone = itemView.findViewById(R.id.contactPhone);
+                contactAction = itemView.findViewById(R.id.contactAction);
+                contactActionMessage = itemView.findViewById(R.id.contactActionMessage);
+                contactActionSave = itemView.findViewById(R.id.contactActionSave);
+            }
+        }
+
+        private void ensurePollViews() {
+            if (pollMessageContainer == null) {
+                pollMessageContainer = itemView.findViewById(R.id.pollMessageContainer);
+                pollQuestionText = itemView.findViewById(R.id.pollQuestionText);
+                pollOptionsLinearLayout = itemView.findViewById(R.id.pollOptionsLinearLayout);
+                pollTotalVotesText = itemView.findViewById(R.id.pollTotalVotesText);
+            }
+        }
+
+        private void ensureBlinkViews() {
+            if (blinkMessageContainer == null) {
+                blinkMessageContainer = itemView.findViewById(R.id.blinkMessageContainer);
+                blinkBadgeIcon = itemView.findViewById(R.id.blinkBadgeIcon);
+                blinkProgressBar = itemView.findViewById(R.id.blinkProgressBar);
+                blinkTitleText = itemView.findViewById(R.id.blinkTitleText);
+                blinkSubtitleText = itemView.findViewById(R.id.blinkSubtitleText);
+            }
+        }
+
+        private void ensureCallViews() {
+            if (callMessageContainer == null) {
+                callMessageContainer = itemView.findViewById(R.id.callMessageContainer);
+                callIconContainer = itemView.findViewById(R.id.callIconContainer);
+                callIcon = itemView.findViewById(R.id.callIcon);
+                callTitleText = itemView.findViewById(R.id.callTitleText);
+                callSubtitleText = itemView.findViewById(R.id.callSubtitleText);
+            }
+        }
+
         private void hideAllMediaContainers() {
+            if (!hasVisibleMediaContainer) return;
+            hasVisibleMediaContainer = false;
             if (linkPreviewContainer != null) linkPreviewContainer.setVisibility(View.GONE);
             if (voiceMessageContainer != null) voiceMessageContainer.setVisibility(View.GONE);
             if (imageMessageContainer != null) imageMessageContainer.setVisibility(View.GONE);
@@ -2161,6 +2367,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 if (replyQuoteContainer != null) replyQuoteContainer.setVisibility(View.GONE);
             } else if (message.isBlink()) {
                 hideAllMediaContainers();
+                ensureBlinkViews();
+                hasVisibleMediaContainer = true;
                 messageText.setVisibility(View.GONE);
                 if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                 bindBlinkCard(message, false, blinkMessageContainer, blinkBadgeIcon, blinkProgressBar, blinkTitleText, blinkSubtitleText);
@@ -2175,6 +2383,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 hideAllMediaContainers();
 
                 if ("voice".equals(message.getType()) || "audio".equals(message.getType())) {
+                    ensureVoiceViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     if (voiceMessageContainer != null) {
@@ -2216,9 +2426,17 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
 
                         if (voiceDownloadState == STATE_DOWNLOADED) {
-                            int totalMs = VoicePlayerManager.getInstance().getAudioDuration(itemView.getContext(), message);
+                            int totalMs = VoicePlayerManager.getInstance().getCachedAudioDuration(message);
                             if (voiceDurationText != null) {
                                 voiceDurationText.setText(totalMs > 0 ? VoicePlayerManager.formatDuration(totalMs) : "0:00");
+                            }
+                            if (totalMs <= 0) {
+                                final String boundMsgId = message.getId();
+                                VoicePlayerManager.getInstance().loadAudioDurationAsync(itemView.getContext(), message, durationMs -> {
+                                    if (durationMs > 0 && voiceDurationText != null && boundMsgId != null && boundMsgId.equals(message.getId())) {
+                                        voiceDurationText.setText(VoicePlayerManager.formatDuration(durationMs));
+                                    }
+                                });
                             }
 
                             if (voiceSpeedButton != null) {
@@ -2254,7 +2472,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                     }
                                     if (!isPlaying && voiceWaveformView != null) {
                                         voiceWaveformView.setProgress(0f);
-                                        int dur = VoicePlayerManager.getInstance().getAudioDuration(itemView.getContext(), message);
+                                        int dur = VoicePlayerManager.getInstance().getCachedAudioDuration(message);
                                         if (voiceDurationText != null) {
                                             voiceDurationText.setText(dur > 0 ? VoicePlayerManager.formatDuration(dur) : "0:00");
                                         }
@@ -2313,6 +2531,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
                     }
                 } else if ("image".equals(message.getType())) {
+                    ensureImageViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);
@@ -2376,7 +2596,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             if (blurred != null) {
                                 messageImage.setImageBitmap(blurred);
                             } else {
-                                messageImage.setImageBitmap(null);
+                                messageImage.setImageDrawable(null);
                             }
                             if (imageProgressBar != null) imageProgressBar.setVisibility(View.GONE);
 
@@ -2431,6 +2651,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
                     }
                 } else if ("video".equals(message.getType())) {
+                    ensureVideoViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (videoMessageContainer != null) {
                         videoMessageContainer.setVisibility(View.VISIBLE);
@@ -2454,9 +2676,17 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.GONE);
                         }
 
-                        int dur = VoicePlayerManager.getInstance().getAudioDuration(itemView.getContext(), message);
+                        int dur = VoicePlayerManager.getInstance().getCachedAudioDuration(message);
                         if (videoDurationText != null) {
                             videoDurationText.setText(dur > 0 ? VoicePlayerManager.formatDuration(dur) : "0:30");
+                        }
+                        if (dur <= 0) {
+                            final String boundVidId = message.getId();
+                            VoicePlayerManager.getInstance().loadAudioDurationAsync(itemView.getContext(), message, durationMs -> {
+                                if (durationMs > 0 && videoDurationText != null && boundVidId != null && boundVidId.equals(message.getId())) {
+                                    videoDurationText.setText(VoicePlayerManager.formatDuration(durationMs));
+                                }
+                            });
                         }
 
                         File localVid = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".mp4");
@@ -2479,9 +2709,15 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                         BitmapFactory.Options opts = new BitmapFactory.Options();
                                         opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
                                         Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length, opts);
-                                        messageVideoThumbnail.setImageBitmap(decodedByte);
+                                        if (decodedByte != null) {
+                                            messageVideoThumbnail.setImageBitmap(decodedByte);
+                                        } else {
+                                            messageVideoThumbnail.setImageDrawable(null);
+                                        }
                                     } catch (Exception ignored) {}
                                 }
+                            } else {
+                                messageVideoThumbnail.setImageDrawable(null);
                             }
 
                             View.OnClickListener playClick = v -> {
@@ -2510,7 +2746,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             if (blurred != null) {
                                 messageVideoThumbnail.setImageBitmap(blurred);
                             } else {
-                                messageVideoThumbnail.setImageBitmap(null);
+                                messageVideoThumbnail.setImageDrawable(null);
                             }
                             if (videoPlayButtonContainer != null) videoPlayButtonContainer.setVisibility(View.GONE);
 
@@ -2565,6 +2801,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
                     }
                 } else if ("document".equals(message.getType())) {
+                    ensureDocumentViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (documentMessageContainer != null) {
                         documentMessageContainer.setVisibility(View.VISIBLE);
@@ -2650,9 +2888,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         });
                     }
                 } else if ("location".equals(message.getType())) {
+                    ensureLocationViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     bindLocationCard(message, locationMessageContainer, locationTitle, locationSubtitle);
                 } else if ("contact".equals(message.getType())) {
+                    ensureContactViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (contactMessageContainer != null) {
                         contactMessageContainer.setVisibility(View.VISIBLE);
@@ -2672,10 +2914,14 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         contactMessageContainer.setOnClickListener(dialClick);
                     }
                 } else if ("poll".equals(message.getType())) {
+                    ensurePollViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     bindPollCard(message, pollMessageContainer, pollQuestionText, pollOptionsLinearLayout, pollTotalVotesText);
                 } else if ("call".equals(message.getType())) {
+                    ensureCallViews();
+                    hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     bindCallCard(message, callMessageContainer, callIconContainer, callIcon, callTitleText, callSubtitleText, false);
@@ -2683,7 +2929,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageText.setVisibility(View.VISIBLE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
-                    bindLinkPreview(message.getText(), linkPreviewContainer, ivLinkThumb, tvLinkDomain, tvLinkTitle, tvLinkDesc);
+                    String rawMsgTxt = message.getText();
+                    if (rawMsgTxt != null && (rawMsgTxt.contains("http://") || rawMsgTxt.contains("https://") || rawMsgTxt.contains("www."))) {
+                        ensureLinkPreviewViews();
+                        hasVisibleMediaContainer = true;
+                        bindLinkPreview(rawMsgTxt, linkPreviewContainer, ivLinkThumb, tvLinkDomain, tvLinkTitle, tvLinkDesc);
+                    }
                     if (message.getText() != null && message.getText().contains("||") && message.getId() != null) {
                         messageText.setOnClickListener(v -> {
                             if (revealedSpoilers.contains(message.getId())) {

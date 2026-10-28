@@ -89,7 +89,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    private static WebRtcManager instance;
    private final Context context;
    private final EglBase rootEglBase = EglBase.create();
-   private PeerConnectionFactory peerConnectionFactory;
+   private volatile PeerConnectionFactory peerConnectionFactory;
    private String currentUserId;
    private final Map<String, PeerConnection> peerConnections = new ConcurrentHashMap<>();
    private final Map<String, DataChannel> dataChannels = new ConcurrentHashMap<>();
@@ -185,7 +185,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       hbThread.setDaemon(true);
       hbThread.start();
       this.heartbeatHandler = new Handler(hbThread.getLooper());
-      this.initializePeerConnectionFactory();
+      this.rtcExecutor.execute(this::initializePeerConnectionFactory);
       SignalingClient.getInstance().setListener(this);
       TurnCredentialManager.getInstance(context).probeAllNodesAsync();
       P2PFileTransferHelper.setOnFileRequestListener(new P2PFileTransferHelper.OnFileRequestListener() {
@@ -482,13 +482,25 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
    }
 
-   private void initializePeerConnectionFactory() {
+   private synchronized void initializePeerConnectionFactory() {
+      if (this.peerConnectionFactory != null) {
+         return;
+      }
       PeerConnectionFactory.InitializationOptions initOptions = InitializationOptions.builder(this.context).setEnableInternalTracer(false).createInitializationOptions();
       PeerConnectionFactory.initialize(initOptions);
       PeerConnectionFactory.Options options = new PeerConnectionFactory.Options();
       DefaultVideoEncoderFactory encoderFactory = new DefaultVideoEncoderFactory(this.rootEglBase.getEglBaseContext(), true, false);
       VideoDecoderFactory decoderFactory = new DefaultVideoDecoderFactory(this.rootEglBase.getEglBaseContext());
       this.peerConnectionFactory = PeerConnectionFactory.builder().setOptions(options).setVideoEncoderFactory(encoderFactory).setVideoDecoderFactory(decoderFactory).createPeerConnectionFactory();
+   }
+
+   private PeerConnectionFactory ensurePeerConnectionFactory() {
+      PeerConnectionFactory factory = this.peerConnectionFactory;
+      if (factory == null) {
+         this.initializePeerConnectionFactory();
+         factory = this.peerConnectionFactory;
+      }
+      return factory;
    }
 
    private List<PeerConnection.IceServer> getIceServers() {
@@ -703,7 +715,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          Log.i("WebRtcManager", "Tor/Strict Relay mode active: PeerConnection initialized with IceTransportsType.RELAY");
       }
 
-      pc = this.peerConnectionFactory.createPeerConnection(rtcConfig, new PeerConnection.Observer() {
+      pc = this.ensurePeerConnectionFactory().createPeerConnection(rtcConfig, new PeerConnection.Observer() {
          public void onSignalingChange(PeerConnection.SignalingState signalingState) {
          }
 
@@ -2933,15 +2945,16 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    }
 
    public synchronized void ensureLocalAudioTrack() {
-      if (this.localAudioTrack == null && this.peerConnectionFactory != null) {
+      PeerConnectionFactory factory = this.ensurePeerConnectionFactory();
+      if (this.localAudioTrack == null && factory != null) {
          try {
             MediaConstraints audioConstraints = new MediaConstraints();
             audioConstraints.mandatory.add(new MediaConstraints.KeyValuePair("googEchoCancellation", "true"));
             audioConstraints.mandatory.add(new MediaConstraints.KeyValuePair("googAutoGainControl", "true"));
             audioConstraints.mandatory.add(new MediaConstraints.KeyValuePair("googHighpassFilter", "true"));
             audioConstraints.mandatory.add(new MediaConstraints.KeyValuePair("googNoiseSuppression", "true"));
-            this.localAudioSource = this.peerConnectionFactory.createAudioSource(audioConstraints);
-            this.localAudioTrack = this.peerConnectionFactory.createAudioTrack("ARDAMSa0", this.localAudioSource);
+            this.localAudioSource = factory.createAudioSource(audioConstraints);
+            this.localAudioTrack = factory.createAudioTrack("ARDAMSa0", this.localAudioSource);
             this.localAudioTrack.setEnabled(true);
          } catch (Exception var2) {
          }

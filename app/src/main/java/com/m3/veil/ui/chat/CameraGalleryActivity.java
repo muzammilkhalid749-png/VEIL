@@ -227,13 +227,13 @@ public class CameraGalleryActivity extends AppCompatActivity {
             layoutFullGallery.setTranslationY(0f);
         }
 
-        if (hasCameraPermission()) {
+        if (!startedDirectlyInGallery && hasCameraPermission()) {
             startCamera();
         }
         if (hasStoragePermission()) {
             loadMediaLibrary();
         }
-        if (!hasCameraPermission() || !hasStoragePermission()) {
+        if ((!startedDirectlyInGallery && !hasCameraPermission()) || !hasStoragePermission()) {
             requestPermissions();
         }
     }
@@ -244,9 +244,26 @@ public class CameraGalleryActivity extends AppCompatActivity {
         if (hasStoragePermission() && allMediaItems.isEmpty()) {
             loadMediaLibrary();
         }
-        if (hasCameraPermission() && cameraProvider == null) {
-            startCamera();
+        boolean galleryCoveringScreen = layoutFullGallery != null && layoutFullGallery.getVisibility() == View.VISIBLE;
+        if (!galleryCoveringScreen && hasCameraPermission()) {
+            if (cameraProvider == null) {
+                startCamera();
+            } else if (camera == null) {
+                bindCameraUseCases();
+            }
         }
+    }
+
+    @Override
+    protected void onPause() {
+        stopRecording();
+        if (cameraProvider != null) {
+            try {
+                cameraProvider.unbindAll();
+                camera = null;
+            } catch (Throwable ignored) {}
+        }
+        super.onPause();
     }
 
     private void handleWindowInsets() {
@@ -635,17 +652,20 @@ public class CameraGalleryActivity extends AppCompatActivity {
         // 2. Image Capture
         imageCapture = new ImageCapture.Builder()
                 .setFlashMode(flashMode)
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                 .build();
-
-        // 3. Video Capture
-        Recorder recorder = new Recorder.Builder()
-                .setQualitySelector(QualitySelector.from(Quality.HD))
-                .build();
-        videoCapture = VideoCapture.withOutput(recorder);
 
         try {
-            camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, videoCapture);
+            if (currentCameraMode == MODE_VIDEO) {
+                Recorder recorder = new Recorder.Builder()
+                        .setQualitySelector(QualitySelector.from(Quality.HD))
+                        .build();
+                videoCapture = VideoCapture.withOutput(recorder);
+                camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, videoCapture);
+            } else {
+                videoCapture = null;
+                camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture);
+            }
         } catch (Exception e) {
             Log.e(TAG, "Use case binding failed", e);
         }
@@ -780,7 +800,15 @@ public class CameraGalleryActivity extends AppCompatActivity {
     }
 
     private void startRecording() {
-        if (videoCapture == null) return;
+        if (videoCapture == null) {
+            if (cameraProvider != null) {
+                int prevMode = currentCameraMode;
+                currentCameraMode = MODE_VIDEO;
+                bindCameraUseCases();
+                currentCameraMode = prevMode;
+            }
+            if (videoCapture == null) return;
+        }
 
         File videoFile = new File(getExternalCacheDir(), "vid_" + System.currentTimeMillis() + ".mp4");
         FileOutputOptions outputOptions = new FileOutputOptions.Builder(videoFile).build();
@@ -848,6 +876,12 @@ public class CameraGalleryActivity extends AppCompatActivity {
 
     private void openMediaEditor(Uri mediaUri, String mediaType) {
         if (mediaUri == null) return;
+        if (cameraProvider != null) {
+            try {
+                cameraProvider.unbindAll();
+                camera = null;
+            } catch (Throwable ignored) {}
+        }
         Intent intent = new Intent(this, MediaEditActivity.class);
         intent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, mediaUri);
         intent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, mediaType);
@@ -880,6 +914,13 @@ public class CameraGalleryActivity extends AppCompatActivity {
                     .setDuration(280)
                     .start();
         } else {
+            if (hasCameraPermission()) {
+                if (cameraProvider == null) {
+                    startCamera();
+                } else if (camera == null) {
+                    bindCameraUseCases();
+                }
+            }
             layoutFullGallery.animate()
                     .translationY(layoutFullGallery.getHeight())
                     .setDuration(220)
@@ -1190,6 +1231,7 @@ public class CameraGalleryActivity extends AppCompatActivity {
     }
 
     private void setCameraMode(int mode) {
+        boolean modeChanged = (currentCameraMode != mode);
         currentCameraMode = mode;
         if (mode == MODE_PHOTO) {
             if (btnModePhoto != null) btnModePhoto.setTextColor(Color.parseColor("#FFCC00"));
@@ -1203,6 +1245,9 @@ public class CameraGalleryActivity extends AppCompatActivity {
             if (!isRecording && shutterInnerCircle != null) {
                 shutterInnerCircle.setBackgroundResource(R.drawable.bg_shutter_recording);
             }
+        }
+        if (modeChanged && !isRecording && cameraProvider != null) {
+            bindCameraUseCases();
         }
     }
 
