@@ -1376,14 +1376,17 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                             com.m3.veil.model.Message existingMsg = EncryptedChatDatabase.getInstance(appCtx).getMessageById(mId);
                                                             String mType = mDoc.getString("type");
                                                             String mText = mDoc.getString("text");
-                                                            if (mText != null && mText.startsWith("ENC:v1:")) {
+                                                            if (mText != null && mText.startsWith("ENC:v")) {
                                                                 mText = EncryptionManager.decryptGroupPayload(finalGroupId, mText);
                                                             }
                                                             Boolean isEditedObj = mDoc.getBoolean("edited");
                                                             String pollJson = mDoc.getString("pollJson");
-                                                            if (pollJson != null && pollJson.startsWith("ENC:v1:")) {
+                                                            if (pollJson != null && pollJson.startsWith("ENC:v")) {
                                                                 pollJson = EncryptionManager.decryptGroupPayload(finalGroupId, pollJson);
                                                             }
+                                                            String mediaUrl = mDoc.getString("mediaUrl");
+                                                            String thumbnail = mDoc.getString("thumbnail");
+                                                            String voiceFilter = mDoc.getString("voiceFilter");
                                                             String sId = mDoc.getString("senderId");
                                                             boolean isFromMe = uid.equals(sId);
                                                             boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
@@ -1404,6 +1407,15 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                 m.setReplyToMessageId(mDoc.getString("replyToMessageId"));
                                                                 m.setReplySenderName(mDoc.getString("replySenderName"));
                                                                 m.setPollJson(pollJson);
+                                                                if (mediaUrl != null && !mediaUrl.isEmpty()) m.setMediaUrl(mediaUrl);
+                                                                if (thumbnail != null && !thumbnail.isEmpty()) m.setThumbnail(thumbnail);
+                                                                if (voiceFilter != null && !voiceFilter.isEmpty()) m.setVoiceFilter(voiceFilter);
+                                                                if (mediaUrl != null && !mediaUrl.isEmpty()) {
+                                                                    com.m3.veil.manager.VeilMessagesController.ensureMediaDecodedOrAutoDownloaded(
+                                                                            appCtx, finalGroupId, m, () -> {
+                                                                                if (isAdded()) loadLocalEncryptedChats();
+                                                                            });
+                                                                }
                                                                 if (Boolean.TRUE.equals(isEditedObj)) m.setEdited(true);
                                                                 if (isFromMe) {
                                                                     boolean hasNet = com.m3.veil.manager.VeilMessagesController.getInstance(appCtx).isNetworkConnected();
@@ -1431,6 +1443,19 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                     }
                                                                 }
                                                             } else {
+                                                                if (mediaUrl != null && !mediaUrl.isEmpty()
+                                                                        && (existingMsg.getLocalFilePath() == null || !new java.io.File(existingMsg.getLocalFilePath()).exists())) {
+                                                                    existingMsg.setMediaUrl(mediaUrl);
+                                                                    if (thumbnail != null && !thumbnail.isEmpty()) existingMsg.setThumbnail(thumbnail);
+                                                                    java.io.File decoded = com.m3.veil.manager.VeilMessagesController.ensureMediaDecodedOrAutoDownloaded(
+                                                                            appCtx, finalGroupId, existingMsg, () -> {
+                                                                                if (isAdded()) loadLocalEncryptedChats();
+                                                                            });
+                                                                    EncryptedChatDatabase.getInstance(appCtx).saveMessage(finalGroupId, existingMsg);
+                                                                    if (decoded != null && decoded.exists()) {
+                                                                        anyNewMsg = true;
+                                                                    }
+                                                                }
                                                                 if (isFromMe) {
                                                                     if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
                                                                         EncryptedChatDatabase.getInstance(appCtx)
@@ -1454,7 +1479,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                 if ("deleted".equals(mType) && !"deleted".equals(existingMsg.getType())) {
                                                                     EncryptedChatDatabase.getInstance(appCtx).markMessageDeleted(finalGroupId, mId);
                                                                     msgChanged = true;
-                                                                } else if (Boolean.TRUE.equals(isEditedObj) && mText != null && !mText.equals(existingMsg.getText())) {
+                                                                } else if ((Boolean.TRUE.equals(isEditedObj) || (existingMsg.getText() != null && existingMsg.getText().startsWith("ENC:v")))
+                                                                        && mText != null && !mText.equals(existingMsg.getText())) {
                                                                     EncryptedChatDatabase.getInstance(appCtx).updateMessageText(finalGroupId, mId, mText);
                                                                     msgChanged = true;
                                                                 }
@@ -1564,9 +1590,12 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                             com.m3.veil.model.Message existingMsg = EncryptedChatDatabase.getInstance(appCtx).getMessageById(mId);
                                                             String mType = mDoc.getString("type");
                                                             String mText = mDoc.getString("text");
-                                                            if (mText != null && mText.startsWith("ENC:v1:")) {
+                                                            if (mText != null && mText.startsWith("ENC:v")) {
                                                                 mText = EncryptionManager.decryptGroupPayload(finalChatId, mText);
                                                             }
+                                                            String mediaUrl = mDoc.getString("mediaUrl");
+                                                            String thumbnail = mDoc.getString("thumbnail");
+                                                            String voiceFilter = mDoc.getString("voiceFilter");
                                                             String sId = mDoc.getString("senderId");
                                                             String sName = mDoc.getString("senderName");
                                                             com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
@@ -1585,6 +1614,17 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                 );
                                                                 m.setChatId(finalChatId);
                                                                 m.setSenderName(sName);
+                                                                m.setReplyToMessageId(mDoc.getString("replyToMessageId"));
+                                                                m.setReplySenderName(mDoc.getString("replySenderName"));
+                                                                if (mediaUrl != null && !mediaUrl.isEmpty()) m.setMediaUrl(mediaUrl);
+                                                                if (thumbnail != null && !thumbnail.isEmpty()) m.setThumbnail(thumbnail);
+                                                                if (voiceFilter != null && !voiceFilter.isEmpty()) m.setVoiceFilter(voiceFilter);
+                                                                if (mediaUrl != null && !mediaUrl.isEmpty()) {
+                                                                    com.m3.veil.manager.VeilMessagesController.ensureMediaDecodedOrAutoDownloaded(
+                                                                            appCtx, finalChatId, m, () -> {
+                                                                                if (isAdded()) loadLocalEncryptedChats();
+                                                                            });
+                                                                }
                                                                 if (isFromMe) {
                                                                     boolean hasNet = com.m3.veil.manager.VeilMessagesController.getInstance(appCtx).isNetworkConnected();
                                                                     m.setPending(!hasNet && !docDelivered && !docRead);
@@ -1610,6 +1650,24 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                 }
                                                                 anyNew = true;
                                                             } else {
+                                                                if (mediaUrl != null && !mediaUrl.isEmpty()
+                                                                        && (existingMsg.getLocalFilePath() == null || !new java.io.File(existingMsg.getLocalFilePath()).exists())) {
+                                                                    existingMsg.setMediaUrl(mediaUrl);
+                                                                    if (thumbnail != null && !thumbnail.isEmpty()) existingMsg.setThumbnail(thumbnail);
+                                                                    java.io.File decoded = com.m3.veil.manager.VeilMessagesController.ensureMediaDecodedOrAutoDownloaded(
+                                                                            appCtx, finalChatId, existingMsg, () -> {
+                                                                                if (isAdded()) loadLocalEncryptedChats();
+                                                                            });
+                                                                    EncryptedChatDatabase.getInstance(appCtx).saveMessage(finalChatId, existingMsg);
+                                                                    if (decoded != null && decoded.exists()) {
+                                                                        anyNew = true;
+                                                                    }
+                                                                }
+                                                                if (existingMsg.getText() != null && existingMsg.getText().startsWith("ENC:v")
+                                                                        && mText != null && !mText.startsWith("ENC:v")) {
+                                                                    EncryptedChatDatabase.getInstance(appCtx).updateMessageText(finalChatId, mId, mText);
+                                                                    anyNew = true;
+                                                                }
                                                                 if (isFromMe) {
                                                                     if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
                                                                         EncryptedChatDatabase.getInstance(appCtx)
@@ -1779,24 +1837,29 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         intent.putExtra("chatId", chat.getId());
         intent.putExtra("recipientName", chat.getName());
         intent.putExtra("isPinVerified", isPinVerified);
+        boolean isGroupChat = chat.isGroupChat()
+                || (chat.getId() != null && (chat.getId().startsWith("group_") || chat.getId().startsWith("channel_") || chat.getId().startsWith("lounge_")));
+        intent.putExtra("isGroup", isGroupChat);
 
-        String recipientId = null;
-        if (chat.getParticipants() != null) {
-            for (String id : chat.getParticipants()) {
-                if (id != null && !id.equals(currentUserId)) {
-                    recipientId = id;
-                    break;
+        if (!isGroupChat) {
+            String recipientId = null;
+            if (chat.getParticipants() != null) {
+                for (String id : chat.getParticipants()) {
+                    if (id != null && !id.equals(currentUserId)) {
+                        recipientId = id;
+                        break;
+                    }
                 }
             }
-        }
-        if ((recipientId == null || recipientId.trim().isEmpty()) && chat.getId() != null && !chat.isGroup()) {
-            String[] parts = chat.getId().split("_");
-            if (parts.length == 2) {
-                recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+            if ((recipientId == null || recipientId.trim().isEmpty()) && chat.getId() != null) {
+                String[] parts = chat.getId().split("_");
+                if (parts.length == 2) {
+                    recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+                }
             }
-        }
-        if (recipientId != null && !recipientId.trim().isEmpty()) {
-            intent.putExtra("recipientId", recipientId);
+            if (recipientId != null && !recipientId.trim().isEmpty()) {
+                intent.putExtra("recipientId", recipientId);
+            }
         }
         startActivity(intent);
     }

@@ -50,6 +50,22 @@
         android:paddingBottom="6dp"
         android:elevation="0.8dp">
 
+        <!-- Group Peer Sender Header Name (Telegram/WhatsApp Style) -->
+        <TextView
+            android:id="@+id/senderNameText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="2dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="2dp"
+            android:text="Peer"
+            android:textColor="@color/colorPrimary"
+            android:textSize="12.5sp"
+            android:textStyle="bold"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:visibility="gone" />
+
         <!-- Quoted Reply Container (WhatsApp Style) -->
         <LinearLayout
             android:id="@+id/replyQuoteContainer"

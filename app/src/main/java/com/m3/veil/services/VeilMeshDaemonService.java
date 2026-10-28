@@ -437,7 +437,17 @@ public class VeilMeshDaemonService extends Service {
     public void onDeliveredAckReceived(String messageId) {
         if (messageId == null || messageId.isEmpty()) return;
         try {
-            EncryptedChatDatabase.getInstance(getCtx()).removeOutboxItem(messageId);
+            EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(getCtx());
+            db.removeOutboxItem(messageId);
+            List<OutboxItem> pending = db.getPendingOutboxItems(100);
+            if (pending != null) {
+                String prefix = messageId + "_";
+                for (OutboxItem item : pending) {
+                    if (item != null && item.id != null && item.id.startsWith(prefix)) {
+                        db.removeOutboxItem(item.id);
+                    }
+                }
+            }
         } catch (Exception ignored) {}
     }
 
@@ -446,9 +456,18 @@ public class VeilMeshDaemonService extends Service {
         try {
             Context ctx = getCtx();
             String myUid = AuthManager.getInstance().getCurrentUserId(ctx);
-            String chatId = chat != null && chat.getId() != null
+            String chatId = (chat != null && chat.getId() != null && !chat.getId().isEmpty())
                     ? chat.getId()
-                    : WebRtcManager.getChatId(myUid, peerId);
+                    : (message.getChatId() != null && !message.getChatId().isEmpty()
+                        ? message.getChatId()
+                        : WebRtcManager.getChatId(myUid, peerId));
+
+            if (chat == null && chatId != null) {
+                chat = EncryptedChatDatabase.getInstance(ctx).getChat(chatId);
+            }
+
+            boolean isGroup = (chat != null && chat.isGroupChat())
+                    || (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_")));
 
             JSONObject json = new JSONObject();
             json.put("type", "chat");
@@ -475,9 +494,9 @@ public class VeilMeshDaemonService extends Service {
             p.put("expiresAt", message.getExpiresAt() != null ? message.getExpiresAt().toDate().getTime() : 0L);
             p.put("vanishTimer", message.getVanishTimer());
             p.put("vanishMode", message.getVanishMode());
+            p.put("isGroup", isGroup);
             if (chat != null) {
-                p.put("isGroup", chat.isGroup());
-                if (chat.isGroup() && chat.getName() != null) {
+                if (isGroup && chat.getName() != null) {
                     p.put("chatName", chat.getName());
                 } else {
                     String sName = message.getSenderName() != null ? message.getSenderName()
@@ -485,11 +504,26 @@ public class VeilMeshDaemonService extends Service {
                     p.put("chatName", sName);
                 }
                 if (chat.getType() != null) p.put("chatType", chat.getType());
+                if (chat.getAdminId() != null) p.put("adminId", chat.getAdminId());
+                if (chat.getDescription() != null) p.put("description", chat.getDescription());
+                if (chat.getParticipants() != null && !chat.getParticipants().isEmpty()) {
+                    JSONArray partsArr = new JSONArray();
+                    for (String pid : chat.getParticipants()) {
+                        if (pid != null && !pid.isEmpty()) partsArr.put(pid);
+                    }
+                    p.put("participants", partsArr);
+                }
+            } else if (isGroup) {
+                p.put("chatType", chatId != null && chatId.startsWith("channel_") ? "channel" : "group");
             }
             json.put("payload", p);
 
+            String outboxPacketId = (isGroup && peerId != null && !peerId.isEmpty())
+                    ? (message.getId() + "_" + peerId)
+                    : message.getId();
+
             enqueueMeshPacketWithId(
-                    message.getId(),
+                    outboxPacketId,
                     chatId,
                     peerId,
                     TYPE_DIRECT_E2EE,

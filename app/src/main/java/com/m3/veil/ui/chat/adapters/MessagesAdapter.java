@@ -58,7 +58,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     }
 
     public boolean isSenderMe(String senderId, Message msg) {
-        if (recipientId != null && !recipientId.isEmpty()) {
+        boolean isGroupMsg = msg != null && msg.getChatId() != null
+                && (msg.getChatId().startsWith("group_") || msg.getChatId().startsWith("channel_") || msg.getChatId().startsWith("lounge_"));
+        if (!isGroupMsg && recipientId != null && !recipientId.isEmpty()) {
             if (recipientId.equals(senderId)) return false;
             if (msg != null && recipientId.equals(msg.getReceiverId())) return true;
         }
@@ -1949,6 +1951,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         TextView tvStarredBadge;
         TextView tvVanishBadge;
         TextView tvEditedBadge;
+        TextView senderNameText;
 
         FrameLayout imageDownloadOverlay;
         LinearLayout imageDownloadIdleLayout;
@@ -1970,6 +1973,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             super(itemView);
             dateHeaderContainer = itemView.findViewById(R.id.dateHeaderContainer);
             dateHeaderText = itemView.findViewById(R.id.dateHeaderText);
+            senderNameText = itemView.findViewById(R.id.senderNameText);
             messageText = itemView.findViewById(R.id.messageText);
             linkPreviewContainer = itemView.findViewById(R.id.linkPreviewContainer);
             ivLinkThumb = itemView.findViewById(R.id.ivLinkThumb);
@@ -2104,10 +2108,32 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             }
             timeText.setText(time);
             bindBubbleInfoBadges(message, tvStarredBadge, tvVanishBadge, tvEditedBadge);
+            int pos = getAdapterPosition() - 1;
+            int clusterPos = computeClusterPosition(pos);
+            boolean isGroupMsg = message != null && message.getChatId() != null
+                    && (message.getChatId().startsWith("group_") || message.getChatId().startsWith("channel_") || message.getChatId().startsWith("lounge_"));
+            if (senderNameText != null) {
+                boolean showSenderHeader = isGroupMsg && (clusterPos == com.m3.veil.ui.views.ChatMessageCell.CLUSTER_SINGLE
+                        || clusterPos == com.m3.veil.ui.views.ChatMessageCell.CLUSTER_FIRST
+                        || showDate);
+                if (showSenderHeader) {
+                    String sName = message.getSenderName();
+                    if (sName == null || sName.trim().isEmpty()) {
+                        String sid = message.getSenderId();
+                        sName = (sid != null && sid.length() >= 4) ? ("Peer #" + sid.substring(0, 4)) : "Peer";
+                    }
+                    senderNameText.setText(sName);
+                    int[] palette = {0xFF38BDF8, 0xFFA855F7, 0xFF34D399, 0xFFFBBF24, 0xFFF472B6, 0xFFFB7185, 0xFF60A5FA};
+                    int hash = Math.abs((message.getSenderId() != null ? message.getSenderId() : sName).hashCode());
+                    senderNameText.setTextColor(palette[hash % palette.length]);
+                    senderNameText.setVisibility(View.VISIBLE);
+                } else {
+                    senderNameText.setVisibility(View.GONE);
+                }
+            }
             if (messageBubble instanceof com.m3.veil.ui.views.ChatMessageCell) {
                 com.m3.veil.ui.views.ChatMessageCell cell = (com.m3.veil.ui.views.ChatMessageCell) messageBubble;
-                int pos = getAdapterPosition() - 1;
-                cell.setMessageObject(message, false, computeClusterPosition(pos), true);
+                cell.setMessageObject(message, false, clusterPos, true);
             }
             attachDoubleTapAndLongPress(messageBubble, itemView, message);
             

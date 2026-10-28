@@ -629,6 +629,16 @@ public class CallEngine implements CallSignaling.Listener {
         return primaryPeerId;
     }
 
+    public String getGroupId() {
+        return groupId;
+    }
+
+    public String getGroupName() {
+        return groupName;
+    }
+
+    public static final int MAX_GROUP_CALL_MESH_PEERS = 8;
+
     public CallInfo getCallInfo() {
         return buildInfo();
     }
@@ -725,21 +735,35 @@ public class CallEngine implements CallSignaling.Listener {
 
         e2ee.generateMasterKey();
         audioDevice.start(type == CallType.VIDEO);
+        if (type == CallType.VIDEO) {
+            int w = lowDataMode ? config.lowDataWidth : config.videoWidth;
+            int h = lowDataMode ? config.lowDataHeight : config.videoHeight;
+            int fps = lowDataMode ? config.lowDataFps : config.videoFps;
+            videoDevice.startCamera(w, h, fps);
+        }
         setState(CallState.CALLING);
 
-        String roster = buildRoster(targets);
-        for (Target target : targets) {
+        List<Target> cappedTargets = targets.size() > 32 ? targets.subList(0, 32) : targets;
+        String roster = buildRoster(cappedTargets);
+        int activeMeshCount = 0;
+        for (Target target : cappedTargets) {
+            if (target == null || target.peerId == null || target.peerId.equals(currentUserId)) continue;
             CallSignal invite = CallSignal.of(CallSignal.INVITE, callId, currentUserId).to(target.peerId);
-            invite.fromName = displayName;
+            invite.fromName = getResolvedDisplayName();
             invite.callType = type.wire;
             invite.groupId = groupId;
             invite.groupName = groupName;
             invite.payload = roster;
             invite.e2eeKeyB64 = e2ee.exportMasterKeyBase64();
+            invite.e2eeKeyIndex = e2ee.getKeyIndex();
             signaling.send(invite);
-            ensurePeer(target.peerId, target.name);
+            putParticipant(target.peerId, target.name);
+            if (activeMeshCount < MAX_GROUP_CALL_MESH_PEERS) {
+                ensurePeer(target.peerId, target.name);
+                maybeInitiate(target.peerId);
+                activeMeshCount++;
+            }
         }
-        for (Target target : targets) maybeInitiate(target.peerId);
         scheduleRingingTimeout();
         startRingingHeartbeat();
         notifyInfo();
@@ -1363,18 +1387,23 @@ public class CallEngine implements CallSignaling.Listener {
     private void joinGroupMesh(String rosterJson) {
         List<Target> roster = groupFromPayload(rosterJson);
         if (roster == null) return;
+        int activeMeshCount = peers.size();
         for (Target target : roster) {
             if (target.peerId == null || target.peerId.equals(currentUserId)
                     || target.peerId.equals(primaryPeerId)) continue;
+            putParticipant(target.peerId, target.name);
             CallSignal invite = CallSignal.of(CallSignal.GROUP_INVITE, callId, currentUserId).to(target.peerId);
-            invite.fromName = displayName;
+            invite.fromName = getResolvedDisplayName();
             invite.callType = callType.wire;
             invite.groupId = groupId;
             invite.groupName = groupName;
             invite.payload = rosterJson;
             signaling.send(invite);
-            ensurePeer(target.peerId, target.name);
-            maybeInitiate(target.peerId);
+            if (activeMeshCount < MAX_GROUP_CALL_MESH_PEERS) {
+                ensurePeer(target.peerId, target.name);
+                maybeInitiate(target.peerId);
+                activeMeshCount++;
+            }
         }
     }
 

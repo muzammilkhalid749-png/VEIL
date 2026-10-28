@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
+import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
@@ -294,6 +295,27 @@ public class UserProfileActivity extends AppCompatActivity {
             btnConfirm.setText("Leave Group");
             btnConfirm.setOnClickListener(v -> {
                 sheet.dismiss();
+                Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
+                String myName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
+                if (chat != null) {
+                    Message leaveNotice = new Message(
+                            UUID.randomUUID().toString(),
+                            currentUserId,
+                            chatId,
+                            "👋 " + (myName != null ? myName : "A member") + " left the group",
+                            Timestamp.now(),
+                            "text"
+                    );
+                    leaveNotice.setChatId(chatId);
+                    leaveNotice.setSenderName(myName);
+                    com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(chat, null, leaveNotice);
+                }
+                android.content.SharedPreferences prefs = getSharedPreferences("VeilPrefs", 0);
+                java.util.Set<String> delSet = new java.util.HashSet<>(
+                        prefs.getStringSet("deleted_group_ids", new java.util.HashSet<>()));
+                delSet.add(chatId);
+                prefs.edit().putStringSet("deleted_group_ids", delSet).apply();
+                com.m3.veil.manager.VeilMessagesController.getInstance(this).removeDialogFromCache(chatId);
                 EncryptedChatDatabase.getInstance(this).deleteChat(chatId);
                 FirebaseFirestore.getInstance().collection("groups").document(chatId)
                         .update("participants", FieldValue.arrayRemove(currentUserId));
@@ -472,6 +494,16 @@ public class UserProfileActivity extends AppCompatActivity {
             }
             EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
             WebRtcManager.getInstance(this).sendGroupInviteToPeers(chat);
+
+            String myName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
+            String roleText = isCurrentlyAdmin
+                    ? ("🛡️ " + displayName + " was dismissed as admin")
+                    : ("👑 " + displayName + " was promoted to Group Admin");
+            Message roleNotice = new Message(UUID.randomUUID().toString(), currentUserId, chatId, roleText, Timestamp.now(), "text");
+            roleNotice.setChatId(chatId);
+            roleNotice.setSenderName(myName);
+            com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(chat, null, roleNotice);
+
             Toast.makeText(this, isCurrentlyAdmin ? displayName + " dismissed as admin" : displayName + " is now an Admin", Toast.LENGTH_SHORT).show();
             loadAndRenderGroupMembers();
         });
@@ -490,13 +522,29 @@ public class UserProfileActivity extends AppCompatActivity {
             }
             chat.removeAdmin(targetUserId);
             EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
+            int rotatedEpoch = com.m3.veil.utils.EncryptionManager.rotateGroupSenderKeyEpoch(chatId);
             FirebaseFirestore.getInstance().collection("groups").document(chatId)
                     .update(
                             "participants", FieldValue.arrayRemove(targetUserId),
-                            "adminIds", FieldValue.arrayRemove(targetUserId)
+                            "adminIds", FieldValue.arrayRemove(targetUserId),
+                            "groupKeyEpoch", rotatedEpoch
                     );
             WebRtcManager.getInstance(this).sendGroupInviteToPeers(chat);
-            Toast.makeText(this, displayName + " removed from group", Toast.LENGTH_SHORT).show();
+
+            String myName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
+            Message removeNotice = new Message(
+                    UUID.randomUUID().toString(),
+                    currentUserId,
+                    chatId,
+                    "🚫 " + displayName + " was removed from the group (Sender-Key rotated to Epoch #" + rotatedEpoch + ")",
+                    Timestamp.now(),
+                    "text"
+            );
+            removeNotice.setChatId(chatId);
+            removeNotice.setSenderName(myName);
+            com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(chat, null, removeNotice);
+
+            Toast.makeText(this, displayName + " removed & group keys rotated", Toast.LENGTH_SHORT).show();
             loadAndRenderGroupMembers();
         });
         root.addView(btnRemove);
@@ -607,6 +655,19 @@ public class UserProfileActivity extends AppCompatActivity {
             // Send full group invite & initiate WebRTC connection so new member receives the group immediately
             WebRtcManager.getInstance(this).sendGroupInviteToPeers(chat);
             WebRtcManager.getInstance(this).initiateConnection(newUserId);
+
+            String myName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
+            Message addNotice = new Message(
+                    UUID.randomUUID().toString(),
+                    currentUserId,
+                    chatId,
+                    "➕ " + (myName != null ? myName : "Admin") + " added " + (name != null ? name : "a new member") + " to the group",
+                    Timestamp.now(),
+                    "text"
+            );
+            addNotice.setChatId(chatId);
+            addNotice.setSenderName(myName);
+            com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(chat, null, addNotice);
 
             Toast.makeText(this, (name != null ? name : "User") + " added to group", Toast.LENGTH_SHORT).show();
             loadAndRenderGroupMembers();

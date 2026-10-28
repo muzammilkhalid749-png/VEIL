@@ -233,16 +233,23 @@ public class GroupSettingsActivity extends AppCompatActivity {
         btnRotateKeys.setText("🔄 Rotate Group Sender-Key Ratchet Now");
         btnRotateKeys.setCornerRadius((int) (12 * dp));
         btnRotateKeys.setOnClickListener(v -> {
+            int newEpoch = com.m3.veil.utils.EncryptionManager.rotateGroupSenderKeyEpoch(chatId);
             try {
                 JSONObject pkt = new JSONObject();
                 pkt.put("action", "group_key_ratchet_rotate");
                 pkt.put("groupId", chatId);
-                pkt.put("epoch", System.currentTimeMillis());
+                pkt.put("epoch", newEpoch);
                 WebRtcManager.getInstance(this).broadcastPacket(
                         new VeilPacket(VeilPacket.LANE_CTRL, VeilPacket.TYPE_GROUP_SETTINGS, pkt.toString())
                 );
             } catch (Exception ignored) {}
-            Toast.makeText(this, "🔐 New Sender-Key epoch rotated across all group peers!", Toast.LENGTH_SHORT).show();
+            if (chatId != null) {
+                Map<String, Object> epochUpdate = new HashMap<>();
+                epochUpdate.put("groupKeyEpoch", newEpoch);
+                FirebaseFirestore.getInstance().collection("groups").document(chatId)
+                        .set(epochUpdate, SetOptions.merge());
+            }
+            Toast.makeText(this, "🔐 Rotated to Sender-Key Epoch #" + newEpoch + " across all group peers!", Toast.LENGTH_SHORT).show();
         });
         cryptoBox.addView(btnRotateKeys);
 
@@ -343,16 +350,19 @@ public class GroupSettingsActivity extends AppCompatActivity {
             return;
         }
 
-        SharedPreferences prefs = getSharedPreferences("VeilGroupPrefs", MODE_PRIVATE);
-        prefs.edit()
-                .putBoolean("admins_only_send_" + chatId, cbAdminsOnlySend.isChecked())
-                .putBoolean("allow_media_" + chatId, cbAllowMedia.isChecked())
-                .putBoolean("allow_polls_" + chatId, cbAllowPolls.isChecked())
-                .putBoolean("members_can_pin_" + chatId, cbAllowPin.isChecked())
-                .putBoolean("members_can_invite_" + chatId, cbAllowMemberInvite.isChecked())
-                .putBoolean("require_admin_approval_" + chatId, cbApproveNewMembers.isChecked())
-                .putInt("slow_mode_sec_" + chatId, selectedSlowModeSec)
-                .apply();
+        String[] prefNamespaces = {"VeilGroupPrefs", "veil_group_perms"};
+        for (String ns : prefNamespaces) {
+            SharedPreferences p = getSharedPreferences(ns, MODE_PRIVATE);
+            p.edit()
+                    .putBoolean("admins_only_send_" + chatId, cbAdminsOnlySend.isChecked())
+                    .putBoolean("allow_media_" + chatId, cbAllowMedia.isChecked())
+                    .putBoolean("allow_polls_" + chatId, cbAllowPolls.isChecked())
+                    .putBoolean("members_can_pin_" + chatId, cbAllowPin.isChecked())
+                    .putBoolean("members_can_invite_" + chatId, cbAllowMemberInvite.isChecked())
+                    .putBoolean("require_admin_approval_" + chatId, cbApproveNewMembers.isChecked())
+                    .putInt("slow_mode_sec_" + chatId, selectedSlowModeSec)
+                    .apply();
+        }
 
         if (currentChat != null) {
             currentChat.setName(newName);
@@ -372,7 +382,11 @@ public class GroupSettingsActivity extends AppCompatActivity {
         updates.put("adminsOnlySend", cbAdminsOnlySend.isChecked());
         updates.put("allowMedia", cbAllowMedia.isChecked());
         updates.put("allowPolls", cbAllowPolls.isChecked());
+        updates.put("allowPin", cbAllowPin.isChecked());
+        updates.put("allowMemberInvite", cbAllowMemberInvite.isChecked());
+        updates.put("requireAdminApproval", cbApproveNewMembers.isChecked());
         updates.put("slowModeSec", selectedSlowModeSec);
+        updates.put("groupKeyEpoch", com.m3.veil.utils.EncryptionManager.getGroupSenderKeyEpoch(chatId));
 
         FirebaseFirestore.getInstance().collection("groups").document(chatId)
                 .set(updates, SetOptions.merge());

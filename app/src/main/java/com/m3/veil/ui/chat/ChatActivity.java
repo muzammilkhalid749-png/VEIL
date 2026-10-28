@@ -417,7 +417,7 @@ public class ChatActivity extends AppCompatActivity {
 
                 @Override
                 public void onPeerTyping(String dialogId, String peerId, boolean isTyping) {
-                    if (peerId != null && peerId.equals(recipientId)) {
+                    if ((chatId != null && chatId.equals(dialogId)) || (peerId != null && peerId.equals(recipientId))) {
                         runOnUiThread(() -> updateVanishUI(isTyping));
                     }
                 }
@@ -559,7 +559,11 @@ public class ChatActivity extends AppCompatActivity {
 
         @Override
         public void onPeerTyping(String peerId, boolean isTyping) {
-            if (peerId != null && peerId.equals(recipientId)) {
+            boolean inThisChat = (peerId != null && peerId.equals(recipientId))
+                    || (isGroupChatContext() && currentLocalChat != null
+                        && currentLocalChat.getParticipants() != null
+                        && currentLocalChat.getParticipants().contains(peerId));
+            if (inThisChat) {
                 runOnUiThread(() -> {
                     updateVanishUI(isTyping);
                 });
@@ -568,7 +572,12 @@ public class ChatActivity extends AppCompatActivity {
 
         @Override
         public void onPeerConnected(String peerId) {
-            if (peerId != null && (peerId.equals(recipientId) || (recipientId == null && chatId != null && chatId.contains(peerId)))) {
+            boolean inThisChat = peerId != null && (peerId.equals(recipientId)
+                    || (recipientId == null && chatId != null && chatId.contains(peerId))
+                    || (isGroupChatContext() && currentLocalChat != null
+                        && currentLocalChat.getParticipants() != null
+                        && currentLocalChat.getParticipants().contains(peerId)));
+            if (inThisChat) {
                 runOnUiThread(() -> {
                     updatePeerP2PStatus(true);
                     if (isActivityResumed && isChatUnlocked()) {
@@ -580,7 +589,11 @@ public class ChatActivity extends AppCompatActivity {
 
         @Override
         public void onPeerDisconnected(String peerId) {
-            if (peerId != null && peerId.equals(recipientId)) {
+            boolean inThisChat = peerId != null && (peerId.equals(recipientId)
+                    || (isGroupChatContext() && currentLocalChat != null
+                        && currentLocalChat.getParticipants() != null
+                        && currentLocalChat.getParticipants().contains(peerId)));
+            if (inThisChat) {
                 runOnUiThread(() -> updatePeerP2PStatus(false));
             }
         }
@@ -662,8 +675,13 @@ public class ChatActivity extends AppCompatActivity {
         }
         recipientName = getIntent().getStringExtra("recipientName");
 
-        // Resolve missing recipient details from chatId if launched from notification or 1-on-1 chat
-        if (recipientId == null && chatId != null && !chatId.startsWith("group_") && !chatId.startsWith("channel_") && !chatId.startsWith("lounge_")) {
+        boolean intentIsGroup = getIntent().getBooleanExtra("isGroup", false)
+                || (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_")));
+        if (intentIsGroup) {
+            // Never allow a single 1:1 peer ID to contaminate a group/channel chat context
+            recipientId = null;
+        } else if (recipientId == null && chatId != null) {
+            // Resolve missing recipient details from chatId if launched from notification or 1-on-1 chat
             String[] parts = chatId.split("_");
             if (parts.length == 2) {
                 recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
@@ -677,7 +695,13 @@ public class ChatActivity extends AppCompatActivity {
         // 1. Instant 0ms RAM lookup for dialog metadata before building views
         if (chatId != null) {
             currentLocalChat = com.m3.veil.manager.VeilMessagesController.getInstance(this).getCachedDialogImmediate(chatId);
+            if (currentLocalChat == null) {
+                currentLocalChat = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
+            }
             if (currentLocalChat != null) {
+                if (currentLocalChat.isGroup() || "group".equalsIgnoreCase(currentLocalChat.getType()) || "channel".equalsIgnoreCase(currentLocalChat.getType())) {
+                    recipientId = null;
+                }
                 currentVanishTimer = currentLocalChat.getVanishTimer();
                 if (currentLocalChat.getVanishMode() != null) {
                     currentVanishMode = currentLocalChat.getVanishMode();
@@ -1598,14 +1622,16 @@ public class ChatActivity extends AppCompatActivity {
         if (content == null || content.isEmpty()) return;
 
         String messageId = UUID.randomUUID().toString();
+        String effectiveReceiver = isGroupChatContext() ? chatId : recipientId;
         Message message = new Message(
                 messageId,
                 currentUserId,
-                recipientId,
+                effectiveReceiver,
                 content,
                 Timestamp.now(),
                 type
         );
+        message.setChatId(chatId);
         message.setBlink(isBlinkModeActive);
         message.setPending(true);
         message.setDelivered(false);
@@ -1641,8 +1667,11 @@ public class ChatActivity extends AppCompatActivity {
 
         if (replyMessage != null) {
             message.setReplyToMessageId(replyMessage.getId());
-            boolean isReplySenderYou = replyMessage.getSenderId().equals(currentUserId);
-            message.setReplySenderName(isReplySenderYou ? "You" : (recipientName != null ? recipientName : "Other User"));
+            boolean isReplySenderYou = replyMessage.getSenderId() != null && replyMessage.getSenderId().equals(currentUserId);
+            String quotedSenderName = (replyMessage.getSenderName() != null && !replyMessage.getSenderName().trim().isEmpty())
+                    ? replyMessage.getSenderName()
+                    : (recipientName != null ? recipientName : "Peer");
+            message.setReplySenderName(isReplySenderYou ? "You" : quotedSenderName);
             cancelReply();
         }
 
@@ -1653,7 +1682,7 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         // Transmit via application-wide VeilMessagesController (warm cache, outbox retry, and direct P2P delivery)
-        com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, recipientId, message);
+        com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, isGroupChatContext() ? null : recipientId, message);
         reloadMessagesFromLocalVault();
     }
 
@@ -1785,6 +1814,17 @@ public class ChatActivity extends AppCompatActivity {
     private void uploadAndSendMedia(File rawFile, String mediaType, String caption) {
         if (rawFile == null || !rawFile.exists()) return;
 
+        if (isGroupChatContext() && chatId != null) {
+            boolean isAdmin = currentLocalChat == null || currentUserId == null || currentLocalChat.isAdmin(currentUserId);
+            if (!isAdmin) {
+                android.content.SharedPreferences permPrefs = getSharedPreferences("veil_group_perms", MODE_PRIVATE);
+                if (!permPrefs.getBoolean("allow_media_" + chatId, true)) {
+                    Toast.makeText(this, "Only admins can send media or voice notes in this group.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+        }
+
         if (recipientPublicKey == null) {
             fetchRecipientPublicKey();
         }
@@ -1795,22 +1835,28 @@ public class ChatActivity extends AppCompatActivity {
             initialText = rawFile.getName() + "|" + formatFileSize(rawFile.length());
         }
 
+        String effectiveReceiver = isGroupChatContext() ? chatId : recipientId;
         Message message = new Message(
                 messageId,
                 currentUserId,
-                recipientId,
+                effectiveReceiver,
                 initialText,
                 Timestamp.now(),
                 mediaType
         );
+        message.setChatId(chatId);
+        message.setSenderName(com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName());
         message.setPending(true);
         message.setDelivered(false);
         message.setRead(false);
 
         if (replyMessage != null) {
             message.setReplyToMessageId(replyMessage.getId());
-            boolean isReplySenderYou = replyMessage.getSenderId().equals(currentUserId);
-            message.setReplySenderName(isReplySenderYou ? "You" : (recipientName != null ? recipientName : "Other User"));
+            boolean isReplySenderYou = replyMessage.getSenderId() != null && replyMessage.getSenderId().equals(currentUserId);
+            String quotedSenderName = (replyMessage.getSenderName() != null && !replyMessage.getSenderName().trim().isEmpty())
+                    ? replyMessage.getSenderName()
+                    : (recipientName != null ? recipientName : "Peer");
+            message.setReplySenderName(isReplySenderYou ? "You" : quotedSenderName);
             runOnUiThread(this::cancelReply);
         }
 
@@ -1921,7 +1967,7 @@ public class ChatActivity extends AppCompatActivity {
             }
 
             // Route through VeilMessagesController (warm cache, outbox retry, and direct P2P / chunked cloud streaming)
-            com.m3.veil.manager.VeilMessagesController.getInstance(appContext).sendMessage(currentLocalChat, recipientId, message);
+            com.m3.veil.manager.VeilMessagesController.getInstance(appContext).sendMessage(currentLocalChat, isGroupChatContext() ? null : recipientId, message);
             runOnUiThread(() -> {
                 if (!isFinishing() && !isDestroyed()) {
                     if (messagesAdapter != null) {
@@ -2038,21 +2084,23 @@ public class ChatActivity extends AppCompatActivity {
             com.m3.veil.model.Chat localChat = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
             String myOwnName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
             if (localChat == null) {
+                boolean isGroupOrChan = isGroupChatContext();
+                boolean isChan = chatId.startsWith("channel_");
                 java.util.List<String> parts = new ArrayList<>();
                 if (currentUserId != null) parts.add(currentUserId);
-                if (recipientId != null) parts.add(recipientId);
-                String initialName = (recipientName != null && !recipientName.isEmpty() && !recipientName.equals(myOwnName))
-                        ? recipientName : "Anonymous Peer";
+                if (!isGroupOrChan && recipientId != null) parts.add(recipientId);
+                String initialName = (recipientName != null && !recipientName.isEmpty() && (!recipientName.equals(myOwnName) || isGroupOrChan))
+                        ? recipientName : (isChan ? "Broadcast Channel" : (isGroupOrChan ? "Encrypted Group" : "Anonymous Peer"));
                 localChat = new com.m3.veil.model.Chat(
                         chatId,
                         initialName,
-                        "🔒 End-to-End Encrypted P2P Chat",
+                        isChan ? "📢 Encrypted Broadcast Channel" : (isGroupOrChan ? "🛡️ Encrypted Group Chat" : "🔒 End-to-End Encrypted P2P Chat"),
                         Timestamp.now(),
                         "avatar_1",
                         0,
-                        false,
+                        isGroupOrChan,
                         isRecipientOnline,
-                        "direct",
+                        isChan ? "channel" : (isGroupOrChan ? "group" : "direct"),
                         parts
                 );
                 com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(localChat);
@@ -2066,6 +2114,7 @@ public class ChatActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 if (!isFinishing() && !isDestroyed()) {
                     updateRecipientHeader();
+                    updatePresenceAndToolbarStatus();
                 }
             });
         });
@@ -2224,8 +2273,11 @@ public class ChatActivity extends AppCompatActivity {
         boolean isChannel = (currentLocalChat != null && currentLocalChat.isChannel())
                 || (chatId != null && chatId.startsWith("channel_"));
         boolean isAdmin = currentLocalChat == null || currentUserId == null || currentLocalChat.isAdmin(currentUserId);
+        android.content.SharedPreferences permPrefs = getSharedPreferences("veil_group_perms", MODE_PRIVATE);
+        boolean adminsOnlyGroup = isGroupChatContext() && !isChannel && chatId != null
+                && permPrefs.getBoolean("admins_only_send_" + chatId, false);
 
-        if (isChannel && !isAdmin) {
+        if ((isChannel || adminsOnlyGroup) && !isAdmin) {
             composerMainRow.setVisibility(View.GONE);
             if (quickFeaturesScrollView != null) quickFeaturesScrollView.setVisibility(View.GONE);
             if (layoutSmartReplies != null) layoutSmartReplies.setVisibility(View.GONE);
@@ -2241,7 +2293,8 @@ public class ChatActivity extends AppCompatActivity {
 
                 MaterialButton btnMuteToggle = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
                 boolean muted = currentLocalChat != null && currentLocalChat.isMuted();
-                btnMuteToggle.setText(muted ? "🔔 Unmute Channel" : "🔕 Mute Channel");
+                String entityLabel = isChannel ? "Channel" : "Group";
+                btnMuteToggle.setText(muted ? "🔔 Unmute " + entityLabel : "🔕 Mute " + entityLabel);
                 btnMuteToggle.setCornerRadius((int) (20 * dp));
                 LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
                 lp1.rightMargin = (int) (6 * dp);
@@ -2251,13 +2304,13 @@ public class ChatActivity extends AppCompatActivity {
                         boolean nextMute = !currentLocalChat.isMuted();
                         currentLocalChat.setMuted(nextMute);
                         com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(currentLocalChat);
-                        btnMuteToggle.setText(nextMute ? "🔔 Unmute Channel" : "🔕 Mute Channel");
-                        Toast.makeText(this, nextMute ? "Channel notifications muted" : "Channel notifications enabled", Toast.LENGTH_SHORT).show();
+                        btnMuteToggle.setText(nextMute ? "🔔 Unmute " + entityLabel : "🔕 Mute " + entityLabel);
+                        Toast.makeText(this, nextMute ? entityLabel + " notifications muted" : entityLabel + " notifications enabled", Toast.LENGTH_SHORT).show();
                     }
                 });
 
                 MaterialButton btnShareChannel = new MaterialButton(this);
-                btnShareChannel.setText("🔗 Share Channel");
+                btnShareChannel.setText(isChannel ? "🔗 Share Channel" : "🛡️ Only Admins Can Send");
                 btnShareChannel.setCornerRadius((int) (20 * dp));
                 btnShareChannel.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary));
                 btnShareChannel.setTextColor(Color.WHITE);
@@ -2265,11 +2318,15 @@ public class ChatActivity extends AppCompatActivity {
                 lp2.leftMargin = (int) (6 * dp);
                 btnShareChannel.setLayoutParams(lp2);
                 btnShareChannel.setOnClickListener(v -> {
-                    String shareLink = "veil://channel/" + chatId;
-                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                    shareIntent.setType("text/plain");
-                    shareIntent.putExtra(Intent.EXTRA_TEXT, "Join \"" + (recipientName != null ? recipientName : "Broadcast Channel") + "\" on VEIL: " + shareLink);
-                    startActivity(Intent.createChooser(shareIntent, "Share Broadcast Channel"));
+                    if (isChannel) {
+                        String shareLink = "veil://channel/" + chatId;
+                        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                        shareIntent.setType("text/plain");
+                        shareIntent.putExtra(Intent.EXTRA_TEXT, "Join \"" + (recipientName != null ? recipientName : "Broadcast Channel") + "\" on VEIL: " + shareLink);
+                        startActivity(Intent.createChooser(shareIntent, "Share Broadcast Channel"));
+                    } else {
+                        Toast.makeText(this, "Only group admins have permission to send messages in this group.", Toast.LENGTH_SHORT).show();
+                    }
                 });
 
                 channelSubscriberBar.addView(btnMuteToggle);
@@ -2435,6 +2492,21 @@ public class ChatActivity extends AppCompatActivity {
             btnConfirm.setText("Leave " + label);
             btnConfirm.setOnClickListener(v -> {
                 sheet.dismiss();
+                if (currentLocalChat != null && currentUserId != null && !currentUserId.isEmpty()) {
+                    String myName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
+                    if (myName == null || myName.trim().isEmpty()) myName = "A member";
+                    Message leaveMsg = new Message(
+                            UUID.randomUUID().toString(),
+                            currentUserId,
+                            chatId,
+                            "👋 " + myName + " left the " + label.toLowerCase(),
+                            Timestamp.now(),
+                            "text"
+                    );
+                    leaveMsg.setChatId(chatId);
+                    leaveMsg.setSenderName(myName);
+                    com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, null, leaveMsg);
+                }
                 android.content.SharedPreferences prefs = getSharedPreferences("VeilPrefs", 0);
                 java.util.Set<String> delSet = new java.util.HashSet<>(
                         prefs.getStringSet("deleted_group_ids", new java.util.HashSet<>()));
@@ -2458,24 +2530,64 @@ public class ChatActivity extends AppCompatActivity {
 
     private void startCall(String type) {
         boolean isGrp = isGroupChatContext();
+        String newCallId = UUID.randomUUID().toString();
         Intent intent = new Intent(this, CallActivity.class);
         intent.putExtra(CallActivity.EXTRA_CALL_TYPE, type);
-        intent.putExtra(CallActivity.EXTRA_CALL_ID, UUID.randomUUID().toString());
+        intent.putExtra(CallActivity.EXTRA_CALL_ID, newCallId);
         intent.putExtra(CallActivity.EXTRA_IS_INCOMING, false);
         if (isGrp) {
-            List<String> parts = currentLocalChat != null && currentLocalChat.getParticipants() != null
+            List<String> rawParts = currentLocalChat != null && currentLocalChat.getParticipants() != null
                     ? new ArrayList<>(currentLocalChat.getParticipants()) : new ArrayList<>();
-            parts.remove(currentUserId);
-            if (parts.isEmpty() && (recipientId == null || recipientId.isEmpty() || recipientId.equals(chatId))) {
+            rawParts.remove(currentUserId);
+            if (rawParts.isEmpty() && (recipientId == null || recipientId.isEmpty() || recipientId.equals(chatId))) {
                 Toast.makeText(this, "No other group members available to call", Toast.LENGTH_SHORT).show();
                 return;
             }
-            String primaryPeer = !parts.isEmpty() ? parts.get(0) : recipientId;
+            // Prioritize currently connected WebRTC P2P peers first, then offline peers, capped at 16 initial invitees
+            List<String> prioritizedParts = new ArrayList<>();
+            for (String p : rawParts) {
+                if (p != null && com.m3.veil.webrtc.WebRtcManager.getInstance(this).isConnectedToPeer(p)) {
+                    prioritizedParts.add(p);
+                }
+            }
+            for (String p : rawParts) {
+                if (p != null && !prioritizedParts.contains(p)) {
+                    prioritizedParts.add(p);
+                }
+            }
+            if (prioritizedParts.size() > 16) {
+                prioritizedParts = new ArrayList<>(prioritizedParts.subList(0, 16));
+            }
+            String primaryPeer = !prioritizedParts.isEmpty() ? prioritizedParts.get(0) : recipientId;
             intent.putExtra(CallActivity.EXTRA_CONTACT_ID, primaryPeer);
             intent.putExtra(CallActivity.EXTRA_CONTACT_NAME, recipientName != null ? recipientName : "Group Call");
             intent.putExtra(CallActivity.EXTRA_GROUP_ID, chatId);
             intent.putExtra(CallActivity.EXTRA_GROUP_NAME, recipientName != null ? recipientName : "Group Call");
-            intent.putExtra(CallActivity.EXTRA_PARTICIPANT_IDS, parts.toArray(new String[0]));
+            intent.putExtra(CallActivity.EXTRA_PARTICIPANT_IDS, prioritizedParts.toArray(new String[0]));
+
+            // Dispatch an encrypted Group Call card into the group chat so any member in a large group can tap to join
+            if (currentLocalChat != null && chatId != null) {
+                String myName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
+                boolean isVid = "video".equalsIgnoreCase(type);
+                Message callMsg = new Message(
+                        UUID.randomUUID().toString(),
+                        currentUserId,
+                        chatId,
+                        (isVid ? "📹 Group Video Call started by " : "📞 Group Voice Call started by ") + (myName != null ? myName : "Member") + " • Tap to Join",
+                        Timestamp.now(),
+                        "call"
+                );
+                callMsg.setChatId(chatId);
+                callMsg.setSenderName(myName);
+                try {
+                    org.json.JSONObject callMeta = new org.json.JSONObject();
+                    callMeta.put("callId", newCallId);
+                    callMeta.put("callType", isVid ? "video" : "audio");
+                    callMeta.put("groupId", chatId);
+                    callMsg.setPollJson(callMeta.toString());
+                } catch (Exception ignored) {}
+                com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, null, callMsg);
+            }
         } else {
             if (recipientId == null || recipientId.isEmpty()) return;
             intent.putExtra(CallActivity.EXTRA_CONTACT_ID, recipientId);
@@ -2597,6 +2709,31 @@ public class ChatActivity extends AppCompatActivity {
             onlineStatus.setTextColor(getResources().getColor(android.R.color.holo_red_light));
             if (ivStatusDot != null) ivStatusDot.setVisibility(View.GONE);
             if (ivLockIcon != null) ivLockIcon.setVisibility(View.VISIBLE);
+        } else if (isGroupChatContext()) {
+            boolean isChan = (currentLocalChat != null && currentLocalChat.isChannel())
+                    || (chatId != null && chatId.startsWith("channel_"));
+            int memberCount = (currentLocalChat != null && currentLocalChat.getParticipants() != null
+                    && !currentLocalChat.getParticipants().isEmpty())
+                    ? currentLocalChat.getParticipants().size() : 1;
+            int connectedPeers = 0;
+            if (currentLocalChat != null && currentLocalChat.getParticipants() != null) {
+                for (String pId : currentLocalChat.getParticipants()) {
+                    if (pId != null && !pId.equals(currentUserId)
+                            && com.m3.veil.webrtc.WebRtcManager.getInstance(this).isConnectedToPeer(pId)) {
+                        connectedPeers++;
+                    }
+                }
+            }
+            String countLabel = memberCount + (isChan
+                    ? (memberCount == 1 ? " subscriber" : " subscribers")
+                    : (memberCount == 1 ? " member" : " members"));
+            String meshSuffix = connectedPeers > 0
+                    ? " • " + connectedPeers + " P2P online"
+                    : " • Encrypted Mesh";
+            onlineStatus.setText(subPrefix + countLabel + meshSuffix);
+            onlineStatus.setTextColor(getResources().getColor(connectedPeers > 0 ? R.color.statusSuccess : R.color.text_secondary));
+            if (ivStatusDot != null) ivStatusDot.setVisibility(connectedPeers > 0 ? View.VISIBLE : View.GONE);
+            if (ivLockIcon != null) ivLockIcon.setVisibility(connectedPeers > 0 ? View.GONE : View.VISIBLE);
         } else if (isP2PActive || isRecipientOnline) {
             String p2pLabel = isP2PActive ? "P2P Direct" : "online";
             onlineStatus.setText(subPrefix + p2pLabel + " • Trust " + trust + "%");
@@ -2654,8 +2791,9 @@ public class ChatActivity extends AppCompatActivity {
             public void onMediaDownloadClick(Message message) {
                 if (message == null || message.getId() == null) return;
                 messagesAdapter.setMediaDownloadState(message.getId(), MessagesAdapter.STATE_DOWNLOADING, 0);
+                String targetDownloadPeer = (recipientId != null && !recipientId.isEmpty()) ? recipientId : message.getSenderId();
                 com.m3.veil.manager.VeilMessagesController.getInstance(ChatActivity.this).downloadMedia(
-                        recipientId,
+                        targetDownloadPeer,
                         message.getId(),
                         new com.m3.veil.webrtc.P2PFileTransferHelper.DownloadProgressListener() {
                             @Override
@@ -3255,6 +3393,16 @@ public class ChatActivity extends AppCompatActivity {
         if (actionPin != null) {
             actionPin.setOnClickListener(v -> {
                 dialog.dismiss();
+                if (isGroupChatContext() && chatId != null) {
+                    boolean isAdmin = currentLocalChat == null || currentUserId == null || currentLocalChat.isAdmin(currentUserId);
+                    if (!isAdmin) {
+                        android.content.SharedPreferences permPrefs = getSharedPreferences("veil_group_perms", MODE_PRIVATE);
+                        if (!permPrefs.getBoolean("members_can_pin_" + chatId, false)) {
+                            Toast.makeText(this, "Only admins can pin messages in this group.", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                    }
+                }
                 boolean currentlyPinned = currentLocalChat != null && message.getId().equals(currentLocalChat.getPinnedMessageId());
                 if (currentlyPinned) {
                     com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
@@ -3287,25 +3435,6 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showMessageInfoDialog(Message message) {
-        StringBuilder info = new StringBuilder();
-        if (message.getTimestamp() != null) {
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd MMM yyyy, HH:mm:ss", java.util.Locale.getDefault());
-            info.append("Sent: ").append(sdf.format(message.getTimestamp().toDate())).append("\n\n");
-        }
-        info.append("Type: ").append(message.getType() != null ? message.getType() : "text").append("\n\n");
-        boolean isMine = message.getSenderId().equals(currentUserId);
-        info.append("From: ").append(isMine ? "You" : (recipientName != null ? recipientName : "Other User")).append("\n\n");
-        info.append("Status: ");
-        if (message.isRead()) {
-            info.append("Read (Seen)");
-        } else if (message.isDelivered()) {
-            info.append("Delivered");
-        } else if (message.isPending()) {
-            info.append("Pending offline delivery");
-        } else {
-            info.append("Sent");
-        }
-
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         sheet.setContentView(R.layout.dialog_message_details_sheet);
 
@@ -3324,18 +3453,53 @@ public class ChatActivity extends AppCompatActivity {
             tvSent.setText(sentStr);
         }
         if (tvDelivered != null) {
-            tvDelivered.setText(message.isDelivered() ? "Delivered to device" : (message.isPending() ? "Pending mesh sync" : "Sent to server"));
+            tvDelivered.setText(message.isDelivered() ? "Delivered to mesh" : (message.isPending() ? "Pending mesh sync" : "Sent to relay"));
         }
         if (tvRead != null) {
             if (message.isRead()) {
-                tvRead.setText("Read (Seen by recipient)");
+                tvRead.setText(isGroupChatContext() ? "Seen by group members" : "Read (Seen by recipient)");
             } else {
                 tvRead.setText("Not yet read");
                 tvRead.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
             }
         }
         if (tvId != null) {
-            tvId.setText(message.getId());
+            int ep = com.m3.veil.utils.EncryptionManager.getGroupSenderKeyEpoch(chatId);
+            tvId.setText(message.getId() + (isGroupChatContext() ? " (Sender-Key Epoch #" + ep + ")" : ""));
+        }
+        if (isGroupChatContext() && chatId != null && message.getId() != null && db != null) {
+            db.collection("groups").document(chatId).collection("messages").document(message.getId())
+                    .get()
+                    .addOnSuccessListener(doc -> {
+                        if (doc == null || !doc.exists() || isFinishing()) return;
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> readByMap = (Map<String, Object>) doc.get("readBy");
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> deliveredByMap = (Map<String, Object>) doc.get("deliveredBy");
+                        if (readByMap != null && !readByMap.isEmpty() && tvRead != null) {
+                            List<String> readerNames = new ArrayList<>();
+                            for (Map.Entry<String, Object> e : readByMap.entrySet()) {
+                                if (currentUserId != null && currentUserId.equals(e.getKey())) continue;
+                                String val = String.valueOf(e.getValue());
+                                readerNames.add((val != null && !val.isEmpty() && !"true".equalsIgnoreCase(val)) ? val : e.getKey());
+                            }
+                            if (!readerNames.isEmpty()) {
+                                tvRead.setText("Seen by " + readerNames.size() + ": " + android.text.TextUtils.join(", ", readerNames));
+                                tvRead.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+                            }
+                        }
+                        if (deliveredByMap != null && !deliveredByMap.isEmpty() && tvDelivered != null) {
+                            List<String> delNames = new ArrayList<>();
+                            for (Map.Entry<String, Object> e : deliveredByMap.entrySet()) {
+                                if (currentUserId != null && currentUserId.equals(e.getKey())) continue;
+                                String val = String.valueOf(e.getValue());
+                                delNames.add((val != null && !val.isEmpty() && !"true".equalsIgnoreCase(val)) ? val : e.getKey());
+                            }
+                            if (!delNames.isEmpty()) {
+                                tvDelivered.setText("Delivered to " + delNames.size() + ": " + android.text.TextUtils.join(", ", delNames));
+                            }
+                        }
+                    });
         }
         if (btnClose != null) {
             btnClose.setOnClickListener(v -> sheet.dismiss());
@@ -3797,19 +3961,43 @@ public class ChatActivity extends AppCompatActivity {
         sendButton.animate().scaleX(1f).scaleY(1f).setDuration(200).start();
     }
 
+    private long lastGroupSlowModeSentMs = 0L;
+
     private void sendMessage() {
         String text = messageEditText.getText().toString().trim();
         if (text.isEmpty()) return;
 
+        if (isGroupChatContext() && chatId != null) {
+            boolean isAdmin = currentLocalChat == null || currentUserId == null || currentLocalChat.isAdmin(currentUserId);
+            if (!isAdmin) {
+                android.content.SharedPreferences permPrefs = getSharedPreferences("veil_group_perms", MODE_PRIVATE);
+                if (permPrefs.getBoolean("admins_only_send_" + chatId, false)) {
+                    Toast.makeText(this, "Only admins can send messages in this group.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                int slowSec = permPrefs.getInt("slow_mode_sec_" + chatId, 0);
+                if (slowSec > 0) {
+                    long elapsedSec = (System.currentTimeMillis() - lastGroupSlowModeSentMs) / 1000L;
+                    if (elapsedSec < slowSec) {
+                        Toast.makeText(this, "Slow mode active: please wait " + (slowSec - elapsedSec) + "s", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                }
+            }
+            lastGroupSlowModeSentMs = System.currentTimeMillis();
+        }
+
         String messageId = UUID.randomUUID().toString();
+        String effectiveReceiver = isGroupChatContext() ? chatId : recipientId;
         Message message = new Message(
                 messageId,
                 currentUserId,
-                recipientId,
+                effectiveReceiver,
                 text,
                 Timestamp.now(),
                 "text"
         );
+        message.setChatId(chatId);
         message.setBlink(isBlinkModeActive);
         message.setPending(true);
         message.setDelivered(false);
@@ -3845,8 +4033,11 @@ public class ChatActivity extends AppCompatActivity {
 
         if (replyMessage != null) {
             message.setReplyToMessageId(replyMessage.getId());
-            boolean isReplySenderYou = replyMessage.getSenderId().equals(currentUserId);
-            message.setReplySenderName(isReplySenderYou ? "You" : (recipientName != null ? recipientName : "Other User"));
+            boolean isReplySenderYou = replyMessage.getSenderId() != null && replyMessage.getSenderId().equals(currentUserId);
+            String quotedSenderName = (replyMessage.getSenderName() != null && !replyMessage.getSenderName().trim().isEmpty())
+                    ? replyMessage.getSenderName()
+                    : (recipientName != null ? recipientName : "Peer");
+            message.setReplySenderName(isReplySenderYou ? "You" : quotedSenderName);
             cancelReply();
         }
 
@@ -3861,7 +4052,7 @@ public class ChatActivity extends AppCompatActivity {
         enqueueBufferedUiMessage(message);
 
         // Route through application-wide VeilMessagesController (optimistic UI + ratcheted encryption + outbox)
-        com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, recipientId, message);
+        com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, isGroupChatContext() ? null : recipientId, message);
     }
 
     private void listenForMessages() {
@@ -3882,9 +4073,11 @@ public class ChatActivity extends AppCompatActivity {
     private void attachGroupRealtimeListeners() {
         if (chatId == null || db == null) return;
         if (currentLocalChat != null && currentLocalChat.getParticipants() != null) {
+            int dialed = 0;
             for (String pId : currentLocalChat.getParticipants()) {
                 if (pId != null && !pId.equals(currentUserId)) {
                     com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(pId);
+                    if (++dialed >= 12) break;
                 }
             }
         }
@@ -3902,6 +4095,29 @@ public class ChatActivity extends AppCompatActivity {
                         @SuppressWarnings("unchecked")
                         List<String> adminIds = (List<String>) doc.get("adminIds");
 
+                        // Sync group permissions & Sender-Key epoch from Firestore to local preferences
+                        Boolean adminsOnly = doc.getBoolean("adminsOnlySend");
+                        Boolean allowMedia = doc.getBoolean("allowMedia");
+                        Boolean allowPolls = doc.getBoolean("allowPolls");
+                        Boolean allowPin = doc.getBoolean("allowPin");
+                        Boolean allowInvite = doc.getBoolean("allowMemberInvite");
+                        Long slowModeSec = doc.getLong("slowModeSec");
+                        Long groupKeyEpoch = doc.getLong("groupKeyEpoch");
+                        if (groupKeyEpoch != null && groupKeyEpoch > 0) {
+                            EncryptionManager.syncGroupSenderKeyEpoch(chatId, groupKeyEpoch.intValue());
+                        }
+                        String[] prefNamespaces = {"VeilGroupPrefs", "veil_group_perms"};
+                        for (String ns : prefNamespaces) {
+                            android.content.SharedPreferences.Editor ed = getSharedPreferences(ns, MODE_PRIVATE).edit();
+                            if (adminsOnly != null) ed.putBoolean("admins_only_send_" + chatId, adminsOnly);
+                            if (allowMedia != null) ed.putBoolean("allow_media_" + chatId, allowMedia);
+                            if (allowPolls != null) ed.putBoolean("allow_polls_" + chatId, allowPolls);
+                            if (allowPin != null) ed.putBoolean("members_can_pin_" + chatId, allowPin);
+                            if (allowInvite != null) ed.putBoolean("members_can_invite_" + chatId, allowInvite);
+                            if (slowModeSec != null) ed.putInt("slow_mode_sec_" + chatId, slowModeSec.intValue());
+                            ed.apply();
+                        }
+
                         if (currentLocalChat != null) {
                             if (gName != null && !gName.isEmpty()) currentLocalChat.setName(gName);
                             if (adminId != null) currentLocalChat.setAdminId(adminId);
@@ -3910,9 +4126,11 @@ public class ChatActivity extends AppCompatActivity {
                             if (chatType != null) currentLocalChat.setType(chatType);
                             if (parts != null) {
                                 currentLocalChat.setParticipants(parts);
+                                int dialed = 0;
                                 for (String pId : parts) {
                                     if (pId != null && !pId.equals(currentUserId)) {
                                         com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this).initiateConnection(pId);
+                                        if (++dialed >= 12) break;
                                     }
                                 }
                             }
@@ -3932,19 +4150,20 @@ public class ChatActivity extends AppCompatActivity {
                     if (docs == null || docs.isEmpty()) return;
                     dbExecutor.execute(() -> {
                         boolean changed = false;
+                        String myDisplayName = com.m3.veil.manager.VeilFeatureManager.getInstance(ChatActivity.this).getActivePersona().getDisplayName();
                         for (com.google.firebase.firestore.DocumentSnapshot mDoc : docs) {
                             try {
                                 String mId = mDoc.getString("id");
                                 if (mId == null) mId = mDoc.getId();
                                 String mType = mDoc.getString("type");
                                 String mText = mDoc.getString("text");
-                                if (mText != null && mText.startsWith("ENC:v1:")) {
+                                if (mText != null && mText.startsWith("ENC:v")) {
                                     mText = EncryptionManager.decryptGroupPayload(chatId, mText);
                                 }
                                 String sId = mDoc.getString("senderId");
                                 String sName = mDoc.getString("senderName");
                                 String pollJson = mDoc.getString("pollJson");
-                                if (pollJson != null && pollJson.startsWith("ENC:v1:")) {
+                                if (pollJson != null && pollJson.startsWith("ENC:v")) {
                                     pollJson = EncryptionManager.decryptGroupPayload(chatId, pollJson);
                                 }
                                 String mediaUrl = mDoc.getString("mediaUrl");
@@ -3975,7 +4194,8 @@ public class ChatActivity extends AppCompatActivity {
                                     if (voiceFilter != null && !voiceFilter.isEmpty()) m.setVoiceFilter(voiceFilter);
                                     if (thumbnail != null && !thumbnail.isEmpty()) m.setThumbnail(thumbnail);
                                     if (mediaUrl != null && !mediaUrl.isEmpty()) {
-                                        com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(ChatActivity.this, chatId, m);
+                                        com.m3.veil.manager.VeilMessagesController.ensureMediaDecodedOrAutoDownloaded(
+                                                ChatActivity.this, chatId, m, this::reloadMessagesFromLocalVault);
                                     }
                                     if (isEdited) m.setEdited(true);
                                     if (isFromMe) {
@@ -3983,9 +4203,31 @@ public class ChatActivity extends AppCompatActivity {
                                         m.setDelivered(docDelivered || docRead);
                                         m.setRead(docRead);
                                     } else {
+                                        boolean shouldMarkRead = isActivityResumed && !Message.isMediaRequiringActionToRead(mType);
                                         m.setPending(false);
                                         m.setDelivered(true);
-                                        m.setRead(isActivityResumed && !Message.isMediaRequiringActionToRead(mType));
+                                        m.setRead(shouldMarkRead);
+                                        Map<String, Object> ack = new HashMap<>();
+                                        ack.put("delivered", true);
+                                        if (currentUserId != null && !currentUserId.isEmpty()) {
+                                            Map<String, Object> delMap = new HashMap<>();
+                                            delMap.put(currentUserId, myDisplayName != null ? myDisplayName : "Member");
+                                            ack.put("deliveredBy", delMap);
+                                        }
+                                        if (shouldMarkRead) {
+                                            ack.put("read", true);
+                                            ack.put("readAt", System.currentTimeMillis());
+                                            if (currentUserId != null && !currentUserId.isEmpty()) {
+                                                Map<String, Object> readMap = new HashMap<>();
+                                                readMap.put(currentUserId, myDisplayName != null ? myDisplayName : "Member");
+                                                ack.put("readBy", readMap);
+                                            }
+                                        }
+                                        mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
+                                        if (sId != null && !sId.isEmpty()) {
+                                            com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this)
+                                                    .sendReceipt(sId, mId, true, shouldMarkRead);
+                                        }
                                     }
                                     com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveMessage(chatId, m);
                                     changed = true;
@@ -3993,11 +4235,20 @@ public class ChatActivity extends AppCompatActivity {
                                     if (mediaUrl != null && !mediaUrl.isEmpty()
                                             && (existing.getLocalFilePath() == null || !new File(existing.getLocalFilePath()).exists())) {
                                         existing.setMediaUrl(mediaUrl);
-                                        File decoded = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(ChatActivity.this, chatId, existing);
+                                        if (thumbnail != null && !thumbnail.isEmpty()) existing.setThumbnail(thumbnail);
+                                        File decoded = com.m3.veil.manager.VeilMessagesController.ensureMediaDecodedOrAutoDownloaded(
+                                                ChatActivity.this, chatId, existing, this::reloadMessagesFromLocalVault);
+                                        com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveMessage(chatId, existing);
                                         if (decoded != null && decoded.exists()) {
-                                            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveMessage(chatId, existing);
                                             changed = true;
                                         }
+                                    }
+                                    if (existing.getText() != null && existing.getText().startsWith("ENC:v")
+                                            && mText != null && !mText.startsWith("ENC:v")) {
+                                        existing.setText(mText);
+                                        com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this)
+                                                .updateMessageText(chatId, mId, mText);
+                                        changed = true;
                                     }
                                     if (isFromMe) {
                                         boolean statusChanged = false;
@@ -4119,13 +4370,13 @@ public class ChatActivity extends AppCompatActivity {
                     if (mId == null) mId = mDoc.getId();
                     String mType = mDoc.getString("type");
                     String mText = mDoc.getString("text");
-                    if (mText != null && mText.startsWith("ENC:v1:")) {
+                    if (mText != null && mText.startsWith("ENC:v")) {
                         mText = EncryptionManager.decryptGroupPayload(chatId, mText);
                     }
                     String sId = mDoc.getString("senderId");
                     String sName = mDoc.getString("senderName");
                     String pollJson = mDoc.getString("pollJson");
-                    if (pollJson != null && pollJson.startsWith("ENC:v1:")) {
+                    if (pollJson != null && pollJson.startsWith("ENC:v")) {
                         pollJson = EncryptionManager.decryptGroupPayload(chatId, pollJson);
                     }
                     String mediaUrl = mDoc.getString("mediaUrl");
@@ -4244,7 +4495,8 @@ public class ChatActivity extends AppCompatActivity {
                             if (voiceFilter != null && !voiceFilter.isEmpty()) m.setVoiceFilter(voiceFilter);
                             if (thumbnail != null && !thumbnail.isEmpty()) m.setThumbnail(thumbnail);
                             if (mediaUrl != null && !mediaUrl.isEmpty()) {
-                                com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(ChatActivity.this, chatId, m);
+                                com.m3.veil.manager.VeilMessagesController.ensureMediaDecodedOrAutoDownloaded(
+                                        ChatActivity.this, chatId, m, this::reloadMessagesFromLocalVault);
                             }
                             if (isEdited) m.setEdited(true);
                             m.setDelivered(true);
@@ -4271,11 +4523,20 @@ public class ChatActivity extends AppCompatActivity {
                             if (mediaUrl != null && !mediaUrl.isEmpty()
                                     && (existing.getLocalFilePath() == null || !new File(existing.getLocalFilePath()).exists())) {
                                 existing.setMediaUrl(mediaUrl);
-                                File decoded = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(ChatActivity.this, chatId, existing);
+                                if (thumbnail != null && !thumbnail.isEmpty()) existing.setThumbnail(thumbnail);
+                                File decoded = com.m3.veil.manager.VeilMessagesController.ensureMediaDecodedOrAutoDownloaded(
+                                        ChatActivity.this, chatId, existing, this::reloadMessagesFromLocalVault);
+                                com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveMessage(chatId, existing);
                                 if (decoded != null && decoded.exists()) {
-                                    com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveMessage(chatId, existing);
                                     changed = true;
                                 }
+                            }
+                            if (existing.getText() != null && existing.getText().startsWith("ENC:v")
+                                    && mText != null && !mText.startsWith("ENC:v")) {
+                                existing.setText(mText);
+                                com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this)
+                                        .updateMessageText(chatId, mId, mText);
+                                changed = true;
                             }
                             if (shouldMarkReadNow && !existing.isRead()) {
                                 existing.setRead(true);
@@ -4394,10 +4655,10 @@ public class ChatActivity extends AppCompatActivity {
                 }
             }
 
-            // 2. Mark dialog read and broadcast bulk chat_read packet to recipient
-            String targetPeer = recipientId;
+            // 2. Mark dialog read and broadcast bulk chat_read packet to recipient(s)
+            String targetPeer = isGroupChatContext() ? null : recipientId;
+            com.m3.veil.manager.VeilMessagesController.getInstance(ChatActivity.this).markDialogAsRead(targetChatId, targetPeer);
             if (targetPeer != null && !targetPeer.isEmpty()) {
-                com.m3.veil.manager.VeilMessagesController.getInstance(ChatActivity.this).markDialogAsRead(targetChatId, targetPeer);
                 com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this).sendChatReadReceipt(targetPeer, targetChatId);
             }
         });
@@ -4936,8 +5197,9 @@ public class ChatActivity extends AppCompatActivity {
                 // Not downloaded yet - trigger on-demand download showing progress on blinkProgressBar
                 messagesAdapter.setMediaDownloadState(message.getId(), MessagesAdapter.STATE_DOWNLOADING, 0);
                 Toast.makeText(this, "Downloading view-once media...", Toast.LENGTH_SHORT).show();
+                String targetBlinkPeer = (recipientId != null && !recipientId.isEmpty()) ? recipientId : message.getSenderId();
                 com.m3.veil.manager.VeilMessagesController.getInstance(this).downloadMedia(
-                        recipientId,
+                        targetBlinkPeer,
                         message.getId(),
                         new com.m3.veil.webrtc.P2PFileTransferHelper.DownloadProgressListener() {
                             @Override
@@ -5261,7 +5523,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void handleCallMessageClick(Message message) {
-        if (message == null || recipientId == null) return;
+        if (message == null) return;
         boolean isVideo = false;
         try {
             if (message.getPollJson() != null && !message.getPollJson().isEmpty()) {
@@ -5272,15 +5534,20 @@ public class ChatActivity extends AppCompatActivity {
             }
         } catch (Exception ignored) {}
 
-        Intent intent = new Intent(this, CallActivity.class);
-        intent.putExtra(CallActivity.EXTRA_CONTACT_ID, recipientId);
-        intent.putExtra(CallActivity.EXTRA_CONTACT_NAME, recipientName != null ? recipientName : "Contact");
-        intent.putExtra(CallActivity.EXTRA_CALL_TYPE, isVideo ? "video" : "audio");
-        intent.putExtra(CallActivity.EXTRA_IS_INCOMING, false);
-        startActivity(intent);
+        startCall(isVideo ? "video" : "audio");
     }
 
     private void showCreateInlinePollDialog() {
+        if (isGroupChatContext() && chatId != null) {
+            boolean isAdmin = currentLocalChat == null || currentUserId == null || currentLocalChat.isAdmin(currentUserId);
+            if (!isAdmin) {
+                android.content.SharedPreferences permPrefs = getSharedPreferences("veil_group_perms", MODE_PRIVATE);
+                if (!permPrefs.getBoolean("allow_polls_" + chatId, true)) {
+                    Toast.makeText(this, "Only admins can create polls in this group.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+        }
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         float dp = getResources().getDisplayMetrics().density;
 
@@ -5422,14 +5689,16 @@ public class ChatActivity extends AppCompatActivity {
                 }
                 poll.put("options", arr);
 
-                Message pollMsg = new Message(UUID.randomUUID().toString(), currentUserId, recipientId, q, Timestamp.now(), "poll");
+                String effectivePollReceiver = isGroupChatContext() ? chatId : recipientId;
+                Message pollMsg = new Message(UUID.randomUUID().toString(), currentUserId, effectivePollReceiver, q, Timestamp.now(), "poll");
+                pollMsg.setChatId(chatId);
                 pollMsg.setPollJson(poll.toString());
                 pollMsg.setSenderName(com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName());
                 if (currentVanishTimer > 0) {
                     long expiresMillis = System.currentTimeMillis() + currentVanishTimer;
                     pollMsg.setExpiresAt(new Timestamp(new Date(expiresMillis)));
                 }
-                com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, recipientId, pollMsg);
+                com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, isGroupChatContext() ? null : recipientId, pollMsg);
                 reloadMessagesFromLocalVault();
                 sheet.dismiss();
             } catch (Exception ignored) {}

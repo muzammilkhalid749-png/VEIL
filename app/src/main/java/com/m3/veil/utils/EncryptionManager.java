@@ -679,21 +679,46 @@ public class EncryptionManager {
         }
     }
 
+    // Stateful Group Sender-Key Epoch Ratchet table (groupId -> currentratchetEpoch)
+    private static final java.util.concurrent.ConcurrentHashMap<String, Integer> groupSenderKeyEpochs =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static int getGroupSenderKeyEpoch(String groupId) {
+        if (groupId == null || groupId.isEmpty()) return 1;
+        Integer ep = groupSenderKeyEpochs.get(groupId);
+        return ep != null && ep > 0 ? ep : 1;
+    }
+
+    public static void syncGroupSenderKeyEpoch(String groupId, int epoch) {
+        if (groupId == null || groupId.isEmpty() || epoch <= 0) return;
+        groupSenderKeyEpochs.compute(groupId, (k, existing) -> existing == null ? epoch : Math.max(existing, epoch));
+    }
+
+    public static int rotateGroupSenderKeyEpoch(String groupId) {
+        if (groupId == null || groupId.isEmpty()) return 1;
+        return groupSenderKeyEpochs.compute(groupId, (k, existing) -> (existing == null || existing < 1) ? 2 : existing + 1);
+    }
+
+    private static byte[] deriveGroupEpochKey(String safeGroupId, int epoch) throws Exception {
+        String infoStr = epoch <= 1 ? "group_payload_key" : ("group_payload_key_epoch_" + epoch);
+        return hkdfSha256(
+                safeGroupId.getBytes(StandardCharsets.UTF_8),
+                "veil_group_shadow_salt_2026".getBytes(StandardCharsets.UTF_8),
+                infoStr.getBytes(StandardCharsets.UTF_8),
+                32
+        );
+    }
+
     /**
-     * Encrypts a group message payload using AES-256-GCM before syncing to Firestore or cloud shadow.
-     * The key is derived deterministically from the unique groupId + a secure application salt via HKDF-SHA256.
-     * Anyone inspecting Firestore will see only opaque ciphertext (starts with "ENC:v1:").
+     * Encrypts a group message payload using AES-256-GCM with forward-secure Sender-Key Epoch Ratcheting.
+     * Anyone inspecting Firestore sees only opaque ciphertext ("ENC:v2:<epoch>:<base64>" or "ENC:v1:<base64>").
      */
     public static String encryptGroupPayload(String groupId, String plainText) {
         if (plainText == null || plainText.isEmpty()) return "";
         try {
             String safeGroupId = groupId != null ? groupId : "veil_global_group";
-            byte[] keyBytes = hkdfSha256(
-                    safeGroupId.getBytes(StandardCharsets.UTF_8),
-                    "veil_group_shadow_salt_2026".getBytes(StandardCharsets.UTF_8),
-                    "group_payload_key".getBytes(StandardCharsets.UTF_8),
-                    32
-            );
+            int epoch = getGroupSenderKeyEpoch(safeGroupId);
+            byte[] keyBytes = deriveGroupEpochKey(safeGroupId, epoch);
             SecretKey secretKey = new SecretKeySpec(keyBytes, "AES");
             byte[] ivBytes = new byte[12];
             new SecureRandom().nextBytes(ivBytes);
@@ -707,7 +732,10 @@ public class EncryptionManager {
             buffer.put(ivBytes);
             buffer.put(encryptedBytes);
             String encoded = Base64.encodeToString(buffer.array(), Base64.NO_WRAP);
-            return "ENC:v1:" + encoded;
+            if (epoch <= 1) {
+                return "ENC:v1:" + encoded;
+            }
+            return "ENC:v2:" + epoch + ":" + encoded;
         } catch (Exception e) {
             Log.e(TAG, "Group payload encryption error", e);
             return plainText;
@@ -715,15 +743,31 @@ public class EncryptionManager {
     }
 
     /**
-     * Decrypts an AES-256-GCM group message payload read from Firestore.
+     * Decrypts an AES-256-GCM group message payload ("ENC:v2:<epoch>:<base64>" or "ENC:v1:<base64>").
      * If the payload is unencrypted (legacy plain text), returns it as-is.
      */
     public static String decryptGroupPayload(String groupId, String textOrCipher) {
-        if (textOrCipher == null || !textOrCipher.startsWith("ENC:v1:")) {
-            return textOrCipher != null ? textOrCipher : "";
+        if (textOrCipher == null) return "";
+        boolean isV2 = textOrCipher.startsWith("ENC:v2:");
+        boolean isV1 = !isV2 && textOrCipher.startsWith("ENC:v1:");
+        if (!isV1 && !isV2) {
+            return textOrCipher;
         }
         try {
-            String encoded = textOrCipher.substring("ENC:v1:".length());
+            String safeGroupId = groupId != null ? groupId : "veil_global_group";
+            int epoch = 1;
+            String encoded;
+            if (isV2) {
+                String rest = textOrCipher.substring("ENC:v2:".length());
+                int colonIdx = rest.indexOf(':');
+                if (colonIdx <= 0) return textOrCipher;
+                epoch = Integer.parseInt(rest.substring(0, colonIdx));
+                encoded = rest.substring(colonIdx + 1);
+                syncGroupSenderKeyEpoch(safeGroupId, epoch);
+            } else {
+                encoded = textOrCipher.substring("ENC:v1:".length());
+            }
+
             byte[] rawBytes = Base64.decode(encoded, Base64.NO_WRAP);
             if (rawBytes.length < 13) return textOrCipher;
 
@@ -732,13 +776,7 @@ public class EncryptionManager {
             byte[] cipherBytes = new byte[rawBytes.length - 12];
             System.arraycopy(rawBytes, 12, cipherBytes, 0, cipherBytes.length);
 
-            String safeGroupId = groupId != null ? groupId : "veil_global_group";
-            byte[] keyBytes = hkdfSha256(
-                    safeGroupId.getBytes(StandardCharsets.UTF_8),
-                    "veil_group_shadow_salt_2026".getBytes(StandardCharsets.UTF_8),
-                    "group_payload_key".getBytes(StandardCharsets.UTF_8),
-                    32
-            );
+            byte[] keyBytes = deriveGroupEpochKey(safeGroupId, epoch);
             SecretKey secretKey = new SecretKeySpec(keyBytes, "AES");
 
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");

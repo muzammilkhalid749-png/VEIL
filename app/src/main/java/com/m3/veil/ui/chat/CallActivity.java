@@ -552,6 +552,13 @@ public class CallActivity extends AppCompatActivity {
                         pulseRing.setVisibility(View.GONE);
                     }
                 }
+                // Dynamically switch main remote video feed to the active speaker in group video calls
+                if (isCallActive && engine != null && peerId != null && !peerId.equals(currentUserId) && audioLevel > 0.05f) {
+                    VideoTrack speakerTrack = engine.getRemoteVideoTrack(peerId);
+                    if (speakerTrack != null && speakerTrack != attachedRemoteTrack) {
+                        attachRemoteVideo(speakerTrack);
+                    }
+                }
             });
         }
 
@@ -1083,8 +1090,9 @@ public class CallActivity extends AppCompatActivity {
         }
         root.addView(reactionsRow);
 
-        String[] itemIcons = {"💬", "🔊", "🔄", "📶", "✋"};
+        String[] itemIcons = {"👥", "💬", "🔊", "🔄", "📶", "✋"};
         String[] itemTitles = {
+                "Group Call Participants & Stage Roster",
                 "In-Call Encrypted Quick Chat",
                 "Select Audio Output (Speaker / Bluetooth / Earpiece)",
                 "Swap Local & Remote Video Feeds",
@@ -1115,18 +1123,20 @@ public class CallActivity extends AppCompatActivity {
             row.setOnClickListener(v -> {
                 sheet.dismiss();
                 if (actionIndex == 0) {
-                    showInCallQuickChatSheet();
+                    showGroupCallParticipantsSheet();
                 } else if (actionIndex == 1) {
-                    showAudioRoutePickerSheet();
+                    showInCallQuickChatSheet();
                 } else if (actionIndex == 2) {
-                    toggleSwapVideoFeeds();
+                    showAudioRoutePickerSheet();
                 } else if (actionIndex == 3) {
+                    toggleSwapVideoFeeds();
+                } else if (actionIndex == 4) {
                     if (engine != null) {
                         boolean next = !engine.isLowDataMode();
                         engine.setLowDataMode(next);
                         toast(next ? "Low-data mode enabled" : "Low-data mode disabled");
                     }
-                } else if (actionIndex == 4) {
+                } else if (actionIndex == 5) {
                     if (engine != null) {
                         CallParticipant self = engine.getParticipant(currentUserId);
                         boolean next = self == null || !self.handRaised;
@@ -1139,6 +1149,98 @@ public class CallActivity extends AppCompatActivity {
             root.addView(row);
         }
 
+        sheet.setContentView(root);
+        showSheetSafely(sheet);
+    }
+
+    private void showGroupCallParticipantsSheet() {
+        if (engine == null) return;
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
+
+        CallInfo info = engine.getCallInfo();
+        java.util.List<CallParticipant> list = (info != null && info.getParticipants() != null)
+                ? new java.util.ArrayList<>(info.getParticipants().values()) : engine.getParticipants();
+        String activeSpeaker = engine.getActiveSpeakerId();
+
+        TextView title = new TextView(this);
+        String topoName = engine.getTopology() == CallEngine.CallTopology.SFRAME_RELAY_OVERLAY
+                ? "SFrame E2EE Mesh" : (engine.getTopology() == CallEngine.CallTopology.CASCADED_P2P_TREE ? "Cascaded P2P Tree" : "Direct P2P Mesh");
+        title.setText("👥 Call Participants (" + (list != null ? list.size() : 1) + ") • " + topoName);
+        title.setTextSize(17.5f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        title.setPadding(0, 0, 0, (int) (6 * dp));
+        root.addView(title);
+
+        TextView sub = new TextView(this);
+        sub.setText("Tap any participant with active video to pin their stream to the main stage.");
+        sub.setTextSize(12.5f);
+        sub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+        sub.setPadding(0, 0, 0, (int) (14 * dp));
+        root.addView(sub);
+
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+
+        if (list != null) {
+            for (CallParticipant p : list) {
+                if (p == null) continue;
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                row.setPadding((int) (10 * dp), (int) (10 * dp), (int) (10 * dp), (int) (10 * dp));
+
+                boolean isSpeaking = p.peerId != null && p.peerId.equals(activeSpeaker) && engine.getActiveSpeakerLevel() > 0.04f;
+                String nameLabel = p.self ? (p.name + " (You)") : (p.name != null ? p.name : "Peer");
+                if (p.handRaised) nameLabel += " ✋";
+                if (isSpeaking) nameLabel += " 🔊";
+
+                TextView tvName = new TextView(this);
+                tvName.setText(nameLabel);
+                tvName.setTextSize(15f);
+                tvName.setTypeface(null, android.graphics.Typeface.BOLD);
+                tvName.setTextColor(isSpeaking ? 0xFF10B981 : ContextCompat.getColor(this, R.color.textPrimary));
+                LinearLayout.LayoutParams lpName = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                tvName.setLayoutParams(lpName);
+                row.addView(tvName);
+
+                StringBuilder statusBadges = new StringBuilder();
+                if (p.screenSharing) statusBadges.append("🖥️ Screen ");
+                else if (p.videoEnabled) statusBadges.append("📹 Video ");
+                statusBadges.append(p.muted ? "🔇 Muted" : "🎙️ Live");
+                boolean isPeerConnected = "connected".equalsIgnoreCase(p.connectionState) || "completed".equalsIgnoreCase(p.connectionState);
+                if (!p.self && !isPeerConnected) statusBadges.append(" • Ringing...");
+
+                TextView tvStatus = new TextView(this);
+                tvStatus.setText(statusBadges.toString());
+                tvStatus.setTextSize(12.5f);
+                tvStatus.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+                row.addView(tvStatus);
+
+                row.setOnClickListener(v -> {
+                    if (!p.self && p.peerId != null) {
+                        VideoTrack vt = engine.getRemoteVideoTrack(p.peerId);
+                        if (vt != null) {
+                            attachRemoteVideo(vt);
+                            toast("Pinned " + (p.name != null ? p.name : "Peer") + "'s video stream");
+                            sheet.dismiss();
+                        } else {
+                            toast((p.name != null ? p.name : "Peer") + " has no active video stream");
+                        }
+                    }
+                });
+                container.addView(row);
+            }
+        }
+
+        scroll.addView(container);
+        root.addView(scroll);
         sheet.setContentView(root);
         showSheetSafely(sheet);
     }

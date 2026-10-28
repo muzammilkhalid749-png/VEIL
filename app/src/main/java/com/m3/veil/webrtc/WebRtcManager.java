@@ -1128,10 +1128,13 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             }
          } else {
             P2PFileTransferHelper.handleIncomingPacket(this.context, peerId, packet, (transferId, fileName, mediaType, caption, file) -> {
-               String chatId = getChatId(this.currentUserId, peerId);
                Message existing = EncryptedChatDatabase.getInstance(this.context).getMessageById(transferId);
+               String chatId = (existing != null && existing.getChatId() != null && !existing.getChatId().isEmpty())
+                       ? existing.getChatId()
+                       : getChatId(this.currentUserId, peerId);
                String messageContent = caption != null && !caption.trim().isEmpty() ? caption.trim() : fileName;
                Message fileMsg = existing != null ? existing : new Message(transferId, peerId, this.currentUserId, messageContent, Timestamp.now(), mediaType);
+               fileMsg.setChatId(chatId);
                fileMsg.setLocalFilePath(file.getAbsolutePath());
                fileMsg.setDelivered(true);
                fileMsg.setRead(false);
@@ -1312,7 +1315,11 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                EncryptedChatDatabase.getInstance(this.context).incrementChatTrustScore(chatId, 2);
             }
 
-            Message message = new Message(msgId, peerId, isGroup ? chatId : this.currentUserId, text, new Timestamp(new Date(timestamp)), msgType);
+            String actualSenderId = p.optString("senderId", peerId);
+            if (actualSenderId == null || actualSenderId.isEmpty()) {
+               actualSenderId = peerId;
+            }
+            Message message = new Message(msgId, actualSenderId, isGroup ? chatId : this.currentUserId, text, new Timestamp(new Date(timestamp)), msgType);
             message.setChatId(chatId);
             message.setDelivered(true);
             message.setRead(false);
@@ -1585,10 +1592,13 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   }
                } else {
                   P2PFileTransferHelper.handleIncomingPayload(this.context, payload, (transferId, fileName, mediaType, caption, file) -> {
-                     String chatId = getChatId(this.currentUserId, peerId);
                      Message existing = EncryptedChatDatabase.getInstance(this.context).getMessageById(transferId);
+                     String chatId = (existing != null && existing.getChatId() != null && !existing.getChatId().isEmpty())
+                             ? existing.getChatId()
+                             : getChatId(this.currentUserId, peerId);
                      String messageContent = caption != null && !caption.trim().isEmpty() ? caption.trim() : fileName;
                      Message fileMsg = existing != null ? existing : new Message(transferId, peerId, this.currentUserId, messageContent, Timestamp.now(), mediaType);
+                     fileMsg.setChatId(chatId);
                      fileMsg.setLocalFilePath(file.getAbsolutePath());
                      fileMsg.setDelivered(true);
                      fileMsg.setRead(false);
@@ -1774,6 +1784,20 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             if (chatType != null) {
                p.put("chatType", chatType);
             }
+            if (isGroup && chatId != null) {
+               Chat localGroup = EncryptedChatDatabase.getInstance(this.context).getChat(chatId);
+               if (localGroup != null) {
+                  if (localGroup.getAdminId() != null) p.put("adminId", localGroup.getAdminId());
+                  if (localGroup.getDescription() != null) p.put("description", localGroup.getDescription());
+                  if (localGroup.getParticipants() != null && !localGroup.getParticipants().isEmpty()) {
+                     JSONArray partsArr = new JSONArray();
+                     for (String pid : localGroup.getParticipants()) {
+                        if (pid != null && !pid.isEmpty()) partsArr.put(pid);
+                     }
+                     p.put("participants", partsArr);
+                  }
+               }
+            }
 
             json.put("payload", p);
             VeilPacket packet = new VeilPacket((byte)1, (short)257, json.toString());
@@ -1786,15 +1810,21 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          }
 
          if (!sentOverP2P) {
-            VeilMeshDaemonService.getInstance(this.context).enqueueOutgoingMessage((Chat)null, peerId, message);
+            message.setChatId(chatId);
+            Chat resolvedChat = chatId != null ? EncryptedChatDatabase.getInstance(this.context).getChat(chatId) : null;
+            VeilMeshDaemonService.getInstance(this.context).enqueueOutgoingMessage(resolvedChat, peerId, message);
          }
 
       }
    }
 
    public void sendFileMessage(String peerId, Message message, File file, P2PFileTransferHelper.FileTransferCallback callback) {
-      String chatId = getChatId(this.currentUserId, peerId);
+      String chatId = (message != null && message.getChatId() != null && !message.getChatId().isEmpty())
+              ? message.getChatId()
+              : getChatId(this.currentUserId, peerId);
       Chat chat = EncryptedChatDatabase.getInstance(this.context).getChat(chatId);
+      boolean isGroup = (chat != null && chat.isGroupChat())
+              || (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_")));
       if (chat != null && chat.getVanishTimer() > 0L) {
          long timer = chat.getVanishTimer();
          String mode = chat.getVanishMode() != null ? chat.getVanishMode() : "after_send";
@@ -1814,10 +1844,18 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          message.setLocalFilePath(file.getAbsolutePath());
       }
 
+      message.setChatId(chatId);
       message.setPending(!this.isNetworkAvailable());
       EncryptedChatDatabase.getInstance(this.context).saveMessage(chatId, message);
       VeilFeatureManager.getInstance(this.context).addXp(10);
-      this.dispatchChatPacketToPeer(chatId, peerId, message, false, chat != null ? chat.getName() : null, "direct");
+      this.dispatchChatPacketToPeer(
+              chatId,
+              peerId,
+              message,
+              isGroup,
+              chat != null ? chat.getName() : null,
+              chat != null && chat.getType() != null ? chat.getType() : (isGroup ? "group" : "direct")
+      );
       DataChannel dc = peerId != null ? this.getDataChannel(peerId) : null;
       if (dc != null && dc.state() == State.OPEN && file != null && file.exists() && file.length() > 28000L) {
          P2PFileTransferHelper.sendFileOverDataChannel(
@@ -1956,8 +1994,29 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                                      if (nowDc != null && nowDc.state() == State.OPEN) {
                                         this.pendingDownloadRequests.remove(messageId);
                                         P2PFileTransferHelper.requestFile(nowDc, messageId);
-                                     } else if (callback != null) {
-                                        this.mainHandler.post(() -> callback.onError(messageId, "Connecting to peer..."));
+                                     } else {
+                                        // Group Swarm Seeding Fallback: if original sender is offline in a group, request from up to 4 connected group members who may have cached dec_<messageId>
+                                        boolean requestedFromSwarm = false;
+                                        if (resolvedChatId.startsWith("group_") || resolvedChatId.startsWith("channel_") || resolvedChatId.startsWith("lounge_")) {
+                                           Chat groupChat = EncryptedChatDatabase.getInstance(this.context).getChat(resolvedChatId);
+                                           if (groupChat != null && groupChat.getParticipants() != null) {
+                                              int swarmQueries = 0;
+                                              for (String memberId : groupChat.getParticipants()) {
+                                                 if (memberId != null && !memberId.equals(this.currentUserId) && !memberId.equals(peerId)) {
+                                                    DataChannel memberDc = (DataChannel)this.dataChannels.get(memberId);
+                                                    if (memberDc != null && memberDc.state() == State.OPEN) {
+                                                       P2PFileTransferHelper.requestFile(memberDc, messageId);
+                                                       requestedFromSwarm = true;
+                                                       swarmQueries++;
+                                                       if (swarmQueries >= 4) break;
+                                                    }
+                                                 }
+                                              }
+                                           }
+                                        }
+                                        if (!requestedFromSwarm && callback != null) {
+                                           this.mainHandler.post(() -> callback.onError(messageId, "Connecting to peer..."));
+                                        }
                                      }
                                   });
                        });
@@ -2206,8 +2265,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   if (groupChat.getAvatar() != null) json.put("avatar", groupChat.getAvatar());
                   json.put("isPublic", groupChat.isPublic());
                   if (groupChat.getHandle() != null) json.put("handle", groupChat.getHandle());
+                  try {
+                     SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", json);
+                  } catch (Exception ignored) {}
                   return json;
                });
+               this.initiateConnection(peerId);
             }
          }
 
@@ -2416,11 +2479,17 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                         }
                      }
                   } else {
+                     String resolvedChatId = (msg.getChatId() != null && !msg.getChatId().isEmpty())
+                             ? msg.getChatId()
+                             : getChatId(this.currentUserId, peerId);
+                     Chat resolvedChat = EncryptedChatDatabase.getInstance(this.context).getChat(resolvedChatId);
+                     boolean isGrp = (resolvedChat != null && resolvedChat.isGroupChat())
+                             || resolvedChatId.startsWith("group_") || resolvedChatId.startsWith("channel_") || resolvedChatId.startsWith("lounge_");
                      JSONObject json = new JSONObject();
                      json.put("type", "chat");
                      JSONObject p = new JSONObject();
                      p.put("id", msg.getId());
-                     p.put("chatId", getChatId(this.currentUserId, peerId));
+                     p.put("chatId", resolvedChatId);
                      p.put("senderId", this.currentUserId);
                      p.put("senderName", msg.getSenderName() != null ? msg.getSenderName() : VeilFeatureManager.getInstance(this.context).getActivePersona().getDisplayName());
                      p.put("text", msg.getText());
@@ -2432,6 +2501,19 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      p.put("voiceFilter", msg.getVoiceFilter());
                      p.put("pollJson", msg.getPollJson());
                      p.put("expiresAt", msg.getExpiresAt() != null ? msg.getExpiresAt().toDate().getTime() : 0L);
+                     p.put("isGroup", isGrp);
+                     if (resolvedChat != null) {
+                        if (isGrp && resolvedChat.getName() != null) p.put("chatName", resolvedChat.getName());
+                        if (resolvedChat.getType() != null) p.put("chatType", resolvedChat.getType());
+                        if (resolvedChat.getAdminId() != null) p.put("adminId", resolvedChat.getAdminId());
+                        if (resolvedChat.getParticipants() != null && !resolvedChat.getParticipants().isEmpty()) {
+                           JSONArray partsArr = new JSONArray();
+                           for (String pid : resolvedChat.getParticipants()) {
+                              if (pid != null && !pid.isEmpty()) partsArr.put(pid);
+                           }
+                           p.put("participants", partsArr);
+                        }
+                     }
                      json.put("payload", p);
                      byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
                      dc.send(new DataChannel.Buffer(ByteBuffer.wrap(bytes), false));
@@ -3550,6 +3632,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       }
       VeilPacket packet = new VeilPacket((byte) 3, (short) 770, encryptedPayload);
       return sendPacket(relayPeerId, packet);
+   }
+
+   public boolean isConnectedToPeer(String peerId) {
+      if (peerId == null || peerId.isEmpty()) return false;
+      PeerChannelHub hub = this.peerHubs.get(peerId);
+      if (hub != null && hub.isConnected()) return true;
+      DataChannel dc = this.dataChannels.get(peerId);
+      return dc != null && dc.state() == State.OPEN;
    }
 
    public void notifyReceiptStatusChanged(final String messageId, final boolean delivered, final boolean read) {

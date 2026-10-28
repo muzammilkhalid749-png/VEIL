@@ -435,6 +435,12 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     mCryptoQueue.execute(() -> {
                         if (!isNetworkConnected()) return;
                         try {
+                            File pendingLocalFile = (msg.getLocalFilePath() != null && !msg.getLocalFilePath().isEmpty())
+                                    ? new File(msg.getLocalFilePath()) : null;
+                            encodeInlineMediaForTransport(dialogId, msg, pendingLocalFile);
+                            if (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()) {
+                                mStorageQueue.execute(() -> mDatabase.saveMessage(dialogId, msg));
+                            }
                             if (isGroup) {
                                 syncGroupOrChannelMessageToFirestore(chat, dialogId, msg);
                             } else {
@@ -823,9 +829,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     ? message.getChatId()
                     : (recipientId != null ? WebRtcManager.getChatId(message.getSenderId() != null ? message.getSenderId() : getCurrentUserId(), recipientId) : null));
         if (dialogId == null) return;
+        if (chat == null) {
+            chat = getCachedDialogImmediate(dialogId);
+            if (chat == null) {
+                chat = mDatabase.getChat(dialogId);
+            }
+        }
         boolean isGroupOrChannel = (chat != null && chat.isGroupChat())
                 || dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_");
-        String finalRecipientId = recipientId;
+        String finalRecipientId = isGroupOrChannel ? null : recipientId;
         if (!isGroupOrChannel && (finalRecipientId == null || finalRecipientId.isEmpty())) {
             String myId = getCurrentUserId();
             if (myId != null && dialogId.contains(myId)) {
@@ -846,6 +858,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         }
         if (!isGroupOrChannel && (finalRecipientId == null || finalRecipientId.isEmpty())) return;
         final String effectiveRecipientId = finalRecipientId;
+        final Chat resolvedChatRef = chat;
         message.setChatId(dialogId);
         message.setPending(true);
         message.setDelivered(false);
@@ -859,7 +872,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         if (message.getSenderName() == null) {
             message.setSenderName(getCurrentUserName());
         }
-        if (isGroupOrChannel && (message.getReceiverId() == null || message.getReceiverId().isEmpty())) {
+        if (isGroupOrChannel) {
             message.setReceiverId(dialogId);
         }
 
@@ -884,13 +897,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             int seq = nextDialogSeq(dialogId);
 
             long vanishTimer = message.getVanishTimer();
-            if (vanishTimer <= 0 && chat != null && chat.getVanishTimer() > 0) {
-                vanishTimer = chat.getVanishTimer();
+            if (vanishTimer <= 0 && resolvedChatRef != null && resolvedChatRef.getVanishTimer() > 0) {
+                vanishTimer = resolvedChatRef.getVanishTimer();
                 message.setVanishTimer(vanishTimer);
             }
             String vanishMode = message.getVanishMode();
-            if (vanishMode == null && chat != null && chat.getVanishMode() != null) {
-                vanishMode = chat.getVanishMode();
+            if (vanishMode == null && resolvedChatRef != null && resolvedChatRef.getVanishMode() != null) {
+                vanishMode = resolvedChatRef.getVanishMode();
                 message.setVanishMode(vanishMode);
             }
             if (vanishTimer > 0 && "after_send".equals(vanishMode) && message.getExpiresAt() == null) {
@@ -993,6 +1006,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         });
     }
 
+    private static final int MAX_DIRECT_P2P_GROUP_FANOUT = 16;
+
     private List<String> resolveTargetPeers(String dialogId, @Nullable String explicitRecipientId, @Nullable Message msg) {
         List<String> targets = new ArrayList<>();
         String myId = getCurrentUserId();
@@ -1003,10 +1018,25 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         boolean isGroup = (chat != null && chat.isGroupChat())
                 || (dialogId != null && (dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_")));
         if (isGroup && chat != null && chat.getParticipants() != null) {
+            List<String> connectedPeers = new ArrayList<>();
+            List<String> offlinePeers = new ArrayList<>();
             for (String pId : chat.getParticipants()) {
-                if (pId != null && !pId.trim().isEmpty() && !pId.equals(myId) && !targets.contains(pId)) {
-                    targets.add(pId);
+                if (pId != null && !pId.trim().isEmpty() && !pId.equals(myId)
+                        && !connectedPeers.contains(pId) && !offlinePeers.contains(pId)) {
+                    if (WebRtcManager.getInstance(mContext).isConnectedToPeer(pId)) {
+                        connectedPeers.add(pId);
+                    } else {
+                        offlinePeers.add(pId);
+                    }
                 }
+            }
+            for (String pId : connectedPeers) {
+                if (targets.size() >= MAX_DIRECT_P2P_GROUP_FANOUT) break;
+                targets.add(pId);
+            }
+            for (String pId : offlinePeers) {
+                if (targets.size() >= MAX_DIRECT_P2P_GROUP_FANOUT) break;
+                targets.add(pId);
             }
         }
         if (targets.isEmpty()) {
@@ -1067,11 +1097,14 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 List<String> targetPeers = resolveTargetPeers(dialogId, recipientId, msg);
                 boolean hasNetwork = isNetworkConnected();
 
-                // Embed encrypted inline payload for voice notes (and compact media <= 512KB)
-                // so the recipient can auto-download and play immediately even if sender closes the app!
-                encodeInlineMediaForTransport(dialogId, msg, localFile);
-                if (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()) {
-                    mStorageQueue.execute(() -> mDatabase.saveMessage(dialogId, msg));
+                // Embed encrypted inline payload for voice notes (and compact media <= 450KB)
+                // or chunked payload (up to 15MB when online) so the recipient can auto-download
+                // and play immediately even if sender closes the app!
+                if (hasNetwork || (localFile != null && localFile.exists() && localFile.length() <= 450 * 1024L)) {
+                    encodeInlineMediaForTransport(dialogId, msg, localFile);
+                    if (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()) {
+                        mStorageQueue.execute(() -> mDatabase.saveMessage(dialogId, msg));
+                    }
                 }
 
                 // Only sync to Firestore/Nostr immediately if device has network connectivity.
@@ -1168,6 +1201,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             String encryptedText = EncryptionManager.encryptGroupPayload(groupId, rawText);
             msgMap.put("text", encryptedText);
             msgMap.put("isEncrypted", true);
+            msgMap.put("senderKeyEpoch", EncryptionManager.getGroupSenderKeyEpoch(groupId));
             msgMap.put("type", msg.getType() != null ? msg.getType() : "text");
             Timestamp tsVal = msg.getTimestamp() != null ? msg.getTimestamp() : Timestamp.now();
             msgMap.put("timestamp", tsVal);
@@ -1333,7 +1367,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
     public static void encodeInlineMediaForTransport(String dialogId, Message msg, @Nullable File localFile) {
         if (msg == null) return;
-        if (msg.getMediaUrl() != null && (msg.getMediaUrl().startsWith("ENC:v1:") || msg.getMediaUrl().startsWith("CHUNKED:v1:"))) {
+        if (msg.getMediaUrl() != null && (msg.getMediaUrl().startsWith("ENC:v") || msg.getMediaUrl().startsWith("CHUNKED:v1:"))) {
             return;
         }
         File fileToRead = localFile;
@@ -1344,20 +1378,20 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
         long fileLen = fileToRead.length();
         long maxInlineBytes = 450 * 1024L; // 450 KB inline (~2 min AAC voice note or compressed HD photo)
-        long maxChunkedBytes = 5 * 1024 * 1024L; // 5 MB chunked cloud-shadow fallback
+        long maxChunkedBytes = 15 * 1024 * 1024L; // 15 MB chunked zero-knowledge cloud-shadow fallback
         if (fileLen > maxChunkedBytes) return;
 
         try {
-            byte[] bytes = new byte[(int) fileLen];
-            try (java.io.FileInputStream fis = new java.io.FileInputStream(fileToRead)) {
-                int offset = 0;
-                int read;
-                while (offset < bytes.length && (read = fis.read(bytes, offset, bytes.length - offset)) != -1) {
-                    offset += read;
-                }
-            }
             String keyScope = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
             if (fileLen <= maxInlineBytes) {
+                byte[] bytes = new byte[(int) fileLen];
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(fileToRead)) {
+                    int offset = 0;
+                    int read;
+                    while (offset < bytes.length && (read = fis.read(bytes, offset, bytes.length - offset)) != -1) {
+                        offset += read;
+                    }
+                }
                 String b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
                 String payload = "INLINE_B64:" + b64;
                 if (keyScope != null && !keyScope.isEmpty()) {
@@ -1369,20 +1403,35 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 int chunkSize = 300 * 1024; // 300 KB raw bytes per chunk (~400 KB encrypted Base64)
                 int totalChunks = (int) ((fileLen + chunkSize - 1) / chunkSize);
                 com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
-                for (int i = 0; i < totalChunks; i++) {
-                    int start = i * chunkSize;
-                    int end = (int) Math.min(fileLen, start + chunkSize);
-                    byte[] slice = java.util.Arrays.copyOfRange(bytes, start, end);
-                    String chunkB64 = android.util.Base64.encodeToString(slice, android.util.Base64.NO_WRAP);
-                    String encChunk = EncryptionManager.encryptGroupPayload(keyScope, chunkB64);
-                    Map<String, Object> chunkDoc = new HashMap<>();
-                    chunkDoc.put("index", i);
-                    chunkDoc.put("total", totalChunks);
-                    chunkDoc.put("data", encChunk);
-                    chunkDoc.put("timestampMs", System.currentTimeMillis());
-                    String docKey = msg.getId() + "_" + i;
-                    fs.collection("chats").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc);
-                    fs.collection("groups").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc);
+                List<com.google.android.gms.tasks.Task<?>> uploadTasks = new ArrayList<>();
+                byte[] sliceBuffer = new byte[chunkSize];
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(fileToRead)) {
+                    for (int i = 0; i < totalChunks; i++) {
+                        int expected = (int) Math.min(chunkSize, fileLen - ((long) i * chunkSize));
+                        int offset = 0;
+                        int read;
+                        while (offset < expected && (read = fis.read(sliceBuffer, offset, expected - offset)) != -1) {
+                            offset += read;
+                        }
+                        if (offset <= 0) break;
+                        String chunkB64 = android.util.Base64.encodeToString(sliceBuffer, 0, offset, android.util.Base64.NO_WRAP);
+                        String encChunk = EncryptionManager.encryptGroupPayload(keyScope, chunkB64);
+                        Map<String, Object> chunkDoc = new HashMap<>();
+                        chunkDoc.put("index", i);
+                        chunkDoc.put("total", totalChunks);
+                        chunkDoc.put("data", encChunk);
+                        chunkDoc.put("timestampMs", System.currentTimeMillis());
+                        String docKey = msg.getId() + "_" + i;
+                        uploadTasks.add(fs.collection("chats").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc));
+                        uploadTasks.add(fs.collection("groups").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc));
+                    }
+                }
+                if (!uploadTasks.isEmpty()) {
+                    for (com.google.android.gms.tasks.Task<?> t : uploadTasks) {
+                        try {
+                            com.google.android.gms.tasks.Tasks.await(t, 10, java.util.concurrent.TimeUnit.SECONDS);
+                        } catch (Exception ignored) {}
+                    }
                 }
                 msg.setMediaUrl("CHUNKED:v1:" + totalChunks + ":" + fileLen);
             }
@@ -1435,13 +1484,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 return null;
             }
             String decrypted = mediaUrl;
-            if (decrypted.startsWith("ENC:v1:")) {
+            if (decrypted.startsWith("ENC:v")) {
                 String keyScope = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
                 if (keyScope != null && !keyScope.isEmpty()) {
                     decrypted = EncryptionManager.decryptGroupPayload(keyScope, decrypted);
                 }
             }
-            if (decrypted == null || decrypted.isEmpty() || decrypted.startsWith("ENC:v1:") || decrypted.startsWith("CHUNKED:")) {
+            if (decrypted == null || decrypted.isEmpty() || decrypted.startsWith("ENC:v") || decrypted.startsWith("CHUNKED:")) {
                 return null;
             }
             String b64;
@@ -1479,74 +1528,172 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         return null;
     }
 
+    private static final Set<String> sInFlightChunkDownloads =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    public static File ensureMediaDecodedOrAutoDownloaded(
+            Context context,
+            String dialogId,
+            Message msg,
+            @Nullable Runnable onAsyncReady) {
+        if (context == null || msg == null || msg.getId() == null) return null;
+        if (msg.getLocalFilePath() != null && !msg.getLocalFilePath().isEmpty()) {
+            File existing = new File(msg.getLocalFilePath());
+            if (existing.exists() && existing.length() >= 64) {
+                return existing;
+            }
+        }
+        String ext = resolveMediaExtension(msg);
+        File cachedDec = new File(context.getExternalCacheDir(), "dec_" + msg.getId() + ext);
+        if (cachedDec.exists() && cachedDec.length() >= 64) {
+            msg.setLocalFilePath(cachedDec.getAbsolutePath());
+            return cachedDec;
+        }
+        String mediaUrl = msg.getMediaUrl();
+        if (mediaUrl == null || mediaUrl.isEmpty()) return null;
+        String resolvedChatId = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
+        if (mediaUrl.startsWith("CHUNKED:v1:")) {
+            if (resolvedChatId != null && !resolvedChatId.isEmpty()) {
+                downloadChunkedMediaFromFirestore(context.getApplicationContext(), resolvedChatId, msg, mediaUrl,
+                        new P2PFileTransferHelper.DownloadProgressListener() {
+                            @Override
+                            public void onProgress(String messageId, int progress) {}
+
+                            @Override
+                            public void onComplete(String messageId, File downloadedFile) {
+                                if (onAsyncReady != null) {
+                                    new Handler(Looper.getMainLooper()).post(onAsyncReady);
+                                }
+                            }
+
+                            @Override
+                            public void onError(String messageId, String error) {}
+                        });
+            }
+            return null;
+        }
+        return decodeInlineMediaToFile(context, resolvedChatId, msg);
+    }
+
     public static void downloadChunkedMediaFromFirestore(
             Context context,
             String resolvedChatId,
             Message targetMsg,
             String chunkedHeader,
             P2PFileTransferHelper.DownloadProgressListener callback) {
-        if (context == null || resolvedChatId == null || targetMsg == null || chunkedHeader == null || !chunkedHeader.startsWith("CHUNKED:v1:")) {
+        if (context == null || resolvedChatId == null || targetMsg == null || targetMsg.getId() == null
+                || chunkedHeader == null || !chunkedHeader.startsWith("CHUNKED:v1:")) {
             if (callback != null && targetMsg != null) callback.onError(targetMsg.getId(), "Unavailable");
+            return;
+        }
+        String ext = resolveMediaExtension(targetMsg);
+        File existingTarget = new File(context.getExternalCacheDir(), "dec_" + targetMsg.getId() + ext);
+        if (existingTarget.exists() && existingTarget.length() >= 64) {
+            targetMsg.setLocalFilePath(existingTarget.getAbsolutePath());
+            EncryptedChatDatabase.getInstance(context).saveMessage(resolvedChatId, targetMsg);
+            if (callback != null) {
+                new Handler(Looper.getMainLooper()).post(() -> callback.onComplete(targetMsg.getId(), existingTarget));
+            }
+            return;
+        }
+        final String downloadKey = resolvedChatId + ":" + targetMsg.getId();
+        if (!sInFlightChunkDownloads.add(downloadKey)) {
             return;
         }
         new Thread(() -> {
             try {
                 String[] parts = chunkedHeader.split(":");
                 int totalChunks = Integer.parseInt(parts[2]);
-                if (totalChunks <= 0 || totalChunks > 64) {
+                if (totalChunks <= 0 || totalChunks > 80) {
                     if (callback != null) callback.onError(targetMsg.getId(), "Invalid chunk count");
                     return;
                 }
                 com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
-                java.io.ByteArrayOutputStream combined = new java.io.ByteArrayOutputStream();
-                for (int i = 0; i < totalChunks; i++) {
-                    String docKey = targetMsg.getId() + "_" + i;
-                    com.google.firebase.firestore.DocumentSnapshot snap = com.google.android.gms.tasks.Tasks.await(
-                            fs.collection("chats").document(resolvedChatId).collection("media_chunks").document(docKey).get(),
-                            15, java.util.concurrent.TimeUnit.SECONDS);
-                    if (snap == null || !snap.exists()) {
-                        snap = com.google.android.gms.tasks.Tasks.await(
-                                fs.collection("groups").document(resolvedChatId).collection("media_chunks").document(docKey).get(),
-                                15, java.util.concurrent.TimeUnit.SECONDS);
-                    }
-                    if (snap == null || !snap.exists()) {
-                        throw new java.io.IOException("Missing media chunk " + i);
-                    }
-                    String encData = snap.getString("data");
-                    String b64Chunk = EncryptionManager.decryptGroupPayload(resolvedChatId, encData);
-                    byte[] rawSlice = android.util.Base64.decode(b64Chunk, android.util.Base64.DEFAULT);
-                    combined.write(rawSlice);
-                    final int pct = (int) (((i + 1) * 100L) / totalChunks);
-                    if (callback != null) {
-                        new Handler(Looper.getMainLooper()).post(() -> callback.onProgress(targetMsg.getId(), pct));
-                    }
+                File targetFile = new File(context.getExternalCacheDir(), "dec_" + targetMsg.getId() + ext);
+                File tempFile = new File(context.getExternalCacheDir(), "tmp_chunk_" + targetMsg.getId() + ".tmp");
+                File checkpointDir = new File(context.getExternalCacheDir(), "chunks_" + targetMsg.getId());
+                if (!checkpointDir.exists()) {
+                    checkpointDir.mkdirs();
                 }
-                byte[] fullBytes = combined.toByteArray();
-                if (fullBytes.length >= 64) {
-                    String ext = resolveMediaExtension(targetMsg);
-                    File targetFile = new File(context.getExternalCacheDir(), "dec_" + targetMsg.getId() + ext);
-                    File tempFile = new File(context.getExternalCacheDir(), "tmp_chunk_" + targetMsg.getId() + ".tmp");
-                    try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
-                        fos.write(fullBytes);
-                        fos.flush();
+                long totalWritten = 0L;
+                byte[] copyBuf = new byte[16 * 1024];
+                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
+                    for (int i = 0; i < totalChunks; i++) {
+                        File partFile = new File(checkpointDir, "part_" + i + ".bin");
+                        if (partFile.exists() && partFile.length() > 0) {
+                            try (java.io.FileInputStream pfis = new java.io.FileInputStream(partFile)) {
+                                int r;
+                                while ((r = pfis.read(copyBuf)) != -1) {
+                                    fos.write(copyBuf, 0, r);
+                                    totalWritten += r;
+                                }
+                            }
+                        } else {
+                            String docKey = targetMsg.getId() + "_" + i;
+                            com.google.firebase.firestore.DocumentSnapshot snap = com.google.android.gms.tasks.Tasks.await(
+                                    fs.collection("chats").document(resolvedChatId).collection("media_chunks").document(docKey).get(),
+                                    15, java.util.concurrent.TimeUnit.SECONDS);
+                            if (snap == null || !snap.exists()) {
+                                snap = com.google.android.gms.tasks.Tasks.await(
+                                        fs.collection("groups").document(resolvedChatId).collection("media_chunks").document(docKey).get(),
+                                        15, java.util.concurrent.TimeUnit.SECONDS);
+                            }
+                            if (snap == null || !snap.exists()) {
+                                throw new java.io.IOException("Missing media chunk " + i);
+                            }
+                            String encData = snap.getString("data");
+                            String b64Chunk = EncryptionManager.decryptGroupPayload(resolvedChatId, encData);
+                            byte[] rawSlice = android.util.Base64.decode(b64Chunk, android.util.Base64.DEFAULT);
+                            if (rawSlice != null && rawSlice.length > 0) {
+                                try (java.io.FileOutputStream pfos = new java.io.FileOutputStream(partFile)) {
+                                    pfos.write(rawSlice);
+                                    pfos.flush();
+                                }
+                                fos.write(rawSlice);
+                                totalWritten += rawSlice.length;
+                            }
+                        }
+                        final int pct = (int) (((i + 1) * 100L) / totalChunks);
+                        if (callback != null) {
+                            new Handler(Looper.getMainLooper()).post(() -> callback.onProgress(targetMsg.getId(), pct));
+                        }
                     }
+                    fos.flush();
+                }
+                if (totalWritten >= 64) {
                     if (targetFile.exists()) targetFile.delete();
                     if (!tempFile.renameTo(targetFile)) {
-                        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(targetFile)) {
-                            fos.write(fullBytes);
+                        try (java.io.FileInputStream fis = new java.io.FileInputStream(tempFile);
+                             java.io.FileOutputStream fos = new java.io.FileOutputStream(targetFile)) {
+                            int r;
+                            while ((r = fis.read(copyBuf)) != -1) {
+                                fos.write(copyBuf, 0, r);
+                            }
                             fos.flush();
                         }
                         tempFile.delete();
                     }
+                    // Clean up checkpoint slices now that full file is verified
+                    File[] partFiles = checkpointDir.listFiles();
+                    if (partFiles != null) {
+                        for (File pf : partFiles) {
+                            pf.delete();
+                        }
+                    }
+                    checkpointDir.delete();
                     targetMsg.setLocalFilePath(targetFile.getAbsolutePath());
                     EncryptedChatDatabase.getInstance(context).saveMessage(resolvedChatId, targetMsg);
                     if (callback != null) {
                         new Handler(Looper.getMainLooper()).post(() -> callback.onComplete(targetMsg.getId(), targetFile));
                     }
                     return;
+                } else {
+                    tempFile.delete();
                 }
             } catch (Throwable t) {
                 Log.w(TAG, "Chunked media assembly notice: " + t.getMessage());
+            } finally {
+                sInFlightChunkDownloads.remove(downloadKey);
             }
             if (callback != null) {
                 new Handler(Looper.getMainLooper()).post(() -> callback.onError(targetMsg.getId(), "Connecting to peer..."));
@@ -1923,10 +2070,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
      * Broadcasts stealth typing waves to peer.
      */
     public void sendTyping(String dialogId, String recipientId, boolean isTyping) {
-        if (recipientId == null) return;
+        if (dialogId == null && recipientId == null) return;
         mCryptoQueue.execute(() -> {
             try {
-                WebRtcManager.getInstance(mContext).sendTyping(recipientId, isTyping);
+                List<String> targets = resolveTargetPeers(dialogId, recipientId, null);
+                for (String peer : targets) {
+                    WebRtcManager.getInstance(mContext).sendTyping(peer, isTyping);
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Failed to send typing indicator", e);
             }
@@ -1969,12 +2119,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
             // Transmit blink opened receipt
             mCryptoQueue.execute(() -> {
-                String myId = getCurrentUserId();
-                String peerId = recipientId;
-                if (peerId == null && msg != null) {
-                    peerId = (myId != null && myId.equals(msg.getReceiverId())) ? msg.getSenderId() : msg.getReceiverId();
-                }
-                if (peerId != null) {
+                for (String peerId : resolveTargetPeers(dialogId, recipientId, msg)) {
                     WebRtcManager.getInstance(mContext).sendBlinkOpenedReceipt(peerId, dialogId, messageId);
                 }
             });
@@ -2001,31 +2146,45 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             });
 
             mCryptoQueue.execute(() -> {
-                String myId = getCurrentUserId();
-                String peerId = recipientId;
-                if (peerId == null && msg != null) {
-                    peerId = (myId != null && myId.equals(msg.getReceiverId())) ? msg.getSenderId() : msg.getReceiverId();
-                }
-                if (peerId != null) {
+                for (String peerId : resolveTargetPeers(dialogId, recipientId, msg)) {
                     WebRtcManager.getInstance(mContext).sendPollVote(peerId, dialogId, messageId, updatedPollJson);
+                }
+                if (dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_")) {
+                    try {
+                        Map<String, Object> upd = new HashMap<>();
+                        upd.put("pollJson", EncryptionManager.encryptGroupPayload(dialogId, updatedPollJson));
+                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                .collection("groups").document(dialogId)
+                                .collection("messages").document(messageId)
+                                .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                    } catch (Exception ignored) {}
+                } else {
+                    try {
+                        Map<String, Object> upd = new HashMap<>();
+                        upd.put("pollJson", EncryptionManager.encryptGroupPayload(dialogId, updatedPollJson));
+                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                .collection("chats").document(dialogId)
+                                .collection("messages").document(messageId)
+                                .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                    } catch (Exception ignored) {}
                 }
             });
         });
     }
 
     /**
-     * Requests streaming P2P download for a media message via WebRTC with DownloadProgressListener.
+     * Requests streaming P2P or encrypted cloud-shadow download for a media message with DownloadProgressListener.
      */
     public void downloadMedia(String recipientId, String messageId, P2PFileTransferHelper.DownloadProgressListener callback) {
-        if (recipientId == null || messageId == null) return;
+        if (messageId == null) return;
         WebRtcManager.getInstance(mContext).requestMediaDownload(recipientId, messageId, callback);
     }
 
     /**
-     * Requests streaming P2P download for a media message via WebRTC.
+     * Requests streaming P2P or encrypted cloud-shadow download for a media message.
      */
     public void downloadMedia(String recipientId, Message message, File destination, P2PFileTransferHelper.FileTransferCallback callback) {
-        if (recipientId == null || message == null || message.getId() == null) return;
+        if (message == null || message.getId() == null) return;
         WebRtcManager.getInstance(mContext).requestMediaDownload(recipientId, message.getId(), new P2PFileTransferHelper.DownloadProgressListener() {
             @Override
             public void onProgress(String transferId, int percent) {
@@ -2387,9 +2546,14 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 message.setRead(true);
             }
 
-            // Auto-decode inline encrypted voice/media immediately before caching and notifying UI
+            // Auto-decode inline encrypted voice/media or auto-download chunked media up to 15MB
             if (message.getMediaUrl() != null && !message.getMediaUrl().isEmpty()) {
-                decodeInlineMediaToFile(mContext, dialogId, message);
+                ensureMediaDecodedOrAutoDownloaded(mContext, dialogId, message, () -> {
+                    putMessageInCache(dialogId, message);
+                    for (MessagesObserver obs : mObservers) {
+                        obs.onMessageReceived(dialogId, message);
+                    }
+                });
             }
 
             // Put in memory cache
@@ -2550,6 +2714,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             if (entry.peerId != null && entry.peerId.equals(peerId)) {
                 iter.remove();
                 mPendingOutboxById.remove(entry.message.getId());
+                mPendingOutboxById.remove(entry.message.getId() + "_" + peerId);
 
                 mCryptoQueue.execute(() -> {
                     boolean ok = false;
@@ -2837,12 +3002,12 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 refreshDialogInCache(dialogId);
             });
 
-            // Transmit read receipt packet to remote peer over WebRTC
-            if (recipientId != null) {
-                mCryptoQueue.execute(() -> {
-                    WebRtcManager.getInstance(mContext).sendChatReadReceipt(recipientId, dialogId);
-                });
-            }
+            // Transmit read receipt packet to remote peer(s) over WebRTC
+            mCryptoQueue.execute(() -> {
+                for (String peer : resolveTargetPeers(dialogId, recipientId, null)) {
+                    WebRtcManager.getInstance(mContext).sendChatReadReceipt(peer, dialogId);
+                }
+            });
         });
     }
 
@@ -2904,12 +3069,12 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 mStorageQueue.execute(() -> mDatabase.saveOrUpdateChat(chat));
             }
 
-            // Transmit setting packet to remote peer
-            if (recipientId != null) {
-                mCryptoQueue.execute(() -> {
-                    WebRtcManager.getInstance(mContext).sendVanishSetting(recipientId, dialogId, vanishMode, vanishTimer);
-                });
-            }
+            // Transmit setting packet to remote peer(s)
+            mCryptoQueue.execute(() -> {
+                for (String peer : resolveTargetPeers(dialogId, recipientId, null)) {
+                    WebRtcManager.getInstance(mContext).sendVanishSetting(peer, dialogId, vanishMode, vanishTimer);
+                }
+            });
         });
     }
 
@@ -2917,7 +3082,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
      * Pins a message to the top of the chat dialog.
      */
     public void pinMessage(String dialogId, String recipientId, String messageId, String messageText) {
-        if (dialogId == null || messageId == null) return;
+        if (dialogId == null) return;
 
         mStageQueue.post(() -> {
             Chat chat = getDialog(dialogId);
@@ -2927,11 +3092,11 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 mStorageQueue.execute(() -> mDatabase.saveOrUpdateChat(chat));
             }
 
-            if (recipientId != null) {
-                mCryptoQueue.execute(() -> {
-                    WebRtcManager.getInstance(mContext).sendPinMessageSetting(recipientId, dialogId, messageId, messageText);
-                });
-            }
+            mCryptoQueue.execute(() -> {
+                for (String peer : resolveTargetPeers(dialogId, recipientId, null)) {
+                    WebRtcManager.getInstance(mContext).sendPinMessageSetting(peer, dialogId, messageId, messageText);
+                }
+            });
         });
     }
 

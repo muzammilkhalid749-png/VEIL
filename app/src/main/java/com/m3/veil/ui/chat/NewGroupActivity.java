@@ -289,7 +289,8 @@ public class NewGroupActivity extends AppCompatActivity {
         groupDoc.put("isGroup", true);
         db.collection("groups").document(groupId).set(groupDoc);
 
-        // 4. Fan-out P2P group invite AND welcome message to all participants under groupId
+        // 4. Register in VeilMessagesController warm cache immediately and fan-out P2P group invite AND welcome message to all participants under groupId
+        com.m3.veil.manager.VeilMessagesController.getInstance(this).prewarmDialog(groupId);
         WebRtcManager.getInstance(this).sendGroupInviteToPeers(groupChat);
         for (String peerId : selectedUserIds) {
             WebRtcManager.getInstance(this).initiateConnection(peerId);
@@ -301,9 +302,6 @@ public class NewGroupActivity extends AppCompatActivity {
         intent.putExtra("chatId", groupId);
         intent.putExtra("recipientName", groupName);
         intent.putExtra("isGroup", true);
-        if (!selectedUserIds.isEmpty()) {
-            intent.putExtra("recipientId", selectedUserIds.iterator().next());
-        }
         startActivity(intent);
         finish();
     }
