@@ -155,7 +155,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 if (messages == null) return;
                 for (int i = 0; i < messages.size(); i++) {
                     Message m = messages.get(i);
-                    if (m != null && messageId.equals(m.getId()) && "voice".equals(m.getType())) {
+                    if (m != null && messageId.equals(m.getId()) && ("voice".equals(m.getType()) || "audio".equals(m.getType()))) {
                         Context ctx = com.m3.veil.VeilApplication.getInstance();
                         if (ctx != null) {
                             VoicePlayerManager.getInstance().playVoiceNote(ctx, m, null, currentUserId);
@@ -368,7 +368,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             }
             if (completedIdx < 0 || completedIdx + 1 >= messages.size()) return;
             Message nextMsg = messages.get(completedIdx + 1);
-            if (nextMsg == null || !"voice".equals(nextMsg.getType()) || nextMsg.isBlink()) {
+            if (nextMsg == null || (!"voice".equals(nextMsg.getType()) && !"audio".equals(nextMsg.getType())) || nextMsg.isBlink()) {
                 return;
             }
             Context ctx = com.m3.veil.VeilApplication.getInstance();
@@ -1349,7 +1349,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             } else {
                 hideAllMediaContainers();
 
-                if ("voice".equals(message.getType())) {
+                if ("voice".equals(message.getType()) || "audio".equals(message.getType())) {
                     messageText.setVisibility(View.GONE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     if (voiceMessageContainer != null) {
@@ -1357,6 +1357,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         File localAudio = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".m4a");
                         boolean hasLocal = (localAudio != null && localAudio.exists() && localAudio.length() > 0)
                                 || (message.getLocalFilePath() != null && new File(message.getLocalFilePath()).exists());
+                        if (!hasLocal && message.getMediaUrl() != null && !message.getMediaUrl().isEmpty()) {
+                            File inlineAudio = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(itemView.getContext(), message.getChatId(), message);
+                            if (inlineAudio != null && inlineAudio.exists() && inlineAudio.length() > 0) {
+                                localAudio = inlineAudio;
+                                hasLocal = true;
+                            }
+                        }
 
                         if (voiceWaveformView != null) {
                             int playedColor = itemView.getContext().getResources().getColor(R.color.voice_waveform_played);
@@ -1701,7 +1708,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             if (isDocSending) {
                                 documentProgressBar.setVisibility(View.VISIBLE);
                                 documentProgressBar.setIndeterminate(docProgress <= 0);
-                                if (docProgress > 0) documentProgressBar.setProgress(docProgress);
+                                if (docProgress > 0) {
+                                    documentProgressBar.setProgress(docProgress);
+                                    documentFileSize.setText(formattedInfo + " • " + docProgress + "%");
+                                }
                                 if (documentActionIcon != null) documentActionIcon.setVisibility(View.GONE);
                             } else {
                                 documentProgressBar.setVisibility(View.GONE);
@@ -1714,13 +1724,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
                         documentMessageContainer.setOnClickListener(v -> {
                             File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, "");
-                            if (local.exists()) {
+                            if (local == null || !local.exists() || local.length() == 0) {
+                                local = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(itemView.getContext(), message.getChatId(), message);
+                            }
+                            if (local != null && local.exists() && local.length() > 0) {
                                 FileMediaManager.openFileWithSystemViewer(itemView.getContext(), local);
                                 try {
                                     com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).markMessageAsReadExplicitly(message);
                                 } catch (Throwable ignored) {}
-                            } else {
-                                Toast.makeText(itemView.getContext(), "Document awaiting peer-to-peer WebRTC transfer", Toast.LENGTH_SHORT).show();
+                            } else if (mediaDownloadClickListener != null) {
+                                mediaDownloadClickListener.onMediaDownloadClick(message);
                             }
                         });
                     }
@@ -1798,6 +1811,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             replyQuoteName.setText(message.getReplySenderName() != null ? message.getReplySenderName() : "User");
                             String quoteText = replyTo.getText();
                             if ("voice".equals(replyTo.getType())) quoteText = "🎤 Voice message";
+                            else if ("audio".equals(replyTo.getType())) quoteText = "🎵 Audio";
                             else if ("image".equals(replyTo.getType())) quoteText = "📷 Photo";
                             else if ("video".equals(replyTo.getType())) quoteText = "🎥 Video";
                             else if ("document".equals(replyTo.getType())) {
@@ -2160,7 +2174,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             } else {
                 hideAllMediaContainers();
 
-                if ("voice".equals(message.getType())) {
+                if ("voice".equals(message.getType()) || "audio".equals(message.getType())) {
                     messageText.setVisibility(View.GONE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                     if (voiceMessageContainer != null) {
@@ -2176,7 +2190,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                         }
 
-                        // Always auto-download incoming voice messages without requiring manual tap
+                        // Always auto-download incoming voice/audio messages without requiring manual tap
                         if (!hasLocal && message.getId() != null) {
                             int currentState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                             if (currentState == STATE_IDLE && autoTriggeredVoiceDownloads.add(message.getId()) && mediaDownloadClickListener != null) {
@@ -2266,9 +2280,14 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             });
                         } else if (voiceDownloadState == STATE_DOWNLOADING) {
                             if (voiceActionButton != null) voiceActionButton.setVisibility(View.GONE);
-                            if (voiceProgressBar != null) voiceProgressBar.setVisibility(View.VISIBLE);
+                            int vProg = downloadProgresses.getOrDefault(message.getId(), 0);
+                            if (voiceProgressBar != null) {
+                                voiceProgressBar.setVisibility(View.VISIBLE);
+                                voiceProgressBar.setIndeterminate(vProg <= 0);
+                                if (vProg > 0) voiceProgressBar.setProgress(vProg);
+                            }
                             if (voiceDurationText != null) {
-                                voiceDurationText.setText("Downloading...");
+                                voiceDurationText.setText(vProg > 0 ? ("Downloading " + vProg + "%") : "Downloading...");
                             }
                         } else {
                             if (voiceProgressBar != null) voiceProgressBar.setVisibility(View.GONE);
@@ -2289,7 +2308,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                             if (voiceDurationText != null) {
                                 String sizeStr = message.getFormattedMediaSize();
-                                voiceDurationText.setText(sizeStr.isEmpty() ? "Voice note" : sizeStr);
+                                voiceDurationText.setText(sizeStr.isEmpty() ? ("audio".equals(message.getType()) ? "Audio" : "Voice note") : sizeStr);
                             }
                         }
                     }
@@ -2577,12 +2596,56 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         String formattedInfo = ext + (size.isEmpty() ? "" : " • " + size);
                         documentFileSize.setText(formattedInfo);
 
+                        File localDoc = FileMediaManager.getDecryptedFile(itemView.getContext(), message, "");
+                        boolean hasLocalDoc = (localDoc != null && localDoc.exists() && localDoc.length() > 0)
+                                || (message.getLocalFilePath() != null && new File(message.getLocalFilePath()).exists());
+                        if (!hasLocalDoc && message.getMediaUrl() != null && !message.getMediaUrl().isEmpty() && !message.getMediaUrl().startsWith("CHUNKED:")) {
+                            File inlineDoc = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(itemView.getContext(), message.getChatId(), message);
+                            if (inlineDoc != null && inlineDoc.exists() && inlineDoc.length() > 0) {
+                                localDoc = inlineDoc;
+                                hasLocalDoc = true;
+                            }
+                        }
+
+                        final int docDownloadState = hasLocalDoc ? STATE_DOWNLOADED : downloadStates.getOrDefault(message.getId(), STATE_IDLE);
+                        final int docProgress = downloadProgresses.getOrDefault(message.getId(), 0);
+
+                        if (documentProgressBar != null) {
+                            if (docDownloadState == STATE_DOWNLOADING) {
+                                documentProgressBar.setVisibility(View.VISIBLE);
+                                documentProgressBar.setIndeterminate(docProgress <= 0);
+                                if (docProgress > 0) {
+                                    documentProgressBar.setProgress(docProgress);
+                                    documentFileSize.setText(formattedInfo + " • " + docProgress + "%");
+                                } else {
+                                    documentFileSize.setText(formattedInfo + " • Downloading...");
+                                }
+                                if (documentActionIcon != null) documentActionIcon.setVisibility(View.GONE);
+                            } else {
+                                documentProgressBar.setVisibility(View.GONE);
+                                if (documentActionIcon != null) {
+                                    documentActionIcon.setVisibility(View.VISIBLE);
+                                    documentActionIcon.setImageResource(docDownloadState == STATE_RETRY ? R.drawable.ic_undo : R.drawable.ic_download);
+                                }
+                            }
+                        }
+
                         documentMessageContainer.setOnClickListener(v -> {
                             File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, "");
-                            if (local.exists()) {
+                            if (local == null || !local.exists() || local.length() == 0) {
+                                local = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(itemView.getContext(), message.getChatId(), message);
+                            }
+                            if (local != null && local.exists() && local.length() > 0) {
                                 FileMediaManager.openFileWithSystemViewer(itemView.getContext(), local);
-                            } else {
-                                Toast.makeText(itemView.getContext(), "Document awaiting peer-to-peer WebRTC transfer", Toast.LENGTH_SHORT).show();
+                                try {
+                                    com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).markMessageAsReadExplicitly(message);
+                                } catch (Throwable ignored) {}
+                            } else if (mediaDownloadClickListener != null) {
+                                if (docDownloadState == STATE_RETRY) {
+                                    mediaDownloadClickListener.onMediaRetryClick(message);
+                                } else {
+                                    mediaDownloadClickListener.onMediaDownloadClick(message);
+                                }
                             }
                         });
                     }
@@ -2649,6 +2712,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             replyQuoteName.setText(message.getReplySenderName() != null ? message.getReplySenderName() : "User");
                             String quoteText = replyTo.getText();
                             if ("voice".equals(replyTo.getType())) quoteText = "🎤 Voice message";
+                            else if ("audio".equals(replyTo.getType())) quoteText = "🎵 Audio";
                             else if ("image".equals(replyTo.getType())) quoteText = "📷 Photo";
                             else if ("video".equals(replyTo.getType())) quoteText = "🎥 Video";
                             else if ("document".equals(replyTo.getType())) {

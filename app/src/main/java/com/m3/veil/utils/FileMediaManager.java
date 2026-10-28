@@ -26,39 +26,81 @@ public class FileMediaManager {
     }
 
     public static File getDecryptedFile(Context context, Message message, String defaultExt) {
-        if (message != null && message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
+        if (message == null || context == null) return null;
+        if (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
             File local = new File(message.getLocalFilePath());
             if (local.exists() && local.length() > 0) {
                 return local;
             }
         }
-        String ext = defaultExt;
-        if ("image".equals(message.getType())) ext = ".jpg";
-        else if ("video".equals(message.getType())) ext = ".mp4";
-        else if ("voice".equals(message.getType())) ext = ".m4a";
-        else if ("document".equals(message.getType())) {
-            // Check if text has original extension
-            String text = message.getText();
-            if (text != null && text.contains(".")) {
-                int pipeIndex = text.indexOf("|");
-                String name = pipeIndex != -1 ? text.substring(0, pipeIndex) : text;
-                int dotIndex = name.lastIndexOf(".");
-                if (dotIndex != -1) {
-                    ext = name.substring(dotIndex);
-                }
+        String ext = com.m3.veil.manager.VeilMessagesController.resolveMediaExtension(message);
+        if ((ext == null || ext.isEmpty() || ".bin".equals(ext)) && defaultExt != null && !defaultExt.isEmpty()) {
+            ext = defaultExt;
+        }
+        if (ext == null) ext = ".bin";
+        File target = new File(context.getExternalCacheDir(), "dec_" + message.getId() + ext);
+        if (target.exists() && target.length() > 0) {
+            return target;
+        }
+        if (defaultExt != null && !defaultExt.equals(ext)) {
+            File alt = new File(context.getExternalCacheDir(), "dec_" + message.getId() + defaultExt);
+            if (alt.exists() && alt.length() > 0) {
+                return alt;
             }
         }
-        return new File(context.getExternalCacheDir(), "dec_" + message.getId() + ext);
+        return target;
     }
 
     public static void downloadAndDecryptMedia(Context context, Message message, String defaultExt, DownloadCallback callback) {
+        if (context == null || message == null) {
+            if (callback != null) callback.onError(new Exception("Invalid media message"));
+            return;
+        }
         File decryptedFile = getDecryptedFile(context, message, defaultExt);
         if (decryptedFile != null && decryptedFile.exists() && decryptedFile.length() > 0) {
             if (callback != null) callback.onSuccess(decryptedFile);
             return;
         }
 
-        // Complete Privacy WebRTC P2P architecture: Media files are never stored in cloud storage.
+        String dialogId = message.getChatId();
+        File inlineDecoded = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(context, dialogId, message);
+        if (inlineDecoded != null && inlineDecoded.exists() && inlineDecoded.length() > 0) {
+            if (callback != null) callback.onSuccess(inlineDecoded);
+            return;
+        }
+
+        if (message.getMediaUrl() != null && message.getMediaUrl().startsWith("CHUNKED:v1:") && dialogId != null && !dialogId.isEmpty()) {
+            if (callback != null) callback.onProgress(true);
+            com.m3.veil.manager.VeilMessagesController.downloadChunkedMediaFromFirestore(
+                    context.getApplicationContext(),
+                    dialogId,
+                    message,
+                    message.getMediaUrl(),
+                    new com.m3.veil.webrtc.P2PFileTransferHelper.DownloadProgressListener() {
+                        @Override
+                        public void onProgress(String messageId, int progress) {
+                            if (callback != null) callback.onProgress(true);
+                        }
+
+                        @Override
+                        public void onComplete(String messageId, File downloadedFile) {
+                            if (callback != null) {
+                                callback.onProgress(false);
+                                callback.onSuccess(downloadedFile);
+                            }
+                        }
+
+                        @Override
+                        public void onError(String messageId, String error) {
+                            if (callback != null) {
+                                callback.onProgress(false);
+                                callback.onError(new Exception(error != null ? error : "Media transfer failed"));
+                            }
+                        }
+                    });
+            return;
+        }
+
         if (callback != null) {
             callback.onProgress(false);
             callback.onError(new Exception("Media awaiting peer-to-peer WebRTC transfer"));

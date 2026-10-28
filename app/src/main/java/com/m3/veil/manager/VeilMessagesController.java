@@ -1403,8 +1403,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 int chunkSize = 300 * 1024; // 300 KB raw bytes per chunk (~400 KB encrypted Base64)
                 int totalChunks = (int) ((fileLen + chunkSize - 1) / chunkSize);
                 com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
-                List<com.google.android.gms.tasks.Task<?>> uploadTasks = new ArrayList<>();
                 byte[] sliceBuffer = new byte[chunkSize];
+                notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 1);
                 try (java.io.FileInputStream fis = new java.io.FileInputStream(fileToRead)) {
                     for (int i = 0; i < totalChunks; i++) {
                         int expected = (int) Math.min(chunkSize, fileLen - ((long) i * chunkSize));
@@ -1422,22 +1422,34 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         chunkDoc.put("data", encChunk);
                         chunkDoc.put("timestampMs", System.currentTimeMillis());
                         String docKey = msg.getId() + "_" + i;
-                        uploadTasks.add(fs.collection("chats").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc));
-                        uploadTasks.add(fs.collection("groups").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc));
-                    }
-                }
-                if (!uploadTasks.isEmpty()) {
-                    for (com.google.android.gms.tasks.Task<?> t : uploadTasks) {
+                        com.google.android.gms.tasks.Task<?> tChat = fs.collection("chats").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc);
+                        com.google.android.gms.tasks.Task<?> tGroup = fs.collection("groups").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc);
                         try {
-                            com.google.android.gms.tasks.Tasks.await(t, 10, java.util.concurrent.TimeUnit.SECONDS);
+                            com.google.android.gms.tasks.Tasks.await(tChat, 10, java.util.concurrent.TimeUnit.SECONDS);
                         } catch (Exception ignored) {}
+                        try {
+                            com.google.android.gms.tasks.Tasks.await(tGroup, 10, java.util.concurrent.TimeUnit.SECONDS);
+                        } catch (Exception ignored) {}
+                        int pct = (int) (((i + 1) * 100L) / totalChunks);
+                        notifyGlobalMediaTransferProgress(keyScope, msg.getId(), pct);
                     }
                 }
                 msg.setMediaUrl("CHUNKED:v1:" + totalChunks + ":" + fileLen);
+                notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 100);
             }
         } catch (Throwable t) {
             Log.w(TAG, "encodeInlineMediaForTransport notice: " + t.getMessage());
         }
+    }
+
+    public static void notifyGlobalMediaTransferProgress(String dialogId, String messageId, int percent) {
+        VeilMessagesController ctrl = sInstance;
+        if (ctrl == null || dialogId == null || messageId == null) return;
+        ctrl.runOnUI(() -> {
+            for (MessagesObserver obs : ctrl.mObservers) {
+                obs.onMediaTransferProgress(dialogId, messageId, percent);
+            }
+        });
     }
 
     public static String resolveMediaExtension(Message msg) {
@@ -1557,10 +1569,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 downloadChunkedMediaFromFirestore(context.getApplicationContext(), resolvedChatId, msg, mediaUrl,
                         new P2PFileTransferHelper.DownloadProgressListener() {
                             @Override
-                            public void onProgress(String messageId, int progress) {}
+                            public void onProgress(String messageId, int progress) {
+                                notifyGlobalMediaTransferProgress(resolvedChatId, messageId, progress);
+                            }
 
                             @Override
                             public void onComplete(String messageId, File downloadedFile) {
+                                notifyGlobalMediaTransferProgress(resolvedChatId, messageId, 100);
                                 if (onAsyncReady != null) {
                                     new Handler(Looper.getMainLooper()).post(onAsyncReady);
                                 }
@@ -1591,6 +1606,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         if (existingTarget.exists() && existingTarget.length() >= 64) {
             targetMsg.setLocalFilePath(existingTarget.getAbsolutePath());
             EncryptedChatDatabase.getInstance(context).saveMessage(resolvedChatId, targetMsg);
+            notifyGlobalMediaTransferProgress(resolvedChatId, targetMsg.getId(), 100);
             if (callback != null) {
                 new Handler(Looper.getMainLooper()).post(() -> callback.onComplete(targetMsg.getId(), existingTarget));
             }
@@ -1654,6 +1670,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                             }
                         }
                         final int pct = (int) (((i + 1) * 100L) / totalChunks);
+                        notifyGlobalMediaTransferProgress(resolvedChatId, targetMsg.getId(), pct);
                         if (callback != null) {
                             new Handler(Looper.getMainLooper()).post(() -> callback.onProgress(targetMsg.getId(), pct));
                         }
@@ -1683,6 +1700,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     checkpointDir.delete();
                     targetMsg.setLocalFilePath(targetFile.getAbsolutePath());
                     EncryptedChatDatabase.getInstance(context).saveMessage(resolvedChatId, targetMsg);
+                    notifyGlobalMediaTransferProgress(resolvedChatId, targetMsg.getId(), 100);
                     if (callback != null) {
                         new Handler(Looper.getMainLooper()).post(() -> callback.onComplete(targetMsg.getId(), targetFile));
                     }

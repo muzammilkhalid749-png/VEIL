@@ -335,6 +335,13 @@ public class VeilMeshDaemonService extends Service {
                     Log.i(TAG, "Network available -> re-syncing signaling & draining P2P outbox");
                     ensureInProcessEnginesInitialized(getCtx());
                     triggerImmediateOutboxDrain();
+                    try {
+                        Context appCtx = getCtx();
+                        if (appCtx != null) {
+                            com.m3.veil.manager.VeilMessagesController.getInstance(appCtx)
+                                    .flushPendingOfflineMessagesOnNetworkAvailable();
+                        }
+                    } catch (Throwable ignored) {}
                 }
             };
             cm.registerNetworkCallback(request, networkCallback);
