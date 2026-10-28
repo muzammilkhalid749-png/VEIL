@@ -84,9 +84,18 @@ public class SplashActivity extends AppCompatActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean hasNavigated = false;
 
+    private volatile boolean cachedPinLockEnabled = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (!isTaskRoot()) {
+            Intent intent = getIntent();
+            if (intent != null && intent.hasCategory(Intent.CATEGORY_LAUNCHER) && Intent.ACTION_MAIN.equals(intent.getAction())) {
+                finish();
+                return;
+            }
+        }
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_splash);
 
@@ -174,6 +183,16 @@ public class SplashActivity extends AppCompatActivity {
         new Thread(() -> {
             try {
                 SovereignIdentityAndDirectoryEngine.getInstance(getApplicationContext());
+                String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(
+                        androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
+                android.content.SharedPreferences securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
+                        "veil_pin_prefs",
+                        masterKeyAlias,
+                        getApplicationContext(),
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+                cachedPinLockEnabled = (securePrefs.getString("pin_hash", null) != null);
             } catch (Throwable t) {
                 Log.w(TAG, "Subsystem warm-up notice: " + t.getMessage());
             }
@@ -362,23 +381,7 @@ public class SplashActivity extends AppCompatActivity {
     }
 
     private void navigateToMainOrPinLock() {
-        Class<?> destination = MainActivity.class;
-        try {
-            String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(
-                    androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
-            android.content.SharedPreferences securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
-                    "veil_pin_prefs",
-                    masterKeyAlias,
-                    this,
-                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            );
-            if (securePrefs.getString("pin_hash", null) != null) {
-                destination = PinUnlockActivity.class;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to check PIN lock status", e);
-        }
+        Class<?> destination = cachedPinLockEnabled ? PinUnlockActivity.class : MainActivity.class;
         navigateToActivity(destination);
     }
 

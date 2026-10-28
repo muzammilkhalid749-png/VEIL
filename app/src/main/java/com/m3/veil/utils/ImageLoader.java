@@ -5,7 +5,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Log;
+import android.util.LruCache;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -13,11 +13,32 @@ import android.widget.ProgressBar;
 import com.m3.veil.model.Message;
 
 import java.io.File;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ImageLoader {
     private static final String TAG = "ImageLoader";
+    private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
+    private static final ExecutorService DECODE_EXECUTOR = Executors.newFixedThreadPool(2, r -> {
+        Thread t = new Thread(r, "VeilImageDecodePool");
+        t.setPriority(Thread.NORM_PRIORITY - 1);
+        t.setDaemon(true);
+        return t;
+    });
+
+    private static final LruCache<String, Bitmap> BITMAP_CACHE = new LruCache<String, Bitmap>(16 * 1024) {
+        @Override
+        protected int sizeOf(String key, Bitmap value) {
+            return Math.max(1, value.getByteCount() / 1024); // KB
+        }
+    };
+
+    public static void clearCache() {
+        BITMAP_CACHE.evictAll();
+    }
 
     public static void loadImage(Context context, Message message, String rsaPrivateKeyString, String currentUserId, ImageView imageView, ProgressBar progressBar) {
+        if (context == null || message == null || imageView == null) return;
         File cacheDir = context.getExternalCacheDir();
         File decryptedFile = new File(cacheDir, "dec_" + message.getId() + ".jpg");
 
@@ -34,13 +55,10 @@ public class ImageLoader {
         } else {
             // Display base64 thumbnail if available while WebRTC P2P streams full image
             if (message.getThumbnail() != null && !message.getThumbnail().isEmpty()) {
-                try {
-                    byte[] decoded = android.util.Base64.decode(message.getThumbnail(), android.util.Base64.DEFAULT);
-                    Bitmap thumb = BitmapFactory.decodeByteArray(decoded, 0, decoded.length);
-                    if (thumb != null) {
-                        imageView.setImageBitmap(thumb);
-                    }
-                } catch (Exception ignored) {}
+                Bitmap thumb = BlurUtils.getBlurredThumbnail(context, message.getThumbnail());
+                if (thumb != null && !thumb.isRecycled()) {
+                    imageView.setImageBitmap(thumb);
+                }
             }
             if (progressBar != null) {
                 progressBar.setVisibility(View.GONE);
@@ -48,15 +66,40 @@ public class ImageLoader {
         }
     }
 
-    private static void displayImage(String filePath, ImageView imageView, ProgressBar progressBar) {
-        if (filePath == null) return;
-        new Thread(() -> {
+    private static void displayImage(final String filePath, final ImageView imageView, final ProgressBar progressBar) {
+        if (filePath == null || imageView == null) return;
+
+        Bitmap cached = BITMAP_CACHE.get(filePath);
+        if (cached != null && !cached.isRecycled()) {
+            imageView.setTag(filePath);
+            imageView.setImageBitmap(cached);
+            if (progressBar != null) {
+                progressBar.setVisibility(View.GONE);
+            }
+            return;
+        }
+
+        imageView.setTag(filePath);
+        DECODE_EXECUTOR.execute(() -> {
             try {
+                Bitmap cachedNow = BITMAP_CACHE.get(filePath);
+                if (cachedNow != null && !cachedNow.isRecycled()) {
+                    MAIN_HANDLER.post(() -> {
+                        if (filePath.equals(imageView.getTag())) {
+                            imageView.setImageBitmap(cachedNow);
+                        }
+                        if (progressBar != null) {
+                            progressBar.setVisibility(View.GONE);
+                        }
+                    });
+                    return;
+                }
+
                 BitmapFactory.Options options = new BitmapFactory.Options();
                 options.inJustDecodeBounds = true;
                 BitmapFactory.decodeFile(filePath, options);
 
-                int targetSize = 800;
+                int targetSize = 720;
                 int inSampleSize = 1;
                 if (options.outHeight > targetSize || options.outWidth > targetSize) {
                     final int halfHeight = options.outHeight / 2;
@@ -69,10 +112,13 @@ public class ImageLoader {
                 BitmapFactory.Options decodeOpts = new BitmapFactory.Options();
                 decodeOpts.inSampleSize = inSampleSize;
                 decodeOpts.inPreferredConfig = Bitmap.Config.RGB_565;
-                Bitmap bitmap = BitmapFactory.decodeFile(filePath, decodeOpts);
+                final Bitmap bitmap = BitmapFactory.decodeFile(filePath, decodeOpts);
+                if (bitmap != null) {
+                    BITMAP_CACHE.put(filePath, bitmap);
+                }
 
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    if (bitmap != null) {
+                MAIN_HANDLER.post(() -> {
+                    if (bitmap != null && !bitmap.isRecycled() && filePath.equals(imageView.getTag())) {
                         imageView.setImageBitmap(bitmap);
                     }
                     if (progressBar != null) {
@@ -80,16 +126,12 @@ public class ImageLoader {
                     }
                 });
             } catch (Throwable t) {
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    try {
-                        Bitmap bitmap = BitmapFactory.decodeFile(filePath);
-                        if (bitmap != null) imageView.setImageBitmap(bitmap);
-                    } catch (Throwable ignored) {}
+                MAIN_HANDLER.post(() -> {
                     if (progressBar != null) {
                         progressBar.setVisibility(View.GONE);
                     }
                 });
             }
-        }).start();
+        });
     }
 }

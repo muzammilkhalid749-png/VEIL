@@ -19,6 +19,7 @@ import org.json.JSONObject;
 
 import com.m3.veil.manager.StatusController;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -1670,8 +1671,18 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         cv.put(COL_MSG_READ, message.isRead() ? 1 : 0);
         cv.put(COL_MSG_DELIVERED, message.isDelivered() ? 1 : 0);
         cv.put(COL_MSG_PENDING, message.isPending() ? 1 : 0);
-        cv.put(COL_MSG_LOCAL_PATH, message.getLocalFilePath());
-        cv.put(COL_MSG_MEDIA_URL, message.getMediaUrl());
+        String localPath = message.getLocalFilePath();
+        String mediaUrlToStore = message.getMediaUrl();
+        if (mediaUrlToStore != null && mediaUrlToStore.startsWith("INLINE_B64:")
+                && !message.isPending() && localPath != null && !localPath.isEmpty()) {
+            File localFile = new File(localPath);
+            if (localFile.exists() && localFile.length() > 0) {
+                mediaUrlToStore = "LOCAL_DECODED";
+                message.setMediaUrl(mediaUrlToStore);
+            }
+        }
+        cv.put(COL_MSG_LOCAL_PATH, localPath);
+        cv.put(COL_MSG_MEDIA_URL, mediaUrlToStore);
         cv.put(COL_MSG_THUMBNAIL, message.getThumbnail());
         cv.put(COL_MSG_EXPIRES_AT, message.getExpiresAt() != null ? message.getExpiresAt().toDate().getTime() : 0);
         cv.put(COL_MSG_REPLY_ID, message.getReplyToMessageId());

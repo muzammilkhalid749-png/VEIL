@@ -13,10 +13,10 @@ import android.util.LruCache;
  */
 public class BlurUtils {
 
-    private static final LruCache<String, Bitmap> blurMemoryCache = new LruCache<String, Bitmap>(50) {
+    private static final LruCache<String, Bitmap> blurMemoryCache = new LruCache<String, Bitmap>(4096) {
         @Override
         protected int sizeOf(String key, Bitmap bitmap) {
-            return bitmap.getByteCount() / 1024; // KB
+            return Math.max(1, bitmap.getByteCount() / 1024); // KB
         }
     };
 
@@ -35,7 +35,8 @@ public class BlurUtils {
             return null;
         }
 
-        Bitmap cached = blurMemoryCache.get(base64Thumbnail);
+        String cacheKey = base64Thumbnail.hashCode() + "_" + base64Thumbnail.length();
+        Bitmap cached = blurMemoryCache.get(cacheKey);
         if (cached != null && !cached.isRecycled()) {
             return cached;
         }
@@ -64,9 +65,10 @@ public class BlurUtils {
             int radius = allowHeavyBlur ? 18 : 6;
             Bitmap blurred = fastStackBlur(scaled, radius);
             if (blurred != null) {
-                blurMemoryCache.put(base64Thumbnail, blurred);
+                blurMemoryCache.put(cacheKey, blurred);
                 return blurred;
             }
+            blurMemoryCache.put(cacheKey, scaled);
             return scaled;
         } catch (Throwable t) {
             return null;

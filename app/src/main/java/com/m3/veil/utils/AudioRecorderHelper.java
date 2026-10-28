@@ -212,6 +212,7 @@ public class AudioRecorderHelper {
 
         // 2. Stop legacy MediaRecorder if active
         if (legacyMediaRecorder != null) {
+            isRecording.set(false);
             try {
                 legacyMediaRecorder.stop();
             } catch (RuntimeException stopException) {
@@ -220,7 +221,12 @@ public class AudioRecorderHelper {
                 }
                 outputFile = null;
             }
-            legacyMediaRecorder.release();
+            try {
+                legacyMediaRecorder.reset();
+            } catch (Throwable ignored) {}
+            try {
+                legacyMediaRecorder.release();
+            } catch (Throwable ignored) {}
             legacyMediaRecorder = null;
         }
         return outputFile;

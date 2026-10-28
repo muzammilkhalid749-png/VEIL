@@ -1869,16 +1869,19 @@ public class SovereignIdentityAndDirectoryEngine {
     // DECENTRALIZED EPHEMERAL WEBSOCKET SIGNALING (<80ms WebRTC & Call P2P Mesh)
     // ─────────────────────────────────────────────────────────────────────────────
 
-    public void subscribeToIncomingSignals(String myUid, OnSignalReceivedListener listener) {
+    public synchronized void subscribeToIncomingSignals(String myUid, OnSignalReceivedListener listener) {
         if (listener != null && !mSignalListeners.contains(listener)) {
             mSignalListeners.add(listener);
         }
         if (myUid == null || myUid.isEmpty()) return;
-        if (myUid.equals(mSubscribedUid) && !mActiveSignalWebSockets.isEmpty()) return;
+        if (myUid.equals(mSubscribedUid)) return;
         mSubscribedUid = myUid;
 
         mExecutor.execute(() -> {
             for (String relayUrl : NOSTR_RELAYS) {
+                if (mActiveSignalWebSockets.containsKey(relayUrl)) {
+                    continue;
+                }
                 Request req = new Request.Builder().url(relayUrl).build();
                 mOkHttpClient.newWebSocket(req, new WebSocketListener() {
                     @Override

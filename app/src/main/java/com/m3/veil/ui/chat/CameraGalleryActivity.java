@@ -1169,9 +1169,14 @@ public class CameraGalleryActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
         stopRecording();
+        if (cameraProvider != null) {
+            try {
+                cameraProvider.unbindAll();
+            } catch (Throwable ignored) {}
+        }
         mediaScanExecutor.shutdown();
+        super.onDestroy();
     }
 
     private void flipLens() {

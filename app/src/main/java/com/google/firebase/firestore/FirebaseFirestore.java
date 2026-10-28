@@ -100,9 +100,11 @@ public class FirebaseFirestore {
             .build();
 
     private final ConcurrentHashMap<String, Map<String, Object>> localStore = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> docUpdateTimes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> docTimestamps = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> deletedDocs = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> lastCreatedAtSecByPath = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> lastColHttpPollMs = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CopyOnWriteArrayList<EventListener<DocumentSnapshot>>> docListeners = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CopyOnWriteArrayList<Runnable>> collectionWakeListeners = new ConcurrentHashMap<>();
 
@@ -476,7 +478,16 @@ public class FirebaseFirestore {
                         if (resp.isSuccessful() && resp.body() != null) {
                             String bodyStr = resp.body().string();
                             JSONObject json = new JSONObject(bodyStr);
+                            String updateTime = json.optString("updateTime", "");
+                            Map<String, Object> existing = localStore.get(normPath);
+                            if (existing != null && !updateTime.isEmpty() && updateTime.equals(docUpdateTimes.get(normPath))) {
+                                tcs.trySetResult(new DocumentSnapshot(docId, normPath, existing, true));
+                                return;
+                            }
                             Map<String, Object> parsed = parseFirestoreDocumentJson(json);
+                            if (!updateTime.isEmpty()) {
+                                docUpdateTimes.put(normPath, updateTime);
+                            }
                             localStore.put(normPath, new HashMap<>(parsed));
                             tcs.trySetResult(new DocumentSnapshot(docId, normPath, parsed, true));
                             return;
@@ -548,13 +559,7 @@ public class FirebaseFirestore {
                             .build();
 
                     try (Response resp = httpClient.newCall(req).execute()) {
-                        if (resp.isSuccessful() && resp.body() != null) {
-                            JSONObject json = new JSONObject(resp.body().string());
-                            Map<String, Object> serverData = parseFirestoreDocumentJson(json);
-                            if (!serverData.isEmpty()) {
-                                localStore.put(normPath, serverData);
-                            }
-                        } else if (resp.code() == 429) {
+                        if (resp.code() == 429) {
                             markFirestoreQuotaExhausted();
                         }
                     } catch (Exception netEx) {
@@ -619,9 +624,14 @@ public class FirebaseFirestore {
         ioExecutor.execute(() -> {
             Map<String, DocumentSnapshot> resultDocs = new HashMap<>();
 
-            if (isFirestoreRestAvailable()) {
+            long nowMs = System.currentTimeMillis();
+            Long lastPoll = lastColHttpPollMs.get(normCollection);
+            boolean skipRemoteHttp = (lastPoll != null && (nowMs - lastPoll) < 6000L && !localStore.isEmpty());
+            if (!skipRemoteHttp && isFirestoreRestAvailable()) {
+                lastColHttpPollMs.put(normCollection, nowMs);
                 try {
-                    String url = BASE_URL + "/" + normCollection + "?pageSize=300";
+                    int pageSize = (limitCount > 0 && limitCount < 80) ? (int) limitCount : 80;
+                    String url = BASE_URL + "/" + normCollection + "?pageSize=" + pageSize;
                     Request req = new Request.Builder().url(url).get().build();
                     try (Response resp = httpClient.newCall(req).execute()) {
                         if (resp.isSuccessful() && resp.body() != null) {
@@ -635,8 +645,15 @@ public class FirebaseFirestore {
                                     String dId = extractDocId(fullName);
                                     String dPath = normCollection + "/" + dId;
                                     if (deletedDocs.containsKey(dPath)) continue;
-                                    Map<String, Object> fieldsMap = parseFirestoreDocumentJson(docJson);
-                                    localStore.put(dPath, fieldsMap);
+                                    String updateTime = docJson.optString("updateTime", "");
+                                    Map<String, Object> fieldsMap = localStore.get(dPath);
+                                    if (fieldsMap == null || updateTime.isEmpty() || !updateTime.equals(docUpdateTimes.get(dPath))) {
+                                        fieldsMap = parseFirestoreDocumentJson(docJson);
+                                        if (!updateTime.isEmpty()) {
+                                            docUpdateTimes.put(dPath, updateTime);
+                                        }
+                                        localStore.put(dPath, fieldsMap);
+                                    }
                                     DocumentSnapshot snap = new DocumentSnapshot(dId, dPath, fieldsMap, true);
                                     if (matchesFilters(snap, filters)) {
                                         resultDocs.put(dId, snap);
@@ -653,7 +670,7 @@ public class FirebaseFirestore {
             }
 
             // Query Nostr relay pool for this collection
-            queryNostrByTagBlocking(collectionTagFor(normCollection), 200, 800L);
+            queryNostrByTagBlocking(collectionTagFor(normCollection), 80, 600L);
 
             for (Map.Entry<String, Map<String, Object>> entry : localStore.entrySet()) {
                 String path = entry.getKey();
@@ -725,14 +742,14 @@ public class FirebaseFirestore {
         String docTag = documentTagFor(normPath);
         ensureLiveTagSubscription(docTag, docTag, 2);
 
-        final Map<String, String> lastHash = new ConcurrentHashMap<>();
+        final Map<String, Integer> lastHash = new ConcurrentHashMap<>();
         ScheduledFuture<?> future = pollExecutor.scheduleWithFixedDelay(() -> {
             getDocumentAsync(normPath).addOnSuccessListener(snap -> {
                 if (snap == null) return;
                 ioExecutor.execute(() -> {
-                    String sig = snap.exists() + ":" + String.valueOf(snap.getData());
-                    String prev = lastHash.put(normPath, sig);
-                    if (prev == null || !prev.equals(sig)) {
+                    int sig = (snap.exists() ? 31 : 0) + (snap.getData() != null ? snap.getData().hashCode() : 0);
+                    Integer prev = lastHash.put(normPath, sig);
+                    if (prev == null || prev != sig) {
                         mainHandler.post(() -> {
                             try {
                                 listener.onEvent(snap, null);
@@ -742,7 +759,7 @@ public class FirebaseFirestore {
                     }
                 });
             });
-        }, 0, 15000, TimeUnit.MILLISECONDS);
+        }, 0, 30000, TimeUnit.MILLISECONDS);
 
         return () -> {
             future.cancel(false);
@@ -830,7 +847,7 @@ public class FirebaseFirestore {
         ScheduledFuture<?> future = pollExecutor.scheduleWithFixedDelay(() -> {
             queryCollectionAsync(normCollection, filters, orderByField, orderDirection, limitCount)
                     .addOnSuccessListener(querySnap -> evaluateAndEmit.run());
-        }, 0, 15000, TimeUnit.MILLISECONDS);
+        }, 0, 30000, TimeUnit.MILLISECONDS);
 
         return () -> {
             future.cancel(false);

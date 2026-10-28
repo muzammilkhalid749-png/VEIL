@@ -512,15 +512,17 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             PeerConnection pc = (PeerConnection)this.peerConnections.get(peerId);
             if (pc != null) {
                PeerConnection.IceConnectionState state = pc.iceConnectionState();
-               if (state != IceConnectionState.CONNECTED && state != IceConnectionState.COMPLETED) {
-                  Log.i("WebRtcManager", "Tier 2 Activated: Direct STUN timed out (3,000ms). Falling back to TURN TCP/443 for peer: " + peerId);
+               if (state != IceConnectionState.CONNECTED
+                       && state != IceConnectionState.COMPLETED
+                       && state != IceConnectionState.CHECKING) {
+                  Log.i("WebRtcManager", "Tier 2 Activated: Direct STUN timed out (12,000ms). Falling back to TURN TCP/443 for peer: " + peerId);
                   this.restartIceWithTurn(peerId);
                }
             }
 
          };
          this.turnFallbackRunnables.put(peerId, r);
-         this.heartbeatHandler.postDelayed(r, 3000L);
+         this.heartbeatHandler.postDelayed(r, 12000L);
       }
    }
 
@@ -3274,9 +3276,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   return;
                }
                if ((sigState == SignalingState.HAVE_LOCAL_OFFER || sigState == SignalingState.HAVE_REMOTE_OFFER || iceState == IceConnectionState.CHECKING)
-                       && lastOffer != null && (now - lastOffer) < 5000L) {
+                       && lastOffer != null && (now - lastOffer) < 18000L) {
                   return;
                }
+               if (lastOffer != null && (now - lastOffer) < 10000L && iceState != IceConnectionState.FAILED && iceState != IceConnectionState.CLOSED) {
+                  return;
+               }
+            } else if (lastOffer != null && (now - lastOffer) < 8000L) {
+               return;
             }
             this.lastOfferTimestamp.put(peerId, now);
             this.scheduleTurnFallback(peerId);
@@ -3314,69 +3321,88 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       }
    }
 
-   public void onOfferReceived(final String fromUserId, String sdp) {
+   public void onOfferReceived(final String fromUserId, final String sdp) {
       if (fromUserId == null || sdp == null) return;
-      PeerConnection existingPc = (PeerConnection)this.peerConnections.get(fromUserId);
-      if (existingPc != null && existingPc.signalingState() == PeerConnection.SignalingState.HAVE_LOCAL_OFFER) {
-         boolean isPolite = this.currentUserId != null && this.currentUserId.compareTo(fromUserId) < 0;
-         if (!isPolite) {
-            Log.i("WebRtcManager", "Impolite peer ignoring collision offer from " + fromUserId);
-            return;
-         }
-         Log.i("WebRtcManager", "Polite peer resetting local offer to accept remote offer from " + fromUserId);
-         List<IceCandidate> savedCandidates = this.pendingIceCandidates.remove(fromUserId);
-         this.closePeerConnection(fromUserId);
-         if (savedCandidates != null) {
-            this.pendingIceCandidates.put(fromUserId, savedCandidates);
-         }
-         existingPc = null;
-      }
-      final PeerConnection pc = (existingPc != null) ? existingPc : this.getOrCreatePeerConnection(fromUserId, false);
-      SessionDescription remoteDesc = new SessionDescription(Type.OFFER, sdp);
-      pc.setRemoteDescription(new SimpleSdpObserver() {
-         public void onSetSuccess() {
-            WebRtcManager.this.drainPendingIceCandidates(fromUserId, pc);
-            MediaConstraints sdpConstraints = new MediaConstraints();
-            sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
-            sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"));
-            pc.createAnswer(new SimpleSdpObserver() {
-               public void onCreateSuccess(final SessionDescription sessionDescription) {
-                  pc.setLocalDescription(new SimpleSdpObserver() {
-                     public void onSetSuccess() {
-                        SignalingClient.getInstance().sendAnswer(fromUserId, sessionDescription.description);
-                     }
-                  }, sessionDescription);
+      this.rtcExecutor.execute(() -> {
+         this.cancelTurnFallback(fromUserId);
+         this.lastOfferTimestamp.put(fromUserId, System.currentTimeMillis());
+         PeerConnection existingPc = (PeerConnection)this.peerConnections.get(fromUserId);
+         if (existingPc != null) {
+            PeerConnection.SignalingState sigState = existingPc.signalingState();
+            PeerConnection.IceConnectionState iceState = existingPc.iceConnectionState();
+            if (sigState == PeerConnection.SignalingState.HAVE_LOCAL_OFFER) {
+               boolean isPolite = this.currentUserId != null && this.currentUserId.compareTo(fromUserId) < 0;
+               if (!isPolite) {
+                  Log.i("WebRtcManager", "Impolite peer ignoring collision offer from " + fromUserId);
+                  return;
                }
-            }, sdpConstraints);
+               Log.i("WebRtcManager", "Polite peer resetting local offer to accept remote offer from " + fromUserId);
+               List<IceCandidate> savedCandidates = this.pendingIceCandidates.remove(fromUserId);
+               this.closePeerConnection(fromUserId);
+               this.lastOfferTimestamp.put(fromUserId, System.currentTimeMillis());
+               if (savedCandidates != null) {
+                  this.pendingIceCandidates.put(fromUserId, savedCandidates);
+               }
+               existingPc = null;
+            } else if (iceState == IceConnectionState.CONNECTED || iceState == IceConnectionState.COMPLETED) {
+               // Already connected; ignore redundant late offer unless it is an explicit ICE restart
+               if (!sdp.contains("ice-ufrag")) {
+                  return;
+               }
+            }
          }
-      }, remoteDesc);
-   }
-
-   public void onAnswerReceived(final String fromUserId, String sdp) {
-      if (fromUserId == null || sdp == null) return;
-      final PeerConnection pc = (PeerConnection)this.peerConnections.get(fromUserId);
-      if (pc != null && pc.signalingState() == PeerConnection.SignalingState.HAVE_LOCAL_OFFER) {
-         SessionDescription remoteDesc = new SessionDescription(Type.ANSWER, sdp);
+         final PeerConnection pc = (existingPc != null) ? existingPc : this.getOrCreatePeerConnection(fromUserId, false);
+         SessionDescription remoteDesc = new SessionDescription(Type.OFFER, sdp);
          pc.setRemoteDescription(new SimpleSdpObserver() {
             public void onSetSuccess() {
                WebRtcManager.this.drainPendingIceCandidates(fromUserId, pc);
+               MediaConstraints sdpConstraints = new MediaConstraints();
+               sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
+               sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"));
+               pc.createAnswer(new SimpleSdpObserver() {
+                  public void onCreateSuccess(final SessionDescription sessionDescription) {
+                     pc.setLocalDescription(new SimpleSdpObserver() {
+                        public void onSetSuccess() {
+                           SignalingClient.getInstance().sendAnswer(fromUserId, sessionDescription.description);
+                        }
+                     }, sessionDescription);
+                  }
+               }, sdpConstraints);
             }
          }, remoteDesc);
-      }
+      });
    }
 
-   public void onIceCandidateReceived(String fromUserId, IceCandidate candidate) {
+   public void onAnswerReceived(final String fromUserId, final String sdp) {
+      if (fromUserId == null || sdp == null) return;
+      this.rtcExecutor.execute(() -> {
+         final PeerConnection pc = (PeerConnection)this.peerConnections.get(fromUserId);
+         if (pc != null && pc.signalingState() == PeerConnection.SignalingState.HAVE_LOCAL_OFFER) {
+            this.lastOfferTimestamp.put(fromUserId, System.currentTimeMillis());
+            SessionDescription remoteDesc = new SessionDescription(Type.ANSWER, sdp);
+            pc.setRemoteDescription(new SimpleSdpObserver() {
+               public void onSetSuccess() {
+                  WebRtcManager.this.drainPendingIceCandidates(fromUserId, pc);
+               }
+            }, remoteDesc);
+         }
+      });
+   }
+
+   public void onIceCandidateReceived(final String fromUserId, final IceCandidate candidate) {
       if (fromUserId == null || candidate == null) return;
-      PeerConnection pc = (PeerConnection)this.peerConnections.get(fromUserId);
-      if (pc != null && pc.getRemoteDescription() != null) {
-         try {
-            pc.addIceCandidate(candidate);
-         } catch (Exception ignored) {}
-      } else {
-         List<IceCandidate> queue = this.pendingIceCandidates.computeIfAbsent(
-                 fromUserId, k -> Collections.synchronizedList(new ArrayList<>()));
-         queue.add(candidate);
-      }
+      this.rtcExecutor.execute(() -> {
+         PeerConnection pc = (PeerConnection)this.peerConnections.get(fromUserId);
+         if (pc != null && pc.getRemoteDescription() != null) {
+            try {
+               pc.addIceCandidate(candidate);
+            } catch (Exception ignored) {}
+         } else {
+            List<IceCandidate> queue = this.pendingIceCandidates.computeIfAbsent(
+                    fromUserId, k -> Collections.synchronizedList(new ArrayList<>()));
+            queue.add(candidate);
+         }
+      });
    }
 
    public void onWakeUpReceived(String fromUserId, String chatId) {
