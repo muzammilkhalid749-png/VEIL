@@ -2,6 +2,7 @@ package com.m3.veil.ui.chat;
 
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -23,12 +24,16 @@ import androidx.core.content.ContextCompat;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
 import com.m3.veil.R;
 import com.m3.veil.database.EncryptedChatDatabase;
 import com.m3.veil.manager.AuthManager;
+import com.m3.veil.manager.VeilMessagesController;
 import com.m3.veil.model.Chat;
+import com.m3.veil.ui.chat.sheets.SharedMediaGalleryBottomSheet;
+import com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet;
 import com.m3.veil.webrtc.VeilPacket;
 import com.m3.veil.webrtc.WebRtcManager;
 
@@ -40,12 +45,14 @@ import java.util.UUID;
 
 /**
  * Dedicated Group & Channel Administrative Console (`GroupSettingsActivity`).
- * Provides granular control over:
+ * Features:
+ * - Group Media Visibility: Toggle whether group media shows in mobile Gallery & File Manager
+ * - Group Theme & Wallpaper: Full mesh-synchronized theme & wallpaper picker with live preview
+ * - Shared Media, Links & Docs: Direct WhatsApp/Telegram-style 4-tab media console
  * - Group/Channel Identity (Title, @handle, Description, Public Directory listing)
- * - Granular Member Permissions (Send messages, Send media, Create polls, Pin messages, Add members)
+ * - Member Permissions Matrix (Send messages, Send media, Create polls, Pin messages, Add members)
  * - Anti-Spam Slow Mode Cooldown (Off, 10s, 30s, 1m, 5m, 15m)
- * - Invite Link & Cryptographic Token Rotation
- * - Sender-Key Ratchet Rotation (Immediate forward-secrecy group key rotation)
+ * - Cryptographic Sender-Key Ratchet Rotation & Invite Link
  */
 public class GroupSettingsActivity extends AppCompatActivity {
 
@@ -63,6 +70,7 @@ public class GroupSettingsActivity extends AppCompatActivity {
     private CheckBox cbAllowPin;
     private CheckBox cbAllowMemberInvite;
     private CheckBox cbApproveNewMembers;
+    private SwitchMaterial switchGroupMediaVisibility;
     private int selectedSlowModeSec = 0;
 
     @Override
@@ -129,7 +137,83 @@ public class GroupSettingsActivity extends AppCompatActivity {
 
         SharedPreferences prefs = getSharedPreferences("VeilGroupPrefs", MODE_PRIVATE);
 
-        // Section 1: Identity & Public Handle
+        // Section 1: Media Visibility in Gallery & File Manager (NEW)
+        MaterialCardView visibilityCard = createSectionCard(dp);
+        LinearLayout visibilityBox = createCardInnerLayout(dp);
+        visibilityBox.addView(createSectionHeader("🖼️ Group Media Visibility", dp));
+
+        boolean mediaVisEnabled = VeilMessagesController.isMediaVisibilityEnabled(this, chatId);
+        switchGroupMediaVisibility = new SwitchMaterial(this);
+        switchGroupMediaVisibility.setText("Show Group Media in Phone Gallery & Files");
+        switchGroupMediaVisibility.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
+        switchGroupMediaVisibility.setChecked(mediaVisEnabled);
+        visibilityBox.addView(switchGroupMediaVisibility);
+
+        TextView tvVisHint = new TextView(this);
+        tvVisHint.setText("When enabled, photos, videos, and files downloaded from this group will be visible in your phone's Gallery, Google Photos, and File Manager. When turned off, they remain in the encrypted vault.");
+        tvVisHint.setTextSize(12.5f);
+        tvVisHint.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
+        tvVisHint.setPadding(0, (int) (6 * dp), 0, (int) (4 * dp));
+        visibilityBox.addView(tvVisHint);
+
+        visibilityCard.addView(visibilityBox);
+        content.addView(visibilityCard);
+
+        // Section 2: Shared Media, Links & Docs Navigation Card
+        MaterialCardView mediaNavCard = createSectionCard(dp);
+        LinearLayout mediaNavBox = createCardInnerLayout(dp);
+        mediaNavBox.addView(createSectionHeader("📁 Group Media, Links & Docs", dp));
+
+        TextView tvMediaNavDesc = new TextView(this);
+        tvMediaNavDesc.setText("Browse photos, videos, audio clips, documents, and shared web links exchanged in this group.");
+        tvMediaNavDesc.setTextSize(12.5f);
+        tvMediaNavDesc.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
+        tvMediaNavDesc.setPadding(0, 0, 0, (int) (10 * dp));
+        mediaNavBox.addView(tvMediaNavDesc);
+
+        MaterialButton btnOpenSharedMedia = new MaterialButton(this);
+        btnOpenSharedMedia.setText("📂 Open Group Media Gallery");
+        btnOpenSharedMedia.setCornerRadius((int) (12 * dp));
+        btnOpenSharedMedia.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary));
+        btnOpenSharedMedia.setTextColor(Color.WHITE);
+        btnOpenSharedMedia.setOnClickListener(v -> {
+            if (chatId != null) {
+                SharedMediaGalleryBottomSheet sheet = SharedMediaGalleryBottomSheet.newInstance(
+                        chatId, currentChat != null ? currentChat.getName() : "Group Media"
+                );
+                sheet.show(getSupportFragmentManager(), "SharedMediaGalleryBottomSheet");
+            }
+        });
+        mediaNavBox.addView(btnOpenSharedMedia);
+
+        mediaNavCard.addView(mediaNavBox);
+        content.addView(mediaNavCard);
+
+        // Section 3: Group Theme & Wallpaper (Full synchronizer with live preview)
+        MaterialCardView themeCard = createSectionCard(dp);
+        LinearLayout themeBox = createCardInnerLayout(dp);
+        themeBox.addView(createSectionHeader("🎨 Group Theme & Wallpaper", dp));
+
+        TextView tvThemeDesc = new TextView(this);
+        tvThemeDesc.setText("Synchronize custom wallpaper, colors, and doodle patterns across all group participants.");
+        tvThemeDesc.setTextSize(12.5f);
+        tvThemeDesc.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
+        tvThemeDesc.setPadding(0, 0, 0, (int) (10 * dp));
+        themeBox.addView(tvThemeDesc);
+
+        MaterialButton btnOpenThemePicker = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnOpenThemePicker.setText("🎨 Customize & Broadcast Group Theme");
+        btnOpenThemePicker.setCornerRadius((int) (12 * dp));
+        btnOpenThemePicker.setOnClickListener(v -> {
+            ThemeWallpaperBottomSheet sheet = ThemeWallpaperBottomSheet.newInstance(chatId, null, true);
+            sheet.show(getSupportFragmentManager(), "ThemeWallpaperBottomSheet");
+        });
+        themeBox.addView(btnOpenThemePicker);
+
+        themeCard.addView(themeBox);
+        content.addView(themeCard);
+
+        // Section 4: Identity & Public Directory
         MaterialCardView idCard = createSectionCard(dp);
         LinearLayout idBox = createCardInnerLayout(dp);
         idBox.addView(createSectionHeader("🏛️ Identity & Public Directory", dp));
@@ -152,7 +236,7 @@ public class GroupSettingsActivity extends AppCompatActivity {
         idCard.addView(idBox);
         content.addView(idCard);
 
-        // Section 2: Member Permissions Matrix
+        // Section 5: Member Permissions Matrix
         MaterialCardView permCard = createSectionCard(dp);
         LinearLayout permBox = createCardInnerLayout(dp);
         permBox.addView(createSectionHeader("🛡️ Member Permissions Matrix", dp));
@@ -184,7 +268,7 @@ public class GroupSettingsActivity extends AppCompatActivity {
         permCard.addView(permBox);
         content.addView(permCard);
 
-        // Section 3: Slow Mode Cooldown
+        // Section 6: Slow Mode Cooldown
         MaterialCardView slowCard = createSectionCard(dp);
         LinearLayout slowBox = createCardInnerLayout(dp);
         slowBox.addView(createSectionHeader("⏱️ Anti-Spam Slow Mode Cooldown", dp));
@@ -224,7 +308,7 @@ public class GroupSettingsActivity extends AppCompatActivity {
         slowCard.addView(slowBox);
         content.addView(slowCard);
 
-        // Section 4: Cryptographic Sender-Key Ratchet & Invite Link
+        // Section 7: Cryptographic Sender-Key Ratchet & Invite Link
         MaterialCardView cryptoCard = createSectionCard(dp);
         LinearLayout cryptoBox = createCardInnerLayout(dp);
         cryptoBox.addView(createSectionHeader("🔐 Cryptographic Group Security", dp));
@@ -270,10 +354,12 @@ public class GroupSettingsActivity extends AppCompatActivity {
         cryptoCard.addView(cryptoBox);
         content.addView(cryptoCard);
 
-        // Save Button
+        // Save All Button
         MaterialButton btnSaveAll = new MaterialButton(this);
         btnSaveAll.setText("Save & Broadcast Group Settings");
         btnSaveAll.setCornerRadius((int) (14 * dp));
+        btnSaveAll.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary));
+        btnSaveAll.setTextColor(Color.WHITE);
         btnSaveAll.setPadding(0, (int) (14 * dp), 0, (int) (14 * dp));
         btnSaveAll.setOnClickListener(v -> saveAndSyncGroupSettings());
         content.addView(btnSaveAll);
@@ -348,6 +434,11 @@ public class GroupSettingsActivity extends AppCompatActivity {
         if (newName.isEmpty()) {
             etGroupName.setError("Name cannot be empty");
             return;
+        }
+
+        // Save Media Visibility for this group
+        if (switchGroupMediaVisibility != null) {
+            VeilMessagesController.setMediaVisibilityEnabled(this, chatId, switchGroupMediaVisibility.isChecked());
         }
 
         String[] prefNamespaces = {"VeilGroupPrefs", "veil_group_perms"};

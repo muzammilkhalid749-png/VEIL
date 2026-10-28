@@ -107,6 +107,14 @@ public class FileMediaManager {
         }
     }
 
+    public static void openDocumentWithOriginalName(Context context, Message message, File file) {
+        if (message == null) {
+            openFileWithSystemViewer(context, file);
+            return;
+        }
+        openDocumentWithOriginalName(context, file, message.getContent());
+    }
+
     public static void openDocumentWithOriginalName(Context context, File file, String rawDisplayFileName) {
         if (file == null || !file.exists()) {
             Toast.makeText(context, "File is not downloaded yet", Toast.LENGTH_SHORT).show();

@@ -69,6 +69,19 @@ public class VoicePlayerManager {
         listeners.put(messageId, listener);
     }
 
+    public void togglePlay(Context context, Message message, PlaybackListener listener) {
+        if (message == null || context == null) return;
+        String id = message.getId();
+        if (id != null && listener != null) {
+            registerListener(id, listener);
+        }
+        if (isPlaying(id)) {
+            pausePlayback();
+        } else {
+            playVoiceNote(context, message, null, null);
+        }
+    }
+
     public void unregisterListener(String messageId) {
         listeners.remove(messageId);
     }

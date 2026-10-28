@@ -1582,7 +1582,10 @@ public class ChatActivity extends AppCompatActivity {
                     cursor.close();
                 }
 
-                File tempDoc = new File(getExternalCacheDir(), "doc_" + System.currentTimeMillis() + "_" + fileName);
+                fileName = com.m3.veil.manager.VeilMessagesController.cleanDocumentFileName(fileName);
+                File docsDir = new File(getExternalCacheDir(), "shared_docs");
+                if (!docsDir.exists()) docsDir.mkdirs();
+                File tempDoc = new File(docsDir, fileName);
                 try (InputStream in = getContentResolver().openInputStream(docUri);
                      OutputStream out = new FileOutputStream(tempDoc)) {
                     byte[] buffer = new byte[8192];
@@ -1835,7 +1838,8 @@ public class ChatActivity extends AppCompatActivity {
         String messageId = UUID.randomUUID().toString();
         String initialText = (caption != null && !caption.trim().isEmpty()) ? caption.trim() : "";
         if ("document".equals(mediaType)) {
-            initialText = rawFile.getName() + "|" + formatFileSize(rawFile.length());
+            String cleanName = com.m3.veil.manager.VeilMessagesController.cleanDocumentFileName(rawFile.getName());
+            initialText = cleanName + "|" + formatFileSize(rawFile.length());
         }
 
         String effectiveReceiver = isGroupChatContext() ? chatId : recipientId;
@@ -2217,6 +2221,12 @@ public class ChatActivity extends AppCompatActivity {
         int wpDim = appPrefs.getInt("wallpaper_dim", 0);
 
         String rawWallpaper = currentLocalChat != null ? currentLocalChat.getWallpaperColor() : null;
+        if ((rawWallpaper == null || rawWallpaper.isEmpty()) && chatId != null) {
+            rawWallpaper = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChatWallpaper(chatId);
+            if (rawWallpaper != null && currentLocalChat != null) {
+                currentLocalChat.setWallpaperColor(rawWallpaper);
+            }
+        }
         String wpType = (rawWallpaper != null && !rawWallpaper.isEmpty()) ? "custom" : appPrefs.getString("wallpaper_type", "default");
         String wpValue = (rawWallpaper != null && !rawWallpaper.isEmpty()) ? rawWallpaper : appPrefs.getString("wallpaper_value", null);
 
@@ -2957,7 +2967,7 @@ public class ChatActivity extends AppCompatActivity {
             }
         });
 
-        ItemTouchHelper.SimpleCallback touchHelperCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT | ItemTouchHelper.LEFT) {
+        ItemTouchHelper.SimpleCallback touchHelperCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
             private boolean hasTriggeredHaptic = false;
             private int pendingReplyPosition = RecyclerView.NO_POSITION;
             private final android.graphics.Paint circlePaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
@@ -2974,7 +2984,6 @@ public class ChatActivity extends AppCompatActivity {
 
             @Override
             public float getSwipeThreshold(@NonNull RecyclerView.ViewHolder viewHolder) {
-                // Return MAX_VALUE so ItemTouchHelper never dismisses the row and always springs dX smoothly back to 0f on release
                 return Float.MAX_VALUE;
             }
 
@@ -2995,7 +3004,7 @@ public class ChatActivity extends AppCompatActivity {
 
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
-                // Handled during finger release in onChildDraw / clearView so the bubble never stays stuck off-center
+                // Handled during finger release so the bubble never stays stuck
             }
 
             @Override
@@ -3011,18 +3020,36 @@ public class ChatActivity extends AppCompatActivity {
                 float maxDx = 68f * density;
                 float triggerThreshold = 44f * density;
 
-                float translationX = dX;
-                if (translationX > maxDx) {
-                    translationX = maxDx + (translationX - maxDx) * 0.12f;
-                } else if (translationX < -maxDx) {
-                    translationX = -maxDx + (translationX + maxDx) * 0.12f;
-                }
-
                 View bubble = null;
                 if (viewHolder instanceof MessagesAdapter.SentMessageViewHolder) {
                     bubble = ((MessagesAdapter.SentMessageViewHolder) viewHolder).messageBubble;
                 } else if (viewHolder instanceof MessagesAdapter.ReceivedMessageViewHolder) {
                     bubble = ((MessagesAdapter.ReceivedMessageViewHolder) viewHolder).messageBubble;
+                }
+
+                if (!isCurrentlyActive) {
+                    // Finger released: immediately animate bubble back home and clear any stuck translation
+                    if (bubble != null) {
+                        bubble.animate().cancel();
+                        bubble.animate().translationX(0f).setDuration(120).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+                    }
+                    viewHolder.itemView.setTranslationX(0f);
+
+                    if (hasTriggeredHaptic && pendingReplyPosition != RecyclerView.NO_POSITION) {
+                        final int replyPos = pendingReplyPosition;
+                        hasTriggeredHaptic = false;
+                        pendingReplyPosition = RecyclerView.NO_POSITION;
+                        if (replyPos > 0 && replyPos <= messageList.size()) {
+                            final Message targetMsg = messageList.get(replyPos - 1);
+                            recyclerView.post(() -> replyToMessage(targetMsg));
+                        }
+                    }
+                    return;
+                }
+
+                float translationX = Math.max(0f, dX);
+                if (translationX > maxDx) {
+                    translationX = maxDx + (translationX - maxDx) * 0.12f;
                 }
 
                 if (bubble != null) {
@@ -3032,37 +3059,24 @@ public class ChatActivity extends AppCompatActivity {
                     viewHolder.itemView.setTranslationX(translationX);
                 }
 
-                float absDx = Math.abs(translationX);
-                if (isCurrentlyActive) {
-                    if (absDx >= triggerThreshold && !hasTriggeredHaptic) {
-                        viewHolder.itemView.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
-                        hasTriggeredHaptic = true;
-                        pendingReplyPosition = viewHolder.getAdapterPosition();
-                    } else if (absDx < triggerThreshold * 0.75f && hasTriggeredHaptic) {
-                        hasTriggeredHaptic = false;
-                        pendingReplyPosition = RecyclerView.NO_POSITION;
-                    }
-                } else if (hasTriggeredHaptic && pendingReplyPosition != RecyclerView.NO_POSITION) {
-                    final int replyPos = pendingReplyPosition;
+                if (translationX >= triggerThreshold && !hasTriggeredHaptic) {
+                    viewHolder.itemView.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                    hasTriggeredHaptic = true;
+                    pendingReplyPosition = viewHolder.getAdapterPosition();
+                } else if (translationX < triggerThreshold * 0.75f && hasTriggeredHaptic) {
                     hasTriggeredHaptic = false;
                     pendingReplyPosition = RecyclerView.NO_POSITION;
-                    if (replyPos > 0 && replyPos <= messageList.size()) {
-                        final Message targetMsg = messageList.get(replyPos - 1);
-                        recyclerView.post(() -> replyToMessage(targetMsg));
-                    }
                 }
 
-                if (absDx > 4f * density) {
-                    float progress = Math.min(1.0f, absDx / triggerThreshold);
+                if (translationX > 4f * density) {
+                    float progress = Math.min(1.0f, translationX / triggerThreshold);
                     circlePaint.setColor(getResources().getColor(R.color.veil_accent));
                     circlePaint.setAlpha((int) (255 * progress));
 
                     float bubbleTop = bubble != null ? bubble.getTop() + viewHolder.itemView.getTop() : viewHolder.itemView.getTop();
                     float bubbleHeight = bubble != null ? bubble.getHeight() : viewHolder.itemView.getHeight();
                     float centerY = bubbleTop + (bubbleHeight / 2f);
-                    float centerX = translationX > 0
-                            ? Math.min(translationX / 2f, 28f * density)
-                            : recyclerView.getWidth() - Math.min(absDx / 2f, 28f * density);
+                    float centerX = Math.min(translationX / 2f, 28f * density);
                     float circleRadius = (16f * density) * progress;
 
                     if (circleRadius > 2f) {
@@ -3096,6 +3110,7 @@ public class ChatActivity extends AppCompatActivity {
                     bubble = ((MessagesAdapter.ReceivedMessageViewHolder) viewHolder).messageBubble;
                 }
                 if (bubble != null) {
+                    bubble.animate().cancel();
                     bubble.setTranslationX(0f);
                 }
                 viewHolder.itemView.setTranslationX(0f);
@@ -6530,132 +6545,11 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showChatWallpaperDialog() {
-        BottomSheetDialog sheet = new BottomSheetDialog(this, R.style.ModernBottomSheetDialogTheme);
-        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundResource(R.drawable.bg_bottom_sheet_modern);
-        int padH = (int) (22 * getResources().getDisplayMetrics().density);
-        int padV = (int) (16 * getResources().getDisplayMetrics().density);
-        root.setPadding(padH, padV, padH, padV * 2);
-
-        View handle = new View(this);
-        int handleW = (int) (38 * getResources().getDisplayMetrics().density);
-        int handleH = (int) (4 * getResources().getDisplayMetrics().density);
-        LinearLayout.LayoutParams handleLp = new LinearLayout.LayoutParams(handleW, handleH);
-        handleLp.gravity = Gravity.CENTER_HORIZONTAL;
-        handleLp.bottomMargin = (int) (14 * getResources().getDisplayMetrics().density);
-        handle.setLayoutParams(handleLp);
-        handle.setBackgroundResource(R.drawable.bg_voice_circle_incoming);
-        root.addView(handle);
-
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText("🌈 Chat Wallpaper");
-        tvTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
-        tvTitle.setTextSize(19);
-        tvTitle.setTypeface(null, Typeface.BOLD);
-        tvTitle.setPadding(0, 0, 0, (int) (12 * getResources().getDisplayMetrics().density));
-        root.addView(tvTitle);
-
-        // Pick Photo from Gallery Button
-        com.google.android.material.button.MaterialButton btnGallery = new com.google.android.material.button.MaterialButton(this);
-        btnGallery.setText("🖼️ Choose from Gallery (Crop 9:16)");
-        btnGallery.setCornerRadius((int) (12 * getResources().getDisplayMetrics().density));
-        btnGallery.setOnClickListener(v -> {
-            sheet.dismiss();
-            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-            intent.setType("image/*");
-            startActivityForResult(Intent.createChooser(intent, "Choose Chat Wallpaper"), REQ_PICK_WALLPAPER);
-        });
-        root.addView(btnGallery);
-
-        // Reset to Theme Default Button
-        com.google.android.material.button.MaterialButton btnDefault = new com.google.android.material.button.MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
-        btnDefault.setText("✨ Use Default Theme Wallpaper");
-        btnDefault.setCornerRadius((int) (12 * getResources().getDisplayMetrics().density));
-        LinearLayout.LayoutParams defLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        defLp.topMargin = (int) (8 * getResources().getDisplayMetrics().density);
-        defLp.bottomMargin = (int) (16 * getResources().getDisplayMetrics().density);
-        btnDefault.setLayoutParams(defLp);
-        btnDefault.setOnClickListener(v -> {
-            sheet.dismiss();
-            com.m3.veil.database.EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, "");
-            if (currentLocalChat != null) currentLocalChat.setWallpaperColor("");
-            applyChatWallpaper();
-            Toast.makeText(this, "Wallpaper reset to theme default", Toast.LENGTH_SHORT).show();
-        });
-        root.addView(btnDefault);
-
-        // Solid & Gradient Preset Rows
-        String[] sectionTitles = {
-                "Light Presets (Clean & Soft):",
-                "Dark Presets (Deep Obsidian):",
-                "Gradient Presets:"
-        };
-
-        String[][] presetNames = {
-                {"Warm Cream", "Mint Foam", "Pastel Sky", "Rose Whisper", "Clean Slate"},
-                {"Midnight Abyss", "Cyber Indigo", "Emerald Matrix", "Crimson Velvet", "Deep Ocean"},
-                {"Sunset Horizon", "Oceanic Aqua", "Cyber Aurora", "Midnight Nebula"}
-        };
-
-        String[][] presetValues = {
-                {"#FAF7F2", "#F0FDF4", "#F0F9FF", "#FFF1F2", "#F8FAFC"},
-                {"#0D1117", "#121026", "#091E1A", "#240B15", "#0A192F"},
-                {"gradient:#FF512F:#DD2476", "gradient:#00C9FF:#92FE9D", "gradient:#8A2387:#E94057:#F27121", "gradient:#0F2027:#203A43:#2C5364"}
-        };
-
-        for (int s = 0; s < sectionTitles.length; s++) {
-            TextView secTitle = new TextView(this);
-            secTitle.setText(sectionTitles[s]);
-            secTitle.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
-            secTitle.setTextSize(12.5f);
-            secTitle.setPadding(0, (int) (6 * getResources().getDisplayMetrics().density), 0, (int) (8 * getResources().getDisplayMetrics().density));
-            root.addView(secTitle);
-
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            rowLp.bottomMargin = (int) (14 * getResources().getDisplayMetrics().density);
-            row.setLayoutParams(rowLp);
-
-            for (int p = 0; p < presetNames[s].length; p++) {
-                final String val = presetValues[s][p];
-                final String name = presetNames[s][p];
-
-                View swatch = new View(this);
-                int size = (int) (38 * getResources().getDisplayMetrics().density);
-                LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(size, size);
-                swLp.rightMargin = (int) (10 * getResources().getDisplayMetrics().density);
-                swatch.setLayoutParams(swLp);
-
-                if (val.startsWith("gradient:")) {
-                    String[] parts = val.substring("gradient:".length()).split(":");
-                    int[] colors = new int[parts.length];
-                    for (int c = 0; c < parts.length; c++) colors[c] = Color.parseColor(parts[c]);
-                    swatch.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, colors));
-                } else {
-                    swatch.setBackgroundColor(Color.parseColor(val));
-                }
-
-                swatch.setClickable(true);
-                swatch.setFocusable(true);
-                swatch.setOnClickListener(v -> {
-                    sheet.dismiss();
-                    com.m3.veil.database.EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, val);
-                    if (currentLocalChat != null) currentLocalChat.setWallpaperColor(val);
-                    applyChatWallpaper();
-                    Toast.makeText(this, "Wallpaper: " + name, Toast.LENGTH_SHORT).show();
-                });
-                row.addView(swatch);
-            }
-            root.addView(row);
-        }
-
-        scroll.addView(root);
-        sheet.setContentView(scroll);
-        sheet.show();
+        if (chatId == null) return;
+        com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet sheet =
+                com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet.newInstance(chatId, recipientId, false);
+        sheet.setOnWallpaperAppliedListener(val -> applyChatWallpaper());
+        sheet.show(getSupportFragmentManager(), "ThemeWallpaperBottomSheet");
     }
 
     private void showSetChatLockDialog() {
@@ -7093,113 +6987,11 @@ public class ChatActivity extends AppCompatActivity {
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
     private void showGroupCustomThemesDialog() {
-        String[] names = {
-                "Default Night (#121212)",
-                "Midnight Abyss (#0D1117)",
-                "Cyber Indigo (#121026)",
-                "Emerald Matrix (#091E1A)",
-                "Crimson Velvet (#240B15)",
-                "Royal Gold (#1F1905)",
-                "Solar Amber (#2A1B0A)",
-                "Deep Ocean (#081D2E)"
-        };
-        String[] hexes = {
-                "#121212",
-                "#0D1117",
-                "#121026",
-                "#091E1A",
-                "#240B15",
-                "#1F1905",
-                "#2A1B0A",
-                "#081D2E"
-        };
-
-        BottomSheetDialog sheet = new BottomSheetDialog(this);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundResource(R.drawable.bottom_sheet_background);
-        int padH = (int) (24 * getResources().getDisplayMetrics().density);
-        int padV = (int) (16 * getResources().getDisplayMetrics().density);
-        root.setPadding(padH, padV, padH, padV * 2);
-
-        View handle = new View(this);
-        int handleW = (int) (36 * getResources().getDisplayMetrics().density);
-        int handleH = (int) (4 * getResources().getDisplayMetrics().density);
-        LinearLayout.LayoutParams handleLp = new LinearLayout.LayoutParams(handleW, handleH);
-        handleLp.gravity = Gravity.CENTER_HORIZONTAL;
-        handleLp.bottomMargin = (int) (16 * getResources().getDisplayMetrics().density);
-        handle.setLayoutParams(handleLp);
-        handle.setBackgroundResource(R.drawable.bg_voice_circle_incoming);
-        root.addView(handle);
-
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText("🎨 Group Themes & Wallpaper (#73)");
-        tvTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
-        tvTitle.setTextSize(19);
-        tvTitle.setTypeface(null, Typeface.BOLD);
-        root.addView(tvTitle);
-
-        TextView tvSub = new TextView(this);
-        tvSub.setText("Select a theme to synchronize across all peers in this group");
-        tvSub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
-        tvSub.setTextSize(13);
-        tvSub.setPadding(0, 4, 0, (int) (16 * getResources().getDisplayMetrics().density));
-        root.addView(tvSub);
-
-        for (int i = 0; i < names.length; i++) {
-            final String hex = hexes[i];
-            final String name = names[i];
-
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(0, (int) (10 * getResources().getDisplayMetrics().density), 0, (int) (10 * getResources().getDisplayMetrics().density));
-
-            View swatch = new View(this);
-            int sDim = (int) (24 * getResources().getDisplayMetrics().density);
-            LinearLayout.LayoutParams swatchLp = new LinearLayout.LayoutParams(sDim, sDim);
-            swatchLp.rightMargin = (int) (12 * getResources().getDisplayMetrics().density);
-            swatch.setLayoutParams(swatchLp);
-            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
-            gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            gd.setColor(Color.parseColor(hex));
-            gd.setStroke(2, Color.WHITE);
-            swatch.setBackground(gd);
-            row.addView(swatch);
-
-            TextView tvName = new TextView(this);
-            tvName.setText(name);
-            tvName.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
-            tvName.setTextSize(15.5f);
-            row.addView(tvName);
-
-            row.setOnClickListener(v -> {
-                sheet.dismiss();
-                com.m3.veil.database.EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, hex);
-                loadLocalChatSettings();
-
-                // Broadcast theme sync packet to group peers
-                try {
-                    org.json.JSONObject payload = new org.json.JSONObject();
-                    payload.put("action", "group_theme_sync");
-                    payload.put("groupId", chatId);
-                    payload.put("themeHex", hex);
-                    payload.put("themeName", name);
-                    com.m3.veil.webrtc.VeilPacket packet = new com.m3.veil.webrtc.VeilPacket(
-                            com.m3.veil.webrtc.VeilPacket.LANE_CTRL,
-                            com.m3.veil.webrtc.VeilPacket.TYPE_GROUP_SETTINGS,
-                            payload.toString()
-                    );
-                    com.m3.veil.webrtc.WebRtcManager.getInstance(this).broadcastPacket(packet);
-                } catch (Throwable ignored) {}
-
-                Toast.makeText(this, "Group theme updated & synced across mesh!", Toast.LENGTH_SHORT).show();
-            });
-            root.addView(row);
-        }
-
-        sheet.setContentView(root);
-        sheet.show();
+        if (chatId == null) return;
+        com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet sheet =
+                com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet.newInstance(chatId, null, true);
+        sheet.setOnWallpaperAppliedListener(val -> applyChatWallpaper());
+        sheet.show(getSupportFragmentManager(), "ThemeWallpaperBottomSheet");
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────

@@ -1562,6 +1562,30 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         notifyChatsChanged();
     }
 
+    public synchronized String getChatWallpaper(String chatId) {
+        if (chatId == null) return null;
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null && cached.getWallpaperColor() != null && !cached.getWallpaperColor().isEmpty()) {
+            return cached.getWallpaperColor();
+        }
+        SQLiteDatabase db = getEncryptedDb();
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_CHATS, new String[]{COL_CHAT_WALLPAPER}, COL_CHAT_ID + "=?", new String[]{chatId}, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                String wp = cursor.getString(0);
+                if (cached != null && wp != null) {
+                    cached.setWallpaperColor(wp);
+                }
+                return wp;
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return null;
+    }
+
     public synchronized void updateChatPinnedMessage(String chatId, String msgId, String msgText) {
         if (chatId == null) return;
         Chat cached = ramChatCache.get(chatId);

@@ -1,5 +1,6 @@
 package com.m3.veil.ui.chat;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -10,8 +11,8 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -23,11 +24,14 @@ import androidx.core.content.ContextCompat;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.m3.veil.R;
 import com.m3.veil.database.EncryptedChatDatabase;
+import com.m3.veil.manager.VeilMessagesController;
 import com.m3.veil.model.Chat;
 import com.m3.veil.model.Message;
-import com.m3.veil.webrtc.WebRtcManager;
+import com.m3.veil.ui.chat.sheets.SharedMediaGalleryBottomSheet;
+import com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -36,12 +40,14 @@ import java.util.List;
 
 /**
  * Dedicated Per-Conversation Chat Settings & Privacy Console (`ChatSettingsActivity`).
- * Provides granular per-chat controls:
- * - Read Receipts (`✓✓` Blue Tick) & Typing Indicator toggle for this conversation
- * - Per-Chat Screenshot & Screen Recording Shield (`FLAG_SECURE`)
+ * Features:
+ * - Media Visibility: Toggle whether downloaded media & files show in Phone Gallery & File Manager
+ * - Synchronized Chat Theme & Wallpaper (Full live bubble preview & 12 presets)
+ * - Media, Links & Docs Browser (WhatsApp/Telegram-style 4-tab console)
+ * - Granular Privacy Controls: Read Receipts (Blue Ticks), Typing Indicators, Screenshot Shield (FLAG_SECURE)
+ * - Auto-Download Preferences
  * - Per-Chat 4-Digit Vault PIN Lock
- * - Custom Chat Theme & Wallpaper Synchronizer
- * - Encrypted Conversation Backup / JSON Transcript Export
+ * - Encrypted Conversation Transcript Export (JSON)
  */
 public class ChatSettingsActivity extends AppCompatActivity {
 
@@ -50,10 +56,11 @@ public class ChatSettingsActivity extends AppCompatActivity {
     private String peerUserName;
     private Chat currentChat;
 
-    private CheckBox cbSendReadReceipts;
-    private CheckBox cbSendTypingIndicators;
-    private CheckBox cbScreenshotShield;
-    private CheckBox cbAutoDownloadMedia;
+    private SwitchMaterial switchReadReceipts;
+    private SwitchMaterial switchTypingIndicators;
+    private SwitchMaterial switchScreenshotShield;
+    private SwitchMaterial switchAutoDownloadMedia;
+    private SwitchMaterial switchMediaVisibility;
     private EditText etPinLock;
 
     @Override
@@ -87,7 +94,7 @@ public class ChatSettingsActivity extends AppCompatActivity {
             return insets;
         });
 
-        // Header Bar
+        // Top App Bar
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
@@ -102,15 +109,26 @@ public class ChatSettingsActivity extends AppCompatActivity {
         btnBack.setOnClickListener(v -> finish());
         topBar.addView(btnBack, new LinearLayout.LayoutParams((int) (40 * dp), (int) (40 * dp)));
 
+        LinearLayout headerTitleCol = new LinearLayout(this);
+        headerTitleCol.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams hLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        hLp.leftMargin = (int) (12 * dp);
+        headerTitleCol.setLayoutParams(hLp);
+
         TextView tvHeader = new TextView(this);
-        tvHeader.setText("⚙️ Chat Settings • " + (peerUserName != null ? peerUserName : "Conversation"));
-        tvHeader.setTextSize(17f);
+        tvHeader.setText("⚙️ Chat Settings");
+        tvHeader.setTextSize(17.5f);
         tvHeader.setTypeface(null, Typeface.BOLD);
         tvHeader.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
-        LinearLayout.LayoutParams hLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        hLp.leftMargin = (int) (10 * dp);
-        tvHeader.setLayoutParams(hLp);
-        topBar.addView(tvHeader);
+        headerTitleCol.addView(tvHeader);
+
+        TextView tvHeaderSub = new TextView(this);
+        tvHeaderSub.setText(peerUserName != null ? peerUserName : "Direct Conversation");
+        tvHeaderSub.setTextSize(12.5f);
+        tvHeaderSub.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
+        headerTitleCol.addView(tvHeaderSub);
+
+        topBar.addView(headerTitleCol);
         root.addView(topBar);
 
         ScrollView scroll = new ScrollView(this);
@@ -119,31 +137,115 @@ public class ChatSettingsActivity extends AppCompatActivity {
         int pad = (int) (16 * dp);
         content.setPadding(pad, pad, pad, (int) (32 * dp));
 
-        // 1. Privacy & Receipts Section
+        // 1. Media Visibility Card (NEW: Show in Gallery / File Manager)
+        MaterialCardView visibilityCard = createSectionCard(dp);
+        LinearLayout visibilityBox = createCardInnerLayout(dp);
+        visibilityBox.addView(createSectionHeader("🖼️ Media Visibility in Gallery", dp));
+
+        boolean mediaVisEnabled = VeilMessagesController.isMediaVisibilityEnabled(this, chatId);
+        switchMediaVisibility = new SwitchMaterial(this);
+        switchMediaVisibility.setText("Show in Phone Gallery & File Manager");
+        switchMediaVisibility.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
+        switchMediaVisibility.setChecked(mediaVisEnabled);
+        visibilityBox.addView(switchMediaVisibility);
+
+        TextView tvVisHint = new TextView(this);
+        tvVisHint.setText("When enabled, photos, videos, and documents downloaded in this chat will appear in your phone's Gallery, Google Photos, and File Manager apps. When disabled, files stay hidden in the private vault.");
+        tvVisHint.setTextSize(12.5f);
+        tvVisHint.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
+        tvVisHint.setPadding(0, (int) (6 * dp), 0, (int) (4 * dp));
+        visibilityBox.addView(tvVisHint);
+
+        visibilityCard.addView(visibilityBox);
+        content.addView(visibilityCard);
+
+        // 2. Shared Media, Links & Docs Card
+        MaterialCardView mediaNavCard = createSectionCard(dp);
+        LinearLayout mediaNavBox = createCardInnerLayout(dp);
+        mediaNavBox.addView(createSectionHeader("📁 Shared Media, Links & Docs", dp));
+
+        TextView tvMediaNavDesc = new TextView(this);
+        tvMediaNavDesc.setText("Browse photos, videos, audio clips, documents, and shared web links exchanged in this chat.");
+        tvMediaNavDesc.setTextSize(12.5f);
+        tvMediaNavDesc.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
+        tvMediaNavDesc.setPadding(0, 0, 0, (int) (10 * dp));
+        mediaNavBox.addView(tvMediaNavDesc);
+
+        MaterialButton btnOpenSharedMedia = new MaterialButton(this);
+        btnOpenSharedMedia.setText("📂 View Shared Media, Links & Docs");
+        btnOpenSharedMedia.setCornerRadius((int) (12 * dp));
+        btnOpenSharedMedia.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary));
+        btnOpenSharedMedia.setTextColor(Color.WHITE);
+        btnOpenSharedMedia.setOnClickListener(v -> {
+            if (chatId != null) {
+                SharedMediaGalleryBottomSheet sheet = SharedMediaGalleryBottomSheet.newInstance(
+                        chatId, peerUserName != null ? peerUserName : "Shared Media"
+                );
+                sheet.show(getSupportFragmentManager(), "SharedMediaGalleryBottomSheet");
+            }
+        });
+        mediaNavBox.addView(btnOpenSharedMedia);
+
+        mediaNavCard.addView(mediaNavBox);
+        content.addView(mediaNavCard);
+
+        // 3. Theme & Wallpaper Card (Full synchronizer with live bubble preview)
+        MaterialCardView themeCard = createSectionCard(dp);
+        LinearLayout themeBox = createCardInnerLayout(dp);
+        themeBox.addView(createSectionHeader("🎨 Chat Theme & Wallpaper", dp));
+
+        TextView tvThemeDesc = new TextView(this);
+        tvThemeDesc.setText("Choose from 12 curated solid & gradient themes, adjust wallpaper dimming, and sync colors across both chat participants.");
+        tvThemeDesc.setTextSize(12.5f);
+        tvThemeDesc.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
+        tvThemeDesc.setPadding(0, 0, 0, (int) (12 * dp));
+        themeBox.addView(tvThemeDesc);
+
+        MaterialButton btnOpenThemePicker = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnOpenThemePicker.setText("🎨 Customize Theme & Wallpaper");
+        btnOpenThemePicker.setCornerRadius((int) (12 * dp));
+        btnOpenThemePicker.setOnClickListener(v -> {
+            ThemeWallpaperBottomSheet sheet = ThemeWallpaperBottomSheet.newInstance(chatId, peerUserId, false);
+            sheet.show(getSupportFragmentManager(), "ThemeWallpaperBottomSheet");
+        });
+        themeBox.addView(btnOpenThemePicker);
+
+        themeCard.addView(themeBox);
+        content.addView(themeCard);
+
+        // 4. Privacy & Receipts Section
         MaterialCardView privacyCard = createSectionCard(dp);
         LinearLayout privacyBox = createCardInnerLayout(dp);
         privacyBox.addView(createSectionHeader("🛡️ Conversation Privacy & Receipts", dp));
 
-        cbSendReadReceipts = createCheckRow("✓✓ Send Blue Read Receipts in this chat",
-                prefs.getBoolean("read_receipts_" + chatId, true));
-        privacyBox.addView(cbSendReadReceipts);
+        switchReadReceipts = new SwitchMaterial(this);
+        switchReadReceipts.setText("Send Blue Read Receipts (✓✓)");
+        switchReadReceipts.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
+        switchReadReceipts.setChecked(prefs.getBoolean("read_receipts_" + chatId, true));
+        privacyBox.addView(switchReadReceipts);
 
-        cbSendTypingIndicators = createCheckRow("⌨️ Send Live Typing & Recording Indicators",
-                prefs.getBoolean("typing_ind_" + chatId, true));
-        privacyBox.addView(cbSendTypingIndicators);
+        switchTypingIndicators = new SwitchMaterial(this);
+        switchTypingIndicators.setText("Send Live Typing & Audio Indicators");
+        switchTypingIndicators.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
+        switchTypingIndicators.setChecked(prefs.getBoolean("typing_ind_" + chatId, true));
+        privacyBox.addView(switchTypingIndicators);
 
-        cbScreenshotShield = createCheckRow("📵 Enforce Screenshot & Screen-Record Shield (FLAG_SECURE)",
-                prefs.getBoolean("screenshot_shield_" + chatId, true));
-        privacyBox.addView(cbScreenshotShield);
+        switchScreenshotShield = new SwitchMaterial(this);
+        switchScreenshotShield.setText("Block Screenshots & Recording (FLAG_SECURE)");
+        switchScreenshotShield.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
+        switchScreenshotShield.setChecked(prefs.getBoolean("screenshot_shield_" + chatId, true));
+        privacyBox.addView(switchScreenshotShield);
 
-        cbAutoDownloadMedia = createCheckRow("📥 Auto-Accept P2P Media Chunks over WebRTC",
-                prefs.getBoolean("auto_media_" + chatId, true));
-        privacyBox.addView(cbAutoDownloadMedia);
+        switchAutoDownloadMedia = new SwitchMaterial(this);
+        switchAutoDownloadMedia.setText("Auto-Download Photos & Documents");
+        switchAutoDownloadMedia.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
+        switchAutoDownloadMedia.setChecked(prefs.getBoolean("auto_media_" + chatId, true));
+        privacyBox.addView(switchAutoDownloadMedia);
 
         privacyCard.addView(privacyBox);
         content.addView(privacyCard);
 
-        // 2. Per-Chat Vault PIN Lock
+        // 5. Per-Chat Vault PIN Lock
         MaterialCardView pinCard = createSectionCard(dp);
         LinearLayout pinBox = createCardInnerLayout(dp);
         pinBox.addView(createSectionHeader("🔐 Per-Chat Vault PIN Lock", dp));
@@ -159,6 +261,10 @@ public class ChatSettingsActivity extends AppCompatActivity {
         etPinLock.setBackgroundResource(R.drawable.bg_search_input);
         int boxPad = (int) (12 * dp);
         etPinLock.setPadding(boxPad, boxPad, boxPad, boxPad);
+        LinearLayout.LayoutParams pinLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        pinLp.bottomMargin = (int) (8 * dp);
+        etPinLock.setLayoutParams(pinLp);
         pinBox.addView(etPinLock);
 
         if (isChatLocked) {
@@ -170,6 +276,7 @@ public class ChatSettingsActivity extends AppCompatActivity {
                     currentChat.setChatLockPin(null);
                     EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(currentChat);
                 }
+                EncryptedChatDatabase.getInstance(this).updateChatLockPin(chatId, null);
                 Toast.makeText(this, "Per-chat PIN lock removed", Toast.LENGTH_SHORT).show();
             });
             pinBox.addView(btnRemovePin);
@@ -178,51 +285,7 @@ public class ChatSettingsActivity extends AppCompatActivity {
         pinCard.addView(pinBox);
         content.addView(pinCard);
 
-        // 3. Custom Chat Theme Swatches
-        MaterialCardView themeCard = createSectionCard(dp);
-        LinearLayout themeBox = createCardInnerLayout(dp);
-        themeBox.addView(createSectionHeader("🎨 Synchronized Chat Wallpaper & Theme", dp));
-
-        String[] themeNames = {"Midnight", "Cyber Indigo", "Emerald Matrix", "Crimson", "Deep Ocean"};
-        String[] themeHexes = {"#0D1117", "#121026", "#091E1A", "#240B15", "#081D2E"};
-
-        LinearLayout swatchRow = new LinearLayout(this);
-        swatchRow.setOrientation(LinearLayout.HORIZONTAL);
-        for (int i = 0; i < themeHexes.length; i++) {
-            final String hex = themeHexes[i];
-            final String tName = themeNames[i];
-            View swatch = new View(this);
-            int dim = (int) (40 * dp);
-            LinearLayout.LayoutParams sLp = new LinearLayout.LayoutParams(dim, dim);
-            sLp.rightMargin = (int) (12 * dp);
-            swatch.setLayoutParams(sLp);
-
-            GradientDrawable gd = new GradientDrawable();
-            gd.setShape(GradientDrawable.OVAL);
-            gd.setColor(Color.parseColor(hex));
-            gd.setStroke((int) (2 * dp), Color.WHITE);
-            swatch.setBackground(gd);
-
-            swatch.setOnClickListener(v -> {
-                if (chatId != null) {
-                    EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, hex);
-                    if (peerUserId != null && !peerUserId.isEmpty()) {
-                        WebRtcManager.getInstance(this).sendChatSettingPacket(
-                                peerUserId, chatId,
-                                currentChat != null ? currentChat.getVanishTimer() : 0L,
-                                currentChat != null ? currentChat.getVanishMode() : "after_send",
-                                tName, hex);
-                    }
-                    Toast.makeText(this, "🎨 Applied & synced " + tName + " theme!", Toast.LENGTH_SHORT).show();
-                }
-            });
-            swatchRow.addView(swatch);
-        }
-        themeBox.addView(swatchRow);
-        themeCard.addView(themeBox);
-        content.addView(themeCard);
-
-        // 4. Encrypted Transcript Export
+        // 6. Encrypted Transcript Export
         MaterialCardView exportCard = createSectionCard(dp);
         LinearLayout exportBox = createCardInnerLayout(dp);
         exportBox.addView(createSectionHeader("📦 Encrypted Vault Export", dp));
@@ -236,10 +299,13 @@ public class ChatSettingsActivity extends AppCompatActivity {
         exportCard.addView(exportBox);
         content.addView(exportCard);
 
-        // Save Button
+        // Save All Button
         MaterialButton btnSave = new MaterialButton(this);
-        btnSave.setText("Save Chat Settings");
+        btnSave.setText("Save All Chat Settings");
         btnSave.setCornerRadius((int) (14 * dp));
+        btnSave.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary));
+        btnSave.setTextColor(Color.WHITE);
+        btnSave.setPadding(0, (int) (14 * dp), 0, (int) (14 * dp));
         btnSave.setOnClickListener(v -> saveChatSettings());
         content.addView(btnSave);
 
@@ -276,16 +342,8 @@ public class ChatSettingsActivity extends AppCompatActivity {
         tv.setTextSize(15.5f);
         tv.setTypeface(null, Typeface.BOLD);
         tv.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
-        tv.setPadding(0, 0, 0, (int) (10 * dp));
+        tv.setPadding(0, 0, 0, (int) (8 * dp));
         return tv;
-    }
-
-    private CheckBox createCheckRow(String label, boolean checked) {
-        CheckBox cb = new CheckBox(this);
-        cb.setText(label);
-        cb.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
-        cb.setChecked(checked);
-        return cb;
     }
 
     private void exportChatTranscript() {
@@ -314,12 +372,19 @@ public class ChatSettingsActivity extends AppCompatActivity {
 
     private void saveChatSettings() {
         if (chatId == null) return;
+
+        // Save Media Visibility setting
+        if (switchMediaVisibility != null) {
+            VeilMessagesController.setMediaVisibilityEnabled(this, chatId, switchMediaVisibility.isChecked());
+        }
+
+        // Save Privacy & Receipts settings
         SharedPreferences prefs = getSharedPreferences("VeilChatSpecificPrefs", MODE_PRIVATE);
         prefs.edit()
-                .putBoolean("read_receipts_" + chatId, cbSendReadReceipts.isChecked())
-                .putBoolean("typing_ind_" + chatId, cbSendTypingIndicators.isChecked())
-                .putBoolean("screenshot_shield_" + chatId, cbScreenshotShield.isChecked())
-                .putBoolean("auto_media_" + chatId, cbAutoDownloadMedia.isChecked())
+                .putBoolean("read_receipts_" + chatId, switchReadReceipts.isChecked())
+                .putBoolean("typing_ind_" + chatId, switchTypingIndicators.isChecked())
+                .putBoolean("screenshot_shield_" + chatId, switchScreenshotShield.isChecked())
+                .putBoolean("auto_media_" + chatId, switchAutoDownloadMedia.isChecked())
                 .apply();
 
         String newPin = etPinLock.getText().toString().trim();
@@ -332,6 +397,7 @@ public class ChatSettingsActivity extends AppCompatActivity {
                 currentChat.setChatLockPin(newPin);
                 EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(currentChat);
             }
+            EncryptedChatDatabase.getInstance(this).updateChatLockPin(chatId, newPin);
         }
 
         Toast.makeText(this, "✅ Chat settings saved!", Toast.LENGTH_SHORT).show();

@@ -188,6 +188,9 @@ public class Chat {
     public String getWallpaperColor() { return wallpaperColor; }
     public void setWallpaperColor(String wallpaperColor) { this.wallpaperColor = wallpaperColor; }
 
+    public String getThemeColorHex() { return wallpaperColor; }
+    public void setThemeColorHex(String hex) { this.wallpaperColor = hex; }
+
     public int getSlowModeSec() { return slowModeSec; }
     public void setSlowModeSec(int slowModeSec) { this.slowModeSec = slowModeSec; }
 
