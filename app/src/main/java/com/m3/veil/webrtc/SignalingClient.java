@@ -147,41 +147,6 @@ public class SignalingClient {
                         dispatchIncomingSignal(type, fromUid, data);
                     });
         }
-
-        try {
-            if (this.socket != null) {
-                this.socket.disconnect();
-                this.socket.off();
-            }
-
-            IO.Options options = new IO.Options();
-            options.transports = new String[]{"websocket"};
-            options.reconnection = true;
-            options.reconnectionAttempts = 5;
-            options.reconnectionDelay = 2000L;
-            options.timeout = 5000L;
-            options.query = "userId=" + userId;
-
-            this.socket = IO.socket(URI.create(SIGNALING_SERVER_URL), options);
-            this.socket.on("connect", args -> {
-                this.isSocketConnected = true;
-                try {
-                    JSONObject reg = new JSONObject();
-                    reg.put("userId", userId);
-                    this.socket.emit("register", reg);
-                } catch (Exception ignored) {}
-            });
-            this.socket.on("disconnect", args -> this.isSocketConnected = false);
-            this.socket.on("connect_error", args -> this.isSocketConnected = false);
-            this.socket.on("signal", args -> {
-                if (args != null && args.length > 0 && args[0] instanceof JSONObject) {
-                    handleWebSocketSignal((JSONObject) args[0]);
-                }
-            });
-            this.socket.connect();
-        } catch (Exception e) {
-            Log.d(TAG, "Optional Socket.IO relay unavailable, using Firestore primary + Nostr fallback");
-        }
     }
 
     private void handleWebSocketSignal(JSONObject data) {
@@ -470,7 +435,25 @@ public class SignalingClient {
         signalDoc.put("timestamp", now);
         signalDoc.put("encrypted", false);
 
-        // Path 1: Primary Firebase Firestore ephemeral signal document
+        // Path 1: Immediate WebSocket / Nostr sub-50ms fast-path
+        try {
+            JSONObject payload = new JSONObject();
+            for (Map.Entry<String, Object> entry : signalDoc.entrySet()) {
+                payload.put(entry.getKey(), entry.getValue());
+            }
+            payload.put("to", toUserId);
+
+            Context ctx = resolveContext();
+            if (ctx != null) {
+                SovereignIdentityAndDirectoryEngine.getInstance(ctx)
+                        .sendEphemeralSignal(toUserId, payload, null);
+            }
+            if (this.isSocketConnected && this.socket != null) {
+                this.socket.emit("signal", payload);
+            }
+        } catch (Exception ignored) {}
+
+        // Path 2: Primary Firebase Firestore ephemeral signal document
         this.db.collection("users")
                 .document(toUserId)
                 .collection("signals")
@@ -492,24 +475,6 @@ public class SignalingClient {
         if (triggerWakeKnock) {
             sendBlindFcmWakeKnock(toUserId, type);
         }
-
-        // Path 2: Parallel WebSocket / Nostr fast-path
-        try {
-            JSONObject payload = new JSONObject();
-            for (Map.Entry<String, Object> entry : signalDoc.entrySet()) {
-                payload.put(entry.getKey(), entry.getValue());
-            }
-            payload.put("to", toUserId);
-
-            Context ctx = resolveContext();
-            if (ctx != null) {
-                SovereignIdentityAndDirectoryEngine.getInstance(ctx)
-                        .sendEphemeralSignal(toUserId, payload, null);
-            }
-            if (this.isSocketConnected && this.socket != null) {
-                this.socket.emit("signal", payload);
-            }
-        } catch (Exception ignored) {}
     }
 
     /**

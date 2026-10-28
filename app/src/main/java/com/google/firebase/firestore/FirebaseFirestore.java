@@ -77,10 +77,19 @@ public class FirebaseFirestore {
     private static final FirebaseFirestore INSTANCE = new FirebaseFirestore();
 
     private final ExecutorService ioExecutor = new java.util.concurrent.ThreadPoolExecutor(
-            4, 8, 30L, TimeUnit.SECONDS,
+            6, 12, 30L, TimeUnit.SECONDS,
             new java.util.concurrent.LinkedBlockingQueue<>(1024),
             r -> {
                 Thread t = new Thread(r, "VeilFirestoreIO");
+                t.setDaemon(true);
+                return t;
+            },
+            new java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy());
+    private final ExecutorService writeExecutor = new java.util.concurrent.ThreadPoolExecutor(
+            4, 8, 30L, TimeUnit.SECONDS,
+            new java.util.concurrent.LinkedBlockingQueue<>(1024),
+            r -> {
+                Thread t = new Thread(r, "VeilFirestoreWrite");
                 t.setDaemon(true);
                 return t;
             },
@@ -92,10 +101,10 @@ public class FirebaseFirestore {
     });
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final OkHttpClient httpClient = new OkHttpClient.Builder()
-            .connectTimeout(4, TimeUnit.SECONDS)
-            .readTimeout(6, TimeUnit.SECONDS)
-            .writeTimeout(6, TimeUnit.SECONDS)
-            .pingInterval(20, TimeUnit.SECONDS)
+            .connectTimeout(3, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .writeTimeout(5, TimeUnit.SECONDS)
+            .pingInterval(15, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build();
 
@@ -111,10 +120,16 @@ public class FirebaseFirestore {
     // Circuit breaker when Firestore Spark project returns HTTP 429 (Quota Exceeded)
     private volatile long firestoreQuotaExhaustedUntil = 0L;
 
+    public interface RawNostrEventListener {
+        void onRawEvent(String subId, JSONObject eventObj);
+    }
+
     // Persistent Nostr WebSocket Pool
     private final ConcurrentHashMap<String, WebSocket> relaySockets = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> relayLastConnectAttempt = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> activeLiveSubFilters = new ConcurrentHashMap<>();
+    private final Set<String> watchedLiveTags = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final CopyOnWriteArrayList<RawNostrEventListener> rawEventListeners = new CopyOnWriteArrayList<>();
     private final ConcurrentHashMap<String, QuerySubContext> pendingQuerySubs = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<String> pendingOutboundEvents = new CopyOnWriteArrayList<>();
     private final AtomicInteger subCounter = new AtomicInteger(1);
@@ -185,6 +200,42 @@ public class FirebaseFirestore {
     // PERSISTENT NOSTR WEBSOCKET RELAY POOL
     // ─────────────────────────────────────────────────────────────────────────────
 
+    public void addRawNostrEventListener(RawNostrEventListener listener) {
+        if (listener != null && !rawEventListeners.contains(listener)) {
+            rawEventListeners.add(listener);
+        }
+    }
+
+    public void registerCustomLiveSubscription(String subId, String reqMsg) {
+        if (subId == null || reqMsg == null) return;
+        ensureNostrPoolConnected();
+        if (!reqMsg.equals(activeLiveSubFilters.put(subId, reqMsg))) {
+            for (WebSocket ws : relaySockets.values()) {
+                try {
+                    ws.send(reqMsg);
+                } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    public boolean broadcastRawNostrEvent(String wireMsg) {
+        if (wireMsg == null || wireMsg.isEmpty()) return false;
+        ensureNostrPoolConnected();
+        while (pendingOutboundEvents.size() > 80) {
+            pendingOutboundEvents.remove(0);
+        }
+        pendingOutboundEvents.add(wireMsg);
+        boolean sentAny = false;
+        for (WebSocket ws : relaySockets.values()) {
+            try {
+                if (ws.send(wireMsg)) {
+                    sentAny = true;
+                }
+            } catch (Exception ignored) {}
+        }
+        return sentAny;
+    }
+
     private void ensureNostrPoolConnected() {
         long now = System.currentTimeMillis();
         for (final String relayUrl : NOSTR_RELAYS) {
@@ -192,7 +243,7 @@ public class FirebaseFirestore {
                 continue;
             }
             Long lastAttempt = relayLastConnectAttempt.get(relayUrl);
-            if (lastAttempt != null && (now - lastAttempt) < 3000L) {
+            if (lastAttempt != null && (now - lastAttempt) < 2000L) {
                 continue;
             }
             relayLastConnectAttempt.put(relayUrl, now);
@@ -244,11 +295,22 @@ public class FirebaseFirestore {
                     String subId = arr.optString(1, "");
                     JSONObject eventObj = arr.optJSONObject(2);
                     if (eventObj != null) {
-                        processIncomingNostrDocEvent(eventObj);
+                        int kind = eventObj.optInt("kind", 30078);
+                        if (kind == 30078 && !subId.startsWith("sig_")) {
+                            processIncomingNostrDocEvent(eventObj);
+                        }
+                        if (!rawEventListeners.isEmpty()) {
+                            for (RawNostrEventListener l : rawEventListeners) {
+                                try {
+                                    l.onRawEvent(subId, eventObj);
+                                } catch (Exception ignored) {}
+                            }
+                        }
                     }
                     QuerySubContext ctx = pendingQuerySubs.get(subId);
                     if (ctx != null) {
                         ctx.eventCount.incrementAndGet();
+                        ctx.firstEoseLatch.countDown();
                     }
                 }
             } else if (text.startsWith("[\"EOSE\"")) {
@@ -257,10 +319,8 @@ public class FirebaseFirestore {
                     String subId = arr.optString(1, "");
                     QuerySubContext ctx = pendingQuerySubs.get(subId);
                     if (ctx != null) {
-                        int count = ctx.eoseCount.incrementAndGet();
-                        if (ctx.eventCount.get() > 0 || count >= 2) {
-                            ctx.firstEoseLatch.countDown();
-                        }
+                        ctx.eoseCount.incrementAndGet();
+                        ctx.firstEoseLatch.countDown();
                     }
                     if (subId.startsWith("q_")) {
                         try {
@@ -369,16 +429,7 @@ public class FirebaseFirestore {
             String eventJson = buildSignedNostrEventJson(seckey32, 30078, tags, wrapper.toString(), createdAtSec);
             String wireMsg = "[\"EVENT\"," + eventJson + "]";
 
-            while (pendingOutboundEvents.size() > 80) {
-                pendingOutboundEvents.remove(0);
-            }
-            pendingOutboundEvents.add(wireMsg);
-
-            for (WebSocket ws : relaySockets.values()) {
-                try {
-                    ws.send(wireMsg);
-                } catch (Exception ignored) {}
-            }
+            broadcastRawNostrEvent(wireMsg);
         } catch (Exception e) {
             Log.w(TAG, "publishNostrDocument notice: " + e.getMessage());
         }
@@ -388,7 +439,7 @@ public class FirebaseFirestore {
         ensureNostrPoolConnected();
         long now = System.currentTimeMillis();
         Long lastQ = lastTagQueryMs.get(tagValue);
-        if (lastQ != null && (now - lastQ) < 15000L && !relaySockets.isEmpty()) {
+        if (lastQ != null && (now - lastQ) < 20000L && !relaySockets.isEmpty()) {
             return;
         }
         lastTagQueryMs.put(tagValue, now);
@@ -406,20 +457,7 @@ public class FirebaseFirestore {
             } catch (Exception ignored) {}
         }
 
-        if (sentCount == 0) {
-            try {
-                Thread.sleep(250);
-            } catch (InterruptedException ignored) {}
-            for (WebSocket ws : relaySockets.values()) {
-                try {
-                    if (ws.send(reqMsg)) {
-                        sentCount++;
-                    }
-                } catch (Exception ignored) {}
-            }
-        }
-
-        if (sentCount > 0) {
+        if (sentCount > 0 && timeoutMs > 0L) {
             try {
                 ctx.firstEoseLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
             } catch (InterruptedException ignored) {}
@@ -427,14 +465,24 @@ public class FirebaseFirestore {
         pendingQuerySubs.remove(subId);
     }
 
-    private String ensureLiveTagSubscription(String tagKey, String tagValue, int limit) {
+    /**
+     * Multiplexes all watched live collection/document tags into a single Nostr subscription ("veil_live_mux")
+     * so public strfry relays never drop subscriptions due to max_reqs_per_connection limits.
+     */
+    private synchronized String ensureLiveTagSubscription(String tagKey, String tagValue, int limit) {
         ensureNostrPoolConnected();
-        String subId = "live_" + tagKey;
-        String reqMsg = "[\"REQ\",\"" + subId + "\",{\"kinds\":[30078],\"#t\":[\"" + tagValue + "\"],\"limit\":" + limit + "}]";
-        if (!reqMsg.equals(activeLiveSubFilters.put(subId, reqMsg))) {
+        boolean added = watchedLiveTags.add(tagValue);
+        String subId = "veil_live_mux";
+        if (added || !activeLiveSubFilters.containsKey(subId)) {
+            JSONArray tagArr = new JSONArray();
+            for (String t : watchedLiveTags) {
+                tagArr.put(t);
+            }
+            String muxReq = "[\"REQ\",\"" + subId + "\",{\"kinds\":[30078],\"#t\":" + tagArr.toString() + ",\"limit\":250}]";
+            activeLiveSubFilters.put(subId, muxReq);
             for (WebSocket ws : relaySockets.values()) {
                 try {
-                    ws.send(reqMsg);
+                    ws.send(muxReq);
                 } catch (Exception ignored) {}
             }
         }
@@ -500,10 +548,13 @@ public class FirebaseFirestore {
                 }
             }
 
-            // Query Nostr decentralized relay pool by document tag
-            queryNostrByTagBlocking(documentTagFor(normPath), 2, 750L);
-
+            String docTag = documentTagFor(normPath);
             Map<String, Object> cached = localStore.get(normPath);
+            if (cached == null || !watchedLiveTags.contains(docTag)) {
+                queryNostrByTagBlocking(docTag, 2, cached != null ? 0L : 250L);
+                cached = localStore.get(normPath);
+            }
+
             if (cached != null && !cached.isEmpty()) {
                 tcs.trySetResult(new DocumentSnapshot(docId, normPath, cached, true));
             } else {
@@ -518,7 +569,7 @@ public class FirebaseFirestore {
         final String normPath = normalizePath(docPath);
         final TaskCompletionSource<Void> tcs = new TaskCompletionSource<>();
 
-        ioExecutor.execute(() -> {
+        writeExecutor.execute(() -> {
             try {
                 Map<String, Object> incoming = objectToMap(data);
                 Map<String, Object> mergedMap;
@@ -580,7 +631,7 @@ public class FirebaseFirestore {
         final String normPath = normalizePath(docPath);
         final TaskCompletionSource<Void> tcs = new TaskCompletionSource<>();
 
-        ioExecutor.execute(() -> {
+        writeExecutor.execute(() -> {
             long now = System.currentTimeMillis();
             deletedDocs.put(normPath, now);
             docTimestamps.put(normPath, now);
@@ -626,7 +677,8 @@ public class FirebaseFirestore {
 
             long nowMs = System.currentTimeMillis();
             Long lastPoll = lastColHttpPollMs.get(normCollection);
-            boolean skipRemoteHttp = (lastPoll != null && (nowMs - lastPoll) < 6000L && !localStore.isEmpty());
+            boolean skipRemoteHttp = (lastPoll != null && (nowMs - lastPoll) < 2500L && !localStore.isEmpty());
+            boolean restSucceeded = false;
             if (!skipRemoteHttp && isFirestoreRestAvailable()) {
                 lastColHttpPollMs.put(normCollection, nowMs);
                 try {
@@ -635,6 +687,7 @@ public class FirebaseFirestore {
                     Request req = new Request.Builder().url(url).get().build();
                     try (Response resp = httpClient.newCall(req).execute()) {
                         if (resp.isSuccessful() && resp.body() != null) {
+                            restSucceeded = true;
                             JSONObject root = new JSONObject(resp.body().string());
                             JSONArray docsArr = root.optJSONArray("documents");
                             if (docsArr != null) {
@@ -669,8 +722,10 @@ public class FirebaseFirestore {
                 }
             }
 
-            // Query Nostr relay pool for this collection
-            queryNostrByTagBlocking(collectionTagFor(normCollection), 80, 600L);
+            String colTag = collectionTagFor(normCollection);
+            if (!watchedLiveTags.contains(colTag) || !lastTagQueryMs.containsKey(colTag)) {
+                queryNostrByTagBlocking(colTag, 80, restSucceeded ? 0L : 220L);
+            }
 
             for (Map.Entry<String, Map<String, Object>> entry : localStore.entrySet()) {
                 String path = entry.getKey();
@@ -742,6 +797,16 @@ public class FirebaseFirestore {
         String docTag = documentTagFor(normPath);
         ensureLiveTagSubscription(docTag, docTag, 2);
 
+        Map<String, Object> localExisting = localStore.get(normPath);
+        if (localExisting != null) {
+            final DocumentSnapshot initialSnap = new DocumentSnapshot(extractDocId(normPath), normPath, localExisting, true);
+            mainHandler.post(() -> {
+                try {
+                    listener.onEvent(initialSnap, null);
+                } catch (Exception ignored) {}
+            });
+        }
+
         final Map<String, Integer> lastHash = new ConcurrentHashMap<>();
         ScheduledFuture<?> future = pollExecutor.scheduleWithFixedDelay(() -> {
             getDocumentAsync(normPath).addOnSuccessListener(snap -> {
@@ -759,7 +824,7 @@ public class FirebaseFirestore {
                     }
                 });
             });
-        }, 0, 30000, TimeUnit.MILLISECONDS);
+        }, 0, 5000, TimeUnit.MILLISECONDS);
 
         return () -> {
             future.cancel(false);
@@ -843,11 +908,12 @@ public class FirebaseFirestore {
         };
 
         collectionWakeListeners.computeIfAbsent(normCollection, k -> new CopyOnWriteArrayList<>()).add(evaluateAndEmit);
+        evaluateAndEmit.run();
 
         ScheduledFuture<?> future = pollExecutor.scheduleWithFixedDelay(() -> {
             queryCollectionAsync(normCollection, filters, orderByField, orderDirection, limitCount)
                     .addOnSuccessListener(querySnap -> evaluateAndEmit.run());
-        }, 0, 30000, TimeUnit.MILLISECONDS);
+        }, 0, 4000, TimeUnit.MILLISECONDS);
 
         return () -> {
             future.cancel(false);

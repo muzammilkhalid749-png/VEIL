@@ -178,29 +178,24 @@ public class TurnCredentialManager {
     private void initDefaultFleet() {
         mRelayFleet.clear();
 
-        // 1. Primary Global Anycast Edge (Zero-Log coturn cluster)
+        // 1. Primary Global Anycast TURN/STUN Edge
         mRelayFleet.add(new RelayNode(
-                "anycast-global", "turn.veil-mesh.net", "Global Anycast Edge",
-                3478, 443, 443, 5349));
+                "anycast-global", "openrelay.metered.ca", "Global Anycast Edge",
+                80, 80, 443, 443));
 
-        // 2. European Edge (Frankfurt / Amsterdam)
+        // 2. Standard Global Relay Edge (TCP/TLS 443)
         mRelayFleet.add(new RelayNode(
-                "eu-central", "eu-turn.veil-mesh.net", "Europe Central (Frankfurt)",
-                3478, 443, 443, 5349));
+                "global-standard", "standard.relay.metered.ca", "Global Standard Relay",
+                80, 80, 443, 443));
 
-        // 3. North America Edge (Ashburn / Oregon)
+        // 3. Google Anycast STUN Primary
         mRelayFleet.add(new RelayNode(
-                "us-east", "us-turn.veil-mesh.net", "US East (Ashburn)",
-                3478, 443, 443, 5349));
+                "google-stun-1", "stun.l.google.com", "Google Global STUN 1",
+                19302, 19302, 19302, 5349));
 
-        // 4. Asia-Pacific Edge (Singapore / Tokyo)
+        // 4. Cloudflare Anycast STUN Edge
         mRelayFleet.add(new RelayNode(
-                "ap-southeast", "ap-turn.veil-mesh.net", "Asia-Pacific (Singapore)",
-                3478, 443, 443, 5349));
-
-        // 5. Local Dev & Private Mesh Node (Default test fallback)
-        mRelayFleet.add(new RelayNode(
-                "local-dev", "10.0.2.2", "Local Emulator Edge",
+                "cloudflare-stun", "stun.cloudflare.com", "Cloudflare Anycast STUN",
                 3478, 3478, 3478, 5349));
     }
 

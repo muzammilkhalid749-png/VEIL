@@ -1869,6 +1869,76 @@ public class SovereignIdentityAndDirectoryEngine {
     // DECENTRALIZED EPHEMERAL WEBSOCKET SIGNALING (<80ms WebRTC & Call P2P Mesh)
     // ─────────────────────────────────────────────────────────────────────────────
 
+    private static String signalTagForUid(String uid) {
+        return "vsig_" + sha256Hex(("veil_sig_tag:" + uid).getBytes(StandardCharsets.UTF_8)).substring(0, 22);
+    }
+
+    private static String hexPubTagForUid(String uid) {
+        return sha256Hex(("veil_sig_p:" + uid).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void handleIncomingRawSignalEvent(JSONObject eventObj, String targetUid) {
+        if (eventObj == null) return;
+        try {
+            int kind = eventObj.optInt("kind", 0);
+            if (kind != 25000 && kind != 25001 && kind != 25002) {
+                return;
+            }
+            String content = eventObj.optString("content", "");
+            String fromUid = null;
+            String sigType = null;
+            String toUid = null;
+
+            JSONArray tags = eventObj.optJSONArray("tags");
+            if (tags != null) {
+                for (int i = 0; i < tags.length(); i++) {
+                    JSONArray t = tags.optJSONArray(i);
+                    if (t != null && t.length() >= 2) {
+                        String key = t.optString(0, "");
+                        String val = t.optString(1, "");
+                        if ("from".equals(key)) fromUid = val;
+                        else if ("type".equals(key)) sigType = val;
+                        else if ("to".equals(key)) toUid = val;
+                    }
+                }
+            }
+
+            JSONObject payload = null;
+            if (content != null && !content.isEmpty()) {
+                try {
+                    payload = new JSONObject(content);
+                    if (sigType == null) sigType = payload.optString("type", null);
+                    if (fromUid == null) fromUid = payload.optString("from", null);
+                    if (toUid == null) toUid = payload.optString("to", null);
+                } catch (Exception ignored) {
+                    payload = new JSONObject();
+                    payload.put("raw", content);
+                }
+            }
+
+            if (targetUid != null && toUid != null && !toUid.isEmpty() && !targetUid.equals(toUid)) {
+                return;
+            }
+
+            if (sigType != null && fromUid != null && payload != null) {
+                final String fType = sigType;
+                final String fFrom = fromUid;
+                final JSONObject fPayload = payload;
+                mExecutor.execute(() -> {
+                    for (OnSignalReceivedListener l : mSignalListeners) {
+                        try {
+                            l.onSignal(fType, fFrom, fPayload);
+                        } catch (Throwable t) {
+                            Log.w(TAG, "Error in signal listener: " + t.getMessage());
+                        }
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Signal parse error: " + e.getMessage());
+        }
+    }
+
     public synchronized void subscribeToIncomingSignals(String myUid, OnSignalReceivedListener listener) {
         if (listener != null && !mSignalListeners.contains(listener)) {
             mSignalListeners.add(listener);
@@ -1877,17 +1947,36 @@ public class SovereignIdentityAndDirectoryEngine {
         if (myUid.equals(mSubscribedUid)) return;
         mSubscribedUid = myUid;
 
+        final String sigTag = signalTagForUid(myUid);
+        final long sinceSec = (System.currentTimeMillis() / 1000L) - 60L;
+        final String subId = "sig_" + sigTag.substring(0, 12);
+        final String reqMsg = "[\"REQ\",\"" + subId + "\",{\"kinds\":[25000,25001,25002],\"#t\":[\"" + sigTag + "\"],\"since\":" + sinceSec + "}]";
+
+        // 1. Attach to FirebaseFirestore's already-warm Nostr WebSocket pool for 0ms connection overhead
+        com.google.firebase.firestore.FirebaseFirestore.getInstance().addRawNostrEventListener((incomingSubId, eventObj) -> {
+            if (eventObj != null && (subId.equals(incomingSubId) || eventObj.optInt("kind", 0) == 25000)) {
+                handleIncomingRawSignalEvent(eventObj, myUid);
+            }
+        });
+        com.google.firebase.firestore.FirebaseFirestore.getInstance().registerCustomLiveSubscription(subId, reqMsg);
+
+        // 2. Also maintain direct dedicated signal WebSockets for redundant sub-50ms delivery
         mExecutor.execute(() -> {
             for (String relayUrl : NOSTR_RELAYS) {
-                if (mActiveSignalWebSockets.containsKey(relayUrl)) {
-                    continue;
+                WebSocket existingWs = mActiveSignalWebSockets.get(relayUrl);
+                if (existingWs != null) {
+                    try {
+                        existingWs.send(reqMsg);
+                        continue;
+                    } catch (Exception ignored) {
+                        mActiveSignalWebSockets.remove(relayUrl);
+                    }
                 }
                 Request req = new Request.Builder().url(relayUrl).build();
                 mOkHttpClient.newWebSocket(req, new WebSocketListener() {
                     @Override
                     public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
                         mActiveSignalWebSockets.put(relayUrl, webSocket);
-                        String reqMsg = "[\"REQ\",\"sig_" + myUid + "\",{\"kinds\":[25000,25001,25002],\"#p\":[\"" + myUid + "\"]}]";
                         webSocket.send(reqMsg);
                         Log.i(TAG, "Subscribed to ephemeral signals on " + relayUrl + " for " + myUid);
                     }
@@ -1895,53 +1984,11 @@ public class SovereignIdentityAndDirectoryEngine {
                     @Override
                     public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
                         try {
-                            if (text.startsWith("[\"EVENT\"")) {
+                            if (text != null && text.startsWith("[\"EVENT\"")) {
                                 JSONArray arr = new JSONArray(text);
                                 if (arr.length() >= 3) {
-                                    JSONObject eventObj = arr.getJSONObject(2);
-                                    String content = eventObj.optString("content");
-                                    String fromUid = null;
-                                    String sigType = null;
-
-                                    JSONArray tags = eventObj.optJSONArray("tags");
-                                    if (tags != null) {
-                                        for (int i = 0; i < tags.length(); i++) {
-                                            JSONArray t = tags.optJSONArray(i);
-                                            if (t != null && t.length() >= 2) {
-                                                String key = t.getString(0);
-                                                String val = t.getString(1);
-                                                if ("from".equals(key)) fromUid = val;
-                                                else if ("type".equals(key)) sigType = val;
-                                            }
-                                        }
-                                    }
-
-                                    JSONObject payload = null;
-                                    if (content != null && !content.isEmpty()) {
-                                        try {
-                                            payload = new JSONObject(content);
-                                            if (sigType == null) sigType = payload.optString("type", null);
-                                            if (fromUid == null) fromUid = payload.optString("from", null);
-                                        } catch (Exception ignored) {
-                                            payload = new JSONObject();
-                                            payload.put("raw", content);
-                                        }
-                                    }
-
-                                    if (sigType != null && fromUid != null && payload != null) {
-                                        final String fType = sigType;
-                                        final String fFrom = fromUid;
-                                        final JSONObject fPayload = payload;
-                                        mExecutor.execute(() -> {
-                                            for (OnSignalReceivedListener l : mSignalListeners) {
-                                                try {
-                                                    l.onSignal(fType, fFrom, fPayload);
-                                                } catch (Throwable t) {
-                                                    Log.w(TAG, "Error in signal listener: " + t.getMessage());
-                                                }
-                                            }
-                                        });
-                                    }
+                                    JSONObject eventObj = arr.optJSONObject(2);
+                                    handleIncomingRawSignalEvent(eventObj, myUid);
                                 }
                             }
                         } catch (Exception e) {
@@ -1972,9 +2019,11 @@ public class SovereignIdentityAndDirectoryEngine {
                 String sigType = signalPayload.optString("type", "message");
                 long createdAt = System.currentTimeMillis() / 1000L;
 
-                byte[] seckey32 = com.google.firebase.firestore.FirebaseFirestore.sha256Bytes("veil_sig_v3:" + senderUid);
-                List<String[]> tags = new ArrayList<>();
-                tags.add(new String[]{"p", recipientUid});
+                byte[] seckey32 = com.google.firebase.firestore.FirebaseFirestore.sha256Bytes("veil_sig_v3:" + senderUid + ":" + System.nanoTime());
+                List<String[]> tags = new ArrayList<>(5);
+                tags.add(new String[]{"t", signalTagForUid(recipientUid)});
+                tags.add(new String[]{"p", hexPubTagForUid(recipientUid)});
+                tags.add(new String[]{"to", recipientUid});
                 tags.add(new String[]{"from", senderUid});
                 tags.add(new String[]{"type", sigType});
 
@@ -1987,23 +2036,13 @@ public class SovereignIdentityAndDirectoryEngine {
                 );
                 String eventMsg = "[\"EVENT\"," + signedEvent + "]";
 
-                boolean sentAny = false;
+                boolean sentAny = com.google.firebase.firestore.FirebaseFirestore.getInstance().broadcastRawNostrEvent(eventMsg);
                 for (String relayUrl : NOSTR_RELAYS) {
                     WebSocket ws = mActiveSignalWebSockets.get(relayUrl);
                     if (ws != null) {
                         if (ws.send(eventMsg)) {
                             sentAny = true;
                         }
-                    } else {
-                        Request req = new Request.Builder().url(relayUrl).build();
-                        mOkHttpClient.newWebSocket(req, new WebSocketListener() {
-                            @Override
-                            public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
-                                mActiveSignalWebSockets.put(relayUrl, webSocket);
-                                webSocket.send(eventMsg);
-                            }
-                        });
-                        sentAny = true;
                     }
                 }
 

@@ -112,26 +112,30 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // Defer P2P WebRTC & Auth Session initialization until after Frame 1 renders
+        // Defer P2P WebRTC & Auth Session initialization to a background worker after Frame 1 renders
         android.os.Looper.myQueue().addIdleHandler(() -> {
-            com.m3.veil.ui.chat.adapters.MessagesAdapter.prewarmViewPool(MainActivity.this);
-            if (!isDestroyed() && com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(MainActivity.this)) {
-                String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(MainActivity.this);
-                if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
-                    com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(MainActivity.this,
-                            com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser());
-                } else {
-                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
-                            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(MainActivity.this).getLocalManifest();
-                    if (manifest != null) {
-                        com.m3.veil.manager.AuthManager.getInstance().onSovereignSessionStarted(MainActivity.this, manifest);
-                    } else if (uid != null) {
-                        com.m3.veil.webrtc.WebRtcManager.getInstance(MainActivity.this).init(uid);
+            new Thread(() -> {
+                try {
+                    com.m3.veil.ui.chat.adapters.MessagesAdapter.prewarmViewPool(MainActivity.this);
+                    if (!isDestroyed() && com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(MainActivity.this)) {
+                        String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(MainActivity.this);
+                        if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                            com.m3.veil.manager.AuthManager.getInstance().onSessionStarted(MainActivity.this,
+                                    com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser());
+                        } else {
+                            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(MainActivity.this).getLocalManifest();
+                            if (manifest != null) {
+                                com.m3.veil.manager.AuthManager.getInstance().onSovereignSessionStarted(MainActivity.this, manifest);
+                            } else if (uid != null) {
+                                com.m3.veil.webrtc.WebRtcManager.getInstance(MainActivity.this).init(uid);
+                            }
+                        }
+                        com.m3.veil.services.VeilMeshDaemonService.start(MainActivity.this);
                     }
-                }
-                com.m3.veil.services.VeilMeshDaemonService.start(MainActivity.this);
-            }
-            WebRtcManager.getInstance(MainActivity.this).addEventListener(globalCallListener);
+                    WebRtcManager.getInstance(MainActivity.this).addEventListener(globalCallListener);
+                } catch (Throwable ignored) {}
+            }, "VeilMainSessionWorker").start();
             return false;
         });
 

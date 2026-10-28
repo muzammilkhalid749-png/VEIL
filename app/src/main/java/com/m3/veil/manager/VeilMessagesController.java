@@ -1129,17 +1129,18 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                             VeilPacket pkt = new VeilPacket(VeilPacket.LANE_MSG, VeilPacket.TYPE_CHAT_MESSAGE, jsonPayloadStr);
                             transmitted = WebRtcManager.getInstance(mContext).sendPacket(peer, pkt);
                         }
-                    }
-
-                    if (transmitted) {
-                        anyTransmitted = true;
-                    } else {
-                        if (hasNetwork && (localFile == null || !localFile.exists() || (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()))) {
+                        if ((localFile == null || !localFile.exists() || (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()))
+                                && jsonPayloadStr.length() <= 32768) {
                             try {
                                 com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(
                                         peer, "p2p_chat", new org.json.JSONObject(jsonPayloadStr));
                             } catch (Exception ignored) {}
                         }
+                    }
+
+                    if (transmitted) {
+                        anyTransmitted = true;
+                    } else {
                         if (hasNetwork) {
                             WebRtcManager.getInstance(mContext).initiateConnection(peer);
                         }

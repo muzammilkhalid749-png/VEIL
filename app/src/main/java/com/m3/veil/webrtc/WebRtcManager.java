@@ -552,12 +552,15 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       if (peerId != null) {
          final PeerConnection pc = (PeerConnection)this.peerConnections.get(peerId);
          if (pc != null) {
-            this.turnActivePeers.add(peerId);
-
             try {
-               if (pc.signalingState() != PeerConnection.SignalingState.STABLE) {
+               PeerConnection.IceConnectionState iceState = pc.iceConnectionState();
+               if (pc.signalingState() != PeerConnection.SignalingState.STABLE
+                       || iceState == IceConnectionState.CONNECTED
+                       || iceState == IceConnectionState.COMPLETED
+                       || iceState == IceConnectionState.CHECKING) {
                   return;
                }
+               this.turnActivePeers.add(peerId);
                Log.i("WebRtcManager", "Tier 2: Upgrading configuration to TURN Port 443 TCP/UDP for peer " + peerId);
                PeerConnection.RTCConfiguration rtcConfig = new PeerConnection.RTCConfiguration(this.getIceServers(true));
                rtcConfig.sdpSemantics = SdpSemantics.UNIFIED_PLAN;
@@ -2460,6 +2463,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
          if (!sentOverP2p && json != null) {
             String type = json.optString("type", "");
+            try {
+               SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", json);
+            } catch (Exception ignored) {}
             if (!"typing".equals(type) && !"call_signal".equals(type)) {
                this.depositOfflineActionEnvelope(peerId, json.toString());
             } else {
@@ -3337,33 +3343,48 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    public void onOfferReceived(final String fromUserId, final String sdp) {
       if (fromUserId == null || sdp == null) return;
       this.rtcExecutor.execute(() -> {
-         this.cancelTurnFallback(fromUserId);
-         this.lastOfferTimestamp.put(fromUserId, System.currentTimeMillis());
+         long now = System.currentTimeMillis();
+         Long prevOfferTs = (Long)this.lastOfferTimestamp.get(fromUserId);
          PeerConnection existingPc = (PeerConnection)this.peerConnections.get(fromUserId);
          if (existingPc != null) {
             PeerConnection.SignalingState sigState = existingPc.signalingState();
             PeerConnection.IceConnectionState iceState = existingPc.iceConnectionState();
+            boolean inActiveCall = fromUserId.equals(this.activeCallPeerId);
+            if (!inActiveCall && (this.isPeerConnected(fromUserId)
+                    || iceState == IceConnectionState.CONNECTED
+                    || iceState == IceConnectionState.COMPLETED)) {
+               Log.d("WebRtcManager", "Ignoring redundant offer on already-connected PeerConnection from " + fromUserId);
+               return;
+            }
+            if (!inActiveCall && iceState == IceConnectionState.CHECKING && prevOfferTs != null && (now - prevOfferTs) < 8000L) {
+               Log.d("WebRtcManager", "Ignoring duplicate offer while ICE is actively CHECKING from " + fromUserId);
+               return;
+            }
             if (sigState == PeerConnection.SignalingState.HAVE_LOCAL_OFFER) {
                boolean isPolite = this.currentUserId != null && this.currentUserId.compareTo(fromUserId) < 0;
-               if (!isPolite) {
+               boolean localOfferStale = prevOfferTs == null || (now - prevOfferTs) > 5000L;
+               if (!isPolite && !localOfferStale) {
                   Log.i("WebRtcManager", "Impolite peer ignoring collision offer from " + fromUserId);
                   return;
                }
-               Log.i("WebRtcManager", "Polite peer resetting local offer to accept remote offer from " + fromUserId);
+               Log.i("WebRtcManager", "Resetting local offer (polite=" + isPolite + ", stale=" + localOfferStale + ") to accept remote offer from " + fromUserId);
                List<IceCandidate> savedCandidates = this.pendingIceCandidates.remove(fromUserId);
                this.closePeerConnection(fromUserId);
-               this.lastOfferTimestamp.put(fromUserId, System.currentTimeMillis());
                if (savedCandidates != null) {
                   this.pendingIceCandidates.put(fromUserId, savedCandidates);
                }
                existingPc = null;
-            } else if (iceState == IceConnectionState.CONNECTED || iceState == IceConnectionState.COMPLETED) {
-               // Already connected; ignore redundant late offer unless it is an explicit ICE restart
-               if (!sdp.contains("ice-ufrag")) {
-                  return;
+            } else if (!inActiveCall && sigState != PeerConnection.SignalingState.STABLE) {
+               List<IceCandidate> savedCandidates = this.pendingIceCandidates.remove(fromUserId);
+               this.closePeerConnection(fromUserId);
+               if (savedCandidates != null) {
+                  this.pendingIceCandidates.put(fromUserId, savedCandidates);
                }
+               existingPc = null;
             }
          }
+         this.cancelTurnFallback(fromUserId);
+         this.lastOfferTimestamp.put(fromUserId, now);
          final PeerConnection pc = (existingPc != null) ? existingPc : this.getOrCreatePeerConnection(fromUserId, false);
          SessionDescription remoteDesc = new SessionDescription(Type.OFFER, sdp);
          pc.setRemoteDescription(new SimpleSdpObserver() {
