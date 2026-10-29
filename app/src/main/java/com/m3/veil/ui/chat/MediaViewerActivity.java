@@ -144,21 +144,53 @@ public class MediaViewerActivity extends AppCompatActivity {
     private TextView btnSpeedChip;
     private TextView btnPipChip;
 
+    private View bottomReplyBar;
+    private android.widget.EditText etMediaReply;
+    private View btnSendMediaReply;
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_media_viewer);
 
-        getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        configureDarkMediaSystemBars();
 
         initViews();
         handleWindowInsets();
         extractExtras();
         setupActions();
         bindMedia();
+    }
+
+    private void configureDarkMediaSystemBars() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            android.view.Window window = getWindow();
+            window.setStatusBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(Color.TRANSPARENT);
+            android.view.WindowInsetsController controller = window.getInsetsController();
+            if (controller != null) {
+                // Clear APPEARANCE_LIGHT_STATUS_BARS and APPEARANCE_LIGHT_NAVIGATION_BARS
+                // to force WHITE/LIGHT status bar & navigation icons on dark media background in all theme modes
+                controller.setSystemBarsAppearance(
+                        0,
+                        android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+                );
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            android.view.Window window = getWindow();
+            window.setStatusBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(Color.TRANSPARENT);
+            int flags = window.getDecorView().getSystemUiVisibility();
+            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            }
+            flags |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            window.getDecorView().setSystemUiVisibility(flags);
+        }
     }
 
     private void handleWindowInsets() {
@@ -183,8 +215,16 @@ public class MediaViewerActivity extends AppCompatActivity {
                         systemBars.bottom + (int) (12 * dp)
                 );
             }
+            if (bottomReplyBar != null) {
+                bottomReplyBar.setPadding(
+                        bottomReplyBar.getPaddingStart(),
+                        bottomReplyBar.getPaddingTop(),
+                        bottomReplyBar.getPaddingEnd(),
+                        systemBars.bottom + (int) (12 * dp)
+                );
+            }
             if (videoControlsBar != null) {
-                int extraBottom = (albumItems.size() > 1) ? (int) (68 * dp) : (int) (12 * dp);
+                int extraBottom = (albumItems.size() > 1) ? (int) (118 * dp) : (int) (62 * dp);
                 videoControlsBar.setPadding(
                         videoControlsBar.getPaddingStart(),
                         videoControlsBar.getPaddingTop(),
@@ -225,6 +265,10 @@ public class MediaViewerActivity extends AppCompatActivity {
         bottomCaptionBar = findViewById(R.id.bottomCaptionBar);
         tvCaption = findViewById(R.id.tvCaption);
         viewerProgressBar = findViewById(R.id.viewerProgressBar);
+
+        bottomReplyBar = findViewById(R.id.bottomReplyBar);
+        etMediaReply = findViewById(R.id.etMediaReply);
+        btnSendMediaReply = findViewById(R.id.btnSendMediaReply);
     }
 
     private void extractExtras() {
@@ -375,12 +419,12 @@ public class MediaViewerActivity extends AppCompatActivity {
         if (index < 0 || index >= albumItems.size()) return;
         currentMediaIndex = index;
         updateActiveItemHeaderAndCaption();
-        if (mediaViewPager != null && mediaViewPager.getVisibility() == View.VISIBLE) {
+        if (mediaViewPager != null) {
             if (mediaViewPager.getCurrentItem() != index) {
                 mediaViewPager.setCurrentItem(index, smooth);
             }
         }
-        if (mediaVerticalRecyclerView != null && mediaVerticalRecyclerView.getVisibility() == View.VISIBLE) {
+        if (mediaVerticalRecyclerView != null) {
             if (smooth) {
                 mediaVerticalRecyclerView.smoothScrollToPosition(index);
             } else {
@@ -409,7 +453,7 @@ public class MediaViewerActivity extends AppCompatActivity {
             btnSpeedChip.setTextColor(Color.WHITE);
             btnSpeedChip.setTextSize(12.5f);
             btnSpeedChip.setTypeface(null, Typeface.BOLD);
-            btnSpeedChip.setBackgroundResource(R.drawable.bg_filter_chip);
+            btnSpeedChip.setBackgroundResource(R.drawable.bg_media_glass_chip);
             btnSpeedChip.setPadding((int) (8 * dp), (int) (4 * dp), (int) (8 * dp), (int) (4 * dp));
             btnSpeedChip.setVisibility("video".equals(mediaType) ? View.VISIBLE : View.GONE);
             btnSpeedChip.setOnClickListener(v -> {
@@ -430,6 +474,8 @@ public class MediaViewerActivity extends AppCompatActivity {
                 btnPipChip.setText("PiP");
                 btnPipChip.setTextColor(Color.WHITE);
                 btnPipChip.setTextSize(12f);
+                btnPipChip.setTypeface(null, Typeface.BOLD);
+                btnPipChip.setBackgroundResource(R.drawable.bg_media_glass_chip);
                 btnPipChip.setPadding((int) (8 * dp), (int) (4 * dp), (int) (8 * dp), (int) (4 * dp));
                 btnPipChip.setVisibility("video".equals(mediaType) ? View.VISIBLE : View.GONE);
                 btnPipChip.setOnClickListener(v -> {
@@ -438,6 +484,45 @@ public class MediaViewerActivity extends AppCompatActivity {
                     } catch (Exception ignored) {}
                 });
                 topBar.addView(btnPipChip, Math.max(1, topBar.getChildCount() - 2));
+            }
+        }
+
+        if (bottomReplyBar != null) {
+            if (isViewOnce) {
+                bottomReplyBar.setVisibility(View.GONE);
+            } else {
+                bottomReplyBar.setVisibility(View.VISIBLE);
+                TextView rHeart = findViewById(R.id.reactionHeart);
+                TextView rPray = findViewById(R.id.reactionPray);
+                TextView rLaugh = findViewById(R.id.reactionLaugh);
+                View.OnClickListener sendReaction = v -> {
+                    if (v instanceof TextView) {
+                        String emoji = ((TextView) v).getText().toString();
+                        Toast.makeText(this, "Reaction sent " + emoji, Toast.LENGTH_SHORT).show();
+                    }
+                };
+                if (rHeart != null) rHeart.setOnClickListener(sendReaction);
+                if (rPray != null) rPray.setOnClickListener(sendReaction);
+                if (rLaugh != null) rLaugh.setOnClickListener(sendReaction);
+
+                if (etMediaReply != null) {
+                    etMediaReply.addTextChangedListener(new android.text.TextWatcher() {
+                        @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                        @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                            if (btnSendMediaReply != null) {
+                                btnSendMediaReply.setVisibility(s != null && s.toString().trim().length() > 0 ? View.VISIBLE : View.GONE);
+                            }
+                        }
+                        @Override public void afterTextChanged(android.text.Editable s) {}
+                    });
+                    etMediaReply.setOnEditorActionListener((v, actionId, event) -> {
+                        sendMediaReplyMessage();
+                        return true;
+                    });
+                }
+                if (btnSendMediaReply != null) {
+                    btnSendMediaReply.setOnClickListener(v -> sendMediaReplyMessage());
+                }
             }
         }
 
@@ -451,6 +536,9 @@ public class MediaViewerActivity extends AppCompatActivity {
         isControlsVisible = !isControlsVisible;
         int vis = isControlsVisible ? View.VISIBLE : View.GONE;
         topBar.setVisibility(vis);
+        if (bottomReplyBar != null && !isViewOnce) {
+            bottomReplyBar.setVisibility(vis);
+        }
         boolean hasCaption = caption != null && !caption.trim().isEmpty();
         boolean hasAlbumStrip = albumItems.size() > 1 && !isViewOnce;
         if (hasCaption || hasAlbumStrip) {
@@ -460,6 +548,14 @@ public class MediaViewerActivity extends AppCompatActivity {
             videoControlsBar.setVisibility(vis);
             videoCenterPlayBtn.setVisibility(isControlsVisible && (videoViewer == null || !videoViewer.isPlaying()) ? View.VISIBLE : View.GONE);
         }
+    }
+
+    private void sendMediaReplyMessage() {
+        if (etMediaReply == null) return;
+        String text = etMediaReply.getText().toString().trim();
+        if (text.isEmpty()) return;
+        etMediaReply.setText("");
+        Toast.makeText(this, "Reply sent: " + text, Toast.LENGTH_SHORT).show();
     }
 
     private void bindMedia() {
@@ -749,7 +845,9 @@ public class MediaViewerActivity extends AppCompatActivity {
 
         @Override
         public void onBindViewHolder(@NonNull PageHolder holder, int position) {
-            AlbumMediaEntry item = albumItems.get(position);
+            int pos = holder.getAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) pos = position;
+            AlbumMediaEntry item = albumItems.get(pos);
             File f = new File(item.path);
 
             // Support simultaneous vertical fling/scroll even while in horizontal swipe mode (and vice versa)
@@ -778,6 +876,16 @@ public class MediaViewerActivity extends AppCompatActivity {
                             return false;
                         }
                     });
+
+            final int targetPos = pos;
+
+            holder.pagePhoto.setOnClickListener(v -> {
+                if (targetPos != currentMediaIndex) {
+                    selectAlbumIndex(targetPos, true);
+                } else {
+                    toggleControls();
+                }
+            });
 
             holder.pagePhoto.setOnTouchListener((v, event) -> {
                 dualAxisDetector.onTouchEvent(event);

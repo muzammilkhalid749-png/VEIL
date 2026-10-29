@@ -22,6 +22,8 @@ app/google-services.json
 app/google-services.json.bak
 debug.keystore
 .agents/
+web/dist/
+dist/
 
 
 

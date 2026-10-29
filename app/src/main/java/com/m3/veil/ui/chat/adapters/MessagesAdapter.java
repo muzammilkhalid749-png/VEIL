@@ -2829,6 +2829,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         TextView tvVanishBadge;
         TextView tvEditedBadge;
         TextView senderNameText;
+        View groupHeaderDivider;
 
         FrameLayout imageDownloadOverlay;
         LinearLayout imageDownloadIdleLayout;
@@ -2853,6 +2854,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             dateHeaderContainer = itemView.findViewById(R.id.dateHeaderContainer);
             dateHeaderText = itemView.findViewById(R.id.dateHeaderText);
             senderNameText = itemView.findViewById(R.id.senderNameText);
+            groupHeaderDivider = itemView.findViewById(R.id.groupHeaderDivider);
             messageText = itemView.findViewById(R.id.messageText);
             timeText = itemView.findViewById(R.id.timeText);
             reactionsText = itemView.findViewById(R.id.reactionsText);
@@ -3134,8 +3136,14 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     int hash = Math.abs((message.getSenderId() != null ? message.getSenderId() : sName).hashCode());
                     senderNameText.setTextColor(palette[hash % palette.length]);
                     senderNameText.setVisibility(View.VISIBLE);
+                    if (groupHeaderDivider != null) {
+                        groupHeaderDivider.setVisibility(View.VISIBLE);
+                    }
                 } else {
                     senderNameText.setVisibility(View.GONE);
+                    if (groupHeaderDivider != null) {
+                        groupHeaderDivider.setVisibility(View.GONE);
+                    }
                 }
             }
             if (messageBubble instanceof com.m3.veil.ui.views.ChatMessageCell) {

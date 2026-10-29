@@ -291,26 +291,49 @@ public class PinUnlockActivity extends AppCompatActivity {
 
     private void updatePinDots() {
         if (pinDotsContainer == null) return;
-        pinDotsContainer.removeAllViews();
 
         int totalDots = Math.max(4, Math.min(8, cachedTargetPinLength));
         int pinLength = enteredPin.length();
-        for (int i = 0; i < totalDots; i++) {
-            View dot = new View(this);
-            int dotSize = getResources().getDimensionPixelSize(R.dimen.pin_dot_size);
-            int dotMargin = getResources().getDimensionPixelSize(R.dimen.pin_dot_margin);
 
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dotSize, dotSize);
-            params.setMargins(dotMargin, 0, dotMargin, 0);
-            dot.setLayoutParams(params);
+        if (pinDotsContainer.getChildCount() != totalDots) {
+            pinDotsContainer.removeAllViews();
+            for (int i = 0; i < totalDots; i++) {
+                View dot = new View(this);
+                int dotSize = getResources().getDimensionPixelSize(R.dimen.pin_dot_size);
+                int dotMargin = getResources().getDimensionPixelSize(R.dimen.pin_dot_margin);
 
-            if (i < pinLength) {
-                dot.setBackgroundResource(R.drawable.pin_dot_filled);
-            } else {
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dotSize, dotSize);
+                params.setMargins(dotMargin, 0, dotMargin, 0);
+                dot.setLayoutParams(params);
+                dot.setTag(false);
                 dot.setBackgroundResource(R.drawable.pin_dot_empty);
+                pinDotsContainer.addView(dot);
             }
+        }
 
-            pinDotsContainer.addView(dot);
+        for (int i = 0; i < totalDots; i++) {
+            View dot = pinDotsContainer.getChildAt(i);
+            boolean shouldBeFilled = (i < pinLength);
+            Boolean isFilled = (Boolean) dot.getTag();
+
+            if (isFilled == null || isFilled != shouldBeFilled) {
+                dot.setTag(shouldBeFilled);
+                if (shouldBeFilled) {
+                    dot.setBackgroundResource(R.drawable.pin_dot_filled);
+                    dot.setScaleX(0.7f);
+                    dot.setScaleY(0.7f);
+                    dot.animate()
+                       .scaleX(1.0f)
+                       .scaleY(1.0f)
+                       .setDuration(120)
+                       .start();
+                } else {
+                    dot.setBackgroundResource(R.drawable.pin_dot_empty);
+                    dot.animate().cancel();
+                    dot.setScaleX(1.0f);
+                    dot.setScaleY(1.0f);
+                }
+            }
         }
     }
 

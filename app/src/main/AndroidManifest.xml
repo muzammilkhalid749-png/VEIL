@@ -56,68 +56,84 @@
         android:theme="@style/Theme.VEIL">
         <activity
             android:name=".ui.auth.PhoneAuthActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.auth.OTPVerificationActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.onboard.OnboardingActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.auth.UsernameActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.auth.PinSetupActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.auth.PinUnlockActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.auth.RecoveryPhraseActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.auth.RestoreAnonymousActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.chat.NewChatActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.chat.NewGroupActivity"
+            android:screenOrientation="portrait"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.chat.ArchivedChatsActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.settings.PrivacySettingsActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.notifications.NotificationsActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.settings.NotificationSettingsActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ui.chat.SearchActivity"
+            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
             android:exported="false" />
 
         <activity
             android:name=".ui.chat.CallActivity"
+            android:screenOrientation="portrait"
             android:launchMode="singleTask"
             android:taskAffinity=":voip"
             android:supportsPictureInPicture="true"
@@ -131,6 +147,7 @@
 
         <activity
             android:name=".ui.splash.SplashActivity"
+            android:screenOrientation="portrait"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -140,17 +157,20 @@
         </activity>
         <activity
             android:name=".ui.chat.ChatActivity"
+            android:screenOrientation="portrait"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
             
         <activity
             android:name=".ui.chat.MediaEditActivity"
+            android:screenOrientation="portrait"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:theme="@style/Theme.VEIL" />
 
         <activity
             android:name=".ui.chat.MediaViewerActivity"
+            android:screenOrientation="portrait"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:theme="@style/Theme.VEIL" />
@@ -176,16 +196,19 @@
 
         <activity
             android:name=".ui.main.CreatePostActivity"
+            android:screenOrientation="portrait"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.main.PostDetailActivity"
+            android:screenOrientation="portrait"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.main.MainActivity"
+            android:screenOrientation="portrait"
             android:launchMode="singleTop"
             android:exported="true" />
             
@@ -196,11 +219,13 @@
 
         <activity
             android:name=".ui.chat.GroupSettingsActivity"
+            android:screenOrientation="portrait"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.chat.ChatSettingsActivity"
+            android:screenOrientation="portrait"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 

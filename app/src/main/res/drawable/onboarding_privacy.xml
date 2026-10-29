@@ -1,92 +1,366 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="200dp"
-    android:height="200dp"
-    android:viewportWidth="200"
-    android:viewportHeight="200">
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="280dp"
+    android:height="280dp"
+    android:viewportWidth="280"
+    android:viewportHeight="280">
 
-    <!-- Background Circle -->
-    <path
-        android:fillColor="@color/veil_primary_light"
-        android:strokeColor="@color/veil_primary_dark"
-        android:strokeWidth="2"
-        android:pathData="M 100,40
-                        C 60,40 40,60 40,100
-                        C 40,140 60,160 100,160
-                        C 140,160 160,140 160,100
-                        C 160,60 140,40 100,40 Z" />
+    <!-- ================================================================= -->
+    <!-- LAYER 1: OUTER AMBIENT HALO (BLEEDS OUTSIDE THE CIRCLE RING)      -->
+    <!-- ================================================================= -->
 
-    <!-- Gear Outer -->
-    <path
-        android:fillColor="@color/veil_accent"
-        android:strokeColor="@color/veil_primary_dark"
-        android:strokeWidth="1"
-        android:pathData="M 100,55
-                        C 75,55 55,75 55,100
-                        C 55,125 75,145 100,145
-                        C 125,145 145,125 145,100
-                        C 145,75 125,55 100,55 Z" />
+    <!-- Outer Left / Center-Left Violet-Indigo Whisper Glow -->
+    <path android:pathData="M 140,140 m -136,0 a 136,136 0 1,1 272,0 a 136,136 0 1,1 -272,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="112"
+                android:centerY="132"
+                android:gradientRadius="124"
+                android:type="radial">
+                <item android:color="#387C6BFF" android:offset="0.0" />
+                <item android:color="#228378FF" android:offset="0.55" />
+                <item android:color="#0C8B82FF" android:offset="0.80" />
+                <item android:color="#008B82FF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Gear Inner -->
-    <path
-        android:fillColor="@color/veil_primary"
-        android:strokeColor="@color/veil_primary_dark"
-        android:strokeWidth="1"
-        android:pathData="M 100,75
-                        C 85,75 75,85 75,100
-                        C 75,115 85,125 100,125
-                        C 115,125 125,115 125,100
-                        C 125,85 115,75 100,75 Z" />
+    <!-- Outer Right / Bottom-Right Aqua-Cyan Whisper Glow -->
+    <path android:pathData="M 140,140 m -136,0 a 136,136 0 1,1 272,0 a 136,136 0 1,1 -272,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="168"
+                android:centerY="154"
+                android:gradientRadius="120"
+                android:type="radial">
+                <item android:color="#3B38BDF8" android:offset="0.0" />
+                <item android:color="#2256CCF2" android:offset="0.55" />
+                <item android:color="#0C67E8F9" android:offset="0.82" />
+                <item android:color="#0067E8F9" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Gear Teeth -->
-    <path
-        android:fillColor="@color/veil_accent"
-        android:pathData="M 100,50 L 105,45 L 95,45 Z" />
-    <path
-        android:fillColor="@color/veil_accent"
-        android:pathData="M 150,100 L 155,95 L 155,105 Z" />
-    <path
-        android:fillColor="@color/veil_accent"
-        android:pathData="M 100,150 L 95,155 L 105,155 Z" />
-    <path
-        android:fillColor="@color/veil_accent"
-        android:pathData="M 50,100 L 45,95 L 45,105 Z" />
+    <!-- Outer Perimeter Ring-Hugging Shade (Soft Halo Just Outside r=92) -->
+    <path android:pathData="M 140,140 m -118,0 a 118,118 0 1,1 236,0 a 118,118 0 1,1 -236,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="140"
+                android:centerY="140"
+                android:gradientRadius="118"
+                android:type="radial">
+                <item android:color="#00000000" android:offset="0.0" />
+                <item android:color="#00000000" android:offset="0.72" />
+                <item android:color="#249AB8FA" android:offset="0.78" />
+                <item android:color="#12A6C4FC" android:offset="0.88" />
+                <item android:color="#00FFFFFF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Lock Icon -->
-    <path
-        android:fillColor="@color/text_primary"
-        android:pathData="M 85,85
-                        L 85,75
-                        C 85,70 89,66 94,66
-                        L 106,66
-                        C 111,66 115,70 115,75
-                        L 115,85
-                        Z" />
+    <!-- ================================================================= -->
+    <!-- LAYER 2: INNER CIRCLE SHADE (STRICTLY INSIDE THE r=92 CIRCLE)     -->
+    <!-- ================================================================= -->
 
-    <!-- Lock Top -->
-    <path
-        android:strokeColor="@color/text_primary"
-        android:strokeWidth="3"
-        android:pathData="M 105,75
-                        C 115,75 120,70 120,65
-                        C 120,60 115,55 105,55
-                        C 95,55 90,60 90,65
-                        C 90,70 95,75 105,75" />
+    <!-- Inner Circle Base Linear Tint (Top-Left Lavender to Bottom-Right Ice Cyan) -->
+    <path android:pathData="M 140,140 m -92,0 a 92,92 0 1,1 184,0 a 92,92 0 1,1 -184,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="215"
+                android:endY="215"
+                android:startX="65"
+                android:startY="65"
+                android:type="linear">
+                <item android:color="#26DEDDFE" android:offset="0.0" />
+                <item android:color="#18E8F0FE" android:offset="0.5" />
+                <item android:color="#2CD2F2FF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Privacy Eye -->
-    <path
-        android:strokeColor="@color/text_primary"
-        android:strokeWidth="3"
-        android:pathData="M 130,115
-                        C 140,115 145,110 145,105
-                        C 145,100 140,95 130,95
-                        C 120,95 115,100 115,105
-                        C 115,110 120,115 130,115" />
+    <!-- Inner Circle Edge Vignette (Soft Shade Hugging the Inside of the Ring) -->
+    <path android:pathData="M 140,140 m -92,0 a 92,92 0 1,1 184,0 a 92,92 0 1,1 -184,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="140"
+                android:centerY="140"
+                android:gradientRadius="92"
+                android:type="radial">
+                <item android:color="#00FFFFFF" android:offset="0.0" />
+                <item android:color="#08A6BCFA" android:offset="0.70" />
+                <item android:color="#1E96B2F8" android:offset="0.90" />
+                <item android:color="#2E8BA8F5" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Eye Slash -->
+    <!-- Deep Core Color Aura Behind Hood (Left Indigo + Lower-Right Cyan) -->
+    <path android:pathData="M 140,140 m -82,0 a 82,82 0 1,1 164,0 a 82,82 0 1,1 -164,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="122"
+                android:centerY="142"
+                android:gradientRadius="76"
+                android:type="radial">
+                <item android:color="#426366F1" android:offset="0.0" />
+                <item android:color="#1F6366F1" android:offset="0.55" />
+                <item android:color="#006366F1" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <path android:pathData="M 140,140 m -82,0 a 82,82 0 1,1 164,0 a 82,82 0 1,1 -164,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="158"
+                android:centerY="152"
+                android:gradientRadius="72"
+                android:type="radial">
+                <item android:color="#4000E5FF" android:offset="0.0" />
+                <item android:color="#1E38BDF8" android:offset="0.55" />
+                <item android:color="#0038BDF8" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- ================================================================= -->
+    <!-- LAYER 3: CONCENTRIC CIRCLE STROKE & ORBIT NODE                    -->
+    <!-- ================================================================= -->
+
+    <!-- Crisp Gradient Circle Ring (r=92) -->
     <path
-        android:strokeColor="@color/text_primary"
-        android:strokeWidth="2"
-        android:pathData="M 125,92 L 135,118" />
+        android:fillColor="#00000000"
+        android:pathData="M 140,140 m -92,0 a 92,92 0 1,1 184,0 a 92,92 0 1,1 -184,0"
+        android:strokeWidth="1.3">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:endX="232"
+                android:endY="180"
+                android:startX="48"
+                android:startY="100"
+                android:type="linear">
+                <item android:color="#CFC9F8" android:offset="0.0" />
+                <item android:color="#C6DCF9" android:offset="0.5" />
+                <item android:color="#BBE6FA" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Orbit Accent Dot (Below "Anonymous" Pill) -->
+    <path
+        android:fillColor="#869FF8"
+        android:pathData="M 204,102 m -4.2,0 a 4.2,4.2 0 1,1 8.4,0 a 4.2,4.2 0 1,1 -8.4,0" />
+
+    <!-- ================================================================= -->
+    <!-- LAYER 4: EXACT VEIL LOGO HOOD & CRESCENT WING (NO SHIELD ICON)    -->
+    <!-- ================================================================= -->
+    <group
+        android:pivotX="100"
+        android:pivotY="95"
+        android:scaleX="0.88"
+        android:scaleY="0.88"
+        android:translateX="40"
+        android:translateY="45">
+
+        <!-- 1. SCULPTED HOOD SHROUD & ROUNDED CAVITY -->
+
+        <!-- Outer Hood Shroud Dome -->
+        <path android:pathData="M 76,40 C 98,23 128,21 149,32 C 164,40 171,58 172,82 C 173,98 171,110 165,120 C 155,134 134,149 110,162 C 104,158 98,150 92,142 C 70,120 56,94 62,64 C 65,51 70,44 76,40 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerColor="#212652"
+                    android:endColor="#0E122B"
+                    android:endX="168"
+                    android:endY="162"
+                    android:startColor="#3B4382"
+                    android:startX="64"
+                    android:startY="24"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+
+        <!-- Smooth Rounded Hood Cavity (Empty Dark Void with Subtle Cyan Depth) -->
+        <path android:pathData="M 136,46 C 153,47 163,66 163,93 C 163,111 151,126 120,148 C 103,132 93,112 95,88 C 97,62 116,45 136,46 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerColor="#0B1933"
+                    android:centerX="132"
+                    android:centerY="98"
+                    android:endColor="#050814"
+                    android:gradientRadius="56"
+                    android:startColor="#1D4E82"
+                    android:type="radial" />
+            </aapt:attr>
+        </path>
+
+        <!-- Soft Ambient Cyan Backlight Inside Empty Hood Cavity -->
+        <path android:pathData="M 136,46 C 153,47 163,66 163,93 C 163,111 151,126 120,148 C 103,132 93,112 95,88 C 97,62 116,45 136,46 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerX="118"
+                    android:centerY="112"
+                    android:gradientRadius="42"
+                    android:type="radial">
+                    <item android:color="#4000F5FF" android:offset="0.0" />
+                    <item android:color="#180284C7" android:offset="0.6" />
+                    <item android:color="#00000000" android:offset="1.0" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- Sculpted Inner Cloth Pleat Valley 1 -->
+        <path android:pathData="M 96,31 C 70,48 62,82 74,112 C 82,130 98,145 108,160 C 94,146 74,130 62,108 C 50,82 60,48 96,31 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:endColor="#070A1A"
+                    android:endX="108"
+                    android:endY="160"
+                    android:startColor="#131735"
+                    android:startX="58"
+                    android:startY="34"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+
+        <!-- Sculpted Inner Cloth Pleat Ridge 1 -->
+        <path android:pathData="M 102,31 C 76,50 68,84 80,112 C 88,130 102,144 110,159 C 100,145 84,130 75,112 C 63,84 71,50 102,31 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerColor="#754F46E5"
+                    android:endColor="#0038BDF8"
+                    android:endX="110"
+                    android:endY="158"
+                    android:startColor="#956366F1"
+                    android:startX="70"
+                    android:startY="32"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+
+        <!-- Sculpted Inner Cloth Pleat Valley 2 -->
+        <path android:pathData="M 120,38 C 92,54 82,86 92,114 C 98,130 108,142 115,154 C 104,142 90,128 84,110 C 76,84 88,52 120,38 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:endColor="#070A1A"
+                    android:endX="115"
+                    android:endY="154"
+                    android:startColor="#131735"
+                    android:startX="76"
+                    android:startY="38"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+
+        <!-- Inner Cavity Crease Catching Cyan Bounce Light -->
+        <path android:pathData="M 136,46 C 116,45 97,62 95,88 C 93,112 103,132 120,148 C 106,133 97,113 99,88 C 101,65 118,49 136,46 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerColor="#806366F1"
+                    android:endColor="#001E1B4B"
+                    android:endX="92"
+                    android:endY="148"
+                    android:startColor="#D038BDF8"
+                    android:startX="138"
+                    android:startY="44"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+
+        <!-- 2. LOWER-RIGHT COLLAR BLADE -->
+        <path android:pathData="M 167,115 C 161,138 142,154 114,163 C 128,148 146,133 167,115 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerColor="#2563EB"
+                    android:endColor="#172554"
+                    android:endX="114"
+                    android:endY="163"
+                    android:startColor="#38BDF8"
+                    android:startX="168"
+                    android:startY="114"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+
+        <path android:pathData="M 167,115 C 161,138 142,154 114,163 C 138,152 156,136 164,118 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerColor="#00F5FF"
+                    android:endColor="#000284C7"
+                    android:endX="114"
+                    android:endY="163"
+                    android:startColor="#A5F3FC"
+                    android:startX="168"
+                    android:startY="114"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+
+        <!-- 3. CALLIGRAPHIC VARIABLE-WIDTH NEON CYAN HOOD RIM -->
+        <path android:pathData="M 76,40 C 98,23 128,21 149,32 C 164,40 171,58 172,82 C 173,98 171,110 165,120 C 155,134 134,149 110,162 C 131,146 150,131 159,118 C 165,108 167,96 166,82 C 165,60 158,44 145,36 C 125,26 99,27 76,40 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerColor="#E0F2FE"
+                    android:endColor="#00F5FF"
+                    android:endX="172"
+                    android:endY="158"
+                    android:startColor="#38BDF8"
+                    android:startX="76"
+                    android:startY="24"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+
+        <!-- 4. SEAMLESS LEFT SPEECH-BUBBLE CRESCENT WING -->
+
+        <!-- Main Indigo Crescent Body -->
+        <path android:pathData="M 96,26 C 54,32 26,66 28,108 C 29,122 34,135 41,144 C 39,151 33,158 26,163 C 39,163 50,159 59,153 C 71,160 84,164 95,163 C 104,162 107,153 101,144 C 93,132 75,121 64,103 C 51,81 56,51 78,35 C 84,30 90,27 96,26 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerColor="#4F46E5"
+                    android:endColor="#3730A3"
+                    android:endX="104"
+                    android:endY="164"
+                    android:startColor="#6366F1"
+                    android:startX="28"
+                    android:startY="26"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+
+        <!-- Continuous Outer 3D Bevel -->
+        <path android:pathData="M 96,26 C 54,32 26,66 28,108 C 29,122 34,135 41,144 C 39,151 33,158 26,163 C 36,154 42,142 41,124 C 38,82 56,42 96,26 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerColor="#60A5FA"
+                    android:endColor="#004F46E5"
+                    android:endX="62"
+                    android:endY="162"
+                    android:startColor="#93C5FD"
+                    android:startX="28"
+                    android:startY="26"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+
+        <!-- Inner S-Curve Specular Rim Highlight -->
+        <path
+            android:pathData="M 96,26 C 90,27 84,30 78,35 C 56,51 51,81 64,103 C 75,121 93,132 101,144 C 107,153 104,162 95,163"
+            android:strokeLineCap="round"
+            android:strokeWidth="1.8">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:centerColor="#90818CF8"
+                    android:endColor="#306366F1"
+                    android:endX="102"
+                    android:endY="162"
+                    android:startColor="#BAE6FD"
+                    android:startX="96"
+                    android:startY="26"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+
+    </group>
 
 </vector>

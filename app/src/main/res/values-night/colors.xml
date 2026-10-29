@@ -22,6 +22,12 @@
     <color name="statusWarning">#F59E0B</color>
     <color name="statusError">#EF4444</color>
 
+    <!-- PIN Progress Dot Colors (Dark Mode) -->
+    <color name="pin_dot_empty_fill">#1E293B</color>
+    <color name="pin_dot_empty_stroke">#475569</color>
+    <color name="pin_dot_filled_fill">#6366F1</color>
+    <color name="pin_dot_filled_stroke">#818CF8</color>
+
     <!-- Legacy / Semantic Mappings for Modern Java UI (Dark) -->
     <color name="veil_primary_dark">#0B0F17</color>
     <color name="veil_primary">#151C28</color>

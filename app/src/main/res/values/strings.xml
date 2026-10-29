@@ -105,18 +105,23 @@
     <string name="search_desc">Search across all your conversations</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_title_1">Secure &amp; Private</string>
-    <string name="onboarding_desc_1">Your conversations are protected with end-to-end encryption. Only you and the recipient can read what\'s sent.</string>
-    <string name="onboarding_title_2">Connect Instantly</string>
-    <string name="onboarding_desc_2">Message anyone around the world instantly. Share photos, videos, and files securely.</string>
-    <string name="onboarding_title_3">Control Your Privacy</string>
-    <string name="onboarding_desc_3">Customize your privacy settings. Choose who can contact you and see your status.</string>
-    <string name="get_started">Get Started</string>
+    <string name="onboarding_title_1">Zero-Knowledge\nEncryption</string>
+    <string name="onboarding_desc_1">All messages are fully encrypted on-device. Only you and your recipient hold the keys.</string>
+
+    <string name="onboarding_title_2">Direct P2P Speed</string>
+    <string name="onboarding_desc_2">Connect directly to peers over a serverless, end-to-end encrypted mesh network.</string>
+
+    <string name="onboarding_title_3">Absolute Anonymity</string>
+    <string name="onboarding_desc_3">No phone number, email, or personal data required. Leave zero footprints.</string>
+
     <string name="next">Next</string>
+    <string name="get_started">Get Started</string>
     <string name="skip">Skip</string>
 
     <!-- Calls Fragment -->
     <string name="no_calls_yet">No Calls Yet</string>
     <string name="start_first_call">Start your first voice or video call</string>
     <string name="new_call">New Call</string>
+
+
 </resources>

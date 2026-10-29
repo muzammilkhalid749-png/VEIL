@@ -30,7 +30,7 @@
                 android:layout_width="72dp"
                 android:layout_height="72dp"
                 android:layout_marginBottom="20dp"
-                app:cardBackgroundColor="@color/colorPrimaryContainer"
+                app:cardBackgroundColor="@color/colorBackground"
                 app:cardCornerRadius="36dp"
                 app:cardElevation="0dp">
 
@@ -41,7 +41,7 @@
                     android:contentDescription="@string/app_name"
                     android:scaleType="fitCenter"
                     android:src="@drawable/veil_logo"
-                    app:tint="@color/colorPrimary" />
+                    />
             </androidx.cardview.widget.CardView>
 
             <TextView

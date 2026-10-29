@@ -1,14 +1,22 @@
 package com.m3.veil.ui.onboard;
 
-public class OnboardingItem {
-    private String title;
-    private String description;
-    private int imageResId;
+import androidx.annotation.Nullable;
 
-    public OnboardingItem(String title, String description, int imageResId) {
+public class OnboardingItem {
+    private final String title;
+    private final String description;
+    private final int imageResId;
+    private final String topRightPill;
+    @Nullable
+    private final String bottomLeftPill;
+
+    public OnboardingItem(String title, String description, int imageResId,
+                          String topRightPill, @Nullable String bottomLeftPill) {
         this.title = title;
         this.description = description;
         this.imageResId = imageResId;
+        this.topRightPill = topRightPill;
+        this.bottomLeftPill = bottomLeftPill;
     }
 
     public String getTitle() {
@@ -21,5 +29,14 @@ public class OnboardingItem {
 
     public int getImageResId() {
         return imageResId;
+    }
+
+    public String getTopRightPill() {
+        return topRightPill;
+    }
+
+    @Nullable
+    public String getBottomLeftPill() {
+        return bottomLeftPill;
     }
 }

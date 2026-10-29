@@ -46,13 +46,19 @@
 
         <TextView
             android:id="@+id/walletBalanceText"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="$250.00"
+            android:text="0 VC"
             android:textColor="@android:color/white"
             android:textSize="32sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            app:autoSizeTextType="uniform"
+            app:autoSizeMinTextSize="18sp"
+            app:autoSizeMaxTextSize="32sp"
+            app:autoSizeStepGranularity="1sp" />
 
         <TextView
             android:id="@+id/walletSubtitleText"

@@ -17,7 +17,7 @@
         android:layout_height="4dp"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="20dp"
-        android:background="@drawable/pin_dot_empty"
+        android:background="@drawable/bg_bottom_sheet_handle"
         android:alpha="0.3" />
 
     <!-- Title Header -->

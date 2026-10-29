@@ -188,20 +188,30 @@ public class MainActivity extends AppCompatActivity {
 
     private void handleWindowInsets() {
         com.m3.veil.utils.UiAnimator.configureSystemBars(this);
+
+        if (bottomNavigation != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(bottomNavigation, (v, insets) -> insets);
+        }
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main_container), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars());
+            int bottomInset = Math.max(systemBars.bottom, navBars.bottom);
+
             findViewById(R.id.appBarLayout).setPadding(systemBars.left, systemBars.top, systemBars.right, 0);
+
             if (bottomNavContainer != null) {
-                bottomNavContainer.setPadding(0, 0, 0, systemBars.bottom);
+                bottomNavContainer.setPadding(systemBars.left, 0, systemBars.right, bottomInset);
             } else if (bottomNavigation != null) {
-                bottomNavigation.setPadding(0, 0, 0, systemBars.bottom);
+                bottomNavigation.setPadding(systemBars.left, 0, systemBars.right, bottomInset);
             }
+
             if (fabNewMessage != null && fabNewMessage.getLayoutParams() instanceof androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams) {
                 androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams lp =
                         (androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams) fabNewMessage.getLayoutParams();
                 int navHeight = (int) (56 * getResources().getDisplayMetrics().density);
-                int fabSpacing = (int) (52 * getResources().getDisplayMetrics().density);
-                lp.bottomMargin = navHeight + fabSpacing + systemBars.bottom;
+                int fabSpacing = (int) (12 * getResources().getDisplayMetrics().density);
+                lp.bottomMargin = navHeight + fabSpacing + bottomInset;
                 fabNewMessage.setLayoutParams(lp);
             }
             return insets;

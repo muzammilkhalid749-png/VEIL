@@ -1,59 +1,176 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="200dp"
-    android:height="200dp"
-    android:viewportWidth="200"
-    android:viewportHeight="200">
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="280dp"
+    android:height="280dp"
+    android:viewportWidth="280"
+    android:viewportHeight="280">
 
-    <!-- Shield Background -->
-    <path
-        android:fillColor="@color/veil_primary_light"
-        android:strokeColor="@color/veil_primary_dark"
-        android:strokeWidth="2"
-        android:pathData="M 100,40
-                        C 60,40 40,60 40,100
-                        C 40,140 60,160 100,160
-                        C 140,160 160,140 160,100
-                        C 160,60 140,40 100,40 Z" />
+    <!-- OUTER AMBIENT HALO (OUTSIDE THE CIRCLE RING) -->
+    <path android:pathData="M 140,140 m -136,0 a 136,136 0 1,1 272,0 a 136,136 0 1,1 -272,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="115"
+                android:centerY="130"
+                android:gradientRadius="124"
+                android:type="radial">
+                <item android:color="#307F9CF5" android:offset="0.0" />
+                <item android:color="#1C8DA8FA" android:offset="0.58" />
+                <item android:color="#008DA8FA" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Shield Detail -->
-    <path
-        android:fillColor="@color/veil_accent"
-        android:strokeColor="@color/veil_primary_dark"
-        android:strokeWidth="1"
-        android:pathData="M 100,50
-                        C 70,50 50,70 50,100
-                        C 50,130 70,150 100,150
-                        C 130,150 150,130 150,100
-                        C 150,70 130,50 100,50 Z" />
+    <path android:pathData="M 140,140 m -136,0 a 136,136 0 1,1 272,0 a 136,136 0 1,1 -272,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="165"
+                android:centerY="152"
+                android:gradientRadius="122"
+                android:type="radial">
+                <item android:color="#3C38BDF8" android:offset="0.0" />
+                <item android:color="#2267E8F9" android:offset="0.58" />
+                <item android:color="#0067E8F9" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Lock Body -->
-    <path
-        android:fillColor="@color/text_primary"
-        android:pathData="M 85,100
-                        L 85,80
-                        C 85,75 89,71 94,71
-                        L 106,71
-                        C 111,71 115,75 115,80
-                        L 115,100
-                        Z" />
+    <!-- Outer Perimeter Ring-Hugging Shade -->
+    <path android:pathData="M 140,140 m -118,0 a 118,118 0 1,1 236,0 a 118,118 0 1,1 -236,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="140"
+                android:centerY="140"
+                android:gradientRadius="118"
+                android:type="radial">
+                <item android:color="#00000000" android:offset="0.0" />
+                <item android:color="#00000000" android:offset="0.72" />
+                <item android:color="#2690CAF9" android:offset="0.78" />
+                <item android:color="#1290CAF9" android:offset="0.88" />
+                <item android:color="#00FFFFFF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Lock Shackle -->
-    <path
-        android:strokeColor="@color/text_primary"
-        android:strokeWidth="4"
-        android:pathData="M 105,80
-                        C 115,80 125,75 125,65
-                        C 125,55 115,50 105,50
-                        C 95,50 85,55 85,65
-                        C 85,75 95,80 105,80" />
+    <!-- INNER CIRCLE SHADE (INSIDE THE r=92 CIRCLE) -->
+    <path android:pathData="M 140,140 m -92,0 a 92,92 0 1,1 184,0 a 92,92 0 1,1 -184,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="215"
+                android:endY="215"
+                android:startX="65"
+                android:startY="65"
+                android:type="linear">
+                <item android:color="#24E3E8FF" android:offset="0.0" />
+                <item android:color="#32D0F4FF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Checkmark -->
+    <path android:pathData="M 140,140 m -92,0 a 92,92 0 1,1 184,0 a 92,92 0 1,1 -184,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="140"
+                android:centerY="140"
+                android:gradientRadius="92"
+                android:type="radial">
+                <item android:color="#4038BDF8" android:offset="0.0" />
+                <item android:color="#1A56CCF2" android:offset="0.62" />
+                <item android:color="#2692B8F8" android:offset="0.90" />
+                <item android:color="#3289B0F5" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- CONCENTRIC CIRCLE RING (r=92) -->
     <path
-        android:strokeColor="@color/text_primary"
-        android:strokeWidth="4"
-        android:pathData="M 80,110
-                        L 95,125
-                        L 120,95" />
+        android:fillColor="#00000000"
+        android:pathData="M 140,140 m -92,0 a 92,92 0 1,1 184,0 a 92,92 0 1,1 -184,0"
+        android:strokeWidth="1.3">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:endX="232"
+                android:endY="180"
+                android:startX="48"
+                android:startY="100"
+                android:type="linear">
+                <item android:color="#CCD8F8" android:offset="0.0" />
+                <item android:color="#B4E4FA" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Orbit Accent Dots & Micro-Pill Connector Stems -->
+    <path
+        android:fillColor="#82B1FF"
+        android:pathData="M 206,102 m -4.2,0 a 4.2,4.2 0 1,1 8.4,0 a 4.2,4.2 0 1,1 -8.4,0" />
+    <path
+        android:fillColor="#6C63FF"
+        android:pathData="M 79,182 m -4.2,0 a 4.2,4.2 0 1,1 8.4,0 a 4.2,4.2 0 1,1 -8.4,0" />
+
+    <!-- CURVED SPLIT-FACET CYAN SHIELD -->
+    <path android:pathData="M 140,66 C 121,78 101,84 86,86.5 L 86,134 C 86,169 110,192 140,206 C 170,192 194,169 194,134 L 194,86.5 C 179,84 159,78 140,66 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="194"
+                android:endY="206"
+                android:startX="86"
+                android:startY="66"
+                android:type="linear">
+                <item android:color="#9BE8FF" android:offset="0.0" />
+                <item android:color="#38BDF8" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Shield Left Facet (Ice Cyan) -->
+    <path android:pathData="M 140,69 C 122,80.5 103,86 89,88.5 L 89,133.5 C 89,166.5 111.5,188.5 140,202.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="140"
+                android:endY="202"
+                android:startX="89"
+                android:startY="69"
+                android:type="linear">
+                <item android:color="#DDF7FF" android:offset="0.0" />
+                <item android:color="#8CE3FF" android:offset="0.55" />
+                <item android:color="#58C7F8" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Shield Right Facet (Azure Cyan) -->
+    <path android:pathData="M 140,69 L 140,202.5 C 168.5,188.5 191,166.5 191,133.5 L 191,88.5 C 177,86 158,80.5 140,69 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="191"
+                android:endY="202"
+                android:startX="140"
+                android:startY="69"
+                android:type="linear">
+                <item android:color="#82DEFF" android:offset="0.0" />
+                <item android:color="#4CC3F7" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Shield Crisp Specular Perimeter Stroke -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M 140,66 C 121,78 101,84 86,86.5 L 86,134 C 86,169 110,192 140,206 C 170,192 194,169 194,134 L 194,86.5 C 179,84 159,78 140,66 Z"
+        android:strokeLineJoin="round"
+        android:strokeWidth="1.6">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:endX="194"
+                android:endY="206"
+                android:startX="86"
+                android:startY="66"
+                android:type="linear">
+                <item android:color="#74D4FF" android:offset="0.0" />
+                <item android:color="#2EA8EB" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
 </vector>
