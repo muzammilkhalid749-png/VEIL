@@ -64,8 +64,7 @@ public class WhatsAppMapPreviewView extends View {
     }
 
     public void updateThemePaints() {
-        boolean isNight = (getResources().getConfiguration().uiMode 
-                & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        boolean isNight = ChatMessageCell.resolveIsNightMode(getContext());
         if (isNight) {
             bgPaint.setColor(Color.parseColor("#151D2A"));
             parkPaint.setColor(Color.parseColor("#143324"));
@@ -126,6 +125,7 @@ public class WhatsAppMapPreviewView extends View {
         this.longitude = lng;
         this.isLiveLocation = live;
         this.accuracyMeters = accuracy;
+        updateThemePaints();
         invalidate();
     }
 

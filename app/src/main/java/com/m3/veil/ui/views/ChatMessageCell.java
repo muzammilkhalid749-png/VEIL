@@ -253,6 +253,32 @@ public class ChatMessageCell extends LinearLayout {
         mStandaloneTimePaint.setTextSize(sp(11f));
     }
 
+    public static boolean resolveIsNightMode(@Nullable Context context) {
+        if (context != null) {
+            try {
+                Context app = context.getApplicationContext() != null ? context.getApplicationContext() : context;
+                android.content.SharedPreferences prefs = app.getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
+                int themeMode = prefs.getInt("theme_mode", androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+                if (themeMode == androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES) {
+                    return true;
+                } else if (themeMode == androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO) {
+                    return false;
+                }
+            } catch (Exception ignored) {}
+        }
+        int defaultMode = androidx.appcompat.app.AppCompatDelegate.getDefaultNightMode();
+        if (defaultMode == androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES) {
+            return true;
+        } else if (defaultMode == androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO) {
+            return false;
+        }
+        if (context != null) {
+            return (context.getResources().getConfiguration().uiMode
+                    & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        }
+        return false;
+    }
+
     /**
      * Dynamically resolves Light Mode and Dark Mode semantic bubble and text colors.
      */
@@ -260,33 +286,39 @@ public class ChatMessageCell extends LinearLayout {
         Context context = getContext();
         if (context == null) return;
 
-        boolean night = (context.getResources().getConfiguration().uiMode
-                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        if (!force && night == mIsNightMode && mColorBubbleSent != 0) {
+        boolean night = resolveIsNightMode(context);
+        if (!force && night == mIsNightMode && mColorBubbleSent != 0 && mColorBubbleReceived != 0) {
             updateColors();
             return;
         }
         mIsNightMode = night;
 
-        mColorBubbleSent = ContextCompat.getColor(context, R.color.message_bubble_sent);
-        mColorBubbleReceived = ContextCompat.getColor(context, R.color.message_bubble_received);
-        mColorTextPrimary = ContextCompat.getColor(context, R.color.message_text_primary);
-        mColorTextSecondary = ContextCompat.getColor(context, R.color.message_text_secondary);
-        mColorPrimary = ContextCompat.getColor(context, R.color.colorPrimary);
-        mColorQuoteStrip = ContextCompat.getColor(context, R.color.message_quote_strip);
-        mColorQuoteBg = ContextCompat.getColor(context, R.color.message_quote_bg);
-        mColorStatusSent = ContextCompat.getColor(context, R.color.message_status_sent);
-        mColorStatusRead = ContextCompat.getColor(context, R.color.message_status_read);
-        mColorError = ContextCompat.getColor(context, R.color.statusError);
-        int outlineColor = ContextCompat.getColor(context, R.color.colorOutline);
-
         if (mIsNightMode) {
+            mColorBubbleSent = 0xFF2E2A72;
+            mColorBubbleReceived = 0xFF1E293B;
+            mColorTextPrimary = 0xFFF8FAFC;
+            mColorTextSecondary = 0xFF94A3B8;
+            mColorPrimary = 0xFF6366F1;
+            mColorQuoteStrip = 0xFF818CF8;
+            mColorQuoteBg = 0x1A818CF8;
+            mColorStatusSent = 0xFF64748B;
+            mColorStatusRead = 0xFF38BDF8;
+            mColorError = 0xFFEF4444;
             mColorBubbleSentStroke = ColorUtils.setAlphaComponent(0xFF818CF8, 56);
-            mColorBubbleReceivedStroke = ColorUtils.setAlphaComponent(outlineColor, 140);
+            mColorBubbleReceivedStroke = ColorUtils.setAlphaComponent(0xFF334155, 160);
         } else {
-            // Crisp hairline borders in Light Mode so soft-indigo & white bubbles pop cleanly
+            mColorBubbleSent = 0xFFE0E7FE;
+            mColorBubbleReceived = 0xFFFFFFFF;
+            mColorTextPrimary = 0xFF0F172A;
+            mColorTextSecondary = 0xFF64748B;
+            mColorPrimary = 0xFF4F46E5;
+            mColorQuoteStrip = 0xFF4F46E5;
+            mColorQuoteBg = 0x0A4F46E5;
+            mColorStatusSent = 0xFF94A3B8;
+            mColorStatusRead = 0xFF4F46E5;
+            mColorError = 0xFFEF4444;
             mColorBubbleSentStroke = 0xFFC7D2FE;
-            mColorBubbleReceivedStroke = outlineColor;
+            mColorBubbleReceivedStroke = 0xFFE2E8F0;
         }
 
         mReplyCirclePaint.setColor(mColorPrimary);
@@ -302,7 +334,7 @@ public class ChatMessageCell extends LinearLayout {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        refreshThemeColors(false);
+        refreshThemeColors(true);
     }
 
     @Override
@@ -328,7 +360,7 @@ public class ChatMessageCell extends LinearLayout {
      * Binds full message metadata to this cell (Telegram {@code setMessageObject} parity).
      */
     public void setMessageObject(@NonNull Message message, boolean outgoing, int clusterPosition, boolean showSenderHeader) {
-        refreshThemeColors(false);
+        refreshThemeColors(true);
         this.mMessage = message;
         this.mIsOutgoing = outgoing;
         this.mClusterPosition = clusterPosition;
