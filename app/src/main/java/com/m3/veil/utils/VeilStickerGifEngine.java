@@ -423,6 +423,96 @@ public class VeilStickerGifEngine {
         stickerDrawable.start();
     }
 
+    /**
+     * Computes Telegram/WhatsApp-style per-sticker display [widthPx, heightPx] based on each sticker's
+     * natural aspect ratio (preset dimensions or local sticker file dimensions) so every sticker
+     * renders at its own unique width and height without any border.
+     */
+    @NonNull
+    public static int[] computeStickerSizePx(@NonNull Context context, @Nullable Message message) {
+        float dp = context.getResources().getDisplayMetrics().density;
+        if (message != null && message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
+            File f = new File(message.getLocalFilePath());
+            if (f.exists() && f.length() > 16) {
+                BitmapFactory.Options opts = new BitmapFactory.Options();
+                opts.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(f.getAbsolutePath(), opts);
+                if (opts.outWidth > 0 && opts.outHeight > 0) {
+                    float ratio = (float) opts.outWidth / (float) opts.outHeight;
+                    float wDp;
+                    float hDp;
+                    if (ratio >= 1.15f) {
+                        wDp = Math.min(212f, Math.max(164f, 180f * Math.min(1.25f, ratio)));
+                        hDp = Math.max(122f, wDp / ratio);
+                    } else if (ratio <= 0.88f) {
+                        hDp = Math.min(212f, Math.max(164f, 180f / Math.max(0.75f, ratio)));
+                        wDp = Math.max(124f, hDp * ratio);
+                    } else {
+                        wDp = 168f;
+                        hDp = 168f / ratio;
+                    }
+                    return new int[]{Math.round(wDp * dp), Math.round(hDp * dp)};
+                }
+            }
+        }
+        String raw = message != null && message.getText() != null ? message.getText().trim() : "✨";
+        StickerPreset preset = resolveStickerPreset(raw);
+        return new int[]{
+                Math.round(preset.intrinsicWidth * dp),
+                Math.round(preset.intrinsicHeight * dp)
+        };
+    }
+
+    /**
+     * Computes Telegram/WhatsApp-style per-GIF display [widthPx, heightPx] so every GIF has its own
+     * natural width and height according to its aspect ratio.
+     */
+    @NonNull
+    public static int[] computeGifSizePx(@NonNull Context context, @Nullable Message message, @Nullable File localFile) {
+        float dp = context.getResources().getDisplayMetrics().density;
+        int[] intrinsic = resolveMediaIntrinsicDimensions(context, message, localFile);
+        if (intrinsic != null && intrinsic.length >= 2 && intrinsic[0] > 0 && intrinsic[1] > 0) {
+            float ratio = (float) intrinsic[0] / (float) intrinsic[1];
+            float wDp;
+            float hDp;
+            if (ratio >= 1.55f) {
+                // 16:9 or ultrawide GIF
+                wDp = 258f;
+                hDp = Math.max(134f, Math.min(168f, wDp / ratio));
+            } else if (ratio >= 1.15f) {
+                // 4:3 landscape GIF
+                wDp = 236f;
+                hDp = Math.max(156f, Math.min(192f, wDp / ratio));
+            } else if (ratio <= 0.82f) {
+                // 3:4 or 9:16 portrait GIF
+                wDp = ratio <= 0.65f ? 176f : 192f;
+                hDp = Math.max(220f, Math.min(268f, wDp / Math.max(0.55f, ratio)));
+            } else {
+                // Square-ish GIF
+                wDp = 204f;
+                hDp = Math.max(186f, Math.min(216f, wDp / ratio));
+            }
+            return new int[]{Math.round(wDp * dp), Math.round(hDp * dp)};
+        }
+        // Fallback varied dimensions based on GIF payload/id so different GIFs have distinct sizes
+        String seed = (message != null && message.getText() != null && !message.getText().isEmpty())
+                ? message.getText()
+                : (message != null && message.getId() != null ? message.getId() : "gif");
+        int variant = Math.abs(seed.hashCode()) % 5;
+        switch (variant) {
+            case 0:
+                return new int[]{Math.round(256f * dp), Math.round(144f * dp)}; // 16:9 wide
+            case 1:
+                return new int[]{Math.round(188f * dp), Math.round(244f * dp)}; // 3:4 portrait
+            case 2:
+                return new int[]{Math.round(234f * dp), Math.round(176f * dp)}; // 4:3 classic
+            case 3:
+                return new int[]{Math.round(202f * dp), Math.round(202f * dp)}; // 1:1 square
+            default:
+                return new int[]{Math.round(264f * dp), Math.round(152f * dp)}; // cinematic
+        }
+    }
+
     // =========================================================================
     // 4. BUILT-IN ANIMATED STICKERS & GIF PRESETS CATALOG
     // =========================================================================
@@ -434,14 +524,23 @@ public class VeilStickerGifEngine {
         public final int primaryColor;
         public final int secondaryColor;
         public final int styleType; // 0=pulse+orbit, 1=bounce+flame, 2=wave+float, 3=glitch+neon, 4=confetti+party
+        public final int intrinsicWidth; // in dp
+        public final int intrinsicHeight; // in dp
 
         public StickerPreset(String code, String emoji, String label, int primaryColor, int secondaryColor, int styleType) {
+            this(code, emoji, label, primaryColor, secondaryColor, styleType, 172, 172);
+        }
+
+        public StickerPreset(String code, String emoji, String label, int primaryColor, int secondaryColor, int styleType,
+                             int intrinsicWidth, int intrinsicHeight) {
             this.code = code;
             this.emoji = emoji;
             this.label = label;
             this.primaryColor = primaryColor;
             this.secondaryColor = secondaryColor;
             this.styleType = styleType;
+            this.intrinsicWidth = intrinsicWidth;
+            this.intrinsicHeight = intrinsicHeight;
         }
     }
 
@@ -478,23 +577,23 @@ public class VeilStickerGifEngine {
     private static final List<GifPreset> BUILTIN_GIFS = new ArrayList<>();
 
     static {
-        // Animated Stickers (Telegram-style expressive characters & badges)
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:fire_lit]", "🔥", "LIT!", 0xFFF97316, 0xFFEF4444, 1));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:rocket_moon]", "🚀", "TO THE MOON", 0xFF6366F1, 0xFF38BDF8, 0));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:heart_love]", "❤️", "LOVE IT", 0xFFEC4899, 0xFFF43F5E, 1));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:laugh_lol]", "😂", "HAHAHA!", 0xFFFACC15, 0xFFF59E0B, 4));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:party_boom]", "🎉", "CELEBRATE", 0xFFA855F7, 0xFFEC4899, 4));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:cypher_bot]", "🤖", "BEEP BOOP", 0xFF10B981, 0xFF06B6D4, 3));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:cool_shades]", "😎", "DEAL WITH IT", 0xFF3B82F6, 0xFF1D4ED8, 2));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:mind_blown]", "🤯", "MIND BLOWN", 0xFFD946EF, 0xFF6366F1, 0));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:ghost_poof]", "👻", "POOF!", 0xFF818CF8, 0xFFC084FC, 2));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:hundred_gold]", "💯", "100% REAL", 0xFFF59E0B, 0xFFEF4444, 1));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:whale_splash]", "🐋", "WHALE MOVE", 0xFF0EA5E9, 0xFF2563EB, 2));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:thumbs_gg]", "👍", "AWESOME", 0xFF22C55E, 0xFF16A34A, 0));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:coffee_vibe]", "☕", "GOOD VIBES", 0xFFD97706, 0xFF92400E, 2));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:sparkle_magic]", "✨", "MAGIC", 0xFFFBBF24, 0xFFA855F7, 4));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:alien_ufo]", "🛸", "BEAM ME UP", 0xFF14B8A6, 0xFF6366F1, 3));
-        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:crown_king]", "👑", "LEGEND", 0xFFEAB308, 0xFFCA8A04, 0));
+        // Animated Stickers with varied Telegram/WhatsApp-style natural dimensions (dp) per sticker!
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:fire_lit]", "🔥", "LIT!", 0xFFF97316, 0xFFEF4444, 1, 162, 198));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:rocket_moon]", "🚀", "TO THE MOON", 0xFF6366F1, 0xFF38BDF8, 0, 154, 210));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:heart_love]", "❤️", "LOVE IT", 0xFFEC4899, 0xFFF43F5E, 1, 178, 166));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:laugh_lol]", "😂", "HAHAHA!", 0xFFFACC15, 0xFFF59E0B, 4, 196, 158));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:party_boom]", "🎉", "CELEBRATE", 0xFFA855F7, 0xFFEC4899, 4, 208, 164));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:cypher_bot]", "🤖", "BEEP BOOP", 0xFF10B981, 0xFF06B6D4, 3, 168, 188));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:cool_shades]", "😎", "DEAL WITH IT", 0xFF3B82F6, 0xFF1D4ED8, 2, 214, 148));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:mind_blown]", "🤯", "MIND BLOWN", 0xFFD946EF, 0xFF6366F1, 0, 184, 196));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:ghost_poof]", "👻", "POOF!", 0xFF818CF8, 0xFFC084FC, 2, 150, 192));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:hundred_gold]", "💯", "100% REAL", 0xFFF59E0B, 0xFFEF4444, 1, 192, 146));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:whale_splash]", "🐋", "WHALE MOVE", 0xFF0EA5E9, 0xFF2563EB, 2, 218, 152));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:thumbs_gg]", "👍", "AWESOME", 0xFF22C55E, 0xFF16A34A, 0, 164, 174));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:coffee_vibe]", "☕", "GOOD VIBES", 0xFFD97706, 0xFF92400E, 2, 172, 184));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:sparkle_magic]", "✨", "MAGIC", 0xFFFBBF24, 0xFFA855F7, 4, 158, 158));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:alien_ufo]", "🛸", "BEAM ME UP", 0xFF14B8A6, 0xFF6366F1, 3, 206, 156));
+        BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:crown_king]", "👑", "LEGEND", 0xFFEAB308, 0xFFCA8A04, 0, 186, 162));
 
         // Built-in Animated GIFs with Portrait, Landscape, and Square aspect ratios!
         BUILTIN_GIFS.add(new GifPreset("[GIF:mind_blown_16_9]", "Mind Blown Galaxy", "Reactions", "🤯", "MIND BLOWN",
@@ -565,7 +664,7 @@ public class VeilStickerGifEngine {
                 return p;
             }
         }
-        // Dynamic animated sticker for any custom pack emoji or custom text sticker!
+        // Dynamic animated sticker for any custom pack emoji or custom text sticker with varied natural sizes!
         String inner = clean;
         if (inner.startsWith("[STICKER:") && inner.endsWith("]")) {
             inner = inner.substring(9, inner.length() - 1).trim();
@@ -573,10 +672,19 @@ public class VeilStickerGifEngine {
         int hash = Math.abs(inner.hashCode());
         int[] colors1 = {0xFF6366F1, 0xFFEC4899, 0xFF10B981, 0xFFF59E0B, 0xFF3B82F6, 0xFFA855F7};
         int[] colors2 = {0xFF38BDF8, 0xFFF43F5E, 0xFF06B6D4, 0xFFEF4444, 0xFF818CF8, 0xFFEC4899};
+        int[][] sizeVariants = {
+                {198, 152}, // Wide sticker
+                {154, 198}, // Tall sticker
+                {174, 174}, // Balanced square sticker
+                {212, 146}, // Banner sticker
+                {164, 190}, // Portrait character sticker
+                {188, 162}  // Compact landscape sticker
+        };
         int cIdx = hash % colors1.length;
+        int[] sz = sizeVariants[hash % sizeVariants.length];
         String label = inner.length() > 4 ? inner.toUpperCase(Locale.ROOT) : "STICKER";
         String dispEmoji = inner.length() <= 4 ? inner : "✨";
-        return new StickerPreset("[STICKER:" + inner + "]", dispEmoji, label, colors1[cIdx], colors2[cIdx], hash % 5);
+        return new StickerPreset("[STICKER:" + inner + "]", dispEmoji, label, colors1[cIdx], colors2[cIdx], hash % 5, sz[0], sz[1]);
     }
 
     // =========================================================================
@@ -613,6 +721,16 @@ public class VeilStickerGifEngine {
             labelPaint.setTextAlign(Paint.Align.CENTER);
             labelPaint.setColor(Color.WHITE);
             labelPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        }
+
+        @Override
+        public int getIntrinsicWidth() {
+            return Math.round(preset.intrinsicWidth * dp);
+        }
+
+        @Override
+        public int getIntrinsicHeight() {
+            return Math.round(preset.intrinsicHeight * dp);
         }
 
         @Override

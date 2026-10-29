@@ -2470,18 +2470,37 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         TextView tvTitle = confirmSheet.findViewById(R.id.tvDestructiveTitle);
         TextView tvMsg = confirmSheet.findViewById(R.id.tvDestructiveMessage);
+        com.google.android.material.checkbox.MaterialCheckBox cbPeer = confirmSheet.findViewById(R.id.cbDeleteForPeer);
         com.google.android.material.button.MaterialButton btnConfirm = confirmSheet.findViewById(R.id.btnDestructiveConfirm);
         com.google.android.material.button.MaterialButton btnCancel = confirmSheet.findViewById(R.id.btnDestructiveCancel);
 
-        if (tvTitle != null) tvTitle.setText("Delete Chat?");
+        String peerLabel = (chat.getName() != null && !chat.getName().isEmpty()) ? chat.getName() : "the other person";
+        if (tvTitle != null) tvTitle.setText("Delete Conversation?");
         if (tvMsg != null) {
-            tvMsg.setText("Are you sure you want to delete this conversation from your device? All messages and attachments will be removed.");
+            tvMsg.setText("Are you sure you want to delete this entire conversation? All messages and attachments will be permanently removed.");
+        }
+        if (cbPeer != null) {
+            cbPeer.setVisibility(View.VISIBLE);
+            cbPeer.setChecked(true);
+            cbPeer.setText(chat.isGroup()
+                    ? "Also delete conversation for all participants"
+                    : "Also delete conversation on " + peerLabel + "'s device");
         }
         if (btnConfirm != null) {
-            btnConfirm.setText("Delete & Shred");
+            btnConfirm.setText("Delete Conversation");
             btnConfirm.setOnClickListener(cv -> {
+                boolean deleteForBoth = cbPeer != null && cbPeer.isChecked();
                 confirmSheet.dismiss();
                 String deletedId = chat.getId();
+                String targetPeerId = null;
+                if (!chat.isGroup() && chat.getParticipants() != null) {
+                    for (String p : chat.getParticipants()) {
+                        if (p != null && !p.equals(currentUserId)) {
+                            targetPeerId = p;
+                            break;
+                        }
+                    }
+                }
                 if (chat.isGroup() && getContext() != null) {
                     android.content.SharedPreferences prefs = requireContext().getSharedPreferences("VeilPrefs", 0);
                     java.util.Set<String> delSet = new java.util.HashSet<>(
@@ -2494,7 +2513,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                 .update("participants", com.google.firebase.firestore.FieldValue.arrayRemove(currentUserId));
                     }
                 }
-                com.m3.veil.manager.VeilMessagesController.getInstance(requireContext()).removeDialogFromCache(deletedId);
+                com.m3.veil.manager.VeilMessagesController.getInstance(requireContext())
+                        .deleteConversation(deletedId, targetPeerId, deleteForBoth);
                 EncryptedChatDatabase.getInstance(requireContext()).deleteChat(deletedId);
                 for (int i = allLocalChats.size() - 1; i >= 0; i--) {
                     if (deletedId.equals(allLocalChats.get(i).getId())) {
@@ -2510,7 +2530,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                     chatsAdapter.notifyDataSetChanged();
                 }
                 loadLocalEncryptedChats();
-                Toast.makeText(getContext(), "Chat deleted from local SQLCipher vault", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), deleteForBoth
+                        ? "Conversation deleted from both devices"
+                        : "Conversation deleted from your device", Toast.LENGTH_SHORT).show();
             });
         }
         if (btnCancel != null) {

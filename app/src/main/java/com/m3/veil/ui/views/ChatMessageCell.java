@@ -374,7 +374,9 @@ public class ChatMessageCell extends LinearLayout {
 
         // Show tail only on SINGLE or LAST message in a cluster
         this.mDrawTail = (clusterPosition == CLUSTER_SINGLE || clusterPosition == CLUSTER_LAST);
-        this.mIsChromeless = com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
+        boolean isStickerOrGif = com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
+                || com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, null);
+        this.mIsChromeless = isStickerOrGif
                 && (message.getReplyToMessageId() == null || message.getReplyToMessageId().isEmpty());
 
         // Group / Persona Sender Header on first/single incoming bubble

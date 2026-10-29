@@ -69,7 +69,18 @@
         android:textColor="@color/textSecondary"
         android:textSize="13.5sp"
         android:lineSpacingExtra="3dp"
-        android:layout_marginBottom="22dp" />
+        android:layout_marginBottom="14dp" />
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/cbDeleteForPeer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Also delete for the other person (both devices)"
+        android:textColor="@color/textPrimary"
+        android:textSize="14sp"
+        android:checked="true"
+        android:layout_marginBottom="14dp"
+        android:visibility="gone" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnDestructiveConfirm"

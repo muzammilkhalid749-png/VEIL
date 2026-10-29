@@ -106,6 +106,24 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <!-- Multi-media selection counter pill (1 / N) -->
+    <TextView
+        android:id="@+id/tvEditBatchCounter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:background="@drawable/bg_filter_chip"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="6dp"
+        android:text="1 / 1"
+        android:textColor="@android:color/white"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/btnClose"
+        app:layout_constraintBottom_toBottomOf="@id/btnClose"
+        app:layout_constraintStart_toEndOf="@id/btnClose" />
+
     <!-- VIDEO TRIMMER BAR -->
     <LinearLayout
         android:id="@+id/videoTrimmerContainer"
@@ -116,7 +134,7 @@
         android:paddingVertical="10dp"
         android:background="#80000000"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/bottomBar">
+        app:layout_constraintBottom_toTopOf="@id/editBatchThumbnailScroll">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -165,6 +183,27 @@
             app:thumbElevation="2dp"
             app:trackHeight="4dp" />
     </LinearLayout>
+
+    <!-- WhatsApp/Telegram Multi-Media Thumbnail Strip for Selected Photos & Videos -->
+    <HorizontalScrollView
+        android:id="@+id/editBatchThumbnailScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:clipToPadding="false"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="6dp"
+        android:background="#80000000"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar">
+
+        <LinearLayout
+            android:id="@+id/editBatchThumbnailStrip"
+            android:layout_width="wrap_content"
+            android:layout_height="60dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
 
     <LinearLayout
         android:id="@+id/bottomBar"

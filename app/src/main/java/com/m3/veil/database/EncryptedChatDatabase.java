@@ -1652,6 +1652,9 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             cv.put(COL_MSG_PINNED, pinned ? 1 : 0);
             db.update(TABLE_MESSAGES, cv, COL_MSG_ID + "=?", new String[]{msgId});
         } catch (Exception ignored) {}
+        if (chatId != null) {
+            notifyMessagesChanged(chatId);
+        }
     }
 
     public synchronized void unpinAllMessagesInChat(String chatId) {
@@ -1675,6 +1678,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=?", new String[]{chatId});
         } catch (Exception ignored) {}
         updateChatPinnedMessage(chatId, null, null);
+        notifyMessagesChanged(chatId);
     }
 
     public synchronized void incrementChatTrustScore(String chatId, int delta) {

@@ -3573,7 +3573,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             }
             mCryptoQueue.execute(() -> {
                 for (String peer : resolveTargetPeers(dialogId, recipientId, null)) {
-                    WebRtcManager.getInstance(mContext).sendPinMessageSetting(peer, dialogId, nextActiveMsgId, nextActiveMsgText);
+                    WebRtcManager.getInstance(mContext).sendPinMessageSetting(peer, dialogId, nextActiveMsgId, nextActiveMsgText, unpinnedMsgId);
                 }
             });
         });
@@ -4077,6 +4077,53 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         } catch (Exception e) {
             Log.e(TAG, "Error handling incoming blink frame", e);
         }
+    }
+
+    /**
+     * Deletes an entire conversation locally and optionally from the remote peer's device as well.
+     */
+    public void deleteConversation(String dialogId, String recipientId, boolean deleteForBoth) {
+        if (dialogId == null) return;
+        mStageQueue.post(() -> {
+            List<String> targetPeers = resolveTargetPeers(dialogId, recipientId, null);
+            if (deleteForBoth && !targetPeers.isEmpty()) {
+                mCryptoQueue.execute(() -> {
+                    for (String peer : targetPeers) {
+                        if (peer != null && !peer.isEmpty()) {
+                            WebRtcManager.getInstance(mContext).sendDeleteConversationForBoth(peer, dialogId, true);
+                        }
+                    }
+                });
+            }
+            wipeDialog(dialogId);
+        });
+    }
+
+    /**
+     * Clears all messages in a conversation locally and optionally on the remote peer's device as well.
+     */
+    public void clearConversationHistory(String dialogId, String recipientId, boolean clearForBoth) {
+        if (dialogId == null) return;
+        mStageQueue.post(() -> {
+            List<String> targetPeers = resolveTargetPeers(dialogId, recipientId, null);
+            if (clearForBoth && !targetPeers.isEmpty()) {
+                mCryptoQueue.execute(() -> {
+                    for (String peer : targetPeers) {
+                        if (peer != null && !peer.isEmpty()) {
+                            WebRtcManager.getInstance(mContext).sendDeleteConversationForBoth(peer, dialogId, false);
+                        }
+                    }
+                });
+            }
+            List<Message> msgs = getLoadedMessages(dialogId);
+            for (Message m : msgs) {
+                if (m.getLocalFilePath() != null) {
+                    cryptographicZeroWipe(new File(m.getLocalFilePath()));
+                }
+            }
+            mDialogMessages.remove(dialogId);
+            mStorageQueue.execute(() -> mDatabase.clearChatMessages(dialogId));
+        });
     }
 
     /**

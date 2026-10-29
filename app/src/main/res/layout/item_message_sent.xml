@@ -353,6 +353,15 @@
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
 
+                        <ImageView
+                            android:id="@+id/ivImagePinnedBadge"
+                            android:layout_width="11dp"
+                            android:layout_height="11dp"
+                            android:layout_marginEnd="3dp"
+                            android:src="@drawable/ic_chat_pin"
+                            app:tint="@android:color/white"
+                            android:visibility="gone" />
+
                         <TextView
                             android:id="@+id/imageTimeText"
                             android:layout_width="wrap_content"
@@ -586,6 +595,15 @@
                         android:background="@drawable/bg_media_overlay_pill"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
+
+                        <ImageView
+                            android:id="@+id/ivVideoPinnedBadge"
+                            android:layout_width="11dp"
+                            android:layout_height="11dp"
+                            android:layout_marginEnd="3dp"
+                            android:src="@drawable/ic_chat_pin"
+                            app:tint="@android:color/white"
+                            android:visibility="gone" />
 
                         <TextView
                             android:id="@+id/videoTimeText"
@@ -1215,6 +1233,16 @@
             android:layout_marginTop="1dp"
             android:layout_marginStart="8dp"
             android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/ivPinnedBadge"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginEnd="4dp"
+                android:src="@drawable/ic_chat_pin"
+                app:tint="@color/message_text_secondary"
+                android:contentDescription="Pinned"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/tvStarredBadge"

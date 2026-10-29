@@ -1554,6 +1554,27 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                String chatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
                String messageId = json.getString("messageId");
                EncryptedChatDatabase.getInstance(this.context).markMessageDeletedForEveryone(chatId, messageId);
+            } else if ("delete_conversation".equals(type)) {
+               String incomingChatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
+               String canonicalChatId = (incomingChatId != null && !incomingChatId.startsWith("group_") && !incomingChatId.startsWith("channel_") && !incomingChatId.startsWith("lounge_"))
+                       ? getChatId(this.currentUserId, peerId)
+                       : incomingChatId;
+               String mode = json.optString("mode", "delete_chat");
+               if ("clear_messages".equals(mode)) {
+                  if (canonicalChatId != null) {
+                     EncryptedChatDatabase.getInstance(this.context).clearChatMessages(canonicalChatId);
+                  }
+                  if (incomingChatId != null && !incomingChatId.equals(canonicalChatId)) {
+                     EncryptedChatDatabase.getInstance(this.context).clearChatMessages(incomingChatId);
+                  }
+               } else {
+                  if (canonicalChatId != null) {
+                     com.m3.veil.manager.VeilMessagesController.getInstance(this.context).wipeDialog(canonicalChatId);
+                  }
+                  if (incomingChatId != null && !incomingChatId.equals(canonicalChatId)) {
+                     com.m3.veil.manager.VeilMessagesController.getInstance(this.context).wipeDialog(incomingChatId);
+                  }
+               }
             } else if ("poll_vote".equals(type)) {
                String chatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
                String messageId = json.getString("messageId");
@@ -1611,6 +1632,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      chat.setVanishTimer(json.optLong("vanishTimer", 0L));
                      EncryptedChatDatabase.getInstance(this.context).saveOrUpdateChat(chat);
                   } else if ("pin_msg".equals(setting)) {
+                     String unpinnedId = json.optString("unpinnedMsgId", (String) null);
+                     if (unpinnedId != null && !unpinnedId.isEmpty()) {
+                        EncryptedChatDatabase.getInstance(this.context).updateMessagePinStatus(chatId, unpinnedId, false);
+                     }
                      String incomingPinId = json.optString("msgId", (String) null);
                      String incomingPinText = json.optString("msgText", (String) null);
                      if (incomingPinId != null && !incomingPinId.isEmpty()) {
@@ -2385,6 +2410,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    }
 
    public void sendPinMessageSetting(String peerId, String chatId, String msgId, String msgText) {
+      this.sendPinMessageSetting(peerId, chatId, msgId, msgText, null);
+   }
+
+   public void sendPinMessageSetting(String peerId, String chatId, String msgId, String msgText, String unpinnedMsgId) {
       EncryptedChatDatabase.getInstance(this.context).updateChatPinnedMessage(chatId, msgId, msgText);
       this.sendJsonToPeer(peerId, () -> {
          JSONObject json = new JSONObject();
@@ -2393,6 +2422,19 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          json.put("chatId", chatId);
          json.put("msgId", msgId);
          json.put("msgText", msgText);
+         if (unpinnedMsgId != null && !unpinnedMsgId.isEmpty()) {
+            json.put("unpinnedMsgId", unpinnedMsgId);
+         }
+         return json;
+      });
+   }
+
+   public void sendDeleteConversationForBoth(String peerId, String chatId, boolean deleteEntireChat) {
+      this.sendJsonToPeer(peerId, () -> {
+         JSONObject json = new JSONObject();
+         json.put("type", "delete_conversation");
+         json.put("chatId", chatId);
+         json.put("mode", deleteEntireChat ? "delete_chat" : "clear_messages");
          return json;
       });
    }

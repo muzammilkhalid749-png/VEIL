@@ -1105,6 +1105,7 @@ public class ChatActivity extends AppCompatActivity {
                         Toast.makeText(this, "Message unpinned", Toast.LENGTH_SHORT).show();
                     }
                     refreshPinnedMessagesBanner();
+                    if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
                 } else {
                     if (currentLocalChat != null) {
                         currentLocalChat.setPinnedMessageId(null);
@@ -1113,6 +1114,7 @@ public class ChatActivity extends AppCompatActivity {
                     com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
                     Toast.makeText(this, "Message unpinned", Toast.LENGTH_SHORT).show();
                     refreshPinnedMessagesBanner();
+                    if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
                 }
             });
             btnUnpinBanner.setOnLongClickListener(v -> {
@@ -1271,6 +1273,9 @@ public class ChatActivity extends AppCompatActivity {
                     return true;
                 } else if (id == R.id.action_clear_chat) {
                     confirmClearChat();
+                    return true;
+                } else if (id == R.id.action_delete_conversation) {
+                    confirmDeleteConversation();
                     return true;
                 } else if (id == R.id.action_block_user) {
                     if (isGrp) {
@@ -1860,18 +1865,50 @@ public class ChatActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_PICK_IMAGE && resultCode == RESULT_OK && data != null) {
-            Uri selectedMediaUri = data.getData();
-            if (selectedMediaUri != null) {
-                String mime = getContentResolver().getType(selectedMediaUri);
-                boolean isGif = (mime != null && mime.toLowerCase(Locale.ROOT).contains("gif"))
-                        || selectedMediaUri.toString().toLowerCase(Locale.ROOT).endsWith(".gif");
-                if (isGif) {
-                    handleDirectMediaSend(selectedMediaUri, "gif", "");
-                } else {
+            if (data.getClipData() != null && data.getClipData().getItemCount() > 1) {
+                android.content.ClipData clip = data.getClipData();
+                java.util.ArrayList<String> batchUris = new java.util.ArrayList<>();
+                java.util.ArrayList<String> batchTypes = new java.util.ArrayList<>();
+                Uri firstUri = null;
+                String firstType = "image";
+                for (int i = 0; i < clip.getItemCount(); i++) {
+                    Uri u = clip.getItemAt(i).getUri();
+                    if (u == null) continue;
+                    String mime = getContentResolver().getType(u);
+                    String t = (mime != null && mime.toLowerCase(Locale.ROOT).startsWith("video")) ? "video" : "image";
+                    if (firstUri == null) {
+                        firstUri = u;
+                        firstType = t;
+                    }
+                    batchUris.add(u.toString());
+                    batchTypes.add(t);
+                }
+                if (firstUri != null) {
                     Intent editIntent = new Intent(this, MediaEditActivity.class);
-                    editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, selectedMediaUri);
-                    editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, "image");
+                    editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, firstUri);
+                    editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, firstType);
+                    editIntent.putStringArrayListExtra(MediaEditActivity.EXTRA_BATCH_URIS, batchUris);
+                    editIntent.putStringArrayListExtra(MediaEditActivity.EXTRA_BATCH_TYPES, batchTypes);
                     startActivityForResult(editIntent, REQ_MEDIA_EDIT);
+                }
+            } else {
+                Uri selectedMediaUri = data.getData();
+                if (selectedMediaUri == null && data.getClipData() != null && data.getClipData().getItemCount() == 1) {
+                    selectedMediaUri = data.getClipData().getItemAt(0).getUri();
+                }
+                if (selectedMediaUri != null) {
+                    String mime = getContentResolver().getType(selectedMediaUri);
+                    boolean isGif = (mime != null && mime.toLowerCase(Locale.ROOT).contains("gif"))
+                            || selectedMediaUri.toString().toLowerCase(Locale.ROOT).endsWith(".gif");
+                    if (isGif) {
+                        handleDirectMediaSend(selectedMediaUri, "gif", "");
+                    } else {
+                        String t = (mime != null && mime.toLowerCase(Locale.ROOT).startsWith("video")) ? "video" : "image";
+                        Intent editIntent = new Intent(this, MediaEditActivity.class);
+                        editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, selectedMediaUri);
+                        editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, t);
+                        startActivityForResult(editIntent, REQ_MEDIA_EDIT);
+                    }
                 }
             }
         } else if (requestCode == REQ_PICK_VIDEO && resultCode == RESULT_OK && data != null) {
@@ -1907,22 +1944,44 @@ public class ChatActivity extends AppCompatActivity {
             if (isViewOnce) {
                 isBlinkModeActive = true;
             }
-            if (editedPath != null) {
-                File editedFile = new File(editedPath);
-                uploadAndSendMedia(editedFile, mediaType != null ? mediaType : "image", caption);
-            }
-            java.util.ArrayList<String> batchPaths = data.getStringArrayListExtra(CameraGalleryActivity.RESULT_BATCH_PATHS);
-            java.util.ArrayList<String> batchTypes = data.getStringArrayListExtra(CameraGalleryActivity.RESULT_BATCH_TYPES);
-            if (batchPaths != null && !batchPaths.isEmpty()) {
-                for (int i = 0; i < batchPaths.size(); i++) {
-                    String bPath = batchPaths.get(i);
-                    String bType = (batchTypes != null && i < batchTypes.size()) ? batchTypes.get(i) : "image";
-                    if (bPath != null) {
-                        File bFile = new File(bPath);
-                        if (bFile.exists()) {
-                            uploadAndSendMedia(bFile, bType, "");
+
+            java.util.ArrayList<String> editedBatchPaths = data.getStringArrayListExtra(MediaEditActivity.RESULT_EDITED_BATCH_PATHS);
+            java.util.ArrayList<String> editedBatchTypes = data.getStringArrayListExtra(MediaEditActivity.RESULT_EDITED_BATCH_TYPES);
+            java.util.ArrayList<String> extraBatchPaths = data.getStringArrayListExtra(CameraGalleryActivity.RESULT_BATCH_PATHS);
+            java.util.ArrayList<String> extraBatchTypes = data.getStringArrayListExtra(CameraGalleryActivity.RESULT_BATCH_TYPES);
+
+            java.util.ArrayList<String> combinedPaths = new java.util.ArrayList<>();
+            java.util.ArrayList<String> combinedTypes = new java.util.ArrayList<>();
+
+            if (editedBatchPaths != null && !editedBatchPaths.isEmpty()) {
+                for (int i = 0; i < editedBatchPaths.size(); i++) {
+                    String p = editedBatchPaths.get(i);
+                    if (p != null && new File(p).exists()) {
+                        combinedPaths.add(p);
+                        combinedTypes.add((editedBatchTypes != null && i < editedBatchTypes.size()) ? editedBatchTypes.get(i) : "image");
+                    }
+                }
+            } else {
+                if (editedPath != null && new File(editedPath).exists()) {
+                    combinedPaths.add(editedPath);
+                    combinedTypes.add(mediaType != null ? mediaType : "image");
+                }
+                if (extraBatchPaths != null) {
+                    for (int i = 0; i < extraBatchPaths.size(); i++) {
+                        String bPath = extraBatchPaths.get(i);
+                        if (bPath != null && new File(bPath).exists()) {
+                            combinedPaths.add(bPath);
+                            combinedTypes.add((extraBatchTypes != null && i < extraBatchTypes.size()) ? extraBatchTypes.get(i) : "image");
                         }
                     }
+                }
+            }
+
+            if (combinedPaths.size() > 1 && !isViewOnce) {
+                uploadAndSendAlbumMedia(combinedPaths, combinedTypes, caption);
+            } else if (!combinedPaths.isEmpty()) {
+                for (int i = 0; i < combinedPaths.size(); i++) {
+                    uploadAndSendMedia(new File(combinedPaths.get(i)), combinedTypes.get(i), i == 0 ? caption : "");
                 }
             }
         } else if (requestCode == REQ_VIEW_ONCE_MEDIA) {
@@ -1961,11 +2020,54 @@ public class ChatActivity extends AppCompatActivity {
         }
     }
 
+    private void uploadAndSendAlbumMedia(java.util.List<String> albumPaths, java.util.List<String> albumTypes, String caption) {
+        if (albumPaths == null || albumPaths.isEmpty()) return;
+        File primaryFile = new File(albumPaths.get(0));
+        if (!primaryFile.exists()) return;
+        String primaryType = (albumTypes != null && !albumTypes.isEmpty()) ? albumTypes.get(0) : "image";
+
+        String albumJson = null;
+        try {
+            org.json.JSONObject root = new org.json.JSONObject();
+            root.put("album", true);
+            org.json.JSONArray arr = new org.json.JSONArray();
+            File cacheDir = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
+            for (int i = 0; i < albumPaths.size(); i++) {
+                String p = albumPaths.get(i);
+                String t = (albumTypes != null && i < albumTypes.size()) ? albumTypes.get(i) : "image";
+                if (p == null) continue;
+                File src = new File(p);
+                if (!src.exists()) continue;
+                String ext = "video".equals(t) ? ".mp4" : ".jpg";
+                File cachedItem = new File(cacheDir, "dec_album_" + System.currentTimeMillis() + "_" + i + ext);
+                if (!src.getAbsolutePath().equals(cachedItem.getAbsolutePath())) {
+                    try {
+                        copyFile(src, cachedItem);
+                    } catch (Exception ignored) {}
+                }
+                File finalFile = (cachedItem.exists() && cachedItem.length() > 0) ? cachedItem : src;
+                org.json.JSONObject itemObj = new org.json.JSONObject();
+                itemObj.put("path", finalFile.getAbsolutePath());
+                itemObj.put("type", t);
+                itemObj.put("caption", i == 0 && caption != null ? caption : "");
+                arr.put(itemObj);
+            }
+            root.put("items", arr);
+            albumJson = root.toString();
+        } catch (Exception ignored) {}
+
+        uploadAndSendMediaWithMetadata(primaryFile, primaryType, caption, albumJson);
+    }
+
     private void uploadAndSendMedia(File rawFile, String mediaType) {
         uploadAndSendMedia(rawFile, mediaType, "");
     }
 
     private void uploadAndSendMedia(File rawFile, String mediaType, String caption) {
+        uploadAndSendMediaWithMetadata(rawFile, mediaType, caption, null);
+    }
+
+    private void uploadAndSendMediaWithMetadata(File rawFile, String mediaType, String caption, @Nullable String customMetadataJson) {
         if (rawFile == null || !rawFile.exists()) return;
 
         if (isGroupChatContext() && chatId != null) {
@@ -2004,6 +2106,9 @@ public class ChatActivity extends AppCompatActivity {
         message.setPending(true);
         message.setDelivered(false);
         message.setRead(false);
+        if (customMetadataJson != null && !customMetadataJson.isEmpty()) {
+            message.setPollJson(customMetadataJson);
+        }
 
         if (replyMessage != null) {
             message.setReplyToMessageId(replyMessage.getId());
@@ -2319,7 +2424,20 @@ public class ChatActivity extends AppCompatActivity {
         if (chatId == null) return;
         dbExecutor.execute(() -> {
             com.m3.veil.model.Chat chat = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
-            if (chat == null || isFinishing() || isDestroyed()) return;
+            if (isFinishing() || isDestroyed()) return;
+            if (chat == null) {
+                if (currentLocalChat != null) {
+                    currentLocalChat = null;
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        if (messageList != null) messageList.clear();
+                        if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+                        Toast.makeText(this, "Conversation was deleted", Toast.LENGTH_SHORT).show();
+                        finish();
+                    });
+                }
+                return;
+            }
             currentLocalChat = chat;
             long vanishTimer = chat.getVanishTimer();
             String vanishMode = chat.getVanishMode() != null ? chat.getVanishMode() : "after_send";
@@ -2368,6 +2486,7 @@ public class ChatActivity extends AppCompatActivity {
                 applyChatWallpaper();
                 updateChannelRoleComposerState();
                 updatePresenceAndToolbarStatus();
+                refreshPinnedMessagesBanner();
             });
         });
     }
@@ -2877,19 +2996,75 @@ public class ChatActivity extends AppCompatActivity {
 
         TextView tvTitle = view.findViewById(R.id.tvDestructiveTitle);
         TextView tvMsg = view.findViewById(R.id.tvDestructiveMessage);
+        com.google.android.material.checkbox.MaterialCheckBox cbPeer = view.findViewById(R.id.cbDeleteForPeer);
         MaterialButton btnConfirm = view.findViewById(R.id.btnDestructiveConfirm);
         MaterialButton btnCancel = view.findViewById(R.id.btnDestructiveCancel);
 
+        String peerLabel = (recipientName != null && !recipientName.isEmpty()) ? recipientName : "the other person";
         tvTitle.setText("Clear Chat Messages");
         tvMsg.setText("Are you sure you want to delete all messages in this chat? This cannot be undone.");
+        if (cbPeer != null) {
+            cbPeer.setVisibility(View.VISIBLE);
+            cbPeer.setChecked(true);
+            cbPeer.setText(isGroupChatContext()
+                    ? "Also clear messages for all participants"
+                    : "Also clear messages on " + peerLabel + "'s device");
+        }
         btnConfirm.setText("Clear Messages");
 
         btnConfirm.setOnClickListener(v -> {
+            boolean forBoth = cbPeer != null && cbPeer.isChecked();
             sheet.dismiss();
             messageList.clear();
             messagesAdapter.notifyDataSetChanged();
-            com.m3.veil.database.EncryptedChatDatabase.getInstance(this).clearChatMessages(chatId);
-            Toast.makeText(this, "Chat messages cleared", Toast.LENGTH_SHORT).show();
+            com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                    .clearConversationHistory(chatId, recipientId, forBoth);
+            Toast.makeText(this, forBoth
+                    ? "Chat messages cleared on both devices"
+                    : "Chat messages cleared on your device", Toast.LENGTH_SHORT).show();
+        });
+
+        btnCancel.setOnClickListener(v -> sheet.dismiss());
+
+        sheet.show();
+    }
+
+    private void confirmDeleteConversation() {
+        if (chatId == null) return;
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_confirm_destructive_sheet, null);
+        sheet.setContentView(view);
+
+        TextView tvTitle = view.findViewById(R.id.tvDestructiveTitle);
+        TextView tvMsg = view.findViewById(R.id.tvDestructiveMessage);
+        com.google.android.material.checkbox.MaterialCheckBox cbPeer = view.findViewById(R.id.cbDeleteForPeer);
+        MaterialButton btnConfirm = view.findViewById(R.id.btnDestructiveConfirm);
+        MaterialButton btnCancel = view.findViewById(R.id.btnDestructiveCancel);
+
+        String peerLabel = (recipientName != null && !recipientName.isEmpty()) ? recipientName : "the other person";
+        tvTitle.setText("Delete Entire Conversation?");
+        tvMsg.setText("This will permanently remove the entire conversation and all media files.");
+        if (cbPeer != null) {
+            cbPeer.setVisibility(View.VISIBLE);
+            cbPeer.setChecked(true);
+            cbPeer.setText(isGroupChatContext()
+                    ? "Also delete conversation for all participants"
+                    : "Also delete conversation on " + peerLabel + "'s device");
+        }
+        btnConfirm.setText("Delete Conversation");
+
+        btnConfirm.setOnClickListener(v -> {
+            boolean forBoth = cbPeer != null && cbPeer.isChecked();
+            sheet.dismiss();
+            currentLocalChat = null;
+            messageList.clear();
+            messagesAdapter.notifyDataSetChanged();
+            com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                    .deleteConversation(chatId, recipientId, forBoth);
+            Toast.makeText(this, forBoth
+                    ? "Conversation deleted from both devices"
+                    : "Conversation deleted from your device", Toast.LENGTH_SHORT).show();
+            finish();
         });
 
         btnCancel.setOnClickListener(v -> sheet.dismiss());
@@ -3786,6 +3961,7 @@ public class ChatActivity extends AppCompatActivity {
                         com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
                     }
                     refreshPinnedMessagesBanner();
+                    if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
                     Toast.makeText(this, "Message unpinned", Toast.LENGTH_SHORT).show();
                 } else {
                     message.setPinned(true);
@@ -3801,6 +3977,7 @@ public class ChatActivity extends AppCompatActivity {
                     List<Message> allPinned = getPinnedMessagesList();
                     currentPinnedBannerIndex = Math.max(0, allPinned.size() - 1);
                     refreshPinnedMessagesBanner();
+                    if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
                     Toast.makeText(this, allPinned.size() > 1
                             ? "📌 Message pinned (" + allPinned.size() + " pinned messages)"
                             : "📌 Message pinned to chat header", Toast.LENGTH_SHORT).show();
@@ -4029,6 +4206,7 @@ public class ChatActivity extends AppCompatActivity {
                     com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
                 }
                 refreshPinnedMessagesBanner();
+                if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
                 sheet.dismiss();
             });
             card.addView(btnUnpinOne);
@@ -4063,6 +4241,7 @@ public class ChatActivity extends AppCompatActivity {
                 }
                 com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
                 refreshPinnedMessagesBanner();
+                if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
                 Toast.makeText(this, "All messages unpinned", Toast.LENGTH_SHORT).show();
                 sheet.dismiss();
             });
@@ -5485,6 +5664,8 @@ public class ChatActivity extends AppCompatActivity {
                                 || oldM.isRead() != newM.isRead()
                                 || oldM.isPending() != newM.isPending()
                                 || oldM.isEdited() != newM.isEdited()
+                                || oldM.isPinned() != newM.isPinned()
+                                || oldM.isStarred() != newM.isStarred()
                                 || oldM.isBlinkViewed() != newM.isBlinkViewed()
                                 || !java.util.Objects.equals(oldM.getType(), newM.getType())
                                 || !java.util.Objects.equals(oldM.getText(), newM.getText())

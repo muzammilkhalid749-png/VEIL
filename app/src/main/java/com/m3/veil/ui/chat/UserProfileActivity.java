@@ -885,19 +885,36 @@ public class UserProfileActivity extends AppCompatActivity {
 
         TextView tvTitle = sheet.findViewById(R.id.tvDestructiveTitle);
         TextView tvMsg = sheet.findViewById(R.id.tvDestructiveMessage);
+        com.google.android.material.checkbox.MaterialCheckBox cbPeer = sheet.findViewById(R.id.cbDeleteForPeer);
         MaterialButton btnConfirm = sheet.findViewById(R.id.btnDestructiveConfirm);
         MaterialButton btnCancel = sheet.findViewById(R.id.btnDestructiveCancel);
 
-        if (tvTitle != null) tvTitle.setText("Clear Chat?");
+        String peerLabel = (peerUserName != null && !peerUserName.isEmpty()) ? peerUserName : "the other person";
+        if (tvTitle != null) tvTitle.setText("Delete Conversation?");
         if (tvMsg != null) {
-            tvMsg.setText("Are you sure you want to clear all messages in this conversation? This action cannot be undone.");
+            tvMsg.setText("Are you sure you want to delete this entire conversation and all messages? This action cannot be undone.");
+        }
+        if (cbPeer != null) {
+            cbPeer.setVisibility(View.VISIBLE);
+            cbPeer.setChecked(true);
+            cbPeer.setText(isGroup
+                    ? "Also delete conversation for all participants"
+                    : "Also delete conversation on " + peerLabel + "'s device");
         }
         if (btnConfirm != null) {
-            btnConfirm.setText("Clear Chat");
+            btnConfirm.setText("Delete Conversation");
             btnConfirm.setOnClickListener(v -> {
+                boolean forBoth = cbPeer != null && cbPeer.isChecked();
                 sheet.dismiss();
-                EncryptedChatDatabase.getInstance(this).clearChatMessages(chatId);
-                Toast.makeText(this, "Chat messages cleared", Toast.LENGTH_SHORT).show();
+                com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                        .deleteConversation(chatId, peerUserId, forBoth);
+                Toast.makeText(this, forBoth
+                        ? "Conversation deleted from both devices"
+                        : "Conversation deleted from your device", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(this, MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+                finish();
             });
         }
         if (btnCancel != null) {

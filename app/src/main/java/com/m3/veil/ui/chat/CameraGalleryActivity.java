@@ -486,9 +486,80 @@ public class CameraGalleryActivity extends AppCompatActivity {
             }
         });
 
-        // Swipe up & button to open full gallery
+        // Swipe up & button to open full gallery (works for both tap and upward swipe gesture)
         btnOpenFullGallery.setOnClickListener(v -> showFullGallery(true));
         btnSwipeUpGallery.setOnClickListener(v -> showFullGallery(true));
+
+        View.OnTouchListener swipeUpBarTouchListener = new View.OnTouchListener() {
+            private float downRawY = 0f;
+            private float downRawX = 0f;
+            private boolean triggered = false;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                float dp = getResources().getDisplayMetrics().density;
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downRawY = event.getRawY();
+                        downRawX = event.getRawX();
+                        triggered = false;
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        float dy = downRawY - event.getRawY();
+                        float dx = Math.abs(downRawX - event.getRawX());
+                        if (!triggered && dy > 22 * dp && dy > dx) {
+                            triggered = true;
+                            showFullGallery(true);
+                            return true;
+                        }
+                        break;
+                    case MotionEvent.ACTION_UP:
+                        if (!triggered) {
+                            float totalDy = downRawY - event.getRawY();
+                            if (totalDy > 16 * dp || Math.abs(totalDy) < 12 * dp) {
+                                v.performClick();
+                                showFullGallery(true);
+                            }
+                        }
+                        return true;
+                }
+                return false;
+            }
+        };
+        btnSwipeUpGallery.setOnTouchListener(swipeUpBarTouchListener);
+        View bottomCameraControls = findViewById(R.id.bottomCameraControls);
+        if (bottomCameraControls != null) {
+            bottomCameraControls.setOnTouchListener((v, event) -> {
+                swipeUpBarTouchListener.onTouch(v, event);
+                return false;
+            });
+        }
+        View galleryHeader = findViewById(R.id.layoutGalleryHeader);
+        if (galleryHeader != null) {
+            galleryHeader.setOnTouchListener(new View.OnTouchListener() {
+                private float startRawY = 0f;
+                private boolean closed = false;
+
+                @Override
+                public boolean onTouch(View v, MotionEvent event) {
+                    float dp = getResources().getDisplayMetrics().density;
+                    switch (event.getActionMasked()) {
+                        case MotionEvent.ACTION_DOWN:
+                            startRawY = event.getRawY();
+                            closed = false;
+                            return true;
+                        case MotionEvent.ACTION_MOVE:
+                            if (!closed && event.getRawY() - startRawY > 36 * dp && !startedDirectlyInGallery) {
+                                closed = true;
+                                showFullGallery(false);
+                                return true;
+                            }
+                            break;
+                    }
+                    return false;
+                }
+            });
+        }
 
         // Back from full gallery
         btnBackFromGallery.setOnClickListener(v -> {
@@ -504,24 +575,30 @@ public class CameraGalleryActivity extends AppCompatActivity {
         // Album Dropdown Selector
         btnAlbumDropdown.setOnClickListener(v -> showAlbumMenu());
 
-        // Send Selected FAB
+        // Send Selected FAB -> Open MediaEditActivity with ALL selected photos/videos so user can swipe left/right
         fabSendSelected.setOnClickListener(v -> {
             List<GalleryMediaItem> selected = fullGalleryAdapter.getSelectedItems();
             if (selected.isEmpty()) return;
             pendingBatchPaths.clear();
             pendingBatchTypes.clear();
-            if (selected.size() > 1) {
-                for (int i = 1; i < selected.size(); i++) {
-                    GalleryMediaItem extra = selected.get(i);
+            ArrayList<String> batchUris = new ArrayList<>();
+            ArrayList<String> batchTypes = new ArrayList<>();
+            for (int i = 0; i < selected.size(); i++) {
+                GalleryMediaItem extra = selected.get(i);
+                String typeStr = extra.isVideo() ? "video" : "image";
+                if (extra.getUri() != null) {
+                    batchUris.add(extra.getUri().toString());
+                    batchTypes.add(typeStr);
+                } else {
                     String resolvedPath = resolveGalleryItemPath(extra);
                     if (resolvedPath != null) {
-                        pendingBatchPaths.add(resolvedPath);
-                        pendingBatchTypes.add(extra.isVideo() ? "video" : "image");
+                        batchUris.add(resolvedPath);
+                        batchTypes.add(typeStr);
                     }
                 }
             }
             GalleryMediaItem item = selected.get(0);
-            openMediaEditor(item.getUri(), item.isVideo() ? "video" : "image");
+            openMediaEditorBatch(item.getUri(), item.isVideo() ? "video" : "image", batchUris, batchTypes);
         });
     }
 
@@ -573,6 +650,11 @@ public class CameraGalleryActivity extends AppCompatActivity {
 
         tapGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
             @Override
+            public boolean onDown(MotionEvent e) {
+                return true;
+            }
+
+            @Override
             public boolean onSingleTapConfirmed(MotionEvent e) {
                 focusOnPoint(e.getX(), e.getY());
                 return true;
@@ -585,8 +667,20 @@ public class CameraGalleryActivity extends AppCompatActivity {
             }
 
             @Override
+            public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+                float dp = getResources().getDisplayMetrics().density;
+                if (e1 != null && e2 != null && (e1.getY() - e2.getY()) > 56 * dp
+                        && Math.abs(e1.getY() - e2.getY()) > Math.abs(e1.getX() - e2.getX()) * 1.25f) {
+                    showFullGallery(true);
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
             public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-                if (e1 != null && e2 != null && e1.getY() - e2.getY() > 100 && Math.abs(velocityY) > 100) {
+                float dp = getResources().getDisplayMetrics().density;
+                if (e1 != null && e2 != null && (e1.getY() - e2.getY()) > 42 * dp && Math.abs(velocityY) > 80) {
                     showFullGallery(true);
                     return true;
                 }
@@ -875,7 +969,11 @@ public class CameraGalleryActivity extends AppCompatActivity {
     }
 
     private void openMediaEditor(Uri mediaUri, String mediaType) {
-        if (mediaUri == null) return;
+        openMediaEditorBatch(mediaUri, mediaType, null, null);
+    }
+
+    private void openMediaEditorBatch(Uri mediaUri, String mediaType, ArrayList<String> batchUris, ArrayList<String> batchTypes) {
+        if (mediaUri == null && (batchUris == null || batchUris.isEmpty())) return;
         if (cameraProvider != null) {
             try {
                 cameraProvider.unbindAll();
@@ -883,8 +981,14 @@ public class CameraGalleryActivity extends AppCompatActivity {
             } catch (Throwable ignored) {}
         }
         Intent intent = new Intent(this, MediaEditActivity.class);
-        intent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, mediaUri);
-        intent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, mediaType);
+        if (mediaUri != null) {
+            intent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, mediaUri);
+            intent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, mediaType);
+        }
+        if (batchUris != null && !batchUris.isEmpty()) {
+            intent.putStringArrayListExtra(MediaEditActivity.EXTRA_BATCH_URIS, batchUris);
+            intent.putStringArrayListExtra(MediaEditActivity.EXTRA_BATCH_TYPES, batchTypes);
+        }
         startActivityForResult(intent, REQ_EDIT_MEDIA);
     }
 
@@ -892,7 +996,17 @@ public class CameraGalleryActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_EDIT_MEDIA && resultCode == RESULT_OK && data != null) {
-            if (!pendingBatchPaths.isEmpty()) {
+            ArrayList<String> editedBatchPaths = data.getStringArrayListExtra(MediaEditActivity.RESULT_EDITED_BATCH_PATHS);
+            ArrayList<String> editedBatchTypes = data.getStringArrayListExtra(MediaEditActivity.RESULT_EDITED_BATCH_TYPES);
+            if (editedBatchPaths != null && editedBatchPaths.size() > 1) {
+                ArrayList<String> extraPaths = new ArrayList<>(editedBatchPaths.subList(1, editedBatchPaths.size()));
+                ArrayList<String> extraTypes = new ArrayList<>();
+                for (int i = 1; i < editedBatchPaths.size(); i++) {
+                    extraTypes.add((editedBatchTypes != null && i < editedBatchTypes.size()) ? editedBatchTypes.get(i) : "image");
+                }
+                data.putStringArrayListExtra(RESULT_BATCH_PATHS, extraPaths);
+                data.putStringArrayListExtra(RESULT_BATCH_TYPES, extraTypes);
+            } else if (!pendingBatchPaths.isEmpty()) {
                 data.putStringArrayListExtra(RESULT_BATCH_PATHS, new ArrayList<>(pendingBatchPaths));
                 data.putStringArrayListExtra(RESULT_BATCH_TYPES, new ArrayList<>(pendingBatchTypes));
                 pendingBatchPaths.clear();
@@ -906,12 +1020,18 @@ public class CameraGalleryActivity extends AppCompatActivity {
 
     private void showFullGallery(boolean show) {
         if (show) {
+            if (layoutFullGallery.getVisibility() == View.VISIBLE && layoutFullGallery.getTranslationY() == 0f) {
+                return;
+            }
             layoutFullGallery.setVisibility(View.VISIBLE);
-            layoutFullGallery.setTranslationY(layoutFullGallery.getHeight() > 0 ? layoutFullGallery.getHeight() : 1000f);
+            float startY = layoutFullGallery.getHeight() > 0
+                    ? layoutFullGallery.getHeight()
+                    : getResources().getDisplayMetrics().heightPixels;
+            layoutFullGallery.setTranslationY(startY);
             layoutFullGallery.animate()
                     .translationY(0f)
-                    .setInterpolator(new OvershootInterpolator(0.7f))
-                    .setDuration(280)
+                    .setInterpolator(new OvershootInterpolator(0.55f))
+                    .setDuration(260)
                     .start();
         } else {
             if (hasCameraPermission()) {
