@@ -69,12 +69,15 @@
         <!-- Quoted Reply Container (WhatsApp Style) -->
         <LinearLayout
             android:id="@+id/replyQuoteContainer"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minWidth="160dp"
             android:orientation="horizontal"
             android:background="@drawable/bg_quote_received"
-            android:padding="6dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:layout_marginBottom="4dp"
             android:visibility="gone">
 
@@ -88,6 +91,7 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:minWidth="120dp"
                 android:orientation="vertical">
 
                 <TextView
@@ -97,17 +101,23 @@
                     android:text="Sender"
                     android:textColor="@color/message_quote_strip"
                     android:textSize="12.5sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false" />
 
                 <TextView
                     android:id="@+id/replyQuoteText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="Quote text"
                     android:textColor="@color/message_text_secondary"
                     android:textSize="12.5sp"
                     android:maxLines="2"
-                    android:ellipsize="end" />
+                    android:ellipsize="end"
+                    android:includeFontPadding="false" />
             </LinearLayout>
         </LinearLayout>
 

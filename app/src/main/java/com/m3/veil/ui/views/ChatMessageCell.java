@@ -573,6 +573,34 @@ public class ChatMessageCell extends LinearLayout {
     }
 
     @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+
+        int measuredWidth = getMeasuredWidth();
+        int measuredHeight = getMeasuredHeight();
+        int innerWidth = measuredWidth - getPaddingLeft() - getPaddingRight();
+        if (innerWidth <= 0) {
+            return;
+        }
+
+        View replyQuote = findViewById(R.id.replyQuoteContainer);
+        if (replyQuote != null && replyQuote.getVisibility() == VISIBLE && replyQuote.getMeasuredWidth() < innerWidth) {
+            int oldReplyHeight = replyQuote.getMeasuredHeight();
+            int exactWidthSpec = MeasureSpec.makeMeasureSpec(innerWidth, MeasureSpec.EXACTLY);
+            int childHeightSpec = getChildMeasureSpec(
+                    heightMeasureSpec,
+                    getPaddingTop() + getPaddingBottom(),
+                    replyQuote.getLayoutParams() != null ? replyQuote.getLayoutParams().height : LayoutParams.WRAP_CONTENT
+            );
+            replyQuote.measure(exactWidthSpec, childHeightSpec);
+            int newReplyHeight = replyQuote.getMeasuredHeight();
+            if (newReplyHeight != oldReplyHeight) {
+                setMeasuredDimension(measuredWidth, measuredHeight + (newReplyHeight - oldReplyHeight));
+            }
+        }
+    }
+
+    @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         updateBubblePath(w, h);
