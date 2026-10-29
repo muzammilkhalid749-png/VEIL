@@ -1047,6 +1047,29 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         if (!path.isEmpty() && new File(path).exists()) {
             return path;
         }
+        String itemType = itemObj.optString("type", "image");
+        String ext = "video".equalsIgnoreCase(itemType) ? ".mp4" : ".jpg";
+        if (context != null && ownerMessage != null && itemIndex == 0) {
+            try {
+                File dec = FileMediaManager.getDecryptedFile(context, ownerMessage, ext);
+                if (dec != null && dec.exists() && dec.length() > 32) {
+                    itemObj.put("path", dec.getAbsolutePath());
+                    return dec.getAbsolutePath();
+                }
+                if (ownerMessage.getLocalFilePath() != null && new File(ownerMessage.getLocalFilePath()).exists()) {
+                    itemObj.put("path", ownerMessage.getLocalFilePath());
+                    return ownerMessage.getLocalFilePath();
+                }
+                if (ownerMessage.getMediaUrl() != null && !ownerMessage.getMediaUrl().isEmpty()) {
+                    File inlineFile = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(
+                            context, ownerMessage.getChatId(), ownerMessage);
+                    if (inlineFile != null && inlineFile.exists() && inlineFile.length() > 32) {
+                        itemObj.put("path", inlineFile.getAbsolutePath());
+                        return inlineFile.getAbsolutePath();
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
         String thumbB64 = itemObj.optString("thumb", "");
         if (thumbB64.isEmpty() && itemIndex == 0 && ownerMessage != null && ownerMessage.getThumbnail() != null) {
             thumbB64 = ownerMessage.getThumbnail();

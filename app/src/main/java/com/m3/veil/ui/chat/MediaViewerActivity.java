@@ -1346,9 +1346,69 @@ public class MediaViewerActivity extends AppCompatActivity {
         }
     }
 
+    private Bitmap decodeCompleteBitmapWithExif(File file, int maxDimension) {
+        if (file == null || !file.exists()) return null;
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+            int maxSide = Math.max(bounds.outWidth, bounds.outHeight);
+            int sample = 1;
+            while (maxSide / sample > maxDimension) {
+                sample *= 2;
+            }
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = Math.max(1, sample);
+            opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            Bitmap bmp = BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
+            if (bmp == null) return null;
+            try {
+                android.media.ExifInterface exif = new android.media.ExifInterface(file.getAbsolutePath());
+                int ori = exif.getAttributeInt(
+                        android.media.ExifInterface.TAG_ORIENTATION,
+                        android.media.ExifInterface.ORIENTATION_NORMAL);
+                int rot = 0;
+                if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_90) rot = 90;
+                else if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_180) rot = 180;
+                else if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_270) rot = 270;
+                if (rot != 0) {
+                    Matrix m = new Matrix();
+                    m.postRotate(rot);
+                    bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), m, true);
+                }
+            } catch (Throwable ignored) {}
+            return bmp;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private void fitVideoViewToAspectRatio(VideoView videoView, View containerView, int videoW, int videoH) {
+        if (videoView == null || videoW <= 0 || videoH <= 0) return;
+        int containerW = (containerView != null && containerView.getWidth() > 0)
+                ? containerView.getWidth()
+                : getResources().getDisplayMetrics().widthPixels;
+        int containerH = (containerView != null && containerView.getHeight() > 0)
+                ? containerView.getHeight()
+                : getResources().getDisplayMetrics().heightPixels;
+        if (containerW <= 0 || containerH <= 0) return;
+        float scale = Math.min((float) containerW / videoW, (float) containerH / videoH);
+        int targetW = Math.max(1, Math.round(videoW * scale));
+        int targetH = Math.max(1, Math.round(videoH * scale));
+        ViewGroup.LayoutParams lp = videoView.getLayoutParams();
+        if (lp instanceof FrameLayout.LayoutParams) {
+            FrameLayout.LayoutParams flp = (FrameLayout.LayoutParams) lp;
+            flp.width = targetW;
+            flp.height = targetH;
+            flp.gravity = Gravity.CENTER;
+            videoView.setLayoutParams(flp);
+        }
+    }
+
     /**
      * STAGE 2 ADAPTER: WhatsApp Vertical Scrolling Album Feed (Screenshot3.jpg & Screenshot4.jpg).
-     * Displays a continuous vertical feed of full-width photo/video cards separated by 12dp dark spacing.
+     * Displays each photo and video in its COMPLETE uncropped natural aspect ratio at full width,
+     * separated by a crisp 14dp visible gap/divider bar between every photo and video item.
      * Clicking ANY card transitions smoothly into Stage 3 (Full-Screen Photo/Video View Mode) at that index.
      */
     private class VerticalAlbumFeedAdapter extends RecyclerView.Adapter<VerticalAlbumFeedAdapter.FeedCardHolder> {
@@ -1357,25 +1417,33 @@ public class MediaViewerActivity extends AppCompatActivity {
         @Override
         public FeedCardHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             float dp = getResources().getDisplayMetrics().density;
-            FrameLayout cardRoot = new FrameLayout(parent.getContext());
-            RecyclerView.LayoutParams lp = new RecyclerView.LayoutParams(
+
+            LinearLayout itemContainer = new LinearLayout(parent.getContext());
+            itemContainer.setOrientation(LinearLayout.VERTICAL);
+            itemContainer.setLayoutParams(new RecyclerView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    Math.round(320 * dp));
-            lp.bottomMargin = Math.round(12 * dp);
-            cardRoot.setLayoutParams(lp);
-            cardRoot.setBackgroundColor(Color.parseColor("#111B21"));
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+            itemContainer.setBackgroundColor(Color.TRANSPARENT);
+
+            FrameLayout cardRoot = new FrameLayout(parent.getContext());
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            cardRoot.setLayoutParams(cardLp);
+            cardRoot.setBackgroundColor(Color.parseColor("#0B141A"));
 
             ImageView ivMedia = new ImageView(parent.getContext());
             ivMedia.setLayoutParams(new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT));
-            ivMedia.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            ivMedia.setAdjustViewBounds(true);
+            ivMedia.setScaleType(ImageView.ScaleType.FIT_CENTER);
             cardRoot.addView(ivMedia);
 
             // Bottom gradient scrim for duration & timestamp legibility
             View bottomScrim = new View(parent.getContext());
             FrameLayout.LayoutParams scrimLp = new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, Math.round(56 * dp), Gravity.BOTTOM);
+                    ViewGroup.LayoutParams.MATCH_PARENT, Math.round(52 * dp), Gravity.BOTTOM);
             bottomScrim.setLayoutParams(scrimLp);
             GradientDrawable scrimGrad = new GradientDrawable(
                     GradientDrawable.Orientation.BOTTOM_TOP,
@@ -1385,16 +1453,17 @@ public class MediaViewerActivity extends AppCompatActivity {
 
             // Centered circular play button for video items
             FrameLayout playCircle = new FrameLayout(parent.getContext());
-            int pSz = Math.round(58 * dp);
+            int pSz = Math.round(60 * dp);
             FrameLayout.LayoutParams pLp = new FrameLayout.LayoutParams(pSz, pSz, Gravity.CENTER);
             playCircle.setLayoutParams(pLp);
             GradientDrawable pBg = new GradientDrawable();
             pBg.setShape(GradientDrawable.OVAL);
             pBg.setColor(0x99000000);
+            pBg.setStroke(Math.max(1, Math.round(1.2f * dp)), 0x40FFFFFF);
             playCircle.setBackground(pBg);
 
             ImageView playIcon = new ImageView(parent.getContext());
-            int icSz = Math.round(30 * dp);
+            int icSz = Math.round(32 * dp);
             playIcon.setLayoutParams(new FrameLayout.LayoutParams(icSz, icSz, Gravity.CENTER));
             playIcon.setImageResource(R.drawable.ic_play_arrow);
             playIcon.setColorFilter(Color.WHITE);
@@ -1411,6 +1480,7 @@ public class MediaViewerActivity extends AppCompatActivity {
             tvVideoDur.setLayoutParams(dLp);
             tvVideoDur.setTextColor(Color.WHITE);
             tvVideoDur.setTextSize(12.5f);
+            tvVideoDur.setTypeface(null, Typeface.BOLD);
             tvVideoDur.setShadowLayer(4f, 0f, 1f, 0xCC000000);
             cardRoot.addView(tvVideoDur);
 
@@ -1427,7 +1497,38 @@ public class MediaViewerActivity extends AppCompatActivity {
             tvTimeTick.setShadowLayer(4f, 0f, 1f, 0xCC000000);
             cardRoot.addView(tvTimeTick);
 
-            return new FeedCardHolder(cardRoot, ivMedia, playCircle, tvVideoDur, tvTimeTick);
+            itemContainer.addView(cardRoot);
+
+            // Visible gap/divider bar between consecutive photos and videos (Screenshot3.jpg & Screenshot4.jpg)
+            LinearLayout dividerContainer = new LinearLayout(parent.getContext());
+            dividerContainer.setOrientation(LinearLayout.VERTICAL);
+            dividerContainer.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    Math.round(14 * dp)));
+            dividerContainer.setBackgroundColor(Color.parseColor("#F0F2F5"));
+
+            int linePx = Math.max(1, Math.round(1f * dp));
+            View topLine = new View(parent.getContext());
+            topLine.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, linePx));
+            topLine.setBackgroundColor(Color.parseColor("#CBD5E1"));
+            dividerContainer.addView(topLine);
+
+            View gapSpacer = new View(parent.getContext());
+            gapSpacer.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+            gapSpacer.setBackgroundColor(Color.parseColor("#F0F2F5"));
+            dividerContainer.addView(gapSpacer);
+
+            View bottomLine = new View(parent.getContext());
+            bottomLine.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, linePx));
+            bottomLine.setBackgroundColor(Color.parseColor("#CBD5E1"));
+            dividerContainer.addView(bottomLine);
+
+            itemContainer.addView(dividerContainer);
+
+            return new FeedCardHolder(itemContainer, cardRoot, ivMedia, playCircle, tvVideoDur, tvTimeTick, dividerContainer);
         }
 
         @Override
@@ -1443,10 +1544,13 @@ public class MediaViewerActivity extends AppCompatActivity {
                 File f = new File(item.path);
                 if (f.exists()) {
                     if (isVideo) {
+                        MediaMetadataRetriever mmr = new MediaMetadataRetriever();
                         try {
-                            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
                             mmr.setDataSource(f.getAbsolutePath());
-                            bmp = mmr.getFrameAtTime();
+                            bmp = mmr.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                            if (bmp == null) {
+                                bmp = mmr.getFrameAtTime();
+                            }
                             String durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
                             if (durStr != null) {
                                 long ms = Long.parseLong(durStr);
@@ -1454,12 +1558,15 @@ public class MediaViewerActivity extends AppCompatActivity {
                                     feedDurationCache.put(item.path, formatTime((int) ms));
                                 }
                             }
-                            mmr.release();
-                        } catch (Throwable ignored) {}
+                        } catch (Throwable ignored) {
+                        } finally {
+                            try { mmr.release(); } catch (Throwable ignored) {}
+                        }
+                        if (bmp == null) {
+                            bmp = decodeCompleteBitmapWithExif(f, 1600);
+                        }
                     } else {
-                        BitmapFactory.Options opts = new BitmapFactory.Options();
-                        opts.inSampleSize = 2;
-                        bmp = BitmapFactory.decodeFile(f.getAbsolutePath(), opts);
+                        bmp = decodeCompleteBitmapWithExif(f, 1600);
                     }
                     if (bmp != null) {
                         feedBitmapCache.put(item.path, bmp);
@@ -1472,18 +1579,27 @@ public class MediaViewerActivity extends AppCompatActivity {
                 int screenW = getResources().getDisplayMetrics().widthPixels;
                 if (bmp.getWidth() > 0 && bmp.getHeight() > 0 && screenW > 0) {
                     float ratio = (float) bmp.getHeight() / (float) bmp.getWidth();
-                    int targetH = Math.round(screenW * ratio);
-                    int minH = Math.round(220 * dp);
-                    int maxH = Math.round(440 * dp);
-                    targetH = Math.max(minH, Math.min(maxH, targetH));
-                    ViewGroup.LayoutParams lp = holder.itemView.getLayoutParams();
-                    if (lp != null && lp.height != targetH) {
-                        lp.height = targetH;
-                        holder.itemView.setLayoutParams(lp);
+                    // Render full natural height without cropping so both photos and videos show 100% complete
+                    int fullNaturalHeight = Math.max(Math.round(140 * dp), Math.round(screenW * ratio));
+                    ViewGroup.LayoutParams cardLp = holder.cardRoot.getLayoutParams();
+                    if (cardLp != null && cardLp.height != fullNaturalHeight) {
+                        cardLp.height = fullNaturalHeight;
+                        holder.cardRoot.setLayoutParams(cardLp);
                     }
                 }
             } else {
                 holder.ivMedia.setImageDrawable(null);
+                ViewGroup.LayoutParams cardLp = holder.cardRoot.getLayoutParams();
+                int fallbackH = Math.round(280 * dp);
+                if (cardLp != null && cardLp.height != fallbackH) {
+                    cardLp.height = fallbackH;
+                    holder.cardRoot.setLayoutParams(cardLp);
+                }
+            }
+
+            // Show visible gap/divider between all items (both photos and videos)
+            if (holder.dividerContainer != null) {
+                holder.dividerContainer.setVisibility(pos < getItemCount() - 1 ? View.VISIBLE : View.GONE);
             }
 
             if (isVideo) {
@@ -1501,14 +1617,16 @@ public class MediaViewerActivity extends AppCompatActivity {
             holder.tvTimeTick.setText(isSentByYou ? (timeStr + "  ✓✓") : timeStr);
 
             final int clickedPos = pos;
-            holder.itemView.setOnClickListener(v -> {
+            View.OnClickListener openFullViewer = v -> {
                 enteredPagerFromAlbumFeed = true;
                 isVerticalScrollMode = false;
                 isControlsVisible = true;
                 currentMediaIndex = clickedPos;
                 applyAlbumScrollMode();
                 selectAlbumIndex(clickedPos, false);
-            });
+            };
+            holder.cardRoot.setOnClickListener(openFullViewer);
+            holder.playCircle.setOnClickListener(openFullViewer);
         }
 
         @Override
@@ -1517,21 +1635,27 @@ public class MediaViewerActivity extends AppCompatActivity {
         }
 
         class FeedCardHolder extends RecyclerView.ViewHolder {
+            final FrameLayout cardRoot;
             final ImageView ivMedia;
             final FrameLayout playCircle;
             final TextView tvVideoDur;
             final TextView tvTimeTick;
+            final View dividerContainer;
 
             FeedCardHolder(@NonNull View itemView,
+                           FrameLayout cardRoot,
                            ImageView ivMedia,
                            FrameLayout playCircle,
                            TextView tvVideoDur,
-                           TextView tvTimeTick) {
+                           TextView tvTimeTick,
+                           View dividerContainer) {
                 super(itemView);
+                this.cardRoot = cardRoot;
                 this.ivMedia = ivMedia;
                 this.playCircle = playCircle;
                 this.tvVideoDur = tvVideoDur;
                 this.tvTimeTick = tvTimeTick;
+                this.dividerContainer = dividerContainer;
             }
         }
     }
@@ -1622,6 +1746,7 @@ public class MediaViewerActivity extends AppCompatActivity {
                     final int boundPosition = pos;
                     holder.pageVideo.setOnPreparedListener(mp -> {
                         int dur = mp.getDuration();
+                        fitVideoViewToAspectRatio(holder.pageVideo, holder.pageVideoWrap, mp.getVideoWidth(), mp.getVideoHeight());
                         if (boundPosition == currentMediaIndex) {
                             activeMediaPlayer = mp;
                             activeAlbumVideoView = holder.pageVideo;
@@ -1680,9 +1805,7 @@ public class MediaViewerActivity extends AppCompatActivity {
                             return;
                         }
                     }
-                    BitmapFactory.Options opts = new BitmapFactory.Options();
-                    opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
-                    Bitmap bmp = BitmapFactory.decodeFile(f.getAbsolutePath(), opts);
+                    Bitmap bmp = decodeCompleteBitmapWithExif(f, 2048);
                     if (bmp != null) {
                         holder.pagePhoto.setImageBitmap(bmp);
                     }
@@ -1758,9 +1881,7 @@ public class MediaViewerActivity extends AppCompatActivity {
                     return;
                 }
             }
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-            Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+            Bitmap bitmap = decodeCompleteBitmapWithExif(file, 2048);
             if (bitmap != null) {
                 photoViewer.setImageBitmap(bitmap);
             } else {
@@ -1780,6 +1901,7 @@ public class MediaViewerActivity extends AppCompatActivity {
         videoViewer.setVideoPath(file.getAbsolutePath());
         videoViewer.setOnPreparedListener(mp -> {
             activeMediaPlayer = mp;
+            fitVideoViewToAspectRatio(videoViewer, videoContainer, mp.getVideoWidth(), mp.getVideoHeight());
             applyCurrentVideoSpeed();
             viewerProgressBar.setVisibility(View.GONE);
             int duration = mp.getDuration();

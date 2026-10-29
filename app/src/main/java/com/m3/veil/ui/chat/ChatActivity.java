@@ -2150,17 +2150,32 @@ public class ChatActivity extends AppCompatActivity {
                         android.graphics.BitmapFactory.decodeFile(finalFile.getAbsolutePath(), opts);
                         int maxDim = Math.max(opts.outWidth, opts.outHeight);
                         int sample = 1;
-                        while (maxDim / sample > 480) {
+                        while (maxDim / sample > 960) {
                             sample *= 2;
                         }
                         opts.inJustDecodeBounds = false;
                         opts.inSampleSize = Math.max(1, sample);
                         bmp = android.graphics.BitmapFactory.decodeFile(finalFile.getAbsolutePath(), opts);
+                        if (bmp != null) {
+                            try {
+                                android.media.ExifInterface exif = new android.media.ExifInterface(finalFile.getAbsolutePath());
+                                int ori = exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL);
+                                int rot = 0;
+                                if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_90) rot = 90;
+                                else if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_180) rot = 180;
+                                else if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_270) rot = 270;
+                                if (rot != 0) {
+                                    android.graphics.Matrix m = new android.graphics.Matrix();
+                                    m.postRotate(rot);
+                                    bmp = android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), m, true);
+                                }
+                            } catch (Exception ignored) {}
+                        }
                     }
                     if (bmp != null) {
                         int w = bmp.getWidth();
                         int h = bmp.getHeight();
-                        int targetMax = 320;
+                        int targetMax = 720;
                         if (w > targetMax || h > targetMax) {
                             float ratio = Math.min((float) targetMax / w, (float) targetMax / h);
                             bmp = android.graphics.Bitmap.createScaledBitmap(
@@ -2171,7 +2186,7 @@ public class ChatActivity extends AppCompatActivity {
                             );
                         }
                         java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-                        bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, baos);
+                        bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 78, baos);
                         String thumbB64 = android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.NO_WRAP);
                         itemObj.put("thumb", thumbB64);
                     }
