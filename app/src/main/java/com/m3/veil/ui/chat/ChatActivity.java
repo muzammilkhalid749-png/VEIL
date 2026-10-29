@@ -2134,6 +2134,48 @@ public class ChatActivity extends AppCompatActivity {
                 itemObj.put("path", finalFile.getAbsolutePath());
                 itemObj.put("type", t);
                 itemObj.put("caption", i == 0 && caption != null ? caption : "");
+                try {
+                    android.graphics.Bitmap bmp = null;
+                    if ("video".equals(t)) {
+                        android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
+                        try {
+                            mmr.setDataSource(finalFile.getAbsolutePath());
+                            bmp = mmr.getFrameAtTime(0);
+                        } finally {
+                            try { mmr.release(); } catch (Exception ignored) {}
+                        }
+                    } else {
+                        android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+                        opts.inJustDecodeBounds = true;
+                        android.graphics.BitmapFactory.decodeFile(finalFile.getAbsolutePath(), opts);
+                        int maxDim = Math.max(opts.outWidth, opts.outHeight);
+                        int sample = 1;
+                        while (maxDim / sample > 480) {
+                            sample *= 2;
+                        }
+                        opts.inJustDecodeBounds = false;
+                        opts.inSampleSize = Math.max(1, sample);
+                        bmp = android.graphics.BitmapFactory.decodeFile(finalFile.getAbsolutePath(), opts);
+                    }
+                    if (bmp != null) {
+                        int w = bmp.getWidth();
+                        int h = bmp.getHeight();
+                        int targetMax = 320;
+                        if (w > targetMax || h > targetMax) {
+                            float ratio = Math.min((float) targetMax / w, (float) targetMax / h);
+                            bmp = android.graphics.Bitmap.createScaledBitmap(
+                                    bmp,
+                                    Math.max(1, Math.round(w * ratio)),
+                                    Math.max(1, Math.round(h * ratio)),
+                                    true
+                            );
+                        }
+                        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                        bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, baos);
+                        String thumbB64 = android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.NO_WRAP);
+                        itemObj.put("thumb", thumbB64);
+                    }
+                } catch (Exception ignored) {}
                 arr.put(itemObj);
             }
             root.put("items", arr);
@@ -3372,6 +3414,7 @@ public class ChatActivity extends AppCompatActivity {
                 onMediaDownloadClick(message);
             }
         });
+        messagesAdapter.setOnQuickForwardClickListener(this::showForwardMessageSheet);
         messagesAdapter.setOnDoubleTapReactListener(message -> {
             if (message == null || message.getId() == null || "deleted".equals(message.getType())) return;
             String reactorKey = com.m3.veil.manager.VeilFeatureManager.getInstance(this).isAnonymousReactionEnabled()
@@ -4590,6 +4633,8 @@ public class ChatActivity extends AppCompatActivity {
         );
         fwdMessage.setLocalFilePath(originalMessage.getLocalFilePath());
         fwdMessage.setThumbnail(originalMessage.getThumbnail());
+        fwdMessage.setMediaUrl(originalMessage.getMediaUrl());
+        fwdMessage.setPollJson(originalMessage.getPollJson());
 
         // Route through VeilMessagesController (optimistic UI + warm cache + outbox + direct P2P delivery)
         com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(targetChat, targetRecipientId, fwdMessage);

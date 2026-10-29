@@ -36,19 +36,36 @@
 
     </LinearLayout>
 
-    <!-- Telegram/Veil Custom Canvas Sent Message Bubble -->
-    <com.m3.veil.ui.views.ChatMessageCell
-        android:id="@+id/messageBubble"
-        android:layout_width="wrap_content"
+    <!-- Sent Bubble Row with Left Quick-Forward Circular Button (WhatsApp Style) -->
+    <LinearLayout
+        android:id="@+id/sentBubbleRow"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="end"
-        android:layout_marginStart="52dp"
-        android:orientation="vertical"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
-        android:elevation="0.8dp">
+        android:gravity="end|center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/btnQuickForwardMedia"
+            android:layout_width="31dp"
+            android:layout_height="31dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="8dp"
+            android:padding="6.5dp"
+            android:src="@drawable/ic_whatsapp_forward_double"
+            android:contentDescription="Forward media"
+            android:visibility="gone" />
+
+        <!-- Telegram/Veil Custom Canvas Sent Message Bubble -->
+        <com.m3.veil.ui.views.ChatMessageCell
+            android:id="@+id/messageBubble"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:elevation="0.8dp">
 
         <!-- Quoted Reply Container (WhatsApp Style) -->
         <LinearLayout
@@ -1292,6 +1309,8 @@
         </LinearLayout>
 
     </com.m3.veil.ui.views.ChatMessageCell>
+
+    </LinearLayout>
 
     <!-- Reactions Floating Container -->
     <TextView

@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp"
+    android:height="20dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Main forward arrow -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M13,8V4.5L20.5,12L13,19.5V15.9C7.8,15.9 4.3,17.5 1.8,21C2.8,15.8 5.8,10.2 13,8Z" />
+    <!-- Secondary WhatsApp double-forward chevron -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M17.5,4.5L24,12L17.5,19.5V16.8L21.7,12L17.5,7.2V4.5Z" />
+</vector>
