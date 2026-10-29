@@ -3,14 +3,19 @@ package com.m3.veil.ui.chat.adapters;
 import android.content.ContentResolver;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Size;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -22,6 +27,7 @@ import com.m3.veil.model.GalleryMediaItem;
 import com.m3.veil.utils.VoicePlayerManager;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,13 +37,14 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
     public interface OnGalleryItemClickListener {
         void onCameraTileClicked();
         void onMediaItemSelected(GalleryMediaItem item);
+        default void onMultiSelectionChanged(List<GalleryMediaItem> selectedItems) {}
     }
 
     private final List<GalleryMediaItem> items;
+    private final List<GalleryMediaItem> selectedItems = new ArrayList<>();
     private final OnGalleryItemClickListener listener;
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private int selectedPosition = -1;
 
     public GalleryMediaAdapter(List<GalleryMediaItem> items, OnGalleryItemClickListener listener) {
         this.items = items;
@@ -66,13 +73,10 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             vh.cardCameraTile.setVisibility(View.GONE);
             vh.cardMediaContainer.setVisibility(View.VISIBLE);
 
-            // Thumbnail loading
             vh.ivThumbnail.setImageBitmap(null);
             vh.ivThumbnail.setTag(item.getUri());
-
             loadThumbnailAsync(item, vh.ivThumbnail);
 
-            // Video indicator
             if (item.isVideo()) {
                 vh.videoDurationPill.setVisibility(View.VISIBLE);
                 vh.tvVideoDuration.setText(VoicePlayerManager.formatDuration((int) item.getDurationMs()));
@@ -80,31 +84,51 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
                 vh.videoDurationPill.setVisibility(View.GONE);
             }
 
-            // Selection state
-            boolean isSelected = item.isSelected();
+            int selIndex = indexOfSelected(item);
+            boolean isSelected = selIndex >= 0;
             vh.selectedOverlay.setVisibility(isSelected ? View.VISIBLE : View.GONE);
-            vh.ivCheckmark.setVisibility(isSelected ? View.VISIBLE : View.GONE);
-            vh.selectionBadge.setBackgroundResource(isSelected ? R.drawable.bg_voice_circle_received : R.drawable.bg_circle_translucent);
+            vh.ivCheckmark.setVisibility(View.GONE);
+
+            if (isSelected) {
+                GradientDrawable greenCircle = new GradientDrawable();
+                greenCircle.setShape(GradientDrawable.OVAL);
+                greenCircle.setColor(Color.parseColor("#00A884"));
+                vh.selectionBadge.setBackground(greenCircle);
+                vh.tvSelectionNumber.setVisibility(View.VISIBLE);
+                vh.tvSelectionNumber.setText(String.valueOf(selIndex + 1));
+            } else {
+                vh.selectionBadge.setBackgroundResource(R.drawable.bg_circle_translucent);
+                vh.tvSelectionNumber.setVisibility(View.GONE);
+            }
 
             vh.cardMediaContainer.setOnClickListener(v -> {
-                int previousPos = selectedPosition;
-                if (selectedPosition != -1 && selectedPosition < items.size()) {
-                    items.get(selectedPosition).setSelected(false);
-                    notifyItemChanged(selectedPosition);
-                }
-
-                if (previousPos == vh.getAdapterPosition()) {
-                    // Deselect
-                    selectedPosition = -1;
-                    if (listener != null) listener.onMediaItemSelected(null);
+                int existingIdx = indexOfSelected(item);
+                if (existingIdx >= 0) {
+                    item.setSelected(false);
+                    selectedItems.remove(existingIdx);
                 } else {
-                    selectedPosition = vh.getAdapterPosition();
                     item.setSelected(true);
-                    notifyItemChanged(selectedPosition);
-                    if (listener != null) listener.onMediaItemSelected(item);
+                    selectedItems.add(item);
+                }
+                notifyDataSetChanged();
+                if (listener != null) {
+                    GalleryMediaItem latest = selectedItems.isEmpty() ? null : selectedItems.get(selectedItems.size() - 1);
+                    listener.onMediaItemSelected(latest);
+                    listener.onMultiSelectionChanged(new ArrayList<>(selectedItems));
                 }
             });
         }
+    }
+
+    private int indexOfSelected(GalleryMediaItem target) {
+        if (target == null || target.getUri() == null) return -1;
+        for (int i = 0; i < selectedItems.size(); i++) {
+            GalleryMediaItem s = selectedItems.get(i);
+            if (s != null && target.getUri().equals(s.getUri())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void loadThumbnailAsync(GalleryMediaItem item, ImageView imageView) {
@@ -140,10 +164,11 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
     }
 
     public GalleryMediaItem getSelectedItem() {
-        if (selectedPosition >= 0 && selectedPosition < items.size()) {
-            return items.get(selectedPosition);
-        }
-        return null;
+        return selectedItems.isEmpty() ? null : selectedItems.get(selectedItems.size() - 1);
+    }
+
+    public List<GalleryMediaItem> getSelectedItems() {
+        return new ArrayList<>(selectedItems);
     }
 
     static class MediaViewHolder extends RecyclerView.ViewHolder {
@@ -155,6 +180,7 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         TextView tvVideoDuration;
         View selectionBadge;
         ImageView ivCheckmark;
+        TextView tvSelectionNumber;
 
         public MediaViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -166,6 +192,19 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             tvVideoDuration = itemView.findViewById(R.id.tvVideoDuration);
             selectionBadge = itemView.findViewById(R.id.selectionBadge);
             ivCheckmark = itemView.findViewById(R.id.ivCheckmark);
+
+            tvSelectionNumber = new TextView(itemView.getContext());
+            tvSelectionNumber.setGravity(Gravity.CENTER);
+            tvSelectionNumber.setTextColor(Color.WHITE);
+            tvSelectionNumber.setTextSize(11f);
+            tvSelectionNumber.setTypeface(null, Typeface.BOLD);
+            tvSelectionNumber.setVisibility(View.GONE);
+            if (selectionBadge instanceof FrameLayout) {
+                ((FrameLayout) selectionBadge).addView(tvSelectionNumber, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        Gravity.CENTER));
+            }
         }
     }
 }

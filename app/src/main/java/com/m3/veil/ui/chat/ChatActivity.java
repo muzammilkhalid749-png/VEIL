@@ -1591,12 +1591,39 @@ public class ChatActivity extends AppCompatActivity {
         showBuiltInMediaGallery();
     }
 
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent != null) {
+            String scrollTargetId = intent.getStringExtra("scrollToMessageId");
+            if (scrollTargetId != null && !scrollTargetId.isEmpty()) {
+                intent.removeExtra("scrollToMessageId");
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    if (messageList != null) {
+                        for (Message m : messageList) {
+                            if (m != null && scrollTargetId.equals(m.getId())) {
+                                scrollToPinnedMessage(m);
+                                break;
+                            }
+                        }
+                    }
+                }, 150);
+            }
+        }
+    }
+
     private void showBuiltInMediaGallery() {
         MediaGalleryBottomSheet gallerySheet = new MediaGalleryBottomSheet();
         gallerySheet.setMediaGalleryListener(new MediaGalleryBottomSheet.MediaGalleryListener() {
             @Override
             public void onMediaSelectedToSend(Uri mediaUri, String mediaType, String caption) {
                 handleDirectMediaSend(mediaUri, mediaType, caption);
+            }
+
+            @Override
+            public void onMultiMediaSelectedToSend(ArrayList<Uri> uris, ArrayList<String> types, String caption) {
+                handleDirectMultiMediaSend(uris, types, caption);
             }
 
             @Override
@@ -1608,11 +1635,68 @@ public class ChatActivity extends AppCompatActivity {
             }
 
             @Override
+            public void onMultiMediaSelectedToEdit(ArrayList<Uri> uris, ArrayList<String> types) {
+                if (uris == null || uris.isEmpty()) return;
+                Intent editIntent = new Intent(ChatActivity.this, MediaEditActivity.class);
+                editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, uris.get(0));
+                editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, types != null && !types.isEmpty() ? types.get(0) : "image");
+                editIntent.putParcelableArrayListExtra(MediaEditActivity.EXTRA_BATCH_URIS, uris);
+                editIntent.putStringArrayListExtra(MediaEditActivity.EXTRA_BATCH_TYPES, types);
+                startActivityForResult(editIntent, REQ_MEDIA_EDIT);
+            }
+
+            @Override
             public void onCameraRequested() {
                 checkAndLaunchCamera();
             }
         });
         gallerySheet.show(getSupportFragmentManager(), "MediaGalleryBottomSheet");
+    }
+
+    private void handleDirectMultiMediaSend(ArrayList<Uri> uris, ArrayList<String> types, String caption) {
+        if (uris == null || uris.isEmpty()) return;
+        if (uris.size() == 1) {
+            String singleType = (types != null && !types.isEmpty()) ? types.get(0) : "image";
+            handleDirectMediaSend(uris.get(0), singleType, caption);
+            return;
+        }
+        new Thread(() -> {
+            try {
+                ArrayList<String> albumPaths = new ArrayList<>();
+                ArrayList<String> albumTypes = new ArrayList<>();
+                for (int i = 0; i < uris.size(); i++) {
+                    Uri u = uris.get(i);
+                    if (u == null) continue;
+                    String t = (types != null && i < types.size()) ? types.get(i) : "image";
+                    String mime = getContentResolver().getType(u);
+                    boolean isGif = "gif".equalsIgnoreCase(t)
+                            || (mime != null && mime.toLowerCase(Locale.ROOT).contains("gif"))
+                            || u.toString().toLowerCase(Locale.ROOT).endsWith(".gif");
+                    String effectiveType = "video".equalsIgnoreCase(t) ? "video" : (isGif ? "gif" : "image");
+                    String ext = "video".equals(effectiveType) ? ".mp4" : (isGif ? ".gif" : ".jpg");
+                    File dest = new File(getExternalCacheDir(), "pick_album_" + System.currentTimeMillis() + "_" + i + ext);
+                    try (InputStream in = getContentResolver().openInputStream(u);
+                         OutputStream out = new FileOutputStream(dest)) {
+                        if (in != null) {
+                            byte[] buffer = new byte[16384];
+                            int read;
+                            while ((read = in.read(buffer)) != -1) {
+                                out.write(buffer, 0, read);
+                            }
+                        }
+                    }
+                    if (dest.exists() && dest.length() > 0) {
+                        albumPaths.add(dest.getAbsolutePath());
+                        albumTypes.add(effectiveType);
+                    }
+                }
+                if (!albumPaths.isEmpty()) {
+                    runOnUiThread(() -> uploadAndSendAlbumMedia(albumPaths, albumTypes, caption));
+                }
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this, "Failed to load selected album media: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            }
+        }).start();
     }
 
     private void handleDirectMediaSend(Uri mediaUri, String mediaType, String caption) {

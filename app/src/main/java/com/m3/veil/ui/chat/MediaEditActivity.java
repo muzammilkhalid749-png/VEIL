@@ -121,7 +121,6 @@ public class MediaEditActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
-        configureDarkMediaSystemBars();
         setContentView(R.layout.activity_media_edit);
 
         View mainView = findViewById(android.R.id.content);
@@ -138,6 +137,8 @@ public class MediaEditActivity extends AppCompatActivity {
             finish();
             return;
         }
+
+        configureDarkMediaSystemBars();
     }
 
     private void configureDarkMediaSystemBars() {

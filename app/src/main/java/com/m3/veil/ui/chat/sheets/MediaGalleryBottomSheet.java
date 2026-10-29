@@ -19,7 +19,6 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -35,24 +34,31 @@ import com.m3.veil.model.GalleryMediaItem;
 import com.m3.veil.ui.chat.adapters.GalleryMediaAdapter;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
  * Built-in Media Gallery & Camera Picker BottomSheet matching WhatsApp, Telegram, and Signal.
- * Features:
- * - Tile 0: Live Camera Action Card
- * - Direct MediaStore query for zero-friction in-app photo & video browsing
- * - Instant single-tap selection with video duration badge
- * - Inline caption input field ("Add a caption...") with direct send FAB
- * - Edit / Crop launcher to open MediaEditActivity
+ * Supports selecting single or multiple photos & videos with numbered badges (1, 2, 3, 4),
+ * inline caption bar, and batch editing in MediaEditActivity.
  */
 public class MediaGalleryBottomSheet extends BottomSheetDialogFragment {
 
     public interface MediaGalleryListener {
         void onMediaSelectedToSend(Uri mediaUri, String mediaType, String caption);
         void onMediaSelectedToEdit(Uri mediaUri, String mediaType);
+        default void onMultiMediaSelectedToSend(ArrayList<Uri> uris, ArrayList<String> types, String caption) {
+            if (uris != null && !uris.isEmpty()) {
+                onMediaSelectedToSend(uris.get(0), types != null && !types.isEmpty() ? types.get(0) : "image", caption);
+            }
+        }
+        default void onMultiMediaSelectedToEdit(ArrayList<Uri> uris, ArrayList<String> types) {
+            if (uris != null && !uris.isEmpty()) {
+                onMediaSelectedToEdit(uris.get(0), types != null && !types.isEmpty() ? types.get(0) : "image");
+            }
+        }
         void onCameraRequested();
     }
 
@@ -68,6 +74,7 @@ public class MediaGalleryBottomSheet extends BottomSheetDialogFragment {
 
     private GalleryMediaAdapter adapter;
     private final List<GalleryMediaItem> mediaItems = new ArrayList<>();
+    private final List<GalleryMediaItem> currentSelectedBatch = new ArrayList<>();
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private MediaGalleryListener listener;
@@ -124,21 +131,50 @@ public class MediaGalleryBottomSheet extends BottomSheetDialogFragment {
             @Override
             public void onMediaItemSelected(GalleryMediaItem item) {
                 currentSelectedMedia = item;
-                if (item != null) {
+            }
+
+            @Override
+            public void onMultiSelectionChanged(List<GalleryMediaItem> selectedItems) {
+                currentSelectedBatch.clear();
+                if (selectedItems != null) {
+                    currentSelectedBatch.addAll(selectedItems);
+                }
+                if (!currentSelectedBatch.isEmpty()) {
+                    GalleryMediaItem last = currentSelectedBatch.get(currentSelectedBatch.size() - 1);
+                    currentSelectedMedia = last;
                     bottomMediaActionContainer.setVisibility(View.VISIBLE);
                     try {
-                        ivSelectedPreview.setImageURI(item.getUri());
+                        ivSelectedPreview.setImageURI(last.getUri());
                     } catch (Exception ignored) {}
+                    if (etMediaCaption != null) {
+                        etMediaCaption.setHint(currentSelectedBatch.size() > 1
+                                ? "Add a caption (" + currentSelectedBatch.size() + " selected)..."
+                                : "Add a caption...");
+                    }
                 } else {
+                    currentSelectedMedia = null;
                     bottomMediaActionContainer.setVisibility(View.GONE);
                 }
             }
         });
         rvMediaGrid.setAdapter(adapter);
 
-        // Edit / Crop button clicked
+        // Edit / Crop button clicked (supports both single and multi-item batch edit)
         btnEditSelectedMedia.setOnClickListener(v -> {
-            if (currentSelectedMedia != null && listener != null) {
+            if (!currentSelectedBatch.isEmpty() && listener != null) {
+                ArrayList<Uri> uris = new ArrayList<>();
+                ArrayList<String> types = new ArrayList<>();
+                for (GalleryMediaItem gi : currentSelectedBatch) {
+                    uris.add(gi.getUri());
+                    types.add(gi.isVideo() ? "video" : "image");
+                }
+                dismiss();
+                if (uris.size() > 1) {
+                    listener.onMultiMediaSelectedToEdit(uris, types);
+                } else {
+                    listener.onMediaSelectedToEdit(uris.get(0), types.get(0));
+                }
+            } else if (currentSelectedMedia != null && listener != null) {
                 Uri uri = currentSelectedMedia.getUri();
                 String type = currentSelectedMedia.isVideo() ? "video" : "image";
                 dismiss();
@@ -146,12 +182,25 @@ public class MediaGalleryBottomSheet extends BottomSheetDialogFragment {
             }
         });
 
-        // Direct Send button clicked
+        // Direct Send button clicked (supports both single and multi-item album send)
         btnSendMedia.setOnClickListener(v -> {
-            if (currentSelectedMedia != null && listener != null) {
+            String caption = etMediaCaption.getText() != null ? etMediaCaption.getText().toString().trim() : "";
+            if (!currentSelectedBatch.isEmpty() && listener != null) {
+                ArrayList<Uri> uris = new ArrayList<>();
+                ArrayList<String> types = new ArrayList<>();
+                for (GalleryMediaItem gi : currentSelectedBatch) {
+                    uris.add(gi.getUri());
+                    types.add(gi.isVideo() ? "video" : "image");
+                }
+                dismiss();
+                if (uris.size() > 1) {
+                    listener.onMultiMediaSelectedToSend(uris, types, caption);
+                } else {
+                    listener.onMediaSelectedToSend(uris.get(0), types.get(0), caption);
+                }
+            } else if (currentSelectedMedia != null && listener != null) {
                 Uri uri = currentSelectedMedia.getUri();
                 String type = currentSelectedMedia.isVideo() ? "video" : "image";
-                String caption = etMediaCaption.getText() != null ? etMediaCaption.getText().toString().trim() : "";
                 dismiss();
                 listener.onMediaSelectedToSend(uri, type, caption);
             }
@@ -162,7 +211,6 @@ public class MediaGalleryBottomSheet extends BottomSheetDialogFragment {
 
     private void loadDeviceMedia() {
         if (!hasStoragePermission()) {
-            // Add Camera tile only
             mediaItems.clear();
             mediaItems.add(GalleryMediaItem.createCameraTile());
             adapter.notifyDataSetChanged();
@@ -176,12 +224,10 @@ public class MediaGalleryBottomSheet extends BottomSheetDialogFragment {
 
         executor.execute(() -> {
             List<GalleryMediaItem> queried = new ArrayList<>();
-            // Tile 0: Camera tile
             queried.add(GalleryMediaItem.createCameraTile());
 
             ContentResolver cr = requireContext().getContentResolver();
 
-            // 1. Query Images
             String[] imageProj = {
                     MediaStore.Images.Media._ID,
                     MediaStore.Images.Media.DATA,
@@ -205,7 +251,6 @@ public class MediaGalleryBottomSheet extends BottomSheetDialogFragment {
                 }
             } catch (Exception ignored) {}
 
-            // 2. Query Videos
             String[] videoProj = {
                     MediaStore.Video.Media._ID,
                     MediaStore.Video.Media.DATA,

@@ -947,9 +947,15 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         return null;
     }
 
+    private final android.util.LruCache<String, Bitmap> albumTileBitmapCache = new android.util.LruCache<>(64);
+    private final android.util.LruCache<String, String> albumTileDurationCache = new android.util.LruCache<>(64);
+
     /**
-     * Renders a Telegram/WhatsApp-style 2x2 grouped media collage inside imageCardView when a message
-     * is a multi-photo/video album, or hides the collage overlay for single media messages.
+     * Renders a WhatsApp-style grouped media collage inside imageCardView when a message
+     * is a multi-photo/video album:
+     * - 2 items: 2 equal side-by-side columns
+     * - 3 items: 1 tall full-height left column + 2 stacked half-height right items (Screenshot1.jpg)
+     * - 4+ items: 2x2 grid with +(totalCount - 3) overlay on the 4th tile (Screenshot1.jpg)
      */
     private void bindGroupedAlbumGridOverlay(
             Context context,
@@ -975,8 +981,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         float dp = context.getResources().getDisplayMetrics().density;
         int totalCount = albumItems.length();
-        int gridW = Math.round(264f * dp);
-        int gridH = totalCount == 2 ? Math.round(176f * dp) : Math.round(256f * dp);
+        int gridW = Math.round(268f * dp);
+        int gridH = totalCount == 2 ? Math.round(180f * dp) : Math.round(264f * dp);
         com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, gridW, gridH);
 
         LinearLayout gridRoot;
@@ -987,7 +993,6 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         } else {
             gridRoot = new LinearLayout(context);
             gridRoot.setTag("veil_album_grid_overlay");
-            gridRoot.setOrientation(LinearLayout.VERTICAL);
             gridRoot.setBackgroundColor(0xFF0F172A);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -995,107 +1000,196 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             cardGroup.addView(gridRoot, 1, lp);
         }
 
-        int gap = Math.max(2, Math.round(2f * dp));
-        int shown = Math.min(4, totalCount);
-        int rows = shown <= 2 ? 1 : 2;
-        int itemIdx = 0;
+        int gap = Math.max(2, Math.round(2.5f * dp));
 
-        for (int r = 0; r < rows; r++) {
-            LinearLayout rowLayout = new LinearLayout(context);
-            rowLayout.setOrientation(LinearLayout.HORIZONTAL);
-            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+        if (totalCount == 3) {
+            // WhatsApp 3-item layout: 1 tall full-height left tile + 2 stacked half-height right tiles
+            gridRoot.setOrientation(LinearLayout.HORIZONTAL);
+
+            FrameLayout leftTile = createAlbumGridTile(
+                    context, albumItems, 0, totalCount, message, senderLabel, time, hasCaption, dp);
+            LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+            leftTile.setLayoutParams(leftLp);
+            gridRoot.addView(leftTile);
+
+            LinearLayout rightCol = new LinearLayout(context);
+            rightCol.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams rightColLp = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+            rightColLp.leftMargin = gap;
+            rightCol.setLayoutParams(rightColLp);
+
+            FrameLayout topRightTile = createAlbumGridTile(
+                    context, albumItems, 1, totalCount, message, senderLabel, time, hasCaption, dp);
+            LinearLayout.LayoutParams trLp = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
-            if (r > 0) rowLp.topMargin = gap;
-            rowLayout.setLayoutParams(rowLp);
+            topRightTile.setLayoutParams(trLp);
+            rightCol.addView(topRightTile);
 
-            int colsInRow = (shown == 3 && r == 0) ? 2 : (shown == 3 ? 1 : 2);
-            for (int c = 0; c < colsInRow && itemIdx < shown; c++) {
-                final int tileIndex = itemIdx++;
-                org.json.JSONObject itemObj = albumItems.optJSONObject(tileIndex);
-                final String itemPath = itemObj != null ? itemObj.optString("path", "") : "";
-                final String itemType = itemObj != null ? itemObj.optString("type", "image") : "image";
+            FrameLayout bottomRightTile = createAlbumGridTile(
+                    context, albumItems, 2, totalCount, message, senderLabel, time, hasCaption, dp);
+            LinearLayout.LayoutParams brLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+            brLp.topMargin = gap;
+            bottomRightTile.setLayoutParams(brLp);
+            rightCol.addView(bottomRightTile);
 
-                FrameLayout tile = new FrameLayout(context);
-                LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams(
-                        0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-                if (c > 0) tileLp.leftMargin = gap;
-                tile.setLayoutParams(tileLp);
+            gridRoot.addView(rightCol);
+        } else {
+            // 2 items (1x2) or 4+ items (2x2 with +N on 4th tile)
+            gridRoot.setOrientation(LinearLayout.VERTICAL);
+            int shown = Math.min(4, totalCount);
+            int rows = shown <= 2 ? 1 : 2;
+            int itemIdx = 0;
 
-                ImageView iv = new ImageView(context);
-                iv.setLayoutParams(new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT));
-                iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                iv.setBackgroundColor(0xFF1E293B);
+            for (int r = 0; r < rows; r++) {
+                LinearLayout rowLayout = new LinearLayout(context);
+                rowLayout.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+                if (r > 0) rowLp.topMargin = gap;
+                rowLayout.setLayoutParams(rowLp);
 
-                if (!itemPath.isEmpty()) {
-                    File f = new File(itemPath);
-                    if (f.exists()) {
-                        if ("video".equalsIgnoreCase(itemType) || itemPath.endsWith(".mp4")) {
-                            try {
-                                android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
-                                mmr.setDataSource(f.getAbsolutePath());
-                                Bitmap frame = mmr.getFrameAtTime();
-                                if (frame != null) iv.setImageBitmap(frame);
-                                mmr.release();
-                            } catch (Throwable ignored) {}
-                        } else {
-                            BitmapFactory.Options opts = new BitmapFactory.Options();
-                            opts.inSampleSize = 2;
-                            Bitmap bmp = BitmapFactory.decodeFile(f.getAbsolutePath(), opts);
-                            if (bmp != null) iv.setImageBitmap(bmp);
-                        }
-                    }
+                for (int c = 0; c < 2 && itemIdx < shown; c++) {
+                    final int tileIndex = itemIdx++;
+                    FrameLayout tile = createAlbumGridTile(
+                            context, albumItems, tileIndex, totalCount, message, senderLabel, time, hasCaption, dp);
+                    LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams(
+                            0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+                    if (c > 0) tileLp.leftMargin = gap;
+                    tile.setLayoutParams(tileLp);
+                    rowLayout.addView(tile);
                 }
-                tile.addView(iv);
-
-                if ("video".equalsIgnoreCase(itemType) || itemPath.endsWith(".mp4")) {
-                    FrameLayout playPill = new FrameLayout(context);
-                    int pSize = Math.round(34f * dp);
-                    FrameLayout.LayoutParams pLp = new FrameLayout.LayoutParams(pSize, pSize, android.view.Gravity.CENTER);
-                    playPill.setLayoutParams(pLp);
-                    android.graphics.drawable.GradientDrawable pBg = new android.graphics.drawable.GradientDrawable();
-                    pBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-                    pBg.setColor(0x99000000);
-                    playPill.setBackground(pBg);
-                    ImageView playIcon = new ImageView(context);
-                    int icSz = Math.round(18f * dp);
-                    playIcon.setLayoutParams(new FrameLayout.LayoutParams(icSz, icSz, android.view.Gravity.CENTER));
-                    playIcon.setImageResource(R.drawable.ic_play_arrow);
-                    playIcon.setColorFilter(0xFFFFFFFF);
-                    playPill.addView(playIcon);
-                    tile.addView(playPill);
-                }
-
-                if (tileIndex == 3 && totalCount > 4) {
-                    TextView moreOverlay = new TextView(context);
-                    moreOverlay.setLayoutParams(new FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT));
-                    moreOverlay.setBackgroundColor(0x99000000);
-                    moreOverlay.setGravity(android.view.Gravity.CENTER);
-                    moreOverlay.setText("+" + (totalCount - 3));
-                    moreOverlay.setTextColor(0xFFFFFFFF);
-                    moreOverlay.setTextSize(20f);
-                    moreOverlay.setTypeface(null, android.graphics.Typeface.BOLD);
-                    tile.addView(moreOverlay);
-                }
-
-                tile.setOnClickListener(v -> {
-                    Intent viewerIntent = buildMediaViewerAlbumIntent(
-                            context, message, itemPath, itemType, senderLabel, time,
-                            hasCaption ? message.getText() : "", tileIndex);
-                    context.startActivity(viewerIntent);
-                });
-                rowLayout.addView(tile);
+                gridRoot.addView(rowLayout);
             }
-            gridRoot.addView(rowLayout);
         }
     }
 
+    private FrameLayout createAlbumGridTile(
+            Context context,
+            org.json.JSONArray albumItems,
+            int tileIndex,
+            int totalCount,
+            Message message,
+            String senderLabel,
+            String time,
+            boolean hasCaption,
+            float dp) {
+        org.json.JSONObject itemObj = albumItems.optJSONObject(tileIndex);
+        final String itemPath = itemObj != null ? itemObj.optString("path", "") : "";
+        final String itemType = itemObj != null ? itemObj.optString("type", "image") : "image";
+        final boolean isVideoTile = "video".equalsIgnoreCase(itemType) || itemPath.toLowerCase(Locale.ROOT).endsWith(".mp4");
+
+        FrameLayout tile = new FrameLayout(context);
+        ImageView iv = new ImageView(context);
+        iv.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        iv.setBackgroundColor(0xFF1E293B);
+
+        if (!itemPath.isEmpty()) {
+            Bitmap cachedBmp = albumTileBitmapCache.get(itemPath);
+            if (cachedBmp != null && !cachedBmp.isRecycled()) {
+                iv.setImageBitmap(cachedBmp);
+            } else {
+                File f = new File(itemPath);
+                if (f.exists()) {
+                    Bitmap loaded = null;
+                    if (isVideoTile) {
+                        try {
+                            android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
+                            mmr.setDataSource(f.getAbsolutePath());
+                            loaded = mmr.getFrameAtTime();
+                            String durMsStr = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);
+                            if (durMsStr != null) {
+                                long dMs = Long.parseLong(durMsStr);
+                                if (dMs > 0) {
+                                    albumTileDurationCache.put(itemPath, VoicePlayerManager.formatDuration((int) dMs));
+                                }
+                            }
+                            mmr.release();
+                        } catch (Throwable ignored) {}
+                    } else {
+                        BitmapFactory.Options opts = new BitmapFactory.Options();
+                        opts.inSampleSize = 2;
+                        loaded = BitmapFactory.decodeFile(f.getAbsolutePath(), opts);
+                    }
+                    if (loaded != null) {
+                        albumTileBitmapCache.put(itemPath, loaded);
+                        iv.setImageBitmap(loaded);
+                    }
+                }
+            }
+        }
+        tile.addView(iv);
+
+        boolean hasMoreScrim = (tileIndex == 3 && totalCount > 4);
+
+        if (isVideoTile && !hasMoreScrim) {
+            FrameLayout playPill = new FrameLayout(context);
+            int pSize = Math.round(38f * dp);
+            FrameLayout.LayoutParams pLp = new FrameLayout.LayoutParams(pSize, pSize, android.view.Gravity.CENTER);
+            playPill.setLayoutParams(pLp);
+            android.graphics.drawable.GradientDrawable pBg = new android.graphics.drawable.GradientDrawable();
+            pBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            pBg.setColor(0x99000000);
+            playPill.setBackground(pBg);
+            ImageView playIcon = new ImageView(context);
+            int icSz = Math.round(20f * dp);
+            playIcon.setLayoutParams(new FrameLayout.LayoutParams(icSz, icSz, android.view.Gravity.CENTER));
+            playIcon.setImageResource(R.drawable.ic_play_arrow);
+            playIcon.setColorFilter(0xFFFFFFFF);
+            playPill.addView(playIcon);
+            tile.addView(playPill);
+
+            String durLabel = albumTileDurationCache.get(itemPath);
+            if (durLabel != null && !durLabel.isEmpty()) {
+                TextView tvVidDur = new TextView(context);
+                FrameLayout.LayoutParams dLp = new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        android.view.Gravity.BOTTOM | android.view.Gravity.START);
+                int m = Math.round(6f * dp);
+                dLp.setMargins(m, m, m, m);
+                tvVidDur.setLayoutParams(dLp);
+                tvVidDur.setText("🎥 " + durLabel);
+                tvVidDur.setTextColor(0xFFFFFFFF);
+                tvVidDur.setTextSize(10.5f);
+                tvVidDur.setShadowLayer(3f, 0f, 1f, 0xCC000000);
+                tile.addView(tvVidDur);
+            }
+        }
+
+        if (hasMoreScrim) {
+            TextView moreOverlay = new TextView(context);
+            moreOverlay.setLayoutParams(new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+            moreOverlay.setBackgroundColor(0x99000000);
+            moreOverlay.setGravity(android.view.Gravity.CENTER);
+            moreOverlay.setText("+" + (totalCount - 3));
+            moreOverlay.setTextColor(0xFFFFFFFF);
+            moreOverlay.setTextSize(22f);
+            moreOverlay.setTypeface(null, android.graphics.Typeface.BOLD);
+            tile.addView(moreOverlay);
+        }
+
+        tile.setOnClickListener(v -> {
+            Intent viewerIntent = buildMediaViewerAlbumIntent(
+                    context, message, itemPath, itemType, senderLabel, time,
+                    hasCaption ? message.getText() : "", tileIndex);
+            context.startActivity(viewerIntent);
+        });
+        return tile;
+    }
+
     /**
-     * Builds an Intent for MediaViewerActivity that includes all grouped album items (or all local
-     * chat photos/videos in the thread) so the user can swipe horizontally AND scroll vertically.
+     * Builds an Intent for MediaViewerActivity.
+     * - If clickedMessage is a multi-item album, opens Stage 2 (Vertical Scrolling Album Feed Mode)
+     *   with all items from that album so clicking any item opens Stage 3 (Full-Screen Viewer).
+     * - If clickedMessage is a single photo/video, opens Stage 3 (Full-Screen Viewer) directly.
      */
     private Intent buildMediaViewerAlbumIntent(
             Context context,
@@ -1111,6 +1205,14 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         intent.putExtra(MediaViewerActivity.EXTRA_MEDIA_TYPE, fallbackType);
         intent.putExtra(MediaViewerActivity.EXTRA_SENDER_NAME, senderLabel);
         intent.putExtra(MediaViewerActivity.EXTRA_TIMESTAMP, time);
+        if (clickedMessage != null) {
+            intent.putExtra(MediaViewerActivity.EXTRA_MESSAGE_ID, clickedMessage.getId());
+            intent.putExtra(MediaViewerActivity.EXTRA_CHAT_ID, clickedMessage.getChatId());
+            intent.putExtra(MediaViewerActivity.EXTRA_IS_STARRED, clickedMessage.isStarred());
+        }
+        if (recipientId != null) {
+            intent.putExtra(MediaViewerActivity.EXTRA_PEER_ID, recipientId);
+        }
         if (caption != null && !caption.isEmpty()) {
             intent.putExtra(MediaViewerActivity.EXTRA_CAPTION, caption);
         }
@@ -1121,14 +1223,15 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         int initialIndex = 0;
 
         org.json.JSONArray explicitAlbum = extractAlbumItems(clickedMessage);
-        if (explicitAlbum != null && explicitAlbum.length() > 0) {
+        boolean isMultiItemAlbum = explicitAlbum != null && explicitAlbum.length() > 1;
+        if (isMultiItemAlbum) {
             for (int i = 0; i < explicitAlbum.length(); i++) {
                 org.json.JSONObject item = explicitAlbum.optJSONObject(i);
                 if (item == null) continue;
                 String p = item.optString("path", "");
                 String t = item.optString("type", "image");
                 String c = item.optString("caption", "");
-                if (!p.isEmpty() && new File(p).exists()) {
+                if (!p.isEmpty()) {
                     if (i == preferredSubIndex) {
                         initialIndex = albumPaths.size();
                     }
@@ -1192,6 +1295,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         intent.putStringArrayListExtra(MediaViewerActivity.EXTRA_ALBUM_TYPES, albumTypes);
         intent.putStringArrayListExtra(MediaViewerActivity.EXTRA_ALBUM_CAPTIONS, albumCaptions);
         intent.putExtra(MediaViewerActivity.EXTRA_INITIAL_INDEX, initialIndex);
+        intent.putExtra(MediaViewerActivity.EXTRA_START_IN_ALBUM_FEED, isMultiItemAlbum);
         return intent;
     }
 
@@ -1216,7 +1320,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             frame.setTag(R.id.messageText, pctView);
         }
         int clamped = Math.max(1, Math.min(99, progress > 0 ? progress : 1));
-        pctView.setText(clamped + "%");
+        pctView.setText("✕\n" + clamped + "%");
+        pctView.setLineSpacing(0f, 0.9f);
         pctView.setVisibility(View.VISIBLE);
         if (cancelBtn != null) {
             cancelBtn.setVisibility(View.GONE);
@@ -2192,14 +2297,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         if (imageCardView != null) imageCardView.setOnClickListener(stickerBounce);
                     }
                 } else if ("image".equals(message.getType()) || "gif".equals(message.getType())
-                        || com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, null)) {
+                        || com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, null)
+                        || extractAlbumItems(message) != null) {
                     ensureImageViews();
                     hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);
+                        String primaryExt = "gif".equals(message.getType()) ? ".gif" : ("video".equals(message.getType()) ? ".mp4" : ".jpg");
                         File localSentMedia = FileMediaManager.getDecryptedFile(
-                                itemView.getContext(), message, "gif".equals(message.getType()) ? ".gif" : ".jpg");
+                                itemView.getContext(), message, primaryExt);
                         boolean isGif = com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, localSentMedia);
                         if (imageGifBadge != null) {
                             imageGifBadge.setVisibility(isGif ? View.VISIBLE : View.GONE);
@@ -2229,9 +2336,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
                         boolean hasCaption = message.getText() != null && !message.getText().trim().isEmpty()
                                 && !message.getText().startsWith("[image")
+                                && !message.getText().startsWith("[video")
                                 && !message.getText().startsWith("[gif")
                                 && !message.getText().startsWith("[GIF:")
-                                && !message.getText().equals("[image message]");
+                                && !message.getText().equals("[image message]")
+                                && !message.getText().equals("[video message]");
 
                         bindGroupedAlbumGridOverlay(itemView.getContext(), imageCardView, message, "You", time, hasCaption);
 
@@ -2292,11 +2401,17 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
 
                         View.OnClickListener openPhoto = v -> {
-                            File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, isGif ? ".gif" : ".jpg");
+                            File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, primaryExt);
                             String path = (local != null && local.exists()) ? local.getAbsolutePath() : message.getLocalFilePath();
+                            org.json.JSONArray alb = extractAlbumItems(message);
+                            if ((path == null || path.isEmpty()) && alb != null && alb.length() > 0) {
+                                org.json.JSONObject firstObj = alb.optJSONObject(0);
+                                if (firstObj != null) path = firstObj.optString("path", "");
+                            }
                             if (path != null && !path.isEmpty()) {
                                 Intent intent = buildMediaViewerAlbumIntent(
-                                        itemView.getContext(), message, path, isGif ? "gif" : "image",
+                                        itemView.getContext(), message, path,
+                                        isGif ? "gif" : ("video".equals(message.getType()) ? "video" : "image"),
                                         "You", time, hasCaption ? message.getText() : "", 0);
                                 itemView.getContext().startActivity(intent);
                             }
@@ -3371,14 +3486,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         if (imageCardView != null) imageCardView.setOnClickListener(stickerBounce);
                     }
                 } else if ("image".equals(message.getType()) || "gif".equals(message.getType())
-                        || com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, null)) {
+                        || com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, null)
+                        || extractAlbumItems(message) != null) {
                     ensureImageViews();
                     hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);
+                        String recPrimaryExt = "gif".equals(message.getType()) ? ".gif" : ("video".equals(message.getType()) ? ".mp4" : ".jpg");
                         File localImg = FileMediaManager.getDecryptedFile(
-                                itemView.getContext(), message, "gif".equals(message.getType()) ? ".gif" : ".jpg");
+                                itemView.getContext(), message, recPrimaryExt);
                         boolean isGif = com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, localImg);
                         if (imageGifBadge != null) {
                             imageGifBadge.setVisibility(isGif ? View.VISIBLE : View.GONE);
@@ -3408,9 +3525,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
                         boolean hasCaption = message.getText() != null && !message.getText().trim().isEmpty()
                                 && !message.getText().startsWith("[image")
+                                && !message.getText().startsWith("[video")
                                 && !message.getText().startsWith("[gif")
                                 && !message.getText().startsWith("[GIF:")
-                                && !message.getText().equals("[image message]");
+                                && !message.getText().equals("[image message]")
+                                && !message.getText().equals("[video message]");
 
                         String recSenderName = message.getSenderName() != null ? message.getSenderName() : "Contact";
                         bindGroupedAlbumGridOverlay(itemView.getContext(), imageCardView, message, recSenderName, time, hasCaption);
@@ -3437,7 +3556,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
 
                         boolean isInlinePresetGif = message.getText() != null && message.getText().trim().startsWith("[GIF:");
-                        boolean hasLocalImg = isInlinePresetGif || (localImg != null && localImg.exists() && localImg.length() >= 64 && !localImg.getName().startsWith("staged_"));
+                        org.json.JSONArray recAlbum = extractAlbumItems(message);
+                        boolean hasLocalImg = isInlinePresetGif
+                                || (recAlbum != null && recAlbum.length() > 1)
+                                || (localImg != null && localImg.exists() && localImg.length() >= 64 && !localImg.getName().startsWith("staged_"));
 
                         final int imgDownloadState = hasLocalImg ? STATE_DOWNLOADED : downloadStates.getOrDefault(message.getId(), STATE_IDLE);
 
@@ -3457,11 +3579,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
 
                             View.OnClickListener openPhoto = v -> {
-                                File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, isGif ? ".gif" : ".jpg");
+                                File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, recPrimaryExt);
                                 String path = (local != null && local.exists()) ? local.getAbsolutePath() : message.getLocalFilePath();
+                                if ((path == null || path.isEmpty()) && recAlbum != null && recAlbum.length() > 0) {
+                                    org.json.JSONObject firstObj = recAlbum.optJSONObject(0);
+                                    if (firstObj != null) path = firstObj.optString("path", "");
+                                }
                                 if (path != null && !path.isEmpty()) {
                                     Intent intent = buildMediaViewerAlbumIntent(
-                                            itemView.getContext(), message, path, isGif ? "gif" : "image",
+                                            itemView.getContext(), message, path,
+                                            isGif ? "gif" : ("video".equals(message.getType()) ? "video" : "image"),
                                             recSenderName, time, hasCaption ? message.getText() : "", 0);
                                     itemView.getContext().startActivity(intent);
                                     try {
