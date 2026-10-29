@@ -124,6 +124,7 @@ public class ChatMessageCell extends LinearLayout {
     protected boolean mIsEdited = false;
     protected int mCustomBubbleColor = 0;
     protected boolean mDrawTail = true;
+    protected boolean mIsChromeless = false;
     protected String mSenderHeaderName = null;
     protected int mSenderHeaderColor = 0;
     protected long mVanishExpiresAtMs = 0L;
@@ -373,6 +374,8 @@ public class ChatMessageCell extends LinearLayout {
 
         // Show tail only on SINGLE or LAST message in a cluster
         this.mDrawTail = (clusterPosition == CLUSTER_SINGLE || clusterPosition == CLUSTER_LAST);
+        this.mIsChromeless = com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
+                && (message.getReplyToMessageId() == null || message.getReplyToMessageId().isEmpty());
 
         // Group / Persona Sender Header on first/single incoming bubble
         if (!outgoing && showSenderHeader
@@ -392,6 +395,13 @@ public class ChatMessageCell extends LinearLayout {
         updateCornerRadii();
         updateBubblePath(getWidth(), getHeight());
         invalidate();
+    }
+
+    public void setChromeless(boolean chromeless) {
+        if (this.mIsChromeless != chromeless) {
+            this.mIsChromeless = chromeless;
+            invalidate();
+        }
     }
 
     public void setOutgoing(boolean outgoing) {
@@ -663,12 +673,14 @@ public class ChatMessageCell extends LinearLayout {
             drawSwipeReplyIndicator(canvas);
         }
 
-        // 2. Draw Anti-Aliased Clustered Message Bubble + Theme-Aware Border
-        canvas.drawPath(mBubblePath, mBubblePaint);
-        if (mIsOutgoing && mSentSheenGradient != null) {
-            canvas.drawPath(mBubblePath, mBubbleSheenPaint);
+        // 2. Draw Anti-Aliased Clustered Message Bubble + Theme-Aware Border (skipped for chromeless stickers)
+        if (!mIsChromeless) {
+            canvas.drawPath(mBubblePath, mBubblePaint);
+            if (mIsOutgoing && mSentSheenGradient != null) {
+                canvas.drawPath(mBubblePath, mBubbleSheenPaint);
+            }
+            canvas.drawPath(mBubblePath, mBubbleStrokePaint);
         }
-        canvas.drawPath(mBubblePath, mBubbleStrokePaint);
 
         // 3. Draw Search / Reply Highlight Pulse Overlay
         if (mHighlightAlpha > 0f) {

@@ -1286,6 +1286,26 @@ public class ChatActivity extends AppCompatActivity {
         });
 
         messageEditText = findViewById(R.id.messageEditText);
+        if (messageEditText != null) {
+            androidx.core.view.ViewCompat.setOnReceiveContentListener(
+                    messageEditText,
+                    new String[]{"image/gif", "image/webp", "image/*"},
+                    (view, payload) -> {
+                        android.content.ClipData clip = payload.getClip();
+                        if (clip != null && clip.getItemCount() > 0) {
+                            Uri uri = clip.getItemAt(0).getUri();
+                            if (uri != null) {
+                                String mime = getContentResolver().getType(uri);
+                                boolean isGifUri = (mime != null && mime.toLowerCase(Locale.ROOT).contains("gif"))
+                                        || uri.toString().toLowerCase(Locale.ROOT).endsWith(".gif");
+                                handleDirectMediaSend(uri, isGifUri ? "gif" : "image", "");
+                                return null;
+                            }
+                        }
+                        return payload;
+                    }
+            );
+        }
         sendButton = findViewById(R.id.sendButton);
 
         layoutSmartReplies = findViewById(R.id.layoutSmartReplies);
@@ -1594,7 +1614,12 @@ public class ChatActivity extends AppCompatActivity {
         if (mediaUri == null) return;
         new Thread(() -> {
             try {
-                String ext = "video".equals(mediaType) ? ".mp4" : ".jpg";
+                String mime = getContentResolver().getType(mediaUri);
+                boolean isGif = "gif".equalsIgnoreCase(mediaType)
+                        || (mime != null && mime.toLowerCase(Locale.ROOT).contains("gif"))
+                        || mediaUri.toString().toLowerCase(Locale.ROOT).endsWith(".gif");
+                String effectiveType = isGif ? "gif" : mediaType;
+                String ext = "video".equals(effectiveType) ? ".mp4" : (isGif ? ".gif" : ".jpg");
                 File dest = new File(getExternalCacheDir(), "pick_" + System.currentTimeMillis() + ext);
                 try (InputStream in = getContentResolver().openInputStream(mediaUri);
                      OutputStream out = new FileOutputStream(dest)) {
@@ -1604,7 +1629,7 @@ public class ChatActivity extends AppCompatActivity {
                         out.write(buffer, 0, read);
                     }
                 }
-                runOnUiThread(() -> uploadAndSendMedia(dest, mediaType, caption));
+                runOnUiThread(() -> uploadAndSendMedia(dest, effectiveType, caption));
             } catch (Exception e) {
                 runOnUiThread(() -> Toast.makeText(this, "Failed to load media: " + e.getMessage(), Toast.LENGTH_SHORT).show());
             }
@@ -1837,10 +1862,17 @@ public class ChatActivity extends AppCompatActivity {
         if (requestCode == REQ_PICK_IMAGE && resultCode == RESULT_OK && data != null) {
             Uri selectedMediaUri = data.getData();
             if (selectedMediaUri != null) {
-                Intent editIntent = new Intent(this, MediaEditActivity.class);
-                editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, selectedMediaUri);
-                editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, "image");
-                startActivityForResult(editIntent, REQ_MEDIA_EDIT);
+                String mime = getContentResolver().getType(selectedMediaUri);
+                boolean isGif = (mime != null && mime.toLowerCase(Locale.ROOT).contains("gif"))
+                        || selectedMediaUri.toString().toLowerCase(Locale.ROOT).endsWith(".gif");
+                if (isGif) {
+                    handleDirectMediaSend(selectedMediaUri, "gif", "");
+                } else {
+                    Intent editIntent = new Intent(this, MediaEditActivity.class);
+                    editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, selectedMediaUri);
+                    editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, "image");
+                    startActivityForResult(editIntent, REQ_MEDIA_EDIT);
+                }
             }
         } else if (requestCode == REQ_PICK_VIDEO && resultCode == RESULT_OK && data != null) {
             Uri selectedMediaUri = data.getData();
@@ -2012,23 +2044,35 @@ public class ChatActivity extends AppCompatActivity {
             File decryptedFile = null;
             try {
                 File cacheDir = appContext.getExternalCacheDir() != null ? appContext.getExternalCacheDir() : appContext.getCacheDir();
-                if ("image".equals(mediaType)) {
+                if ("image".equals(mediaType) || "gif".equals(mediaType)) {
+                    boolean isGifMedia = "gif".equals(mediaType) || com.m3.veil.utils.VeilStickerGifEngine.isGifFile(rawFile);
                     BitmapFactory.Options opts = new BitmapFactory.Options();
                     opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
                     Bitmap bitmap = BitmapFactory.decodeFile(rawFile.getAbsolutePath(), opts);
-                    decryptedFile = new File(cacheDir, "dec_" + messageId + ".jpg");
+                    decryptedFile = new File(cacheDir, "dec_" + messageId + (isGifMedia ? ".gif" : ".jpg"));
                     if (bitmap != null) {
-                        Bitmap thumbBitmap = Bitmap.createScaledBitmap(bitmap, 40, 40, true);
+                        int bw = Math.max(1, bitmap.getWidth());
+                        int bh = Math.max(1, bitmap.getHeight());
+                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions("msg_" + messageId, bw, bh);
+                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions(decryptedFile.getAbsolutePath(), bw, bh);
+                        float thumbRatio = Math.min(72f / bw, 72f / bh);
+                        int thumbW = Math.max(18, Math.round(bw * thumbRatio));
+                        int thumbH = Math.max(18, Math.round(bh * thumbRatio));
+                        Bitmap thumbBitmap = Bitmap.createScaledBitmap(bitmap, thumbW, thumbH, true);
                         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        thumbBitmap.compress(Bitmap.CompressFormat.JPEG, 40, baos);
+                        thumbBitmap.compress(Bitmap.CompressFormat.JPEG, 45, baos);
                         byte[] thumbBytes = baos.toByteArray();
                         String base64Thumb = Base64.encodeToString(thumbBytes, Base64.DEFAULT);
                         message.setThumbnail(base64Thumb);
                         if (thumbBitmap != bitmap) {
                             thumbBitmap.recycle();
                         }
-                        // Optimize HD photo for fast P2P + inline cloud transport if larger than 280 KB
-                        if (rawFile.length() > 280 * 1024L) {
+                        if (isGifMedia) {
+                            // Keep animated GIF binary frames intact without JPEG flattening
+                            if (!rawFile.getAbsolutePath().equals(decryptedFile.getAbsolutePath())) {
+                                copyFile(rawFile, decryptedFile);
+                            }
+                        } else if (rawFile.length() > 280 * 1024L) {
                             int maxDim = 1280;
                             int w = bitmap.getWidth();
                             int h = bitmap.getHeight();
@@ -2057,9 +2101,15 @@ public class ChatActivity extends AppCompatActivity {
                         retriever.setDataSource(rawFile.getAbsolutePath());
                         Bitmap frame = retriever.getFrameAtTime();
                         if (frame != null) {
-                            Bitmap thumb = Bitmap.createScaledBitmap(frame, 60, 60, true);
+                            int fw = Math.max(1, frame.getWidth());
+                            int fh = Math.max(1, frame.getHeight());
+                            com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions("msg_" + messageId, fw, fh);
+                            float thumbRatio = Math.min(76f / fw, 76f / fh);
+                            int thumbW = Math.max(18, Math.round(fw * thumbRatio));
+                            int thumbH = Math.max(18, Math.round(fh * thumbRatio));
+                            Bitmap thumb = Bitmap.createScaledBitmap(frame, thumbW, thumbH, true);
                             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                            thumb.compress(Bitmap.CompressFormat.JPEG, 40, baos);
+                            thumb.compress(Bitmap.CompressFormat.JPEG, 45, baos);
                             message.setThumbnail(Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT));
                             if (thumb != frame) {
                                 thumb.recycle();
@@ -3561,6 +3611,25 @@ public class ChatActivity extends AppCompatActivity {
             int start = Math.max(messageEditText.getSelectionStart(), 0);
             int end = Math.max(messageEditText.getSelectionEnd(), 0);
             messageEditText.getText().replace(Math.min(start, end), Math.max(start, end), emoji, 0, emoji.length());
+        });
+        sheet.setOnStickerOrGifSelectedListener(new EmojiStickerBottomSheet.OnStickerOrGifSelectedListener() {
+            @Override
+            public void onStickerSelected(String stickerCode) {
+                sendMessageWithType("sticker", stickerCode);
+            }
+
+            @Override
+            public void onGifSelected(String gifCode) {
+                sendMessageWithType("gif", gifCode);
+            }
+
+            @Override
+            public void onPickDeviceGifRequested() {
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.setType("image/gif");
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/gif", "image/webp"});
+                startActivityForResult(Intent.createChooser(intent, "Select GIF"), REQ_PICK_IMAGE);
+            }
         });
         sheet.show(getSupportFragmentManager(), "EmojiStickerBottomSheet");
     }

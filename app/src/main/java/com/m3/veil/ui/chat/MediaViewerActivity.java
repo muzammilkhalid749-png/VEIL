@@ -386,6 +386,13 @@ public class MediaViewerActivity extends AppCompatActivity {
         videoContainer.setVisibility(View.GONE);
 
         try {
+            if ("gif".equals(mediaType) || com.m3.veil.utils.VeilStickerGifEngine.isGifFile(file)) {
+                android.graphics.drawable.Drawable gifDrawable = com.m3.veil.utils.VeilStickerGifEngine.loadAnimatedGifFromFile(file);
+                if (gifDrawable != null) {
+                    photoViewer.setImageDrawable(gifDrawable);
+                    return;
+                }
+            }
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inPreferredConfig = Bitmap.Config.ARGB_8888;
             Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);

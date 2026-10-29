@@ -40,17 +40,36 @@ public class ImageLoader {
     public static void loadImage(Context context, Message message, String rsaPrivateKeyString, String currentUserId, ImageView imageView, ProgressBar progressBar) {
         if (context == null || message == null || imageView == null) return;
         File cacheDir = context.getExternalCacheDir();
-        File decryptedFile = new File(cacheDir, "dec_" + message.getId() + ".jpg");
+        File decryptedGif = new File(cacheDir, "dec_" + message.getId() + ".gif");
+        File decryptedFile = decryptedGif.exists() && decryptedGif.length() > 0
+                ? decryptedGif
+                : new File(cacheDir, "dec_" + message.getId() + ".jpg");
 
         if (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
             File local = new File(message.getLocalFilePath());
             if (local.exists() && local.length() > 0) {
+                if (VeilStickerGifEngine.isGifFile(local)) {
+                    android.graphics.drawable.Drawable gif = VeilStickerGifEngine.loadAnimatedGifFromFile(local);
+                    if (gif != null) {
+                        imageView.setImageDrawable(gif);
+                        if (progressBar != null) progressBar.setVisibility(View.GONE);
+                        return;
+                    }
+                }
                 displayImage(local.getAbsolutePath(), imageView, progressBar);
                 return;
             }
         }
 
         if (decryptedFile.exists() && decryptedFile.length() > 0) {
+            if (VeilStickerGifEngine.isGifFile(decryptedFile)) {
+                android.graphics.drawable.Drawable gif = VeilStickerGifEngine.loadAnimatedGifFromFile(decryptedFile);
+                if (gif != null) {
+                    imageView.setImageDrawable(gif);
+                    if (progressBar != null) progressBar.setVisibility(View.GONE);
+                    return;
+                }
+            }
             displayImage(decryptedFile.getAbsolutePath(), imageView, progressBar);
         } else {
             // Display base64 thumbnail if available while WebRTC P2P streams full image
@@ -98,6 +117,9 @@ public class ImageLoader {
                 BitmapFactory.Options options = new BitmapFactory.Options();
                 options.inJustDecodeBounds = true;
                 BitmapFactory.decodeFile(filePath, options);
+                if (options.outWidth > 0 && options.outHeight > 0) {
+                    VeilStickerGifEngine.cacheDimensions(filePath, options.outWidth, options.outHeight);
+                }
 
                 int targetSize = 720;
                 int inSampleSize = 1;

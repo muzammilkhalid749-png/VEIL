@@ -1363,10 +1363,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         View voiceLine;
         SeekBar voiceSeekBar;
         
-        // Image UI
+        // Image / GIF / Sticker UI
         View imageMessageContainer;
         View imageCardView;
         ImageView messageImage;
+        View imageScrimView;
+        TextView imageGifBadge;
         ProgressBar imageProgressBar;
         View imageOverlayPill;
         TextView imageTimeText;
@@ -1495,6 +1497,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 imageMessageContainer = itemView.findViewById(R.id.imageMessageContainer);
                 imageCardView = itemView.findViewById(R.id.imageCardView);
                 messageImage = itemView.findViewById(R.id.messageImage);
+                imageScrimView = itemView.findViewById(R.id.imageScrimView);
+                imageGifBadge = itemView.findViewById(R.id.imageGifBadge);
                 imageProgressBar = itemView.findViewById(R.id.imageProgressBar);
                 imageOverlayPill = itemView.findViewById(R.id.imageOverlayPill);
                 imageTimeText = itemView.findViewById(R.id.imageTimeText);
@@ -1817,14 +1821,65 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                         }
                     }
-                } else if ("image".equals(message.getType())) {
+                } else if (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)) {
                     ensureImageViews();
                     hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);
+                        float dp = itemView.getContext().getResources().getDisplayMetrics().density;
+                        int stickerPx = Math.round(168f * dp);
+                        com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, stickerPx, stickerPx);
+                        if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
+                        if (imageGifBadge != null) imageGifBadge.setVisibility(View.GONE);
+                        if (imageProgressBar != null) imageProgressBar.setVisibility(View.GONE);
+                        if (imageDownloadOverlay != null) imageDownloadOverlay.setVisibility(View.GONE);
+                        if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
+                        if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.GONE);
+                        if (imageOverlayPill != null) {
+                            imageOverlayPill.setVisibility(View.VISIBLE);
+                            if (imageTimeText != null) imageTimeText.setText(time);
+                            if (imageStatusIcon != null) updateOverlayStatusIcon(imageStatusIcon, message);
+                        }
+                        if (messageImage != null) {
+                            messageImage.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                            com.m3.veil.utils.VeilStickerGifEngine.bindStickerToImageView(itemView.getContext(), message, messageImage);
+                        }
+                        View.OnClickListener stickerBounce = v -> {
+                            if (messageImage != null) {
+                                messageImage.animate().scaleX(1.18f).scaleY(1.18f).setDuration(140)
+                                        .withEndAction(() -> messageImage.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
+                                        .start();
+                            }
+                        };
+                        imageMessageContainer.setOnClickListener(stickerBounce);
+                        if (imageCardView != null) imageCardView.setOnClickListener(stickerBounce);
+                    }
+                } else if ("image".equals(message.getType()) || "gif".equals(message.getType())
+                        || com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, null)) {
+                    ensureImageViews();
+                    hasVisibleMediaContainer = true;
+                    messageText.setVisibility(View.GONE);
+                    if (imageMessageContainer != null) {
+                        imageMessageContainer.setVisibility(View.VISIBLE);
+                        if (imageScrimView != null) imageScrimView.setVisibility(View.VISIBLE);
+                        if (messageImage != null) {
+                            messageImage.setBackgroundColor(0x15000000);
+                            messageImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                        }
+                        File localSentMedia = FileMediaManager.getDecryptedFile(
+                                itemView.getContext(), message, "gif".equals(message.getType()) ? ".gif" : ".jpg");
+                        boolean isGif = com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, localSentMedia);
+                        if (imageGifBadge != null) {
+                            imageGifBadge.setVisibility(isGif ? View.VISIBLE : View.GONE);
+                        }
+                        com.m3.veil.utils.VeilStickerGifEngine.applyDynamicMediaCardSize(
+                                itemView.getContext(), imageCardView, imageCaptionText, message, localSentMedia);
+
                         boolean hasCaption = message.getText() != null && !message.getText().trim().isEmpty()
                                 && !message.getText().startsWith("[image")
+                                && !message.getText().startsWith("[gif")
+                                && !message.getText().startsWith("[GIF:")
                                 && !message.getText().equals("[image message]");
 
                         if (hasCaption) {
@@ -1844,40 +1899,44 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.GONE);
                         }
 
-                        if (message.getThumbnail() != null && !message.getThumbnail().isEmpty()) {
-                            Bitmap thumb = BlurUtils.getBlurredThumbnail(itemView.getContext(), message.getThumbnail());
-                            if (thumb != null) {
-                                messageImage.setImageBitmap(thumb);
-                            } else {
-                                byte[] decodedString = Base64.decode(message.getThumbnail(), Base64.DEFAULT);
-                                BitmapFactory.Options opts = new BitmapFactory.Options();
-                                opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
-                                Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length, opts);
-                                if (decodedByte != null) {
-                                    messageImage.setImageBitmap(decodedByte);
+                        boolean handledGif = isGif && com.m3.veil.utils.VeilStickerGifEngine.bindGifToImageView(
+                                itemView.getContext(), message, localSentMedia, messageImage, imageProgressBar);
+                        if (!handledGif) {
+                            if (message.getThumbnail() != null && !message.getThumbnail().isEmpty()) {
+                                Bitmap thumb = BlurUtils.getBlurredThumbnail(itemView.getContext(), message.getThumbnail());
+                                if (thumb != null) {
+                                    messageImage.setImageBitmap(thumb);
                                 } else {
-                                    messageImage.setImageDrawable(null);
+                                    byte[] decodedString = Base64.decode(message.getThumbnail(), Base64.DEFAULT);
+                                    BitmapFactory.Options opts = new BitmapFactory.Options();
+                                    opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
+                                    Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length, opts);
+                                    if (decodedByte != null) {
+                                        messageImage.setImageBitmap(decodedByte);
+                                    } else {
+                                        messageImage.setImageDrawable(null);
+                                    }
                                 }
+                            } else {
+                                messageImage.setImageDrawable(null);
                             }
-                        } else {
-                            messageImage.setImageDrawable(null);
+
+                            ImageLoader.loadImage(
+                                itemView.getContext(),
+                                message,
+                                null,
+                                currentUserId,
+                                messageImage,
+                                imageProgressBar
+                            );
                         }
 
-                        ImageLoader.loadImage(
-                            itemView.getContext(),
-                            message,
-                            null,
-                            currentUserId,
-                            messageImage,
-                            imageProgressBar
-                        );
-
                         View.OnClickListener openPhoto = v -> {
-                            File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".jpg");
+                            File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, isGif ? ".gif" : ".jpg");
                             if (local != null && local.exists()) {
                                 Intent intent = new Intent(itemView.getContext(), MediaViewerActivity.class);
                                 intent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, local.getAbsolutePath());
-                                intent.putExtra(MediaViewerActivity.EXTRA_MEDIA_TYPE, "image");
+                                intent.putExtra(MediaViewerActivity.EXTRA_MEDIA_TYPE, isGif ? "gif" : "image");
                                 intent.putExtra(MediaViewerActivity.EXTRA_SENDER_NAME, "You");
                                 intent.putExtra(MediaViewerActivity.EXTRA_TIMESTAMP, time);
                                 if (hasCaption) intent.putExtra(MediaViewerActivity.EXTRA_CAPTION, message.getText());
@@ -1887,16 +1946,17 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         imageMessageContainer.setOnClickListener(openPhoto);
                         if (imageCardView != null) imageCardView.setOnClickListener(openPhoto);
 
+                        boolean isInlinePresetGif = message.getText() != null && message.getText().trim().startsWith("[GIF:");
                         int dlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                         final int progress = downloadProgresses.getOrDefault(message.getId(), 0);
-                        if (progress >= 100 || message.isRead() || (dlState != STATE_DOWNLOADING && (!message.isPending() || message.isDelivered()))) {
+                        if (isInlinePresetGif || progress >= 100 || message.isRead() || (dlState != STATE_DOWNLOADING && (!message.isPending() || message.isDelivered()))) {
                             if (dlState == STATE_DOWNLOADING) {
                                 dlState = STATE_DOWNLOADED;
                                 downloadStates.put(message.getId(), STATE_DOWNLOADED);
                             }
                         }
-                        final boolean isSending = (message.isPending() && !message.isDelivered() && !message.isRead())
-                                || (dlState == STATE_DOWNLOADING && progress < 100);
+                        final boolean isSending = !isInlinePresetGif && ((message.isPending() && !message.isDelivered() && !message.isRead())
+                                || (dlState == STATE_DOWNLOADING && progress < 100));
 
                         if (imageDownloadOverlay != null) {
                             if (isSending) {
@@ -1930,6 +1990,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageText.setVisibility(View.GONE);
                     if (videoMessageContainer != null) {
                         videoMessageContainer.setVisibility(View.VISIBLE);
+                        File localSentVid = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".mp4");
+                        com.m3.veil.utils.VeilStickerGifEngine.applyDynamicMediaCardSize(
+                                itemView.getContext(), videoCardView, videoCaptionText, message, localSentVid);
                         boolean hasCaption = message.getText() != null && !message.getText().trim().isEmpty()
                                 && !message.getText().startsWith("[video")
                                 && !message.getText().equals("[video message]");
@@ -2246,6 +2309,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             String quoteText = replyTo.getText();
                             if ("voice".equals(replyTo.getType())) quoteText = "🎤 Voice message";
                             else if ("audio".equals(replyTo.getType())) quoteText = "🎵 Audio";
+                            else if (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(replyTo)) quoteText = "✨ Sticker";
+                            else if (com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(replyTo, null)) quoteText = "🎬 GIF";
                             else if ("image".equals(replyTo.getType())) quoteText = "📷 Photo";
                             else if ("video".equals(replyTo.getType())) quoteText = "🎥 Video";
                             else if ("document".equals(replyTo.getType())) {
@@ -2336,10 +2401,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         View voiceLine;
         SeekBar voiceSeekBar;
         
-        // Image UI
+        // Image / GIF / Sticker UI
         View imageMessageContainer;
         View imageCardView;
         ImageView messageImage;
+        View imageScrimView;
+        TextView imageGifBadge;
         ProgressBar imageProgressBar;
         View imageOverlayPill;
         TextView imageTimeText;
@@ -2467,6 +2534,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 imageMessageContainer = itemView.findViewById(R.id.imageMessageContainer);
                 imageCardView = itemView.findViewById(R.id.imageCardView);
                 messageImage = itemView.findViewById(R.id.messageImage);
+                imageScrimView = itemView.findViewById(R.id.imageScrimView);
+                imageGifBadge = itemView.findViewById(R.id.imageGifBadge);
                 imageProgressBar = itemView.findViewById(R.id.imageProgressBar);
                 imageOverlayPill = itemView.findViewById(R.id.imageOverlayPill);
                 imageTimeText = itemView.findViewById(R.id.imageTimeText);
@@ -2890,14 +2959,65 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                         }
                     }
-                } else if ("image".equals(message.getType())) {
+                } else if (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)) {
                     ensureImageViews();
                     hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);
+                        float dp = itemView.getContext().getResources().getDisplayMetrics().density;
+                        int stickerPx = Math.round(168f * dp);
+                        com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, stickerPx, stickerPx);
+                        if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
+                        if (imageGifBadge != null) imageGifBadge.setVisibility(View.GONE);
+                        if (imageProgressBar != null) imageProgressBar.setVisibility(View.GONE);
+                        if (imageDownloadOverlay != null) imageDownloadOverlay.setVisibility(View.GONE);
+                        if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
+                        if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.GONE);
+                        if (imageOverlayPill != null) {
+                            imageOverlayPill.setVisibility(View.VISIBLE);
+                            if (imageTimeText != null) imageTimeText.setText(time);
+                        }
+                        if (messageImage != null) {
+                            messageImage.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                            com.m3.veil.utils.VeilStickerGifEngine.bindStickerToImageView(itemView.getContext(), message, messageImage);
+                        }
+                        View.OnClickListener stickerBounce = v -> {
+                            if (messageImage != null) {
+                                messageImage.animate().scaleX(1.18f).scaleY(1.18f).setDuration(140)
+                                        .withEndAction(() -> messageImage.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
+                                        .start();
+                            }
+                        };
+                        imageMessageContainer.setOnClickListener(stickerBounce);
+                        if (imageCardView != null) imageCardView.setOnClickListener(stickerBounce);
+                    }
+                } else if ("image".equals(message.getType()) || "gif".equals(message.getType())
+                        || com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, null)) {
+                    ensureImageViews();
+                    hasVisibleMediaContainer = true;
+                    messageText.setVisibility(View.GONE);
+                    if (imageMessageContainer != null) {
+                        imageMessageContainer.setVisibility(View.VISIBLE);
+                        if (imageScrimView != null) imageScrimView.setVisibility(View.VISIBLE);
+                        if (messageImage != null) {
+                            messageImage.setBackgroundColor(0x15000000);
+                            messageImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                        }
+
+                        File localImg = FileMediaManager.getDecryptedFile(
+                                itemView.getContext(), message, "gif".equals(message.getType()) ? ".gif" : ".jpg");
+                        boolean isGif = com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, localImg);
+                        if (imageGifBadge != null) {
+                            imageGifBadge.setVisibility(isGif ? View.VISIBLE : View.GONE);
+                        }
+                        com.m3.veil.utils.VeilStickerGifEngine.applyDynamicMediaCardSize(
+                                itemView.getContext(), imageCardView, imageCaptionText, message, localImg);
+
                         boolean hasCaption = message.getText() != null && !message.getText().trim().isEmpty()
                                 && !message.getText().startsWith("[image")
+                                && !message.getText().startsWith("[gif")
+                                && !message.getText().startsWith("[GIF:")
                                 && !message.getText().equals("[image message]");
 
                         if (hasCaption) {
@@ -2916,28 +3036,32 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.GONE);
                         }
 
-                        File localImg = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".jpg");
-                        boolean hasLocalImg = (localImg != null && localImg.exists() && localImg.length() >= 64 && !localImg.getName().startsWith("staged_"));
+                        boolean isInlinePresetGif = message.getText() != null && message.getText().trim().startsWith("[GIF:");
+                        boolean hasLocalImg = isInlinePresetGif || (localImg != null && localImg.exists() && localImg.length() >= 64 && !localImg.getName().startsWith("staged_"));
 
                         final int imgDownloadState = hasLocalImg ? STATE_DOWNLOADED : downloadStates.getOrDefault(message.getId(), STATE_IDLE);
 
                         if (imgDownloadState == STATE_DOWNLOADED) {
                             if (imageDownloadOverlay != null) imageDownloadOverlay.setVisibility(View.GONE);
-                            ImageLoader.loadImage(
-                                itemView.getContext(),
-                                message,
-                                null,
-                                currentUserId,
-                                messageImage,
-                                imageProgressBar
-                            );
+                            boolean boundGif = isGif && com.m3.veil.utils.VeilStickerGifEngine.bindGifToImageView(
+                                    itemView.getContext(), message, localImg, messageImage, imageProgressBar);
+                            if (!boundGif) {
+                                ImageLoader.loadImage(
+                                    itemView.getContext(),
+                                    message,
+                                    null,
+                                    currentUserId,
+                                    messageImage,
+                                    imageProgressBar
+                                );
+                            }
 
                             View.OnClickListener openPhoto = v -> {
-                                File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".jpg");
+                                File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, isGif ? ".gif" : ".jpg");
                                 if (local != null && local.exists()) {
                                     Intent intent = new Intent(itemView.getContext(), MediaViewerActivity.class);
                                     intent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, local.getAbsolutePath());
-                                    intent.putExtra(MediaViewerActivity.EXTRA_MEDIA_TYPE, "image");
+                                    intent.putExtra(MediaViewerActivity.EXTRA_MEDIA_TYPE, isGif ? "gif" : "image");
                                     intent.putExtra(MediaViewerActivity.EXTRA_SENDER_NAME, message.getSenderName() != null ? message.getSenderName() : "Contact");
                                     intent.putExtra(MediaViewerActivity.EXTRA_TIMESTAMP, time);
                                     if (hasCaption) intent.putExtra(MediaViewerActivity.EXTRA_CAPTION, message.getText());
@@ -3019,6 +3143,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageText.setVisibility(View.GONE);
                     if (videoMessageContainer != null) {
                         videoMessageContainer.setVisibility(View.VISIBLE);
+                        File localRecVid = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".mp4");
+                        com.m3.veil.utils.VeilStickerGifEngine.applyDynamicMediaCardSize(
+                                itemView.getContext(), videoCardView, videoCaptionText, message, localRecVid);
                         boolean hasCaption = message.getText() != null && !message.getText().trim().isEmpty()
                                 && !message.getText().startsWith("[video")
                                 && !message.getText().equals("[video message]");
@@ -3365,6 +3492,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             String quoteText = replyTo.getText();
                             if ("voice".equals(replyTo.getType())) quoteText = "🎤 Voice message";
                             else if ("audio".equals(replyTo.getType())) quoteText = "🎵 Audio";
+                            else if (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(replyTo)) quoteText = "✨ Sticker";
+                            else if (com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(replyTo, null)) quoteText = "🎬 GIF";
                             else if ("image".equals(replyTo.getType())) quoteText = "📷 Photo";
                             else if ("video".equals(replyTo.getType())) quoteText = "🎥 Video";
                             else if ("document".equals(replyTo.getType())) {

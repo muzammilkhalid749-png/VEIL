@@ -1863,6 +1863,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         String mType = msg.getType();
         if ("voice".equals(mType) || "audio".equals(mType)) {
             return ".m4a";
+        } else if ("gif".equals(mType)) {
+            return ".gif";
         } else if ("image".equals(mType)) {
             return ".jpg";
         } else if ("video".equals(mType)) {

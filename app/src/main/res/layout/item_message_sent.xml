@@ -205,10 +205,30 @@
 
                     <!-- Bottom gradient scrim for high contrast overlay -->
                     <View
+                        android:id="@+id/imageScrimView"
                         android:layout_width="match_parent"
                         android:layout_height="48dp"
                         android:layout_gravity="bottom"
                         android:background="@drawable/bg_gradient_bottom_scrim" />
+
+                    <!-- Top-Left WhatsApp / Telegram GIF Badge -->
+                    <TextView
+                        android:id="@+id/imageGifBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="top|start"
+                        android:layout_margin="8dp"
+                        android:background="@drawable/bg_media_overlay_pill"
+                        android:paddingStart="7dp"
+                        android:paddingEnd="7dp"
+                        android:paddingTop="2dp"
+                        android:paddingBottom="2dp"
+                        android:text="GIF"
+                        android:textColor="@android:color/white"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.06"
+                        android:visibility="gone" />
 
                     <!-- Centered progress loader -->
                     <ProgressBar
