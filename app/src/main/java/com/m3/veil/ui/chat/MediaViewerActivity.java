@@ -1498,11 +1498,12 @@ public class MediaViewerActivity extends AppCompatActivity {
                 int nw = Math.max(1, Math.round(w * scale));
                 int nh = Math.max(1, Math.round(h * scale));
                 Bitmap scaled = Bitmap.createScaledBitmap(src, nw, nh, true);
+                Bitmap dieCut = com.m3.veil.utils.VeilStickerGifEngine.stripSolidBorderBackgroundIfPresent(scaled);
                 File stickerDir = new File(getFilesDir(), "custom_stickers");
                 if (!stickerDir.exists()) stickerDir.mkdirs();
                 stickerFile = new File(stickerDir, "sticker_" + System.currentTimeMillis() + ".png");
                 try (FileOutputStream fos = new FileOutputStream(stickerFile)) {
-                    scaled.compress(Bitmap.CompressFormat.PNG, 95, fos);
+                    dieCut.compress(Bitmap.CompressFormat.PNG, 100, fos);
                     fos.flush();
                 }
             }

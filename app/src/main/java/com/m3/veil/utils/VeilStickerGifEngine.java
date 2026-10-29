@@ -397,30 +397,173 @@ public class VeilStickerGifEngine {
     }
 
     /**
-     * Binds a Telegram-style chromeless animated sticker into an ImageView.
+     * Binds a WhatsApp/Telegram-style chromeless, borderless, transparent sticker into an ImageView.
      */
     public static void bindStickerToImageView(
             @NonNull Context context,
             @NonNull Message message,
             @NonNull ImageView targetView) {
+        targetView.setBackgroundColor(Color.TRANSPARENT);
+        targetView.setBackground(null);
+        targetView.setPadding(0, 0, 0, 0);
         String raw = message.getText() != null ? message.getText().trim() : "✨";
-        // Check if backed by a local .gif / .webp sticker file
+        // 1. Check if backed by a local .gif / .webp / .png / .jpg custom sticker file
+        File candidateFile = null;
         if (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
             File f = new File(message.getLocalFilePath());
-            if (f.exists() && isGifFile(f)) {
-                Drawable d = loadAnimatedGifFromFile(f);
+            if (f.exists() && f.length() > 16) {
+                candidateFile = f;
+            }
+        }
+        if (candidateFile == null) {
+            File decPng = com.m3.veil.utils.FileMediaManager.getDecryptedFile(context, message, ".png");
+            if (decPng != null && decPng.exists() && decPng.length() > 16) {
+                candidateFile = decPng;
+            }
+        }
+        if (candidateFile != null && candidateFile.exists()) {
+            if (isGifFile(candidateFile)) {
+                Drawable d = loadAnimatedGifFromFile(candidateFile);
                 if (d != null) {
                     targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     targetView.setImageDrawable(d);
                     return;
                 }
+            } else {
+                Bitmap bmp = BitmapFactory.decodeFile(candidateFile.getAbsolutePath());
+                if (bmp != null) {
+                    Bitmap dieCut = stripSolidBorderBackgroundIfPresent(bmp);
+                    targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    targetView.setImageBitmap(dieCut);
+                    return;
+                }
             }
+        }
+        // 2. Check if message has a base64 thumbnail for custom sticker
+        if (message.getThumbnail() != null && !message.getThumbnail().isEmpty()
+                && ("[sticker]".equalsIgnoreCase(raw) || raw.isEmpty())) {
+            try {
+                byte[] bytes = android.util.Base64.decode(message.getThumbnail(), android.util.Base64.DEFAULT);
+                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (bmp != null) {
+                    Bitmap dieCut = stripSolidBorderBackgroundIfPresent(bmp);
+                    targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    targetView.setImageBitmap(dieCut);
+                    return;
+                }
+            } catch (Exception ignored) {}
         }
         StickerPreset preset = resolveStickerPreset(raw);
         AnimatedStickerDrawable stickerDrawable = new AnimatedStickerDrawable(context, preset);
         targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         targetView.setImageDrawable(stickerDrawable);
         stickerDrawable.start();
+    }
+
+    /**
+     * Automatically strips solid rectangular background/border from custom screenshot/photo stickers
+     * via edge flood-fill chroma key so stickers always float cleanly on the chat wallpaper.
+     */
+    @NonNull
+    public static Bitmap stripSolidBorderBackgroundIfPresent(@NonNull Bitmap src) {
+        try {
+            int w = src.getWidth();
+            int h = src.getHeight();
+            if (w < 8 || h < 8) return src;
+            // Check if corners are already transparent
+            int c00 = src.getPixel(0, 0);
+            int c10 = src.getPixel(w - 1, 0);
+            int c01 = src.getPixel(0, h - 1);
+            int c11 = src.getPixel(w - 1, h - 1);
+            if (Color.alpha(c00) < 20 && Color.alpha(c10) < 20 && Color.alpha(c01) < 20 && Color.alpha(c11) < 20) {
+                return src;
+            }
+            Bitmap out = src.copy(Bitmap.Config.ARGB_8888, true);
+            int[] pixels = new int[w * h];
+            out.getPixels(pixels, 0, w, 0, 0, w, h);
+
+            int seedColor = c00;
+            int sr = Color.red(seedColor);
+            int sg = Color.green(seedColor);
+            int sb = Color.blue(seedColor);
+
+            boolean[] visited = new boolean[w * h];
+            int[] queue = new int[w * h];
+            int head = 0, tail = 0;
+
+            // Enqueue border pixels that match corner background color within tolerance
+            int tolerance = 42;
+            for (int x = 0; x < w; x++) {
+                int topIdx = x;
+                int botIdx = (h - 1) * w + x;
+                if (colorDist(pixels[topIdx], sr, sg, sb) <= tolerance) {
+                    visited[topIdx] = true;
+                    queue[tail++] = topIdx;
+                }
+                if (!visited[botIdx] && colorDist(pixels[botIdx], sr, sg, sb) <= tolerance) {
+                    visited[botIdx] = true;
+                    queue[tail++] = botIdx;
+                }
+            }
+            for (int y = 0; y < h; y++) {
+                int leftIdx = y * w;
+                int rightIdx = y * w + (w - 1);
+                if (!visited[leftIdx] && colorDist(pixels[leftIdx], sr, sg, sb) <= tolerance) {
+                    visited[leftIdx] = true;
+                    queue[tail++] = leftIdx;
+                }
+                if (!visited[rightIdx] && colorDist(pixels[rightIdx], sr, sg, sb) <= tolerance) {
+                    visited[rightIdx] = true;
+                    queue[tail++] = rightIdx;
+                }
+            }
+
+            while (head < tail) {
+                int idx = queue[head++];
+                pixels[idx] = Color.TRANSPARENT;
+                int x = idx % w;
+                int y = idx / w;
+                if (x > 0) {
+                    int n = idx - 1;
+                    if (!visited[n] && colorDist(pixels[n], sr, sg, sb) <= tolerance) {
+                        visited[n] = true;
+                        queue[tail++] = n;
+                    }
+                }
+                if (x + 1 < w) {
+                    int n = idx + 1;
+                    if (!visited[n] && colorDist(pixels[n], sr, sg, sb) <= tolerance) {
+                        visited[n] = true;
+                        queue[tail++] = n;
+                    }
+                }
+                if (y > 0) {
+                    int n = idx - w;
+                    if (!visited[n] && colorDist(pixels[n], sr, sg, sb) <= tolerance) {
+                        visited[n] = true;
+                        queue[tail++] = n;
+                    }
+                }
+                if (y + 1 < h) {
+                    int n = idx + w;
+                    if (!visited[n] && colorDist(pixels[n], sr, sg, sb) <= tolerance) {
+                        visited[n] = true;
+                        queue[tail++] = n;
+                    }
+                }
+            }
+            out.setPixels(pixels, 0, w, 0, 0, w, h);
+            return out;
+        } catch (Exception e) {
+            return src;
+        }
+    }
+
+    private static int colorDist(int pixel, int r, int g, int b) {
+        int dr = Math.abs(Color.red(pixel) - r);
+        int dg = Math.abs(Color.green(pixel) - g);
+        int db = Math.abs(Color.blue(pixel) - b);
+        return Math.max(dr, Math.max(dg, db));
     }
 
     /**
@@ -741,69 +884,56 @@ public class VeilStickerGifEngine {
             float w = b.width();
             float h = b.height();
             float cx = b.left + w * 0.5f;
-            float cy = b.top + h * 0.45f;
+            float cy = b.top + h * 0.44f;
             float minDim = Math.min(w, h);
 
             long elapsed = (SystemClock.uptimeMillis() + startTimeOffset) % 2400L;
             float phase = (float) elapsed / 2400f; // 0..1 loop
             float angleRad = (float) (phase * Math.PI * 2.0);
 
-            // 1. Soft radial aura glow behind the sticker (transparent surroundings, no bubble box)
-            float pulse = 0.88f + 0.12f * (float) Math.sin(angleRad);
-            float auraRadius = minDim * 0.36f * pulse;
-            glowPaint.setColor(preset.primaryColor);
-            glowPaint.setAlpha(46);
-            canvas.drawCircle(cx, cy, auraRadius, glowPaint);
+            // 1. WhatsApp Die-Cut Sticker Style: ZERO background circle, ZERO border box!
+            //    Subtle floating musical notes / expressive comic accents around the character
+            emojiPaint.setTextSize(minDim * 0.14f);
+            float noteBounce = (float) Math.sin(angleRad * 2f) * (3.5f * dp);
+            labelPaint.setStyle(Paint.Style.FILL);
+            labelPaint.setColor(0xFF1F1F1F);
+            labelPaint.setTextSize(minDim * 0.15f);
+            canvas.drawText("♪", cx - minDim * 0.30f, cy - minDim * 0.08f + noteBounce, labelPaint);
+            canvas.drawText("♫", cx + minDim * 0.30f, cy - minDim * 0.12f - noteBounce, labelPaint);
 
-            glowPaint.setColor(preset.secondaryColor);
-            glowPaint.setAlpha(34);
-            canvas.drawCircle(cx, cy, auraRadius * 0.76f, glowPaint);
-
-            // 2. Orbiting sparkle particles
-            int particleCount = 6;
-            for (int i = 0; i < particleCount; i++) {
-                float pAngle = angleRad + (float) (i * Math.PI * 2.0 / particleCount);
-                float orbitR = minDim * (0.33f + 0.05f * (float) Math.sin(angleRad * 2f + i));
-                float px = cx + (float) Math.cos(pAngle) * orbitR;
-                float py = cy + (float) Math.sin(pAngle) * orbitR * 0.85f;
-                float pSize = (2.5f + 1.8f * (float) Math.cos(angleRad + i)) * dp;
-                glowPaint.setColor(i % 2 == 0 ? preset.primaryColor : preset.secondaryColor);
-                glowPaint.setAlpha(185);
-                canvas.drawCircle(px, py, Math.max(1.5f, pSize), glowPaint);
-            }
-
-            // 3. Animated central character / emoji with spring bounce & tilt
+            // 2. Animated central sticker character with expressive spring bounce & tilt
             canvas.save();
-            float bounceY = (float) Math.sin(angleRad) * (minDim * 0.045f);
-            float scale = 0.94f + 0.11f * (float) Math.sin(angleRad * 2f);
-            float tiltDeg = (float) Math.cos(angleRad) * 6.5f;
+            float bounceY = (float) Math.sin(angleRad) * (minDim * 0.035f);
+            float scale = 0.96f + 0.07f * (float) Math.sin(angleRad * 2f);
+            float tiltDeg = (float) Math.cos(angleRad) * 4.5f;
             canvas.translate(cx, cy + bounceY);
             canvas.rotate(tiltDeg);
             canvas.scale(scale, scale);
 
-            emojiPaint.setTextSize(minDim * 0.44f);
+            emojiPaint.setTextSize(minDim * 0.52f);
             Paint.FontMetrics fm = emojiPaint.getFontMetrics();
             float textCenterOffset = -(fm.ascent + fm.descent) * 0.5f;
             canvas.drawText(preset.emoji, 0, textCenterOffset, emojiPaint);
             canvas.restore();
 
-            // 4. Expressive sticker ribbon label at the bottom (Telegram sticker caption style)
+            // 3. Borderless hand-lettered WhatsApp sticker typography (white die-cut halo + dark ink text, NO pill box/border!)
             if (preset.label != null && !preset.label.isEmpty()) {
-                labelPaint.setTextSize(Math.max(10f * dp, minDim * 0.088f));
-                float textW = labelPaint.measureText(preset.label);
-                float padH = 10f * dp;
-                float badgeW = Math.min(w * 0.92f, textW + padH * 2f);
-                float badgeH = Math.max(20f * dp, minDim * 0.155f);
-                float badgeTop = b.top + h * 0.74f;
-                badgeRect.set(cx - badgeW * 0.5f, badgeTop, cx + badgeW * 0.5f, badgeTop + badgeH);
-
-                badgePaint.setColor(preset.primaryColor);
-                badgePaint.setAlpha(235);
-                canvas.drawRoundRect(badgeRect, badgeH * 0.5f, badgeH * 0.5f, badgePaint);
-                canvas.drawRoundRect(badgeRect, badgeH * 0.5f, badgeH * 0.5f, badgeStrokePaint);
-
+                float textSize = Math.max(12f * dp, minDim * 0.115f);
+                labelPaint.setTextSize(textSize);
                 Paint.FontMetrics lfm = labelPaint.getFontMetrics();
-                float lBaseline = badgeRect.centerY() - (lfm.ascent + lfm.descent) * 0.5f;
+                float lBaseline = b.top + h * 0.85f - (lfm.ascent + lfm.descent) * 0.5f;
+
+                // White sticker die-cut outline behind text for readability on any chat wallpaper
+                labelPaint.setStyle(Paint.Style.STROKE);
+                labelPaint.setStrokeJoin(Paint.Join.ROUND);
+                labelPaint.setStrokeCap(Paint.Cap.ROUND);
+                labelPaint.setStrokeWidth(3.5f * dp);
+                labelPaint.setColor(0xF2FFFFFF);
+                canvas.drawText(preset.label, cx, lBaseline, labelPaint);
+
+                // Crisp dark hand-lettered ink fill (like "LEAVE ME ALONE" / "PLEASE, GO ON..." in WhatsApp)
+                labelPaint.setStyle(Paint.Style.FILL);
+                labelPaint.setColor(0xFF1F1D1B);
                 canvas.drawText(preset.label, cx, lBaseline, labelPaint);
             }
 

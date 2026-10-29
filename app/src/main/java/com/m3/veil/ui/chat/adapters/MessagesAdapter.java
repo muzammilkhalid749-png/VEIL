@@ -887,56 +887,278 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
      * Styles the below-bubble info row (timestamp + status tick: clock, single, double, or blue read tick)
      * when displayed below a borderless/chromeless sticker or GIF, or resets it for standard bubbles.
      */
+    /**
+     * Styles the below-bubble info row (timestamp + status tick: clock, single, double, or blue/green read tick)
+     * when displayed below a borderless/chromeless sticker, matching WhatsApp's floating pill (#D9FDD3 / #FFFFFF),
+     * or resets it for standard bubbles.
+     */
     private void applyChromelessBelowInfoStyle(
             View bubbleInfoContainer,
             TextView timeText,
             ImageView statusIcon,
             ImageView ivPinnedBadge,
             Message message,
-            boolean isChromelessStickerOrGif,
+            boolean isChromelessSticker,
             boolean isOutgoing,
             boolean isDarkBubble) {
         if (bubbleInfoContainer == null) return;
         float dp = bubbleInfoContainer.getContext().getResources().getDisplayMetrics().density;
-        if (isChromelessStickerOrGif) {
-            bubbleInfoContainer.setVisibility(View.VISIBLE);
+        boolean isNight = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(bubbleInfoContainer.getContext());
+        if (isChromelessSticker) {
             android.graphics.drawable.GradientDrawable pill = new android.graphics.drawable.GradientDrawable();
             pill.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-            pill.setCornerRadius(12f * dp);
-            pill.setColor(0x66000000);
+            pill.setCornerRadius(11f * dp);
+            int pillBgColor;
+            int pillTextColor;
+            if (isOutgoing) {
+                pillBgColor = isNight ? 0xFF005C4B : 0xFFD9FDD3;
+                pillTextColor = isNight ? 0xB3FFFFFF : 0xFF667781;
+            } else {
+                pillBgColor = isNight ? 0xFF1F2C34 : 0xFFFFFFFF;
+                pillTextColor = isNight ? 0x99FFFFFF : 0xFF667781;
+            }
+            pill.setColor(pillBgColor);
             bubbleInfoContainer.setBackground(pill);
-            int padH = Math.round(7f * dp);
+            bubbleInfoContainer.setElevation(1f * dp);
+            int padH = Math.round(7.5f * dp);
             int padV = Math.round(2.5f * dp);
             bubbleInfoContainer.setPadding(padH, padV, padH, padV);
             if (timeText != null) {
-                timeText.setTextColor(0xFFFFFFFF);
+                timeText.setTextColor(pillTextColor);
             }
             if (ivPinnedBadge != null) {
-                ivPinnedBadge.setColorFilter(0xFFFFFFFF);
+                ivPinnedBadge.setColorFilter(pillTextColor);
             }
-            if (isOutgoing && statusIcon != null) {
+            if (isOutgoing && statusIcon != null && message != null) {
                 statusIcon.setVisibility(View.VISIBLE);
                 if (message.isPending()) {
                     statusIcon.setImageResource(R.drawable.ic_timer);
-                    statusIcon.setColorFilter(0xFFFFFFFF);
+                    statusIcon.setColorFilter(pillTextColor);
                 } else if (message.isRead()) {
                     statusIcon.setImageResource(R.drawable.ic_check_double);
-                    statusIcon.setColorFilter(0xFF38BDF8);
+                    statusIcon.setColorFilter(isNight ? 0xFF53BDEB : 0xFF25D366);
                 } else if (message.isDelivered()) {
                     statusIcon.setImageResource(R.drawable.ic_check_double);
-                    statusIcon.setColorFilter(0xFFFFFFFF);
+                    statusIcon.setColorFilter(pillTextColor);
                 } else {
                     statusIcon.setImageResource(R.drawable.ic_check);
-                    statusIcon.setColorFilter(0xFFFFFFFF);
+                    statusIcon.setColorFilter(pillTextColor);
                 }
             }
         } else {
             bubbleInfoContainer.setBackground(null);
+            bubbleInfoContainer.setElevation(0f);
             bubbleInfoContainer.setPadding(0, 0, 0, 0);
             if (isOutgoing && statusIcon != null && message != null && !"call".equals(message.getType())) {
                 updateStatusIcon(statusIcon, message, isDarkBubble);
             }
         }
+    }
+
+    /**
+     * Checks if a message is a standalone chromeless sticker eligible for WhatsApp 2-column side-by-side pairing.
+     */
+    private boolean isEligibleForStickerPairing(Message m) {
+        if (m == null || "deleted".equals(m.getType()) || m.isBlink()) return false;
+        if (!com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(m)) return false;
+        return m.getReplyToMessageId() == null || m.getReplyToMessageId().isEmpty();
+    }
+
+    private boolean canPairConsecutiveStickers(Message prev, Message curr) {
+        if (!isEligibleForStickerPairing(prev) || !isEligibleForStickerPairing(curr)) return false;
+        String s1 = prev.getSenderId();
+        String s2 = curr.getSenderId();
+        if (s1 == null || !s1.equals(s2)) return false;
+        if (prev.getTimestamp() == null || curr.getTimestamp() == null) return false;
+        long diff = Math.abs(curr.getTimestamp().toDate().getTime() - prev.getTimestamp().toDate().getTime());
+        return diff <= 120_000L;
+    }
+
+    /**
+     * Computes the position of a sticker within a consecutive run of stickers from the same sender.
+     * Even indices (0, 2, 4...) pair with (msgIndex + 1) if available; odd indices (1, 3, 5...) are collapsed
+     * into their preceding partner row. Only runs of >= 2 stickers are paired side-by-side; single isolated
+     * stickers or the trailing odd sticker in a run render singly with the circular forward button.
+     */
+    private int getStickerRunOffset(int msgIndex) {
+        if (messages == null || msgIndex < 0 || msgIndex >= messages.size()) return -1;
+        Message curr = messages.get(msgIndex);
+        if (!isEligibleForStickerPairing(curr)) return -1;
+        int runStart = msgIndex;
+        while (runStart > 0 && canPairConsecutiveStickers(messages.get(runStart - 1), messages.get(runStart))) {
+            runStart--;
+        }
+        return msgIndex - runStart;
+    }
+
+    private boolean isCollapsedPairedStickerChild(int msgIndex) {
+        int offset = getStickerRunOffset(msgIndex);
+        return offset > 0 && (offset % 2 == 1);
+    }
+
+    private Message getPairedSecondSticker(int msgIndex) {
+        if (messages == null || msgIndex < 0 || msgIndex + 1 >= messages.size()) return null;
+        int offset = getStickerRunOffset(msgIndex);
+        if (offset < 0 || (offset % 2 != 0)) return null;
+        Message curr = messages.get(msgIndex);
+        Message next = messages.get(msgIndex + 1);
+        if (canPairConsecutiveStickers(curr, next)) {
+            return next;
+        }
+        return null;
+    }
+
+    /**
+     * Renders a 2-column side-by-side sticker pair (sticker_second_Screenshot_9e6f15cb.jpg) when two
+     * stickers are sent consecutively, or removes the pair overlay when rendering a single sticker.
+     */
+    private void bindPairedStickerOverlay(
+            Context ctx,
+            View imageCardView,
+            Message firstSticker,
+            Message secondSticker,
+            boolean isOutgoing) {
+        if (!(imageCardView instanceof ViewGroup)) return;
+        ViewGroup host = (ViewGroup) imageCardView;
+        final String TAG_PAIR = "veil_sticker_pair_overlay";
+        View existing = host.findViewWithTag(TAG_PAIR);
+        if (secondSticker == null) {
+            if (existing != null) host.removeView(existing);
+            return;
+        }
+        if (existing != null) host.removeView(existing);
+
+        float dp = ctx.getResources().getDisplayMetrics().density;
+        boolean isNight = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(ctx);
+        int cellSize = Math.round(140f * dp);
+        int gapPx = Math.round(12f * dp);
+        int pillHeightPx = Math.round(24f * dp);
+
+        android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
+        row.setTag(TAG_PAIR);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        Message[] pair = new Message[]{firstSticker, secondSticker};
+        for (int i = 0; i < 2; i++) {
+            final Message sMsg = pair[i];
+            android.widget.LinearLayout col = new android.widget.LinearLayout(ctx);
+            col.setOrientation(android.widget.LinearLayout.VERTICAL);
+            col.setGravity(android.view.Gravity.END);
+            android.widget.LinearLayout.LayoutParams colLp =
+                    new android.widget.LinearLayout.LayoutParams(cellSize, cellSize + pillHeightPx);
+            if (i == 1) colLp.leftMargin = gapPx;
+            col.setLayoutParams(colLp);
+
+            ImageView ivSticker = new ImageView(ctx);
+            ivSticker.setLayoutParams(new android.widget.LinearLayout.LayoutParams(cellSize, cellSize));
+            ivSticker.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            com.m3.veil.utils.VeilStickerGifEngine.bindStickerToImageView(ctx, sMsg, ivSticker);
+            ivSticker.setOnClickListener(v -> {
+                ivSticker.animate().scaleX(1.16f).scaleY(1.16f).setDuration(140)
+                        .withEndAction(() -> ivSticker.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
+                        .start();
+            });
+            ivSticker.setOnLongClickListener(v -> {
+                if (longClickListener != null) {
+                    longClickListener.onMessageLongClick(sMsg, v);
+                    return true;
+                }
+                return false;
+            });
+            col.addView(ivSticker);
+
+            // WhatsApp floating timestamp pill below each sticker in the pair ("11:06 PM ✓✓")
+            android.widget.LinearLayout pillLayout = new android.widget.LinearLayout(ctx);
+            pillLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            pillLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            android.graphics.drawable.GradientDrawable pillBg = new android.graphics.drawable.GradientDrawable();
+            pillBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            pillBg.setCornerRadius(11f * dp);
+            int bgColor = isOutgoing ? (isNight ? 0xFF005C4B : 0xFFD9FDD3) : (isNight ? 0xFF1F2C34 : 0xFFFFFFFF);
+            int txtColor = isOutgoing ? (isNight ? 0xB3FFFFFF : 0xFF667781) : (isNight ? 0x99FFFFFF : 0xFF667781);
+            pillBg.setColor(bgColor);
+            pillLayout.setBackground(pillBg);
+            pillLayout.setElevation(1f * dp);
+            int padH = Math.round(7f * dp);
+            int padV = Math.round(2f * dp);
+            pillLayout.setPadding(padH, padV, padH, padV);
+            android.widget.LinearLayout.LayoutParams pillLp = new android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            pillLp.topMargin = Math.round(2f * dp);
+            pillLayout.setLayoutParams(pillLp);
+
+            TextView tvTime = new TextView(ctx);
+            String sTime = "";
+            if (sMsg.getTimestamp() != null) {
+                sTime = new java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
+                        .format(sMsg.getTimestamp().toDate());
+            }
+            tvTime.setText(sTime);
+            tvTime.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f);
+            tvTime.setTextColor(txtColor);
+            pillLayout.addView(tvTime);
+
+            if (isOutgoing) {
+                ImageView ivTick = new ImageView(ctx);
+                android.widget.LinearLayout.LayoutParams tickLp = new android.widget.LinearLayout.LayoutParams(
+                        Math.round(14f * dp), Math.round(14f * dp));
+                tickLp.leftMargin = Math.round(3f * dp);
+                ivTick.setLayoutParams(tickLp);
+                if (sMsg.isPending()) {
+                    ivTick.setImageResource(R.drawable.ic_timer);
+                    ivTick.setColorFilter(txtColor);
+                } else if (sMsg.isRead()) {
+                    ivTick.setImageResource(R.drawable.ic_check_double);
+                    ivTick.setColorFilter(isNight ? 0xFF53BDEB : 0xFF25D366);
+                } else if (sMsg.isDelivered()) {
+                    ivTick.setImageResource(R.drawable.ic_check_double);
+                    ivTick.setColorFilter(txtColor);
+                } else {
+                    ivTick.setImageResource(R.drawable.ic_check);
+                    ivTick.setColorFilter(txtColor);
+                }
+                pillLayout.addView(ivTick);
+            }
+            col.addView(pillLayout);
+            row.addView(col);
+        }
+
+        host.addView(row);
+        int totalW = cellSize * 2 + gapPx;
+        int totalH = cellSize + pillHeightPx + Math.round(4f * dp);
+        com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, totalW, totalH);
+    }
+
+    /**
+     * Styles the centered circular dark translucent "GIF" badge inside a WhatsApp GIF bubble
+     * (matching the "KYA?" GIF in sticker_second_Screenshot_9e6f15cb.jpg).
+     */
+    private void styleWhatsAppCenteredGifBadge(TextView gifBadge) {
+        if (gifBadge == null) return;
+        float dp = gifBadge.getContext().getResources().getDisplayMetrics().density;
+        int sizePx = Math.round(42f * dp);
+        ViewGroup.LayoutParams lp = gifBadge.getLayoutParams();
+        if (lp instanceof android.widget.FrameLayout.LayoutParams) {
+            android.widget.FrameLayout.LayoutParams flp = (android.widget.FrameLayout.LayoutParams) lp;
+            flp.width = sizePx;
+            flp.height = sizePx;
+            flp.gravity = android.view.Gravity.CENTER;
+            flp.setMargins(0, 0, 0, 0);
+            gifBadge.setLayoutParams(flp);
+        }
+        android.graphics.drawable.GradientDrawable circle = new android.graphics.drawable.GradientDrawable();
+        circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        circle.setColor(0x88000000);
+        gifBadge.setBackground(circle);
+        gifBadge.setGravity(android.view.Gravity.CENTER);
+        gifBadge.setPadding(0, 0, 0, 0);
+        gifBadge.setText("GIF");
+        gifBadge.setTextColor(0xFFFFFFFF);
+        gifBadge.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
     }
 
     /**
@@ -2408,7 +2630,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         public void bind(Message message, String time, boolean showDate, String dateLabel) {
             int msgIdx = findMessageIndex(message);
-            if (isCollapsedAutoAlbumChild(msgIdx)) {
+            if (isCollapsedAutoAlbumChild(msgIdx) || isCollapsedPairedStickerChild(msgIdx)) {
                 applyCollapsedRowState(itemView, true);
                 return;
             }
@@ -2589,16 +2811,21 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     ensureImageViews();
                     hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
+                    if (messageBubble != null) {
+                        messageBubble.setPadding(0, 0, 0, 0);
+                    }
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);
+                        imageMessageContainer.setPadding(0, 0, 0, 0);
+                        imageMessageContainer.setBackground(null);
                         bindGroupedAlbumGridOverlay(itemView.getContext(), imageCardView, null, "You", time, false);
-                        int[] stickerDims = com.m3.veil.utils.VeilStickerGifEngine.computeStickerSizePx(itemView.getContext(), message);
-                        com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, stickerDims[0], stickerDims[1]);
+                        Message secondPairedSticker = getPairedSecondSticker(msgIdx);
                         if (imageCardView instanceof com.google.android.material.card.MaterialCardView) {
                             com.google.android.material.card.MaterialCardView mcv = (com.google.android.material.card.MaterialCardView) imageCardView;
                             mcv.setStrokeWidth(0);
                             mcv.setCardElevation(0f);
                             mcv.setCardBackgroundColor(android.graphics.Color.TRANSPARENT);
+                            mcv.setBackground(null);
                             mcv.setRadius(0f);
                         }
                         if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
@@ -2606,23 +2833,37 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         if (imageProgressBar != null) imageProgressBar.setVisibility(View.GONE);
                         if (imageDownloadOverlay != null) imageDownloadOverlay.setVisibility(View.GONE);
                         if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
-                        // WhatsApp/Telegram style: no overlay inside sticker; show time & status tick BELOW sticker!
                         if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
-                        if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
-                        if (statusIcon != null) statusIcon.setVisibility(View.VISIBLE);
-                        if (messageImage != null) {
-                            messageImage.setBackgroundColor(android.graphics.Color.TRANSPARENT);
-                            com.m3.veil.utils.VeilStickerGifEngine.bindStickerToImageView(itemView.getContext(), message, messageImage);
-                        }
-                        View.OnClickListener stickerBounce = v -> {
+
+                        if (secondPairedSticker != null) {
+                            // 2-Column Side-by-Side Consecutive Sticker Pair (sticker_second_Screenshot_9e6f15cb.jpg)
+                            if (messageImage != null) messageImage.setVisibility(View.GONE);
+                            if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.GONE);
+                            bindQuickForwardButton(btnQuickForwardMedia, message, false);
+                            bindPairedStickerOverlay(itemView.getContext(), imageCardView, message, secondPairedSticker, true);
+                        } else {
+                            // Single chromeless sticker with floating pill below & circular forward button (sticker_first_screenshot_87646071.jpg)
+                            bindPairedStickerOverlay(itemView.getContext(), imageCardView, message, null, true);
+                            int[] stickerDims = com.m3.veil.utils.VeilStickerGifEngine.computeStickerSizePx(itemView.getContext(), message);
+                            com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, stickerDims[0], stickerDims[1]);
+                            if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
+                            if (statusIcon != null) statusIcon.setVisibility(View.VISIBLE);
+                            bindQuickForwardButton(btnQuickForwardMedia, message, true);
                             if (messageImage != null) {
-                                messageImage.animate().scaleX(1.18f).scaleY(1.18f).setDuration(140)
-                                        .withEndAction(() -> messageImage.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
-                                        .start();
+                                messageImage.setVisibility(View.VISIBLE);
+                                messageImage.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                                com.m3.veil.utils.VeilStickerGifEngine.bindStickerToImageView(itemView.getContext(), message, messageImage);
                             }
-                        };
-                        imageMessageContainer.setOnClickListener(stickerBounce);
-                        if (imageCardView != null) imageCardView.setOnClickListener(stickerBounce);
+                            View.OnClickListener stickerBounce = v -> {
+                                if (messageImage != null) {
+                                    messageImage.animate().scaleX(1.18f).scaleY(1.18f).setDuration(140)
+                                            .withEndAction(() -> messageImage.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
+                                            .start();
+                                }
+                            };
+                            imageMessageContainer.setOnClickListener(stickerBounce);
+                            if (imageCardView != null) imageCardView.setOnClickListener(stickerBounce);
+                        }
                     }
                 } else if ("image".equals(message.getType()) || "gif".equals(message.getType())
                         || com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, null)
@@ -2632,12 +2873,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageText.setVisibility(View.GONE);
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);
+                        bindPairedStickerOverlay(itemView.getContext(), imageCardView, message, null, true);
                         String primaryExt = "gif".equals(message.getType()) ? ".gif" : ("video".equals(message.getType()) ? ".mp4" : ".jpg");
                         File localSentMedia = FileMediaManager.getDecryptedFile(
                                 itemView.getContext(), message, primaryExt);
                         boolean isGif = com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, localSentMedia);
                         if (imageGifBadge != null) {
                             imageGifBadge.setVisibility(isGif ? View.VISIBLE : View.GONE);
+                            if (isGif) {
+                                styleWhatsAppCenteredGifBadge(imageGifBadge);
+                            }
                         }
                         boolean isAlbumCollage = extractAlbumItems(message) != null;
                         float dp = itemView.getContext().getResources().getDisplayMetrics().density;
@@ -2647,6 +2892,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 int pTop = Math.round(4.5f * dp);
                                 int pBot = Math.round(5f * dp);
                                 messageBubble.setPadding(pSide, pTop, pSide, pBot);
+                            } else if (isGif) {
+                                int pGif = Math.round(3.5f * dp);
+                                messageBubble.setPadding(pGif, pGif, pGif, pGif);
                             } else {
                                 int pSide = Math.round(8f * dp);
                                 int pVert = Math.round(6f * dp);
@@ -2658,7 +2906,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             mcv.setStrokeWidth(0);
                             mcv.setCardElevation(0f);
                             mcv.setCardBackgroundColor(android.graphics.Color.TRANSPARENT);
-                            mcv.setRadius(isAlbumCollage ? 0f : (12f * dp));
+                            mcv.setRadius(isAlbumCollage ? 0f : (isGif ? (10f * dp) : (12f * dp)));
                         }
                         if (isAlbumCollage) {
                             if (messageImage != null) messageImage.setVisibility(View.GONE);
@@ -2668,12 +2916,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             int[] gifDims = com.m3.veil.utils.VeilStickerGifEngine.computeGifSizePx(
                                     itemView.getContext(), message, localSentMedia);
                             com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, gifDims[0], gifDims[1]);
-                            if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
+                            if (imageScrimView != null) imageScrimView.setVisibility(View.VISIBLE);
                         } else {
                             if (messageImage != null) messageImage.setVisibility(View.VISIBLE);
                             if (imageScrimView != null) imageScrimView.setVisibility(View.VISIBLE);
                             com.m3.veil.utils.VeilStickerGifEngine.applyDynamicMediaCardSize(
-                                    itemView.getContext(), imageCardView, imageCaptionText, message, localSentMedia);
+                                     itemView.getContext(), imageCardView, imageCaptionText, message, localSentMedia);
                         }
                         if (messageImage != null && !isAlbumCollage) {
                             messageImage.setBackgroundColor(isGif ? android.graphics.Color.TRANSPARENT : 0x15000000);
@@ -2689,7 +2937,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 && !message.getText().equals("[video message]");
 
                         bindGroupedAlbumGridOverlay(itemView.getContext(), imageCardView, message, "You", time, hasCaption);
-                        bindQuickForwardButton(btnQuickForwardMedia, message, !isGif);
+                        bindQuickForwardButton(btnQuickForwardMedia, message, true);
 
                         if (hasCaption) {
                             if (imageCaptionText != null) {
@@ -2698,12 +2946,6 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                             if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
-                        } else if (isGif) {
-                            // Telegram/WhatsApp frameless GIF: show time & tick below GIF
-                            if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
-                            if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
-                            if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
-                            if (statusIcon != null) statusIcon.setVisibility(View.VISIBLE);
                         } else if (isAlbumCollage) {
                             // WhatsApp grouped collage bubble (Screenshot1_bada0f2a.jpg): single footer row below grid inside bubble
                             if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
@@ -2711,6 +2953,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                             if (statusIcon != null) statusIcon.setVisibility(View.VISIBLE);
                         } else {
+                            // Both standard single photos AND WhatsApp GIF bubbles ("KYA?" in sticker_second_Screenshot_9e6f15cb.jpg)
+                            // show bottom-right overlaid timestamp inside the media frame!
                             if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
                             if (imageOverlayPill != null) {
                                 imageOverlayPill.setVisibility(View.VISIBLE);
@@ -3191,8 +3435,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 }
                 
                 applySentBubbleTheme(isDarkBubble);
-                boolean isChromelessSent = (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
-                        || com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, null))
+                boolean isChromelessSent = com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
                         && (message.getReplyToMessageId() == null || message.getReplyToMessageId().isEmpty());
                 applyChromelessBelowInfoStyle(bubbleInfoContainer, timeText, statusIcon, ivPinnedBadge,
                         message, isChromelessSent, true, isDarkBubble);
@@ -3577,7 +3820,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         public void bind(Message message, String time, boolean showDate, String dateLabel) {
             int msgIdx = findMessageIndex(message);
-            if (isCollapsedAutoAlbumChild(msgIdx)) {
+            if (isCollapsedAutoAlbumChild(msgIdx) || isCollapsedPairedStickerChild(msgIdx)) {
                 applyCollapsedRowState(itemView, true);
                 return;
             }
@@ -3817,16 +4060,21 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     ensureImageViews();
                     hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
+                    if (messageBubble != null) {
+                        messageBubble.setPadding(0, 0, 0, 0);
+                    }
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);
+                        imageMessageContainer.setPadding(0, 0, 0, 0);
+                        imageMessageContainer.setBackground(null);
                         bindGroupedAlbumGridOverlay(itemView.getContext(), imageCardView, null, "Contact", time, false);
-                        int[] stickerDims = com.m3.veil.utils.VeilStickerGifEngine.computeStickerSizePx(itemView.getContext(), message);
-                        com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, stickerDims[0], stickerDims[1]);
+                        Message secondPairedSticker = getPairedSecondSticker(msgIdx);
                         if (imageCardView instanceof com.google.android.material.card.MaterialCardView) {
                             com.google.android.material.card.MaterialCardView mcv = (com.google.android.material.card.MaterialCardView) imageCardView;
                             mcv.setStrokeWidth(0);
                             mcv.setCardElevation(0f);
                             mcv.setCardBackgroundColor(android.graphics.Color.TRANSPARENT);
+                            mcv.setBackground(null);
                             mcv.setRadius(0f);
                         }
                         if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
@@ -3834,22 +4082,36 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         if (imageProgressBar != null) imageProgressBar.setVisibility(View.GONE);
                         if (imageDownloadOverlay != null) imageDownloadOverlay.setVisibility(View.GONE);
                         if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
-                        // WhatsApp/Telegram style: no overlay inside sticker; show time BELOW sticker!
                         if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
-                        if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
-                        if (messageImage != null) {
-                            messageImage.setBackgroundColor(android.graphics.Color.TRANSPARENT);
-                            com.m3.veil.utils.VeilStickerGifEngine.bindStickerToImageView(itemView.getContext(), message, messageImage);
-                        }
-                        View.OnClickListener stickerBounce = v -> {
+
+                        if (secondPairedSticker != null) {
+                            // 2-Column Side-by-Side Consecutive Sticker Pair (sticker_second_Screenshot_9e6f15cb.jpg)
+                            if (messageImage != null) messageImage.setVisibility(View.GONE);
+                            if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.GONE);
+                            bindQuickForwardButton(btnQuickForwardMedia, message, false);
+                            bindPairedStickerOverlay(itemView.getContext(), imageCardView, message, secondPairedSticker, false);
+                        } else {
+                            // Single chromeless sticker with floating pill below & circular forward button
+                            bindPairedStickerOverlay(itemView.getContext(), imageCardView, message, null, false);
+                            int[] stickerDims = com.m3.veil.utils.VeilStickerGifEngine.computeStickerSizePx(itemView.getContext(), message);
+                            com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, stickerDims[0], stickerDims[1]);
+                            if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
+                            bindQuickForwardButton(btnQuickForwardMedia, message, true);
                             if (messageImage != null) {
-                                messageImage.animate().scaleX(1.18f).scaleY(1.18f).setDuration(140)
-                                        .withEndAction(() -> messageImage.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
-                                        .start();
+                                messageImage.setVisibility(View.VISIBLE);
+                                messageImage.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                                com.m3.veil.utils.VeilStickerGifEngine.bindStickerToImageView(itemView.getContext(), message, messageImage);
                             }
-                        };
-                        imageMessageContainer.setOnClickListener(stickerBounce);
-                        if (imageCardView != null) imageCardView.setOnClickListener(stickerBounce);
+                            View.OnClickListener stickerBounce = v -> {
+                                if (messageImage != null) {
+                                    messageImage.animate().scaleX(1.18f).scaleY(1.18f).setDuration(140)
+                                            .withEndAction(() -> messageImage.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
+                                            .start();
+                                }
+                            };
+                            imageMessageContainer.setOnClickListener(stickerBounce);
+                            if (imageCardView != null) imageCardView.setOnClickListener(stickerBounce);
+                        }
                     }
                 } else if ("image".equals(message.getType()) || "gif".equals(message.getType())
                         || com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, null)
@@ -3859,12 +4121,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageText.setVisibility(View.GONE);
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);
+                        bindPairedStickerOverlay(itemView.getContext(), imageCardView, message, null, false);
                         String recPrimaryExt = "gif".equals(message.getType()) ? ".gif" : ("video".equals(message.getType()) ? ".mp4" : ".jpg");
                         File localImg = FileMediaManager.getDecryptedFile(
                                 itemView.getContext(), message, recPrimaryExt);
                         boolean isGif = com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, localImg);
                         if (imageGifBadge != null) {
                             imageGifBadge.setVisibility(isGif ? View.VISIBLE : View.GONE);
+                            if (isGif) {
+                                styleWhatsAppCenteredGifBadge(imageGifBadge);
+                            }
                         }
                         org.json.JSONArray recAlbum = extractAlbumItems(message);
                         boolean isAlbumCollage = recAlbum != null && recAlbum.length() > 1;
@@ -3875,6 +4141,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 int pTop = Math.round(4.5f * dp);
                                 int pBot = Math.round(5f * dp);
                                 messageBubble.setPadding(pSide, pTop, pSide, pBot);
+                            } else if (isGif) {
+                                int pGif = Math.round(3.5f * dp);
+                                messageBubble.setPadding(pGif, pGif, pGif, pGif);
                             } else {
                                 int pSide = Math.round(8f * dp);
                                 int pVert = Math.round(6f * dp);
@@ -3886,7 +4155,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             mcv.setStrokeWidth(0);
                             mcv.setCardElevation(0f);
                             mcv.setCardBackgroundColor(android.graphics.Color.TRANSPARENT);
-                            mcv.setRadius(isAlbumCollage ? 0f : (12f * dp));
+                            mcv.setRadius(isAlbumCollage ? 0f : (isGif ? (10f * dp) : (12f * dp)));
                         }
                         if (isAlbumCollage) {
                             if (messageImage != null) messageImage.setVisibility(View.GONE);
@@ -3896,7 +4165,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             int[] gifDims = com.m3.veil.utils.VeilStickerGifEngine.computeGifSizePx(
                                      itemView.getContext(), message, localImg);
                             com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, gifDims[0], gifDims[1]);
-                            if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
+                            if (imageScrimView != null) imageScrimView.setVisibility(View.VISIBLE);
                         } else {
                             if (messageImage != null) messageImage.setVisibility(View.VISIBLE);
                             if (imageScrimView != null) imageScrimView.setVisibility(View.VISIBLE);
@@ -3918,7 +4187,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
                         String recSenderName = message.getSenderName() != null ? message.getSenderName() : "Contact";
                         bindGroupedAlbumGridOverlay(itemView.getContext(), imageCardView, message, recSenderName, time, hasCaption);
-                        bindQuickForwardButton(btnQuickForwardMedia, message, !isGif);
+                        bindQuickForwardButton(btnQuickForwardMedia, message, true);
 
                         if (hasCaption) {
                             if (imageCaptionText != null) {
@@ -3927,11 +4196,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                             if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
-                        } else if (isGif || isAlbumCollage) {
+                        } else if (isAlbumCollage) {
                             if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
                             if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                         } else {
+                            // Both standard single photos AND WhatsApp GIF bubbles ("KYA?" in sticker_second_Screenshot_9e6f15cb.jpg)
+                            // show bottom-right overlaid timestamp ("5:26 PM") inside the media frame!
                             if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
                             if (imageOverlayPill != null) {
                                 imageOverlayPill.setVisibility(View.VISIBLE);
@@ -4458,8 +4729,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 }
                 
                 applyReceivedBubbleTheme(isDarkBubble);
-                boolean isChromelessRec = (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
-                        || com.m3.veil.utils.VeilStickerGifEngine.isGifMessage(message, null))
+                boolean isChromelessRec = com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
                         && (message.getReplyToMessageId() == null || message.getReplyToMessageId().isEmpty());
                 applyChromelessBelowInfoStyle(bubbleInfoContainer, timeText, null, ivPinnedBadge,
                         message, isChromelessRec, false, isDarkBubble);
