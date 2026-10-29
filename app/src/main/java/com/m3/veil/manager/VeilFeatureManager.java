@@ -63,15 +63,122 @@ public class VeilFeatureManager {
     // I. MULTI-PERSONA SYSTEM
     // ==========================================
 
+    public static boolean isShadowVeilOrGeneric(String name) {
+        if (name == null) return true;
+        String clean = name.trim();
+        return clean.isEmpty()
+                || clean.equalsIgnoreCase("@ShadowVeil")
+                || clean.equalsIgnoreCase("ShadowVeil")
+                || clean.equalsIgnoreCase("@Anonymous")
+                || clean.equalsIgnoreCase("Anonymous")
+                || clean.equalsIgnoreCase("VeilUser")
+                || clean.equalsIgnoreCase("Veil User")
+                || clean.equalsIgnoreCase("@User")
+                || clean.equalsIgnoreCase("Direct Chat")
+                || clean.equalsIgnoreCase("Veil Contact")
+                || clean.equalsIgnoreCase("Anonymous Peer");
+    }
+
+    public String resolveRealUserHandle() {
+        try {
+            com.m3.veil.utils.UserPreferences up = new com.m3.veil.utils.UserPreferences(appContext);
+            String uname = up.getUsername();
+            String dname = up.getDisplayName();
+            com.m3.veil.model.User u = up.getCurrentUser();
+            if (u != null) {
+                if (isShadowVeilOrGeneric(uname) && !isShadowVeilOrGeneric(u.getUsername())) {
+                    uname = u.getUsername();
+                }
+                if (isShadowVeilOrGeneric(dname) && !isShadowVeilOrGeneric(u.getDisplayName())) {
+                    dname = u.getDisplayName();
+                }
+            }
+            if (isShadowVeilOrGeneric(uname)) {
+                uname = mainPrefs.getString("custom_username", null);
+            }
+            if (isShadowVeilOrGeneric(uname)) {
+                android.content.SharedPreferences vPrefs = appContext.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE);
+                uname = vPrefs.getString("username", null);
+            }
+            if (isShadowVeilOrGeneric(dname)) {
+                dname = mainPrefs.getString("display_name", null);
+            }
+            if (!isShadowVeilOrGeneric(uname)) {
+                String clean = uname.trim();
+                return clean.startsWith("@") ? clean : "@" + clean;
+            }
+            if (!isShadowVeilOrGeneric(dname)) {
+                String clean = dname.trim();
+                return clean.startsWith("@") ? clean : "@" + clean;
+            }
+        } catch (Throwable ignored) {}
+        return "@User";
+    }
+
+    public String resolveRealUserDisplayName() {
+        try {
+            com.m3.veil.utils.UserPreferences up = new com.m3.veil.utils.UserPreferences(appContext);
+            String dname = up.getDisplayName();
+            if (isShadowVeilOrGeneric(dname)) {
+                com.m3.veil.model.User u = up.getCurrentUser();
+                if (u != null && !isShadowVeilOrGeneric(u.getDisplayName())) {
+                    dname = u.getDisplayName();
+                }
+            }
+            if (!isShadowVeilOrGeneric(dname)) {
+                return dname.trim();
+            }
+            String handle = resolveRealUserHandle();
+            if (!isShadowVeilOrGeneric(handle)) {
+                return handle.startsWith("@") ? handle.substring(1) : handle;
+            }
+        } catch (Throwable ignored) {}
+        return "User";
+    }
+
+    public void syncPrimaryPersonaWithUser(String username, String displayName, String bio, String mood) {
+        try {
+            String handle = (!isShadowVeilOrGeneric(username))
+                    ? (username.trim().startsWith("@") ? username.trim() : "@" + username.trim())
+                    : ((!isShadowVeilOrGeneric(displayName))
+                            ? (displayName.trim().startsWith("@") ? displayName.trim() : "@" + displayName.trim())
+                            : resolveRealUserHandle());
+            JSONArray arr = new JSONArray(prefs.getString("personas_json", "[]"));
+            boolean updated = false;
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                if ("persona_primary".equals(o.optString("id"))) {
+                    if (!isShadowVeilOrGeneric(handle)) {
+                        o.put("name", handle);
+                        updated = true;
+                    }
+                    if (bio != null && !bio.trim().isEmpty()) {
+                        o.put("bio", bio.trim());
+                        updated = true;
+                    }
+                    if (mood != null && !mood.trim().isEmpty()) {
+                        o.put("mood", mood.trim());
+                        updated = true;
+                    }
+                    break;
+                }
+            }
+            if (updated) {
+                prefs.edit().putString("personas_json", arr.toString()).apply();
+            }
+        } catch (Exception ignored) {}
+    }
+
     private void ensureDefaultPersonas() {
         String json = prefs.getString("personas_json", null);
+        String realHandle = resolveRealUserHandle();
         if (json == null || json.isEmpty()) {
             try {
                 JSONArray arr = new JSONArray();
 
                 JSONObject p1 = new JSONObject();
                 p1.put("id", "persona_primary");
-                p1.put("name", "@ShadowVeil");
+                p1.put("name", realHandle);
                 p1.put("bio", "Primary zero-trace identity");
                 p1.put("mood", "🛡️ Encrypted");
                 p1.put("bubbleColor", "#0B57CF");
@@ -101,18 +208,49 @@ public class VeilFeatureManager {
                         .putString("active_persona_id", "persona_primary")
                         .apply();
             } catch (Exception ignored) {}
+        } else if (json.contains("ShadowVeil")) {
+            try {
+                JSONArray arr = new JSONArray(json);
+                boolean migrated = false;
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject o = arr.getJSONObject(i);
+                    String name = o.optString("name");
+                    if ("persona_primary".equals(o.optString("id")) || isShadowVeilOrGeneric(name)) {
+                        o.put("name", realHandle);
+                        migrated = true;
+                    }
+                }
+                if (migrated) {
+                    prefs.edit().putString("personas_json", arr.toString()).apply();
+                }
+            } catch (Exception ignored) {}
         }
     }
 
     public List<Persona> getPersonas() {
         List<Persona> list = new ArrayList<>();
+        String realHandle = resolveRealUserHandle();
+        boolean needsSave = false;
         try {
             JSONArray arr = new JSONArray(prefs.getString("personas_json", "[]"));
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
+                String id = o.optString("id");
+                String name = o.optString("name");
+                if ("persona_primary".equals(id)) {
+                    if (isShadowVeilOrGeneric(name) || (!isShadowVeilOrGeneric(realHandle) && !realHandle.equalsIgnoreCase(name))) {
+                        name = realHandle;
+                        o.put("name", name);
+                        needsSave = true;
+                    }
+                } else if (isShadowVeilOrGeneric(name)) {
+                    name = realHandle;
+                    o.put("name", name);
+                    needsSave = true;
+                }
                 Persona p = new Persona(
-                        o.optString("id"),
-                        o.optString("name"),
+                        id,
+                        name,
                         o.optString("bio"),
                         o.optString("bubbleColor", "#0B57CF"),
                         o.optString("mood", "✨ Active"),
@@ -120,6 +258,9 @@ public class VeilFeatureManager {
                         o.optLong("expiresAt", 0L)
                 );
                 list.add(p);
+            }
+            if (needsSave) {
+                prefs.edit().putString("personas_json", arr.toString()).apply();
             }
         } catch (Exception ignored) {}
         return list;
@@ -131,7 +272,7 @@ public class VeilFeatureManager {
         for (Persona p : all) {
             if (p.getPersonaId().equals(activeId)) return p;
         }
-        return all.isEmpty() ? new Persona("default", "@Anonymous", "Encrypted user", "#0B57CF", "✨ Active", false) : all.get(0);
+        return all.isEmpty() ? new Persona("persona_primary", resolveRealUserHandle(), "Encrypted user", "#0B57CF", "🛡️ Encrypted", false) : all.get(0);
     }
 
     public void setActivePersona(String personaId) {

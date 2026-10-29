@@ -771,12 +771,8 @@ public class ChatActivity extends AppCompatActivity {
                         && !recipientId.startsWith("group_") && !recipientId.startsWith("channel_") && !recipientId.startsWith("lounge_")) {
                     com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
                     String myOwnName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
-                    if (recipientName == null || recipientName.trim().isEmpty()
-                            || (myOwnName != null && recipientName.equals(myOwnName))
-                            || "Direct Chat".equals(recipientName)
-                            || "Veil Contact".equals(recipientName)
-                            || "Veil User".equals(recipientName)
-                            || "Anonymous Peer".equals(recipientName)) {
+                    if (com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(recipientName)
+                            || (myOwnName != null && recipientName.equals(myOwnName))) {
                         db.collection("users").document(recipientId).get().addOnSuccessListener(dbExecutor, doc -> {
                             if (doc != null && doc.exists()) {
                                 String dName = doc.getString("displayName");
@@ -864,6 +860,9 @@ public class ChatActivity extends AppCompatActivity {
         if (isFinishing() || isDestroyed()) return;
         if (recipientId != null && messagesAdapter != null) {
             messagesAdapter.setRecipientId(recipientId);
+        }
+        if (recipientName != null && messagesAdapter != null) {
+            messagesAdapter.setRecipientName(recipientName);
         }
         TextView nameText = findViewById(R.id.recipientName);
         if (nameText != null) {
@@ -987,28 +986,82 @@ public class ChatActivity extends AppCompatActivity {
             });
         }
 
-        // Collapsible Pinned Message Banner (WhatsApp Style)
+        // Collapsible Multi-Pinned Message Banner (Telegram / WhatsApp Style)
         View pinnedMessageBanner = findViewById(R.id.pinnedMessageBanner);
         View btnUnpinBanner = findViewById(R.id.btnUnpinBanner);
         if (pinnedMessageBanner != null) {
             pinnedMessageBanner.setOnClickListener(v -> {
-                if (currentLocalChat != null && currentLocalChat.getPinnedMessageId() != null && messageList != null) {
+                List<Message> pinnedMsgs = getPinnedMessagesList();
+                if (!pinnedMsgs.isEmpty()) {
+                    if (currentPinnedBannerIndex < 0 || currentPinnedBannerIndex >= pinnedMsgs.size()) {
+                        currentPinnedBannerIndex = pinnedMsgs.size() - 1;
+                    }
+                    Message target = pinnedMsgs.get(currentPinnedBannerIndex);
+                    scrollToPinnedMessage(target);
+                    if (pinnedMsgs.size() > 1) {
+                        currentPinnedBannerIndex = (currentPinnedBannerIndex + 1) % pinnedMsgs.size();
+                        refreshPinnedMessagesBanner();
+                    }
+                } else if (currentLocalChat != null && currentLocalChat.getPinnedMessageId() != null && messageList != null) {
                     String pinId = currentLocalChat.getPinnedMessageId();
                     for (int i = 0; i < messageList.size(); i++) {
                         if (pinId.equals(messageList.get(i).getId())) {
-                            int pos = i + 1;
-                            highlightPosition = pos;
-                            messagesRecyclerView.smoothScrollToPosition(pos);
+                            scrollToPinnedMessage(messageList.get(i));
                             break;
                         }
                     }
                 }
             });
+            pinnedMessageBanner.setOnLongClickListener(v -> {
+                showPinnedMessagesBottomSheet();
+                return true;
+            });
         }
         if (btnUnpinBanner != null) {
             btnUnpinBanner.setOnClickListener(v -> {
-                com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
-                Toast.makeText(this, "Message unpinned", Toast.LENGTH_SHORT).show();
+                List<Message> pinnedMsgs = getPinnedMessagesList();
+                if (!pinnedMsgs.isEmpty()) {
+                    if (currentPinnedBannerIndex < 0 || currentPinnedBannerIndex >= pinnedMsgs.size()) {
+                        currentPinnedBannerIndex = pinnedMsgs.size() - 1;
+                    }
+                    Message toUnpin = pinnedMsgs.get(currentPinnedBannerIndex);
+                    toUnpin.setPinned(false);
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(this)
+                            .updateMessagePinStatus(chatId, toUnpin.getId(), false);
+                    List<Message> remaining = getPinnedMessagesList();
+                    if (!remaining.isEmpty()) {
+                        Message latest = remaining.get(remaining.size() - 1);
+                        String preview = formatPinPreview(latest);
+                        if (currentLocalChat != null) {
+                            currentLocalChat.setPinnedMessageId(latest.getId());
+                            currentLocalChat.setPinnedMessageText(preview);
+                        }
+                        com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                                .unpinSpecificMessage(chatId, recipientId, toUnpin.getId(), latest.getId(), preview);
+                        currentPinnedBannerIndex = remaining.size() - 1;
+                        Toast.makeText(this, "Message unpinned (" + remaining.size() + " remaining)", Toast.LENGTH_SHORT).show();
+                    } else {
+                        if (currentLocalChat != null) {
+                            currentLocalChat.setPinnedMessageId(null);
+                            currentLocalChat.setPinnedMessageText(null);
+                        }
+                        com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
+                        Toast.makeText(this, "Message unpinned", Toast.LENGTH_SHORT).show();
+                    }
+                    refreshPinnedMessagesBanner();
+                } else {
+                    if (currentLocalChat != null) {
+                        currentLocalChat.setPinnedMessageId(null);
+                        currentLocalChat.setPinnedMessageText(null);
+                    }
+                    com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
+                    Toast.makeText(this, "Message unpinned", Toast.LENGTH_SHORT).show();
+                    refreshPinnedMessagesBanner();
+                }
+            });
+            btnUnpinBanner.setOnLongClickListener(v -> {
+                showPinnedMessagesBottomSheet();
+                return true;
             });
         }
 
@@ -1403,6 +1456,7 @@ public class ChatActivity extends AppCompatActivity {
 
             @Override
             public void onBrowseSystemDocumentsRequested() {
+                com.m3.veil.manager.PresenceManager.getInstance().notifyExternalPickerLaunched();
                 Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType("*/*");
@@ -1683,11 +1737,7 @@ public class ChatActivity extends AppCompatActivity {
 
         if (replyMessage != null) {
             message.setReplyToMessageId(replyMessage.getId());
-            boolean isReplySenderYou = replyMessage.getSenderId() != null && replyMessage.getSenderId().equals(currentUserId);
-            String quotedSenderName = (replyMessage.getSenderName() != null && !replyMessage.getSenderName().trim().isEmpty())
-                    ? replyMessage.getSenderName()
-                    : (recipientName != null ? recipientName : "Peer");
-            message.setReplySenderName(isReplySenderYou ? "You" : quotedSenderName);
+            message.setReplySenderName(resolveCleanReplySenderName(replyMessage));
             cancelReply();
         }
 
@@ -1869,11 +1919,7 @@ public class ChatActivity extends AppCompatActivity {
 
         if (replyMessage != null) {
             message.setReplyToMessageId(replyMessage.getId());
-            boolean isReplySenderYou = replyMessage.getSenderId() != null && replyMessage.getSenderId().equals(currentUserId);
-            String quotedSenderName = (replyMessage.getSenderName() != null && !replyMessage.getSenderName().trim().isEmpty())
-                    ? replyMessage.getSenderName()
-                    : (recipientName != null ? recipientName : "Peer");
-            message.setReplySenderName(isReplySenderYou ? "You" : quotedSenderName);
+            message.setReplySenderName(resolveCleanReplySenderName(replyMessage));
             runOnUiThread(this::cancelReply);
         }
 
@@ -2780,18 +2826,8 @@ public class ChatActivity extends AppCompatActivity {
             }
         }
 
-        // Update Collapsible Pinned Message Banner
-        View pinnedBanner = findViewById(R.id.pinnedMessageBanner);
-        TextView tvPinnedBannerText = findViewById(R.id.tvPinnedBannerText);
-        if (pinnedBanner != null && tvPinnedBannerText != null) {
-            if (currentLocalChat != null && currentLocalChat.getPinnedMessageText() != null
-                    && !currentLocalChat.getPinnedMessageText().isEmpty()) {
-                pinnedBanner.setVisibility(View.VISIBLE);
-                tvPinnedBannerText.setText(currentLocalChat.getPinnedMessageText());
-            } else {
-                pinnedBanner.setVisibility(View.GONE);
-            }
-        }
+        // Update Collapsible Multi-Pinned Message Banner
+        refreshPinnedMessagesBanner();
 
         TextView onlineStatus = findViewById(R.id.onlineStatus);
         View ivStatusDot = findViewById(R.id.ivStatusDot);
@@ -3218,13 +3254,28 @@ public class ChatActivity extends AppCompatActivity {
         animatorSet.start();
     }
 
+    private String resolveCleanReplySenderName(Message targetMsg) {
+        if (targetMsg == null) return recipientName != null ? recipientName : "Peer";
+        boolean isSenderYou = isSenderMe(targetMsg.getSenderId(), targetMsg);
+        if (isSenderYou) {
+            return "You";
+        }
+        String msgSenderName = targetMsg.getSenderName();
+        if (msgSenderName != null && !com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(msgSenderName)) {
+            return msgSenderName.trim();
+        }
+        if (recipientName != null && !com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(recipientName)) {
+            return recipientName.trim();
+        }
+        return "Peer";
+    }
+
     private void replyToMessage(Message message) {
         if ("deleted".equals(message.getType())) return;
         replyMessage = message;
         replyPreviewContainer.setVisibility(View.VISIBLE);
 
-        boolean isSender = message.getSenderId().equals(currentUserId);
-        replyPreviewName.setText(isSender ? "You" : (recipientName != null ? recipientName : "Other User"));
+        replyPreviewName.setText(resolveCleanReplySenderName(message));
 
         String preview = message.getText();
         if ("voice".equals(message.getType())) {
@@ -3515,9 +3566,22 @@ public class ChatActivity extends AppCompatActivity {
             });
         }
 
-        // Action: Pin / Unpin
+        // Action: Pin / Unpin (Supports Multiple Pinned Messages like Telegram & WhatsApp)
         View actionPin = view.findViewById(R.id.actionPin);
         if (actionPin != null) {
+            boolean currentlyPinned = message.isPinned()
+                    || (currentLocalChat != null && message.getId() != null && message.getId().equals(currentLocalChat.getPinnedMessageId()));
+            if (actionPin instanceof ViewGroup) {
+                ViewGroup vg = (ViewGroup) actionPin;
+                for (int i = 0; i < vg.getChildCount(); i++) {
+                    if (vg.getChildAt(i) instanceof TextView) {
+                        ((TextView) vg.getChildAt(i)).setText(currentlyPinned ? "Unpin" : "Pin");
+                        break;
+                    }
+                }
+            } else if (actionPin instanceof TextView) {
+                ((TextView) actionPin).setText(currentlyPinned ? "Unpin" : "Pin");
+            }
             actionPin.setOnClickListener(v -> {
                 dialog.dismiss();
                 if (isGroupChatContext() && chatId != null) {
@@ -3530,15 +3594,47 @@ public class ChatActivity extends AppCompatActivity {
                         }
                     }
                 }
-                boolean currentlyPinned = currentLocalChat != null && message.getId().equals(currentLocalChat.getPinnedMessageId());
                 if (currentlyPinned) {
-                    com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
+                    message.setPinned(false);
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(this)
+                            .updateMessagePinStatus(chatId, message.getId(), false);
+                    List<Message> remaining = getPinnedMessagesList();
+                    if (!remaining.isEmpty()) {
+                        Message latest = remaining.get(remaining.size() - 1);
+                        String latestPreview = formatPinPreview(latest);
+                        if (currentLocalChat != null) {
+                            currentLocalChat.setPinnedMessageId(latest.getId());
+                            currentLocalChat.setPinnedMessageText(latestPreview);
+                        }
+                        com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                                .unpinSpecificMessage(chatId, recipientId, message.getId(), latest.getId(), latestPreview);
+                        currentPinnedBannerIndex = remaining.size() - 1;
+                    } else {
+                        if (currentLocalChat != null) {
+                            currentLocalChat.setPinnedMessageId(null);
+                            currentLocalChat.setPinnedMessageText(null);
+                        }
+                        com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
+                    }
+                    refreshPinnedMessagesBanner();
                     Toast.makeText(this, "Message unpinned", Toast.LENGTH_SHORT).show();
                 } else {
-                    String pinPreview = message.getText() != null ? message.getText() : "[" + message.getType() + "]";
-                    if (pinPreview.length() > 32) pinPreview = pinPreview.substring(0, 32) + "…";
-                    com.m3.veil.manager.VeilMessagesController.getInstance(this).pinMessage(chatId, recipientId, message.getId(), pinPreview);
-                    Toast.makeText(this, "📌 Message pinned to chat header", Toast.LENGTH_SHORT).show();
+                    message.setPinned(true);
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(this)
+                            .updateMessagePinStatus(chatId, message.getId(), true);
+                    String pinPreview = formatPinPreview(message);
+                    if (currentLocalChat != null) {
+                        currentLocalChat.setPinnedMessageId(message.getId());
+                        currentLocalChat.setPinnedMessageText(pinPreview);
+                    }
+                    com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                            .pinMessage(chatId, recipientId, message.getId(), pinPreview);
+                    List<Message> allPinned = getPinnedMessagesList();
+                    currentPinnedBannerIndex = Math.max(0, allPinned.size() - 1);
+                    refreshPinnedMessagesBanner();
+                    Toast.makeText(this, allPinned.size() > 1
+                            ? "📌 Message pinned (" + allPinned.size() + " pinned messages)"
+                            : "📌 Message pinned to chat header", Toast.LENGTH_SHORT).show();
                 }
             });
         }
@@ -3561,9 +3657,297 @@ public class ChatActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private int currentPinnedBannerIndex = 0;
+
+    private String formatPinPreview(Message msg) {
+        if (msg == null) return "Pinned message";
+        String type = msg.getType() != null ? msg.getType() : "text";
+        String preview;
+        if ("image".equals(type)) {
+            preview = "📷 Photo" + (msg.getText() != null && !msg.getText().isEmpty() ? ": " + msg.getText() : "");
+        } else if ("video".equals(type)) {
+            preview = "🎥 Video" + (msg.getText() != null && !msg.getText().isEmpty() ? ": " + msg.getText() : "");
+        } else if ("voice".equals(type)) {
+            preview = "🎤 Voice message";
+        } else if ("audio".equals(type)) {
+            preview = "🎵 Audio";
+        } else if ("document".equals(type)) {
+            String dName = msg.getText();
+            if (dName != null && dName.contains("|")) dName = dName.split("\\|", 2)[0];
+            preview = "📄 " + (dName != null && !dName.isEmpty() ? dName : "Document");
+        } else if ("location".equals(type)) {
+            preview = "📍 Location";
+        } else if ("contact".equals(type)) {
+            preview = "👤 Contact";
+        } else if ("poll".equals(type)) {
+            preview = "📊 Poll";
+        } else {
+            preview = msg.getText() != null && !msg.getText().trim().isEmpty() ? msg.getText().trim() : "[" + type + "]";
+        }
+        if (preview.length() > 48) {
+            preview = preview.substring(0, 48) + "…";
+        }
+        return preview;
+    }
+
+    private List<Message> getPinnedMessagesList() {
+        List<Message> pinned = new ArrayList<>();
+        if (messageList == null) return pinned;
+        String activeId = currentLocalChat != null ? currentLocalChat.getPinnedMessageId() : null;
+        for (int i = 0; i < messageList.size(); i++) {
+            Message m = messageList.get(i);
+            if (m == null || "deleted".equals(m.getType())) continue;
+            if (m.isPinned() || (activeId != null && activeId.equals(m.getId()))) {
+                if (!m.isPinned()) {
+                    m.setPinned(true);
+                }
+                pinned.add(m);
+            }
+        }
+        return pinned;
+    }
+
+    private void scrollToPinnedMessage(Message target) {
+        if (target == null || target.getId() == null || messageList == null || messagesRecyclerView == null) return;
+        for (int i = 0; i < messageList.size(); i++) {
+            Message m = messageList.get(i);
+            if (m != null && target.getId().equals(m.getId())) {
+                int pos = i + 1;
+                highlightPosition = pos;
+                messagesRecyclerView.smoothScrollToPosition(pos);
+                messagesRecyclerView.postDelayed(() -> {
+                    RecyclerView.ViewHolder vh = messagesRecyclerView.findViewHolderForAdapterPosition(pos);
+                    if (vh != null && vh.itemView != null) {
+                        View bubble = vh.itemView.findViewById(R.id.messageBubble);
+                        if (bubble instanceof com.m3.veil.ui.views.ChatMessageCell) {
+                            ((com.m3.veil.ui.views.ChatMessageCell) bubble).triggerHighlightPulse();
+                        }
+                    }
+                }, 260);
+                break;
+            }
+        }
+    }
+
+    private void refreshPinnedMessagesBanner() {
+        View pinnedBanner = findViewById(R.id.pinnedMessageBanner);
+        TextView tvPinnedBannerTitle = findViewById(R.id.tvPinnedBannerTitle);
+        TextView tvPinnedBannerText = findViewById(R.id.tvPinnedBannerText);
+        if (pinnedBanner == null || tvPinnedBannerText == null) return;
+
+        List<Message> pinnedList = getPinnedMessagesList();
+        if (!pinnedList.isEmpty()) {
+            pinnedBanner.setVisibility(View.VISIBLE);
+            if (currentPinnedBannerIndex < 0 || currentPinnedBannerIndex >= pinnedList.size()) {
+                currentPinnedBannerIndex = pinnedList.size() - 1;
+            }
+            Message shown = pinnedList.get(currentPinnedBannerIndex);
+            tvPinnedBannerText.setText(formatPinPreview(shown));
+            if (tvPinnedBannerTitle != null) {
+                if (pinnedList.size() > 1) {
+                    tvPinnedBannerTitle.setText("Pinned Message #" + (currentPinnedBannerIndex + 1) + " of " + pinnedList.size() + " • Hold for all");
+                } else {
+                    tvPinnedBannerTitle.setText("Pinned Message");
+                }
+            }
+        } else if (currentLocalChat != null && currentLocalChat.getPinnedMessageText() != null
+                && !currentLocalChat.getPinnedMessageText().isEmpty()) {
+            pinnedBanner.setVisibility(View.VISIBLE);
+            tvPinnedBannerText.setText(currentLocalChat.getPinnedMessageText());
+            if (tvPinnedBannerTitle != null) {
+                tvPinnedBannerTitle.setText("Pinned Message");
+            }
+        } else {
+            pinnedBanner.setVisibility(View.GONE);
+        }
+    }
+
+    private void showPinnedMessagesBottomSheet() {
+        List<Message> pinnedList = getPinnedMessagesList();
+        if (pinnedList.isEmpty()) {
+            Toast.makeText(this, "No pinned messages in this chat", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        boolean isDark = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(this);
+        float dp = getResources().getDisplayMetrics().density;
+
+        BottomSheetDialog sheet = new BottomSheetDialog(this, R.style.ModernBottomSheetDialogTheme);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding((int) (20 * dp), (int) (16 * dp), (int) (20 * dp), (int) (24 * dp));
+        android.graphics.drawable.GradientDrawable sheetBg = new android.graphics.drawable.GradientDrawable();
+        sheetBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        sheetBg.setCornerRadii(new float[]{24 * dp, 24 * dp, 24 * dp, 24 * dp, 0, 0, 0, 0});
+        sheetBg.setColor(isDark ? 0xFF151C28 : 0xFFFFFFFF);
+        root.setBackground(sheetBg);
+
+        TextView tvHeader = new TextView(this);
+        tvHeader.setText("📌 Pinned Messages (" + pinnedList.size() + ")");
+        tvHeader.setTextSize(18f);
+        tvHeader.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvHeader.setTextColor(isDark ? 0xFFF8FAFC : 0xFF0F172A);
+        tvHeader.setPadding(0, 0, 0, (int) (12 * dp));
+        root.addView(tvHeader);
+
+        for (int idx = pinnedList.size() - 1; idx >= 0; idx--) {
+            final Message pinnedMsg = pinnedList.get(idx);
+            final int pinnedIdx = idx;
+
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.HORIZONTAL);
+            card.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            card.setPadding((int) (14 * dp), (int) (12 * dp), (int) (10 * dp), (int) (12 * dp));
+            android.graphics.drawable.GradientDrawable cardBg = new android.graphics.drawable.GradientDrawable();
+            cardBg.setCornerRadius(12 * dp);
+            cardBg.setColor(isDark ? 0xFF1E293B : 0xFFF1F5F9);
+            cardBg.setStroke(Math.max(1, (int) dp), isDark ? 0xFF334155 : 0xFFE2E8F0);
+            card.setBackground(cardBg);
+
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            cardLp.bottomMargin = (int) (8 * dp);
+            card.setLayoutParams(cardLp);
+
+            LinearLayout textCol = new LinearLayout(this);
+            textCol.setOrientation(LinearLayout.VERTICAL);
+            textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            String senderLabel = (currentUserId != null && currentUserId.equals(pinnedMsg.getSenderId()))
+                    ? "You"
+                    : (pinnedMsg.getSenderName() != null && !pinnedMsg.getSenderName().isEmpty() ? pinnedMsg.getSenderName() : "Peer");
+            TextView tvSender = new TextView(this);
+            tvSender.setText(senderLabel);
+            tvSender.setTextSize(12f);
+            tvSender.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvSender.setTextColor(isDark ? 0xFF818CF8 : 0xFF4F46E5);
+            textCol.addView(tvSender);
+
+            TextView tvBody = new TextView(this);
+            tvBody.setText(formatPinPreview(pinnedMsg));
+            tvBody.setTextSize(14f);
+            tvBody.setTextColor(isDark ? 0xFFF8FAFC : 0xFF0F172A);
+            tvBody.setMaxLines(2);
+            tvBody.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            textCol.addView(tvBody);
+
+            card.addView(textCol);
+
+            TextView btnUnpinOne = new TextView(this);
+            btnUnpinOne.setText("Unpin");
+            btnUnpinOne.setTextSize(12.5f);
+            btnUnpinOne.setTypeface(null, android.graphics.Typeface.BOLD);
+            btnUnpinOne.setTextColor(0xFFEF4444);
+            btnUnpinOne.setPadding((int) (10 * dp), (int) (6 * dp), (int) (10 * dp), (int) (6 * dp));
+            btnUnpinOne.setOnClickListener(v -> {
+                pinnedMsg.setPinned(false);
+                com.m3.veil.database.EncryptedChatDatabase.getInstance(this)
+                        .updateMessagePinStatus(chatId, pinnedMsg.getId(), false);
+                List<Message> rem = getPinnedMessagesList();
+                if (!rem.isEmpty()) {
+                    Message latest = rem.get(rem.size() - 1);
+                    String prev = formatPinPreview(latest);
+                    if (currentLocalChat != null) {
+                        currentLocalChat.setPinnedMessageId(latest.getId());
+                        currentLocalChat.setPinnedMessageText(prev);
+                    }
+                    com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                            .unpinSpecificMessage(chatId, recipientId, pinnedMsg.getId(), latest.getId(), prev);
+                } else {
+                    if (currentLocalChat != null) {
+                        currentLocalChat.setPinnedMessageId(null);
+                        currentLocalChat.setPinnedMessageText(null);
+                    }
+                    com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
+                }
+                refreshPinnedMessagesBanner();
+                sheet.dismiss();
+            });
+            card.addView(btnUnpinOne);
+
+            card.setOnClickListener(v -> {
+                sheet.dismiss();
+                currentPinnedBannerIndex = pinnedIdx;
+                refreshPinnedMessagesBanner();
+                scrollToPinnedMessage(pinnedMsg);
+            });
+
+            root.addView(card);
+        }
+
+        if (pinnedList.size() > 1) {
+            com.google.android.material.button.MaterialButton btnUnpinAll =
+                    new com.google.android.material.button.MaterialButton(this);
+            LinearLayout.LayoutParams allLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            allLp.topMargin = (int) (6 * dp);
+            btnUnpinAll.setLayoutParams(allLp);
+            btnUnpinAll.setText("Unpin All (" + pinnedList.size() + ")");
+            btnUnpinAll.setAllCaps(false);
+            btnUnpinAll.setCornerRadius((int) (12 * dp));
+            btnUnpinAll.setOnClickListener(v -> {
+                for (Message m : pinnedList) {
+                    m.setPinned(false);
+                }
+                if (currentLocalChat != null) {
+                    currentLocalChat.setPinnedMessageId(null);
+                    currentLocalChat.setPinnedMessageText(null);
+                }
+                com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
+                refreshPinnedMessagesBanner();
+                Toast.makeText(this, "All messages unpinned", Toast.LENGTH_SHORT).show();
+                sheet.dismiss();
+            });
+            root.addView(btnUnpinAll);
+        }
+
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
     private void showMessageInfoDialog(Message message) {
-        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        BottomSheetDialog sheet = new BottomSheetDialog(this, R.style.ModernBottomSheetDialogTheme);
         sheet.setContentView(R.layout.dialog_message_details_sheet);
+
+        boolean isDark = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(this);
+        float dp = getResources().getDisplayMetrics().density;
+        int primaryColor = isDark ? 0xFFF8FAFC : 0xFF0F172A;
+        int secondaryColor = isDark ? 0xFF94A3B8 : 0xFF64748B;
+
+        View sheetRoot = sheet.findViewById(R.id.detailsSheetRoot);
+        if (sheetRoot != null) {
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            bg.setCornerRadii(new float[]{24 * dp, 24 * dp, 24 * dp, 24 * dp, 0, 0, 0, 0});
+            bg.setColor(isDark ? 0xFF151C28 : 0xFFFFFFFF);
+            sheetRoot.setBackground(bg);
+        }
+        View handleBar = sheet.findViewById(R.id.detailsHandleBar);
+        if (handleBar != null) {
+            handleBar.setBackgroundColor(isDark ? 0xFF334155 : 0xFFE2E8F0);
+        }
+        com.google.android.material.card.MaterialCardView detailsCard = sheet.findViewById(R.id.detailsCard);
+        if (detailsCard != null) {
+            detailsCard.setCardBackgroundColor(isDark ? 0xFF1E293B : 0xFFF1F5F9);
+            detailsCard.setStrokeColor(isDark ? 0xFF334155 : 0xFFE2E8F0);
+        }
+        View detailsDivider = sheet.findViewById(R.id.detailsDivider);
+        if (detailsDivider != null) {
+            detailsDivider.setBackgroundColor(isDark ? 0xFF334155 : 0xFFE2E8F0);
+        }
+
+        TextView tvTitle = sheet.findViewById(R.id.tvDetailsTitle);
+        TextView tvSubtitle = sheet.findViewById(R.id.tvDetailsSubtitle);
+        TextView tvSentLabel = sheet.findViewById(R.id.tvSentLabel);
+        TextView tvDeliveredLabel = sheet.findViewById(R.id.tvDeliveredLabel);
+        TextView tvReadLabel = sheet.findViewById(R.id.tvReadLabel);
+        TextView tvMessageIdLabel = sheet.findViewById(R.id.tvMessageIdLabel);
+
+        if (tvTitle != null) tvTitle.setTextColor(primaryColor);
+        if (tvSubtitle != null) tvSubtitle.setTextColor(secondaryColor);
+        if (tvSentLabel != null) tvSentLabel.setTextColor(secondaryColor);
+        if (tvDeliveredLabel != null) tvDeliveredLabel.setTextColor(secondaryColor);
+        if (tvReadLabel != null) tvReadLabel.setTextColor(secondaryColor);
+        if (tvMessageIdLabel != null) tvMessageIdLabel.setTextColor(secondaryColor);
 
         TextView tvSent = sheet.findViewById(R.id.tvDetailsSent);
         TextView tvDelivered = sheet.findViewById(R.id.tvDetailsDelivered);
@@ -3578,21 +3962,25 @@ public class ChatActivity extends AppCompatActivity {
                 sentStr = sdf.format(message.getTimestamp().toDate());
             }
             tvSent.setText(sentStr);
+            tvSent.setTextColor(primaryColor);
         }
         if (tvDelivered != null) {
-            tvDelivered.setText(message.isDelivered() ? "Delivered to mesh" : (message.isPending() ? "Pending mesh sync" : "Sent to relay"));
+            tvDelivered.setText(message.isDelivered() || message.isRead() ? "Delivered to mesh" : (message.isPending() ? "Pending mesh sync" : "Sent to relay"));
+            tvDelivered.setTextColor(primaryColor);
         }
         if (tvRead != null) {
             if (message.isRead()) {
                 tvRead.setText(isGroupChatContext() ? "Seen by group members" : "Read (Seen by recipient)");
+                tvRead.setTextColor(0xFF22C55E);
             } else {
                 tvRead.setText("Not yet read");
-                tvRead.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+                tvRead.setTextColor(secondaryColor);
             }
         }
         if (tvId != null) {
             int ep = com.m3.veil.utils.EncryptionManager.getGroupSenderKeyEpoch(chatId);
             tvId.setText(message.getId() + (isGroupChatContext() ? " (Sender-Key Epoch #" + ep + ")" : ""));
+            tvId.setTextColor(primaryColor);
         }
         if (isGroupChatContext() && chatId != null && message.getId() != null && db != null) {
             db.collection("groups").document(chatId).collection("messages").document(message.getId())
@@ -3612,7 +4000,7 @@ public class ChatActivity extends AppCompatActivity {
                             }
                             if (!readerNames.isEmpty()) {
                                 tvRead.setText("Seen by " + readerNames.size() + ": " + android.text.TextUtils.join(", ", readerNames));
-                                tvRead.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+                                tvRead.setTextColor(0xFF22C55E);
                             }
                         }
                         if (deliveredByMap != null && !deliveredByMap.isEmpty() && tvDelivered != null) {
@@ -3624,9 +4012,15 @@ public class ChatActivity extends AppCompatActivity {
                             }
                             if (!delNames.isEmpty()) {
                                 tvDelivered.setText("Delivered to " + delNames.size() + ": " + android.text.TextUtils.join(", ", delNames));
+                                tvDelivered.setTextColor(primaryColor);
                             }
                         }
                     });
+        }
+        if (btnClose instanceof com.google.android.material.button.MaterialButton) {
+            com.google.android.material.button.MaterialButton mb = (com.google.android.material.button.MaterialButton) btnClose;
+            mb.setBackgroundTintList(android.content.res.ColorStateList.valueOf(isDark ? 0xFF2E2A72 : 0xFFEEF2FF));
+            mb.setTextColor(isDark ? 0xFFF8FAFC : 0xFF3730A3);
         }
         if (btnClose != null) {
             btnClose.setOnClickListener(v -> sheet.dismiss());
@@ -4160,11 +4554,7 @@ public class ChatActivity extends AppCompatActivity {
 
         if (replyMessage != null) {
             message.setReplyToMessageId(replyMessage.getId());
-            boolean isReplySenderYou = replyMessage.getSenderId() != null && replyMessage.getSenderId().equals(currentUserId);
-            String quotedSenderName = (replyMessage.getSenderName() != null && !replyMessage.getSenderName().trim().isEmpty())
-                    ? replyMessage.getSenderName()
-                    : (recipientName != null ? recipientName : "Peer");
-            message.setReplySenderName(isReplySenderYou ? "You" : quotedSenderName);
+            message.setReplySenderName(resolveCleanReplySenderName(replyMessage));
             cancelReply();
         }
 
@@ -4521,6 +4911,9 @@ public class ChatActivity extends AppCompatActivity {
                     }
                     String sId = mDoc.getString("senderId");
                     String sName = mDoc.getString("senderName");
+                    if (com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(sName)) {
+                        sName = null;
+                    }
                     String pollJson = mDoc.getString("pollJson");
                     if (pollJson != null && pollJson.startsWith("ENC:v")) {
                         pollJson = EncryptionManager.decryptGroupPayload(chatId, pollJson);
@@ -4537,12 +4930,8 @@ public class ChatActivity extends AppCompatActivity {
                     boolean isFromMe = isSenderMe(sId, existing);
 
                     if (!isFromMe && sId != null && sName != null && !sName.isEmpty()
-                            && (recipientName == null || recipientName.isEmpty()
-                            || (myOwnName != null && recipientName.equals(myOwnName))
-                            || "Direct Chat".equals(recipientName)
-                            || "Veil Contact".equals(recipientName)
-                            || "Veil User".equals(recipientName)
-                            || "Anonymous Peer".equals(recipientName))) {
+                            && (com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(recipientName)
+                            || (myOwnName != null && recipientName.equals(myOwnName)))) {
                         recipientName = sName;
                         if (recipientId == null && !isGroupChatContext()) {
                             recipientId = sId;

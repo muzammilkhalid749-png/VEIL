@@ -1611,7 +1611,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      chat.setVanishTimer(json.optLong("vanishTimer", 0L));
                      EncryptedChatDatabase.getInstance(this.context).saveOrUpdateChat(chat);
                   } else if ("pin_msg".equals(setting)) {
-                     EncryptedChatDatabase.getInstance(this.context).updateChatPinnedMessage(chatId, json.optString("msgId", (String)null), json.optString("msgText", (String)null));
+                     String incomingPinId = json.optString("msgId", (String) null);
+                     String incomingPinText = json.optString("msgText", (String) null);
+                     if (incomingPinId != null && !incomingPinId.isEmpty()) {
+                        EncryptedChatDatabase.getInstance(this.context).updateMessagePinStatus(chatId, incomingPinId, true);
+                        EncryptedChatDatabase.getInstance(this.context).updateChatPinnedMessage(chatId, incomingPinId, incomingPinText);
+                     } else {
+                        EncryptedChatDatabase.getInstance(this.context).unpinAllMessagesInChat(chatId);
+                     }
                   } else if ("theme_wallpaper".equals(setting)) {
                      String hex = json.optString("themeColorHex", "");
                      if (!hex.isEmpty()) {

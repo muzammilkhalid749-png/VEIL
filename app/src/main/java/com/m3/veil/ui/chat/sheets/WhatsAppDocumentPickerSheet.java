@@ -292,8 +292,9 @@ public class WhatsAppDocumentPickerSheet extends BottomSheetDialogFragment {
                     "VeilChat Mesh Network Audit Report - 100% Peer-to-Peer Direct DataChannel Verification.");
             ensureSampleDoc(veilDocsDir, "Encrypted_Key_Bundle_Archive.zip",
                     "PK\u0003\u0004 VeilChat Encrypted Identity Archive");
+            String activeHandle = com.m3.veil.manager.VeilFeatureManager.getInstance(requireContext()).getActivePersona().getDisplayName();
             ensureSampleDoc(veilDocsDir, "VeilCoins_Ledger_Summary.xlsx",
-                    "Persona,XP,Karma,VeilCoins\n@ShadowVeil,450,88,500\n");
+                    "Persona,XP,Karma,VeilCoins\n" + activeHandle + ",450,88,500\n");
 
             scanDirectory(veilDocsDir, 0);
         } catch (Exception ignored) {}

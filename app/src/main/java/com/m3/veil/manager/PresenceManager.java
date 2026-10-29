@@ -48,6 +48,8 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
     private boolean isForeground = false;
     private volatile boolean sessionPinUnlocked = false;
     private volatile long lastBackgroundTimestampMs = 0L;
+    private volatile boolean externalPickerActive = false;
+    private volatile long externalPickerTimestampMs = 0L;
     private Runnable heartbeatRunnable;
 
     private PresenceManager() { }
@@ -81,6 +83,34 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
         return sessionPinUnlocked;
     }
 
+    /**
+     * Marks that the user is opening an external system activity (gallery, file picker, camera, share sheet)
+     * so returning to Veil does not falsely trigger the App Lock PIN screen.
+     */
+    public void notifyExternalPickerLaunched() {
+        this.externalPickerActive = true;
+        this.externalPickerTimestampMs = System.currentTimeMillis();
+    }
+
+    private long resolveAutoLockTimeoutMs() {
+        if (this.context == null) return 60_000L;
+        try {
+            android.content.SharedPreferences prefs = this.context.getSharedPreferences(
+                    "veil_privacy_prefs", android.content.Context.MODE_PRIVATE);
+            String label = prefs.getString("auto_lock_timeout_label", "1 Minute");
+            if ("Immediate".equalsIgnoreCase(label)) {
+                return 30_000L; // 30s grace for system dialogs/pickers
+            } else if ("5 Minutes".equalsIgnoreCase(label)) {
+                return 5 * 60_000L;
+            } else if ("15 Minutes".equalsIgnoreCase(label)) {
+                return 15 * 60_000L;
+            } else if ("30 Minutes".equalsIgnoreCase(label)) {
+                return 30 * 60_000L;
+            }
+        } catch (Throwable ignored) {}
+        return 60_000L;
+    }
+
     private boolean isPinExemptActivity(@NonNull Activity activity) {
         String name = activity.getClass().getSimpleName();
         return "SplashActivity".equals(name)
@@ -92,7 +122,8 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
                 || "UsernameActivity".equals(name)
                 || "RecoveryPhraseActivity".equals(name)
                 || "RestoreAnonymousActivity".equals(name)
-                || "CallActivity".equals(name);
+                || "CallActivity".equals(name)
+                || "UCropActivity".equals(name);
     }
 
     private String resolveCurrentUid() {
@@ -109,8 +140,16 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
         activityCount++;
         if (wasBackground) {
             isForeground = true;
-            if (lastBackgroundTimestampMs > 0L && (System.currentTimeMillis() - lastBackgroundTimestampMs) >= 800L) {
-                sessionPinUnlocked = false;
+            long now = System.currentTimeMillis();
+            if (externalPickerActive && (now - externalPickerTimestampMs) < 15 * 60_000L) {
+                externalPickerActive = false;
+                lastBackgroundTimestampMs = 0L;
+            } else {
+                externalPickerActive = false;
+                long timeoutMs = resolveAutoLockTimeoutMs();
+                if (lastBackgroundTimestampMs > 0L && (now - lastBackgroundTimestampMs) >= timeoutMs) {
+                    sessionPinUnlocked = false;
+                }
             }
             onAppForeground();
         }

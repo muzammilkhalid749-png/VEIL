@@ -53,10 +53,33 @@ public class AccountSettingsBottomSheet extends BottomSheetDialogFragment {
         });
 
         view.findViewById(R.id.btnChangePin).setOnClickListener(v -> {
-            dismiss();
-            Intent pinIntent = new Intent(requireContext(), PinSetupActivity.class);
-            pinIntent.putExtra("is_change_pin", true);
-            startActivity(pinIntent);
+            com.m3.veil.manager.VeilFeatureManager fm = com.m3.veil.manager.VeilFeatureManager.getInstance(requireContext());
+            if (fm.isAppLockPinEnabled()) {
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                        .setTitle("🔐 App Lock PIN")
+                        .setItems(new CharSequence[]{"🔑 Change Security PIN", "🔓 Remove PIN Lock"}, (dialog, which) -> {
+                            if (which == 0) {
+                                dismiss();
+                                Intent pinIntent = new Intent(requireContext(), PinSetupActivity.class);
+                                pinIntent.putExtra("is_change_pin", true);
+                                startActivity(pinIntent);
+                            } else {
+                                fm.setMasterPin(null);
+                                com.m3.veil.manager.PresenceManager.getInstance().markSessionPinUnlocked(true);
+                                requireContext().getSharedPreferences("veil_secure", Context.MODE_PRIVATE)
+                                        .edit().putBoolean("pin_set", false).apply();
+                                Toast.makeText(requireContext(), "🔓 App Lock PIN removed", Toast.LENGTH_SHORT).show();
+                                dismiss();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            } else {
+                dismiss();
+                Intent pinIntent = new Intent(requireContext(), PinSetupActivity.class);
+                pinIntent.putExtra("is_change_pin", true);
+                startActivity(pinIntent);
+            }
         });
 
         view.findViewById(R.id.btnViewRecoveryPhrase).setOnClickListener(v -> {
@@ -124,6 +147,29 @@ public class AccountSettingsBottomSheet extends BottomSheetDialogFragment {
             container = (ViewGroup) container.getChildAt(0);
         }
         float dp = getResources().getDisplayMetrics().density;
+
+        com.m3.veil.manager.VeilFeatureManager fm = com.m3.veil.manager.VeilFeatureManager.getInstance(requireContext());
+        if (fm.isAppLockPinEnabled()) {
+            com.google.android.material.button.MaterialButton btnRemovePinLock =
+                    new com.google.android.material.button.MaterialButton(
+                            requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+            android.widget.LinearLayout.LayoutParams removeLp = new android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            removeLp.topMargin = (int) (10 * dp);
+            btnRemovePinLock.setLayoutParams(removeLp);
+            btnRemovePinLock.setText("🔓 Remove App PIN Lock");
+            btnRemovePinLock.setAllCaps(false);
+            btnRemovePinLock.setCornerRadius((int) (12 * dp));
+            btnRemovePinLock.setOnClickListener(v -> {
+                fm.setMasterPin(null);
+                com.m3.veil.manager.PresenceManager.getInstance().markSessionPinUnlocked(true);
+                requireContext().getSharedPreferences("veil_secure", Context.MODE_PRIVATE)
+                        .edit().putBoolean("pin_set", false).apply();
+                Toast.makeText(requireContext(), "🔓 App Lock PIN removed", Toast.LENGTH_SHORT).show();
+                dismiss();
+            });
+            container.addView(btnRemovePinLock);
+        }
 
         com.google.android.material.button.MaterialButton btnBackup =
                 new com.google.android.material.button.MaterialButton(requireContext());

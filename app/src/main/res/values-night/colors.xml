@@ -4,6 +4,7 @@
     <color name="colorBackground">#0B0F17</color>
     <color name="colorSurface">#151C28</color>
     <color name="colorSurfaceVariant">#1E293B</color>
+    <color name="surfaceVariant">#1E293B</color>
     <color name="colorOutline">#222D3F</color>
     <color name="dividerColor">#222D3F</color>
     <color name="colorPrimary">#6366F1</color>

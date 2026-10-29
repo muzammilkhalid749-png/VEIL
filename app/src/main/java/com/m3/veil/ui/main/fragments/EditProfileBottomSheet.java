@@ -409,6 +409,7 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
 
     private void openGalleryPicker() {
         try {
+            com.m3.veil.manager.PresenceManager.getInstance().notifyExternalPickerLaunched();
             Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
             intent.setType("image/*");
             imagePickerLauncher.launch(intent);
@@ -618,8 +619,10 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
             userPreferences.saveUser(currentUser);
         }
 
-        // 3. Register new username in Bloom Filter
+        // 3. Register new username in Bloom Filter & sync active persona
         sovereignEngine.recordClaimedUsername(finalUsername);
+        com.m3.veil.manager.VeilFeatureManager.getInstance(getContext())
+                .syncPrimaryPersonaWithUser(finalUsername, finalDisplayName, finalBio, selectedMood);
 
         // 4. Update Firestore ("users/{uid}" & "usernames/{finalUsername}")
         if (uid != null && !uid.isEmpty()) {

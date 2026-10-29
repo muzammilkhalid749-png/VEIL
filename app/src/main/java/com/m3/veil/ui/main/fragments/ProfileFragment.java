@@ -227,15 +227,15 @@ public class ProfileFragment extends Fragment {
 
 
         Persona active = fm.getActivePersona();
-
         if (active != null && profileStatus != null) {
-
             int score = fm.calculatePrivacyScore(true);
-
-            profileStatus.setText("🎭 " + active.getDisplayName() + " (" + active.getMood() + ") • 🛡️ Privacy " + score + "/100");
-
+            boolean isPrimary = "persona_primary".equals(active.getPersonaId());
+            if (isPrimary) {
+                profileStatus.setText(active.getMood() + " • 🛡️ Privacy " + score + "/100");
+            } else {
+                profileStatus.setText("🎭 " + active.getDisplayName() + " (" + active.getMood() + ") • 🛡️ Privacy " + score + "/100");
+            }
         }
-
     }
 
 
@@ -2376,6 +2376,10 @@ public class ProfileFragment extends Fragment {
         } else {
             profileUsername.setText("@username");
         }
+
+        VeilFeatureManager.getInstance(requireContext()).syncPrimaryPersonaWithUser(
+                username, displayName, user.getBio(), null);
+        refreshGamificationAndVaultStats();
 
         if (profileImage != null) {
             String uid = user.getUserId() != null ? user.getUserId() : up.getUserId();

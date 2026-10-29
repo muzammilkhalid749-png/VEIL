@@ -83,7 +83,12 @@ public class PinSetupActivity extends AppCompatActivity {
         pinDotsContainer = findViewById(R.id.pinDotsContainer);
 
         if (getIntent().getBooleanExtra("is_change_pin", false) && skipButton != null) {
-            skipButton.setVisibility(View.GONE);
+            if (com.m3.veil.manager.VeilFeatureManager.getInstance(this).isAppLockPinEnabled()) {
+                skipButton.setVisibility(View.VISIBLE);
+                skipButton.setText("🔓 Remove PIN Lock");
+            } else {
+                skipButton.setVisibility(View.GONE);
+            }
         }
 
         findViewById(R.id.backButton).setOnClickListener(v -> onBackPressed());
@@ -165,6 +170,14 @@ public class PinSetupActivity extends AppCompatActivity {
     }
 
     private void handleSkip() {
+        if (getIntent().getBooleanExtra("is_change_pin", false)) {
+            com.m3.veil.manager.VeilFeatureManager.getInstance(this).setMasterPin(null);
+            com.m3.veil.manager.PresenceManager.getInstance().markSessionPinUnlocked(true);
+            getSharedPreferences("veil_secure", MODE_PRIVATE).edit().putBoolean("pin_set", false).apply();
+            android.widget.Toast.makeText(this, "🔓 App Lock PIN removed", android.widget.Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
         // Store MEK in Android Keystore without PIN
         generateAndStoreMEKWithoutPin();
     }

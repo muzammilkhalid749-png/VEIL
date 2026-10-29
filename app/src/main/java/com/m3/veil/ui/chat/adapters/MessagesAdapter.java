@@ -52,10 +52,48 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     private List<Message> messages;
     private String currentUserId;
     private String recipientId;
+    private String recipientName;
     private SimpleDateFormat timeFormat;
 
     public void setRecipientId(String recipientId) {
         this.recipientId = recipientId;
+    }
+
+    public void setRecipientName(String recipientName) {
+        this.recipientName = recipientName;
+    }
+
+    public String resolveReplyQuoteSenderName(Message message, Message replyTo) {
+        if (replyTo != null) {
+            if (isSenderMe(replyTo.getSenderId(), replyTo)) {
+                return "You";
+            }
+            if (replyTo.getSenderName() != null && !com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(replyTo.getSenderName())) {
+                return replyTo.getSenderName().trim();
+            }
+        }
+        String rawReplySender = message != null ? message.getReplySenderName() : null;
+        if ("You".equalsIgnoreCase(rawReplySender)) {
+            return "You";
+        }
+        if (rawReplySender != null && !com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(rawReplySender)) {
+            return rawReplySender.trim();
+        }
+        if (recipientName != null && !com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(recipientName)) {
+            return recipientName.trim();
+        }
+        if (message != null && message.getChatId() != null) {
+            try {
+                com.m3.veil.model.Chat dialog = com.m3.veil.manager.VeilMessagesController
+                        .getInstance(com.m3.veil.VeilApplication.getInstance())
+                        .getDialog(message.getChatId());
+                if (dialog != null && !dialog.isGroup() && dialog.getName() != null
+                        && !com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(dialog.getName())) {
+                    return dialog.getName().trim();
+                }
+            } catch (Throwable ignored) {}
+        }
+        return "Peer";
     }
 
     public boolean isSenderMe(String senderId, Message msg) {
@@ -2168,7 +2206,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         Message replyTo = getMessageById(message.getReplyToMessageId());
                         if (replyTo != null && !"deleted".equals(replyTo.getType())) {
                             replyQuoteContainer.setVisibility(View.VISIBLE);
-                            replyQuoteName.setText(message.getReplySenderName() != null ? message.getReplySenderName() : "User");
+                            replyQuoteName.setText(resolveReplyQuoteSenderName(message, replyTo));
                             String quoteText = replyTo.getText();
                             if ("voice".equals(replyTo.getType())) quoteText = "🎤 Voice message";
                             else if ("audio".equals(replyTo.getType())) quoteText = "🎵 Audio";
@@ -2191,7 +2229,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             replyQuoteText.setTypeface(null, android.graphics.Typeface.NORMAL);
                         } else {
                             replyQuoteContainer.setVisibility(View.VISIBLE);
-                            replyQuoteName.setText(message.getReplySenderName() != null ? message.getReplySenderName() : "User");
+                            replyQuoteName.setText(resolveReplyQuoteSenderName(message, replyTo));
                             replyQuoteText.setText("This message was deleted");
                             replyQuoteText.setTypeface(null, android.graphics.Typeface.ITALIC);
                         }
@@ -2615,7 +2653,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         || showDate);
                 if (showSenderHeader) {
                     String sName = message.getSenderName();
-                    if (sName == null || sName.trim().isEmpty()) {
+                    if (com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(sName)) {
                         String sid = message.getSenderId();
                         sName = (sid != null && sid.length() >= 4) ? ("Peer #" + sid.substring(0, 4)) : "Peer";
                     }
@@ -2632,7 +2670,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             }
             if (messageBubble instanceof com.m3.veil.ui.views.ChatMessageCell) {
                 com.m3.veil.ui.views.ChatMessageCell cell = (com.m3.veil.ui.views.ChatMessageCell) messageBubble;
-                cell.setMessageObject(message, false, clusterPos, true);
+                cell.setMessageObject(message, false, clusterPos, isGroupMsg);
                 if (cachedCornerRadiusDp > 0) {
                     cell.setCornerRadiusDp(cachedCornerRadiusDp);
                 }
@@ -3287,7 +3325,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         Message replyTo = getMessageById(message.getReplyToMessageId());
                         if (replyTo != null && !"deleted".equals(replyTo.getType())) {
                             replyQuoteContainer.setVisibility(View.VISIBLE);
-                            replyQuoteName.setText(message.getReplySenderName() != null ? message.getReplySenderName() : "User");
+                            replyQuoteName.setText(resolveReplyQuoteSenderName(message, replyTo));
                             String quoteText = replyTo.getText();
                             if ("voice".equals(replyTo.getType())) quoteText = "🎤 Voice message";
                             else if ("audio".equals(replyTo.getType())) quoteText = "🎵 Audio";
@@ -3310,7 +3348,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             replyQuoteText.setTypeface(null, android.graphics.Typeface.NORMAL);
                         } else {
                             replyQuoteContainer.setVisibility(View.VISIBLE);
-                            replyQuoteName.setText(message.getReplySenderName() != null ? message.getReplySenderName() : "User");
+                            replyQuoteName.setText(resolveReplyQuoteSenderName(message, replyTo));
                             replyQuoteText.setText("This message was deleted");
                             replyQuoteText.setTypeface(null, android.graphics.Typeface.ITALIC);
                         }

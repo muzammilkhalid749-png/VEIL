@@ -500,7 +500,11 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         if (this.mCurrentUserId == null) {
             this.mCurrentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(mContext).getCurrentUserId();
         }
-        this.mCurrentUserName = prefs.getString("username", "VeilUser");
+        String candidate = prefs.getString("username", null);
+        if (VeilFeatureManager.isShadowVeilOrGeneric(candidate)) {
+            candidate = VeilFeatureManager.getInstance(mContext).getActivePersona().getDisplayName();
+        }
+        this.mCurrentUserName = !VeilFeatureManager.isShadowVeilOrGeneric(candidate) ? candidate : "User";
     }
 
     public String getCurrentUserId() {
@@ -509,6 +513,12 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     }
 
     public String getCurrentUserName() {
+        if (VeilFeatureManager.isShadowVeilOrGeneric(mCurrentUserName)) {
+            String activeName = VeilFeatureManager.getInstance(mContext).getActivePersona().getDisplayName();
+            if (!VeilFeatureManager.isShadowVeilOrGeneric(activeName)) {
+                mCurrentUserName = activeName;
+            }
+        }
         return mCurrentUserName;
     }
 
@@ -876,7 +886,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         if (message.getSenderId() == null) {
             message.setSenderId(getCurrentUserId());
         }
-        if (message.getSenderName() == null) {
+        if (message.getSenderName() == null || VeilFeatureManager.isShadowVeilOrGeneric(message.getSenderName())) {
             message.setSenderName(getCurrentUserName());
         }
         if (isGroupOrChannel) {
@@ -3512,12 +3522,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     }
 
     /**
-     * Pins a message to the top of the chat dialog.
+     * Pins a message to the top of the chat dialog (supports multiple pinned messages).
      */
     public void pinMessage(String dialogId, String recipientId, String messageId, String messageText) {
         if (dialogId == null) return;
 
         mStageQueue.post(() -> {
+            if (messageId != null) {
+                mStorageQueue.execute(() -> mDatabase.updateMessagePinStatus(dialogId, messageId, true));
+            }
             Chat chat = getDialog(dialogId);
             if (chat != null) {
                 chat.setPinnedMessageId(messageId);
@@ -3534,10 +3547,34 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     }
 
     /**
-     * Unpins the pinned message in a dialog.
+     * Unpins a specific message or all pinned messages in a dialog.
      */
     public void unpinMessage(String dialogId, String recipientId) {
-        pinMessage(dialogId, recipientId, null, null);
+        if (dialogId == null) return;
+        mStageQueue.post(() -> {
+            mStorageQueue.execute(() -> mDatabase.unpinAllMessagesInChat(dialogId));
+            pinMessage(dialogId, recipientId, null, null);
+        });
+    }
+
+    public void unpinSpecificMessage(String dialogId, String recipientId, String unpinnedMsgId, String nextActiveMsgId, String nextActiveMsgText) {
+        if (dialogId == null) return;
+        mStageQueue.post(() -> {
+            if (unpinnedMsgId != null) {
+                mStorageQueue.execute(() -> mDatabase.updateMessagePinStatus(dialogId, unpinnedMsgId, false));
+            }
+            Chat chat = getDialog(dialogId);
+            if (chat != null) {
+                chat.setPinnedMessageId(nextActiveMsgId);
+                chat.setPinnedMessageText(nextActiveMsgText);
+                mStorageQueue.execute(() -> mDatabase.saveOrUpdateChat(chat));
+            }
+            mCryptoQueue.execute(() -> {
+                for (String peer : resolveTargetPeers(dialogId, recipientId, null)) {
+                    WebRtcManager.getInstance(mContext).sendPinMessageSetting(peer, dialogId, nextActiveMsgId, nextActiveMsgText);
+                }
+            });
+        });
     }
 
     /**

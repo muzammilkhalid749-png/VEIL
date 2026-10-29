@@ -597,7 +597,11 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         VeilFeatureManager fm = VeilFeatureManager.getInstance(requireContext());
         Persona active = fm.getActivePersona();
         if (btnActivePersona != null && active != null) {
-            btnActivePersona.setText("🎭 " + active.getDisplayName() + " • " + active.getMood());
+            String handle = active.getDisplayName();
+            if (VeilFeatureManager.isShadowVeilOrGeneric(handle)) {
+                handle = fm.resolveRealUserHandle();
+            }
+            btnActivePersona.setText("🎭 " + handle + " • " + active.getMood());
         }
         if (tvMeshStatusPill != null) {
             int peers = WebRtcManager.getInstance(requireContext()).getConnectedPeersCount();

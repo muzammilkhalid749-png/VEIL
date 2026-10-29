@@ -1629,6 +1629,54 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         notifyChatsChanged();
     }
 
+    public synchronized void updateMessagePinStatus(String chatId, String msgId, boolean pinned) {
+        if (msgId == null) return;
+        Message single = ramSingleMessageCache.get(msgId);
+        if (single != null) {
+            single.setPinned(pinned);
+        }
+        if (chatId != null) {
+            List<Message> cachedList = ramMessageListCache.get(chatId);
+            if (cachedList != null) {
+                for (Message m : cachedList) {
+                    if (m != null && msgId.equals(m.getId())) {
+                        m.setPinned(pinned);
+                        break;
+                    }
+                }
+            }
+        }
+        try {
+            SQLiteDatabase db = getEncryptedDb();
+            ContentValues cv = new ContentValues();
+            cv.put(COL_MSG_PINNED, pinned ? 1 : 0);
+            db.update(TABLE_MESSAGES, cv, COL_MSG_ID + "=?", new String[]{msgId});
+        } catch (Exception ignored) {}
+    }
+
+    public synchronized void unpinAllMessagesInChat(String chatId) {
+        if (chatId == null) return;
+        List<Message> cachedList = ramMessageListCache.get(chatId);
+        if (cachedList != null) {
+            for (Message m : cachedList) {
+                if (m != null) {
+                    m.setPinned(false);
+                    if (m.getId() != null) {
+                        Message single = ramSingleMessageCache.get(m.getId());
+                        if (single != null) single.setPinned(false);
+                    }
+                }
+            }
+        }
+        try {
+            SQLiteDatabase db = getEncryptedDb();
+            ContentValues cv = new ContentValues();
+            cv.put(COL_MSG_PINNED, 0);
+            db.update(TABLE_MESSAGES, cv, COL_MSG_CHAT_ID + "=?", new String[]{chatId});
+        } catch (Exception ignored) {}
+        updateChatPinnedMessage(chatId, null, null);
+    }
+
     public synchronized void incrementChatTrustScore(String chatId, int delta) {
         Chat chat = getChat(chatId);
         if (chat != null) {
