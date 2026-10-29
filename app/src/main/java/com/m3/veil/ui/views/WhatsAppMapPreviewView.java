@@ -50,23 +50,55 @@ public class WhatsAppMapPreviewView extends View {
         init();
     }
 
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        updateThemePaints();
+    }
+
+    @Override
+    protected void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        updateThemePaints();
+        invalidate();
+    }
+
+    public void updateThemePaints() {
+        boolean isNight = (getResources().getConfiguration().uiMode 
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        if (isNight) {
+            bgPaint.setColor(Color.parseColor("#151D2A"));
+            parkPaint.setColor(Color.parseColor("#143324"));
+            waterPaint.setColor(Color.parseColor("#162E44"));
+            minorRoadPaint.setColor(Color.parseColor("#253245"));
+            majorRoadPaint.setColor(Color.parseColor("#2E3D52"));
+            highwayPaint.setColor(Color.parseColor("#5A4518"));
+            labelPaint.setColor(Color.parseColor("#94A3B8"));
+            shadowPaint.setColor(Color.parseColor("#66000000"));
+        } else {
+            bgPaint.setColor(Color.parseColor("#EFECE6"));
+            parkPaint.setColor(Color.parseColor("#C8E6C9"));
+            waterPaint.setColor(Color.parseColor("#AEDFF7"));
+            minorRoadPaint.setColor(Color.WHITE);
+            majorRoadPaint.setColor(Color.WHITE);
+            highwayPaint.setColor(Color.parseColor("#FFE082"));
+            labelPaint.setColor(Color.parseColor("#607D8B"));
+            shadowPaint.setColor(Color.parseColor("#33000000"));
+        }
+    }
+
     private void init() {
         float dp = getResources().getDisplayMetrics().density;
 
-        bgPaint.setColor(Color.parseColor("#EFECE6"));
-        parkPaint.setColor(Color.parseColor("#C8E6C9"));
-        waterPaint.setColor(Color.parseColor("#AEDFF7"));
+        updateThemePaints();
 
-        minorRoadPaint.setColor(Color.WHITE);
         minorRoadPaint.setStyle(Paint.Style.STROKE);
         minorRoadPaint.setStrokeWidth(4.5f * dp);
         minorRoadPaint.setStrokeCap(Paint.Cap.ROUND);
 
-        majorRoadPaint.setColor(Color.WHITE);
         majorRoadPaint.setStyle(Paint.Style.STROKE);
         majorRoadPaint.setStrokeWidth(7.5f * dp);
 
-        highwayPaint.setColor(Color.parseColor("#FFE082"));
         highwayPaint.setStyle(Paint.Style.STROKE);
         highwayPaint.setStrokeWidth(8.5f * dp);
 
@@ -83,10 +115,8 @@ public class WhatsAppMapPreviewView extends View {
         pinCenterPaint.setColor(Color.WHITE);
         pinCenterPaint.setStyle(Paint.Style.FILL);
 
-        shadowPaint.setColor(Color.parseColor("#33000000"));
         shadowPaint.setStyle(Paint.Style.FILL);
 
-        labelPaint.setColor(Color.parseColor("#607D8B"));
         labelPaint.setTextSize(9.5f * dp);
         labelPaint.setFakeBoldText(true);
     }

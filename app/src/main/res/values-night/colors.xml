@@ -58,6 +58,7 @@
     <color name="message_text_secondary">#94A3B8</color>
     <color name="message_status_sent">#64748B</color>
     <color name="message_status_read">#818CF8</color>
+    <color name="message_doc_badge_bg">#4338CA</color>
     <color name="message_inner_card_bg">#18FFFFFF</color>
     <color name="message_divider">#1AFFFFFF</color>
     <color name="message_action_button">#818CF8</color>
@@ -65,5 +66,6 @@
     <color name="message_quote_bg">#1A818CF8</color>
     <color name="voice_waveform_played">#818CF8</color>
     <color name="voice_waveform_unplayed">#64748B</color>
-    <color name="chat_wallpaper_bg">#0B0F17</color>
+    <color name="chat_wallpaper_bg">#0B132B</color>
+    <color name="chat_doodle_tint">#3838BDF8</color>
 </resources>

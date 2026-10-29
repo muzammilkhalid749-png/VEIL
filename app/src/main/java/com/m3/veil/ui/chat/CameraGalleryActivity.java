@@ -731,7 +731,7 @@ public class CameraGalleryActivity extends AppCompatActivity {
         root.addView(handle);
 
         TextView title = new TextView(this);
-        title.setText("🎭 AR Anonymous Camera Masks (#211)");
+        title.setText("🎭 AR Anonymous Camera Masks");
         title.setTextSize(18f);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));

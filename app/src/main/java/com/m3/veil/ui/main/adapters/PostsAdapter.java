@@ -556,7 +556,7 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
                 }
 
                 MaterialButton btnAppend = new MaterialButton(context);
-                btnAppend.setText("➕ Append Node to Collab Chain (#214)");
+                btnAppend.setText("➕ Append Node to Collab Chain");
                 btnAppend.setTextSize(11.5f);
                 btnAppend.setCornerRadius((int) (12 * dp));
                 btnAppend.setOnClickListener(v -> showAppendCollabNodeDialog(context, post, onRefreshItem));
@@ -573,7 +573,7 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
             root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
 
             TextView title = new TextView(context);
-            title.setText("🔗 Append to Collaborative Chain (#214)");
+            title.setText("🔗 Append to Collaborative Chain");
             title.setTextSize(17.5f);
             title.setTypeface(null, Typeface.BOLD);
             title.setTextColor(Color.WHITE);
@@ -631,12 +631,12 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
             root.addView(title);
 
             String[] actions = {
-                    "🔖 Bookmark Post to Encrypted Vault (#114)",
-                    "🪙 Tip 5 VeilCoins Anonymously (#164)",
-                    "➕ Append Node to Collaborative Chain (#214)",
-                    "💬 1-Tap Anonymous DM with Author (#99)",
-                    "🔄 Quote-Repost to VeilBoard (#92)",
-                    "⚖️ Flag Post for Community Jury (#193)"
+                    "🔖 Bookmark Post to Encrypted Vault",
+                    "🪙 Tip 5 VeilCoins Anonymously",
+                    "➕ Append Node to Collaborative Chain",
+                    "💬 1-Tap Anonymous DM with Author",
+                    "🔄 Quote-Repost to VeilBoard",
+                    "⚖️ Flag Post for Community Jury"
             };
 
             for (int i = 0; i < actions.length; i++) {
@@ -677,7 +677,7 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
                             break;
                         case 5:
                             VeilBoardController.getInstance(context).reportPost(post.getId(), "Flagged by peer for Jury Review");
-                            Toast.makeText(context, "⚖️ Submitted to Decentralized Community Jury (#193)", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(context, "⚖️ Submitted to Decentralized Community Jury", Toast.LENGTH_SHORT).show();
                             break;
                     }
                 });

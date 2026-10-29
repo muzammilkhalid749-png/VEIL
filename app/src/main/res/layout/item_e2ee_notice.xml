@@ -12,28 +12,27 @@
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_message_received"
-        android:backgroundTint="#1A4A7BB8"
+        android:background="@drawable/bg_date_header_pill"
         android:gravity="center"
         android:orientation="vertical"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp">
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
 
         <ImageView
             android:layout_width="16dp"
             android:layout_height="16dp"
             android:layout_marginBottom="4dp"
             android:src="@drawable/ic_lock"
-            app:tint="@color/veil_accent" />
+            app:tint="@color/message_text_secondary" />
 
         <TextView
             android:layout_width="240dp"
             android:layout_height="wrap_content"
             android:text="Messages and calls are end-to-end encrypted. No one outside of this chat, not even VEIL, can read or listen to them."
             android:textAlignment="center"
-            android:textColor="@color/veil_accent"
+            android:textColor="@color/message_text_secondary"
             android:textSize="11sp" />
 
     </LinearLayout>

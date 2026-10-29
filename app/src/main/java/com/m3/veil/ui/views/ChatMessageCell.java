@@ -462,9 +462,26 @@ public class ChatMessageCell extends LinearLayout {
     // DYNAMIC CORNER CLUSTERING & BEZIER TAIL GEOMETRY
     // =========================================================================
 
+    private float mCustomCornerRadiusDp = -1f;
+
+    public void setCornerRadiusDp(float radiusDp) {
+        if (radiusDp > 0 && Math.abs(this.mCustomCornerRadiusDp - radiusDp) > 0.1f) {
+            this.mCustomCornerRadiusDp = radiusDp;
+            updateCornerRadii();
+            updateBubblePath(getWidth(), getHeight());
+            invalidate();
+        }
+    }
+
+    public boolean isDarkBubble() {
+        int color = (mIsOutgoing && mCustomBubbleColor != 0) ? mCustomBubbleColor
+                : (mIsOutgoing ? mColorBubbleSent : mColorBubbleReceived);
+        return ColorUtils.calculateLuminance(color) < 0.5;
+    }
+
     protected void updateCornerRadii() {
-        float rL = mCornerLarge;
-        float rS = mCornerSmall;
+        float rL = mCustomCornerRadiusDp > 0 ? (mCustomCornerRadiusDp * mDensity) : mCornerLarge;
+        float rS = mCustomCornerRadiusDp > 0 ? Math.min(5f * mDensity, rL * 0.35f) : mCornerSmall;
 
         if (mIsOutgoing) {
             switch (mClusterPosition) {

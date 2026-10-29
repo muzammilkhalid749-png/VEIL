@@ -500,7 +500,7 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
         layout.setPadding(padH, padV, padH, padV * 2);
 
         android.widget.TextView tvTitle = new android.widget.TextView(requireContext());
-        tvTitle.setText("🔄 Repost / Share Veil (#92)");
+        tvTitle.setText("🔄 Repost / Share Veil");
         tvTitle.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
         tvTitle.setTextSize(18);
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);

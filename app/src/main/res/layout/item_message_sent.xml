@@ -1080,7 +1080,7 @@
                     android:gravity="center"
                     android:background="@drawable/bg_view_once_ring"
                     android:text="1"
-                    android:textColor="@color/colorPrimary"
+                    android:textColor="#00A884"
                     android:textSize="12sp"
                     android:textStyle="bold" />
 

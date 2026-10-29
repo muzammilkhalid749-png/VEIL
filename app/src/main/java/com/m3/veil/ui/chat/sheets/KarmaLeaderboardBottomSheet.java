@@ -61,7 +61,7 @@ public class KarmaLeaderboardBottomSheet extends BottomSheetDialogFragment {
 
         // Header Title
         TextView tvTitle = new TextView(context);
-        tvTitle.setText("🏆 Anonymous Karma & Reaction Leaderboard (#161)");
+        tvTitle.setText("🏆 Anonymous Karma & Reaction Leaderboard");
         tvTitle.setTextSize(18f);
         tvTitle.setTypeface(null, Typeface.BOLD);
         tvTitle.setTextColor(ContextCompat.getColor(context, R.color.textPrimary));

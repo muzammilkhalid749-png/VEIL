@@ -1537,7 +1537,7 @@ public class CallActivity extends AppCompatActivity {
         root.addView(title);
 
         TextView sub = new TextView(this);
-        sub.setText("Real-time separable box blur & cyberpunk silhouette mask (#122, #220)");
+        sub.setText("Real-time separable box blur & cyberpunk silhouette mask");
         sub.setTextSize(13f);
         sub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
         sub.setPadding(0, 0, 0, (int) (16 * dp));
@@ -1569,7 +1569,7 @@ public class CallActivity extends AppCompatActivity {
         // Toggle 2: Silhouette
         com.google.android.material.switchmaterial.SwitchMaterial silSwitch =
                 new com.google.android.material.switchmaterial.SwitchMaterial(this);
-        silSwitch.setText("Cyberpunk Silhouette Mode (#122)");
+        silSwitch.setText("Cyberpunk Silhouette Mode");
         silSwitch.setTextSize(15.5f);
         silSwitch.setChecked(engine != null && engine.isVideoSilhouetteMode());
         silSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
@@ -1600,7 +1600,7 @@ public class CallActivity extends AppCompatActivity {
 
         // AR Anonymous Camera Masks (#211)
         TextView arTitle = new TextView(this);
-        arTitle.setText("AR Anonymous Face Masks (#211)");
+        arTitle.setText("AR Anonymous Face Masks");
         arTitle.setTextSize(15f);
         arTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         arTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));

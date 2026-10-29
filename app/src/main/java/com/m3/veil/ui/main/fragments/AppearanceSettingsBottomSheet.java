@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
@@ -28,6 +30,8 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
@@ -101,6 +105,34 @@ public class AppearanceSettingsBottomSheet extends BottomSheetDialogFragment {
         return R.style.ModernBottomSheetDialogTheme;
     }
 
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (getDialog() instanceof BottomSheetDialog) {
+            BottomSheetDialog dialog = (BottomSheetDialog) getDialog();
+            FrameLayout bottomSheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) {
+                BottomSheetBehavior<FrameLayout> behavior = BottomSheetBehavior.from(bottomSheet);
+                behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+                behavior.setSkipCollapsed(true);
+            }
+        }
+    }
+
+    private void setSafeSliderValue(Slider slider, float value) {
+        if (slider == null) return;
+        float from = slider.getValueFrom();
+        float to = slider.getValueTo();
+        float clamped = Math.max(from, Math.min(to, value));
+        float step = slider.getStepSize();
+        if (step > 0.0001f) {
+            float steps = Math.round((clamped - from) / step);
+            clamped = from + steps * step;
+            clamped = Math.max(from, Math.min(to, clamped));
+        }
+        slider.setValue(clamped);
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -166,7 +198,7 @@ public class AppearanceSettingsBottomSheet extends BottomSheetDialogFragment {
         switchAmoledBlack.setChecked(isAmoled);
 
         // Doodle Pattern Overlay
-        boolean isDoodlePattern = prefs.getBoolean("doodle_pattern_enabled", false);
+        boolean isDoodlePattern = prefs.getBoolean("doodle_pattern_enabled", true);
         switchDoodlePattern.setChecked(isDoodlePattern);
         if (ivPreviewDoodleOverlay != null) {
             ivPreviewDoodleOverlay.setVisibility(isDoodlePattern ? View.VISIBLE : View.GONE);
@@ -177,9 +209,9 @@ public class AppearanceSettingsBottomSheet extends BottomSheetDialogFragment {
         String wpValue = prefs.getString("wallpaper_value", "#0D1117");
         int dimLevel = prefs.getInt("wallpaper_dim", 0);
 
-        sliderWallpaperDim.setValue(dimLevel);
-        tvDimPercent.setText(dimLevel + "%");
-        updateDimOverlay(dimLevel);
+        setSafeSliderValue(sliderWallpaperDim, dimLevel);
+        tvDimPercent.setText((int) sliderWallpaperDim.getValue() + "%");
+        updateDimOverlay((int) sliderWallpaperDim.getValue());
         renderWallpaperPreview(wpType, wpValue);
 
         // Bubble Accent
@@ -198,9 +230,9 @@ public class AppearanceSettingsBottomSheet extends BottomSheetDialogFragment {
 
         // Text Size
         float textSize = prefs.getFloat("chat_text_size_sp", 15.5f);
-        sliderChatTextSize.setValue(Math.max(12.0f, Math.min(22.0f, textSize)));
-        tvChatTextSize.setText(String.format(java.util.Locale.US, "%.1f sp", textSize));
-        applyPreviewTextSize(textSize);
+        setSafeSliderValue(sliderChatTextSize, textSize);
+        tvChatTextSize.setText(String.format(java.util.Locale.US, "%.1f sp", sliderChatTextSize.getValue()));
+        applyPreviewTextSize(sliderChatTextSize.getValue());
     }
 
     private void renderWallpaperPreview(String wpType, String wpValue) {
@@ -234,9 +266,32 @@ public class AppearanceSettingsBottomSheet extends BottomSheetDialogFragment {
             boolean isNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
             boolean amoled = prefs.getBoolean("amoled_pure_black", false);
             if (isNight) {
-                previewWallpaperContainer.setBackgroundColor(amoled ? Color.BLACK : Color.parseColor("#0B0F17"));
+                if (amoled) {
+                    previewWallpaperContainer.setBackgroundColor(Color.BLACK);
+                    applyPreviewDoodlePattern(Color.parseColor("#2638BDF8"));
+                } else {
+                    previewWallpaperContainer.setBackgroundResource(R.drawable.bg_wallpaper_midnight_sapphire);
+                    applyPreviewDoodlePattern(Color.parseColor("#3838BDF8"));
+                }
             } else {
-                previewWallpaperContainer.setBackgroundColor(Color.parseColor("#F8FAFC"));
+                previewWallpaperContainer.setBackgroundResource(R.drawable.bg_wallpaper_nordic_frost);
+                applyPreviewDoodlePattern(Color.parseColor("#3D334155"));
+            }
+        }
+    }
+
+    private void applyPreviewDoodlePattern(int tintColor) {
+        if (ivPreviewDoodleOverlay != null) {
+            boolean isDoodlePattern = prefs.getBoolean("doodle_pattern_enabled", true);
+            ivPreviewDoodleOverlay.setVisibility(isDoodlePattern ? View.VISIBLE : View.GONE);
+            if (isDoodlePattern) {
+                Drawable d = ContextCompat.getDrawable(requireContext(), R.drawable.bg_chat_doodle_pattern);
+                if (d != null) {
+                    d = d.mutate();
+                    d.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN);
+                    ivPreviewDoodleOverlay.setBackground(d);
+                    ivPreviewDoodleOverlay.setImageDrawable(null);
+                }
             }
         }
     }
@@ -361,7 +416,7 @@ public class AppearanceSettingsBottomSheet extends BottomSheetDialogFragment {
                     .putString("wallpaper_type", "default")
                     .remove("wallpaper_value")
                     .putInt("wallpaper_dim", 0)
-                    .putBoolean("doodle_pattern_enabled", false)
+                    .putBoolean("doodle_pattern_enabled", true)
                     .putBoolean("amoled_pure_black", false)
                     .putString("chat_bubble_accent", "#4F46E5")
                     .putFloat("chat_bubble_corner_radius_dp", 18.0f)

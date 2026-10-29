@@ -11,10 +11,9 @@
         android:id="@+id/chatDoodleOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="centerCrop"
-        android:src="@drawable/bg_chat_doodle_pattern"
-        android:alpha="0.22"
-        android:visibility="gone" />
+        
+        android:alpha="1.0"
+        android:visibility="visible" />
 
     <!-- Top Header Stack (Toolbar + In-Chat Search + Pinned Message Banner) -->
     <LinearLayout

@@ -20,7 +20,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.ScrollView;
+import androidx.core.widget.NestedScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -196,9 +196,11 @@ public class SharedMediaGalleryBottomSheet extends BottomSheetDialogFragment {
         tvEmptyState.setVisibility(View.GONE);
         root.addView(tvEmptyState);
 
-        ScrollView scroll = new ScrollView(ctx);
+        NestedScrollView scroll = new NestedScrollView(ctx);
         scroll.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, (int) (440 * dp)));
+                ViewGroup.LayoutParams.MATCH_PARENT, (int) (480 * dp)));
+        scroll.setNestedScrollingEnabled(true);
+        scroll.setFillViewport(true);
 
         containerContent = new LinearLayout(ctx);
         containerContent.setOrientation(LinearLayout.VERTICAL);

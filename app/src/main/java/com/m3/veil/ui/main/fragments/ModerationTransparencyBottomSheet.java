@@ -80,7 +80,7 @@ public class ModerationTransparencyBottomSheet extends BottomSheetDialogFragment
         root.addView(title);
 
         TextView subtitle = new TextView(context);
-        subtitle.setText("Verifiable P2P community jury & immutable transparency receipts (#193, #194, #196)");
+        subtitle.setText("Verifiable P2P community jury & immutable transparency receipts");
         subtitle.setTextSize(12);
         subtitle.setTextColor(ContextCompat.getColor(context, R.color.text_secondary));
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -305,7 +305,7 @@ public class ModerationTransparencyBottomSheet extends BottomSheetDialogFragment
         List<EncryptedChatDatabase.ModerationTransparencyLog> logs = vbc.getTransparencyLogs();
 
         TextView intro = new TextView(context);
-        intro.setText("📜 Immutable Cryptographic Audit Log (#196)\nEvery moderation consensus generates a verifiable SHA-256 hash receipt.");
+        intro.setText("📜 Immutable Cryptographic Audit Log\nEvery moderation consensus generates a verifiable SHA-256 hash receipt.");
         intro.setTextSize(12);
         intro.setTextColor(Color.parseColor("#94A3B8"));
         LinearLayout.LayoutParams inLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -383,7 +383,7 @@ public class ModerationTransparencyBottomSheet extends BottomSheetDialogFragment
         VeilBoardController.AbuseStatistics stats = vbc.getAbuseStatistics();
 
         TextView intro = new TextView(context);
-        intro.setText("📊 Live Network Abuse & Spam Transparency (#194)");
+        intro.setText("📊 Live Network Abuse & Spam Transparency");
         intro.setTextSize(14);
         intro.setTypeface(null, Typeface.BOLD);
         intro.setTextColor(ContextCompat.getColor(context, R.color.text_primary));

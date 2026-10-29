@@ -69,7 +69,7 @@ import java.util.UUID;
  * 5. Anonymous Poll & Quiz Mode
  * 6. Time-Capsule Post (#215) with future unlock timestamp
  * 7. Collaborative Chain Post (#214) open for peer contributions
- * 8. Anonymous Doodle Sketch Pad (#207)
+ * 8. Anonymous Doodle Sketch Pad
  * 9. One-Time Burner Identity toggle
  */
 public class CreatePostActivity extends AppCompatActivity {
@@ -219,9 +219,9 @@ public class CreatePostActivity extends AppCompatActivity {
             addQuickChip(formatRow, "🎨 Gradient", v -> cycleBackgroundGradient());
             addQuickChip(formatRow, "🔤 Font", v -> cycleTypographyStyle());
             addQuickChip(formatRow, "🎙️ Voice DSP", v -> showVoiceConfessionRecorderSheet());
-            addQuickChip(formatRow, "🎨 Doodle (#207)", v -> showDoodleSketchPadSheet());
-            addQuickChip(formatRow, "⏳ Time-Capsule (#215)", v -> showTimeCapsulePickerSheet());
-            addQuickChip(formatRow, "🔗 Collab Chain (#214)", v -> toggleCollaborativeChain());
+            addQuickChip(formatRow, "🎨 Doodle", v -> showDoodleSketchPadSheet());
+            addQuickChip(formatRow, "⏳ Time-Capsule", v -> showTimeCapsulePickerSheet());
+            addQuickChip(formatRow, "🔗 Collab Chain", v -> toggleCollaborativeChain());
             addQuickChip(formatRow, "🔥 Burner ID", v -> toggleBurnerIdentity());
 
             formatScroll.addView(formatRow);
@@ -320,7 +320,7 @@ public class CreatePostActivity extends AppCompatActivity {
     private void toggleCollaborativeChain() {
         isCollaborativeChain = !isCollaborativeChain;
         Toast.makeText(this, isCollaborativeChain
-                ? "🔗 Collaborative Chain ON (#214): Peers can append nodes!"
+                ? "🔗 Collaborative Chain ON: Peers can append nodes!"
                 : "Collaborative Chain OFF", Toast.LENGTH_SHORT).show();
         refreshStudioPreview();
     }
@@ -351,10 +351,10 @@ public class CreatePostActivity extends AppCompatActivity {
         badges.append("📌 Mode: ").append(selectedCategory.toUpperCase()).append("  •  ").append(selectedMoodBadge);
         if (selectedGradientIndex > 0) badges.append("  •  🎨 Gradient #").append(selectedGradientIndex);
         if (selectedFontStyle > 0) badges.append("  •  🔤 Font #").append(selectedFontStyle);
-        if (isCollaborativeChain) badges.append("\n🔗 Collaborative Chain (#214) Open for Peer Appends");
+        if (isCollaborativeChain) badges.append("\n🔗 Collaborative Chain Open for Peer Appends");
         if (timeCapsuleUnlockAtMs > System.currentTimeMillis()) {
             long mins = Math.max(1, (timeCapsuleUnlockAtMs - System.currentTimeMillis()) / 60000L);
-            badges.append("\n⏳ Time-Capsule (#215): Unlocks in ").append(mins).append(" mins");
+            badges.append("\n⏳ Time-Capsule: Unlocks in ").append(mins).append(" mins");
         }
         if (attachedPollJson != null) {
             badges.append("\n📊 Interactive Poll / Quiz Attached");
@@ -417,9 +417,9 @@ public class CreatePostActivity extends AppCompatActivity {
                 "Attach Poll or Quiz Mode",
                 "Voice Confession Studio (Real-Time DSP)",
                 "Attach Image (EXIF Strip + Privacy Mosaic)",
-                "Anonymous Doodle Sketch Pad (#207)",
-                "Seal as Time-Capsule Post (#215)",
-                "Toggle Collaborative Chain Post (#214)"
+                "Anonymous Doodle Sketch Pad",
+                "Seal as Time-Capsule Post",
+                "Toggle Collaborative Chain Post"
         };
         String[] descs = {
                 "Visible on global P2P feed",
@@ -653,7 +653,7 @@ public class CreatePostActivity extends AppCompatActivity {
     }
 
     /**
-     * Anonymous Doodle Sketch Pad (#207):
+     * Anonymous Doodle Sketch Pad:
      * Inline custom View canvas allowing neon freehand drawing exported to encrypted local PNG.
      */
     private void showDoodleSketchPadSheet() {
@@ -664,7 +664,7 @@ public class CreatePostActivity extends AppCompatActivity {
         root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
 
         TextView title = new TextView(this);
-        title.setText("🎨 Anonymous Doodle Sketch Pad (#207)");
+        title.setText("🎨 Anonymous Doodle Sketch Pad");
         title.setTextSize(18f);
         title.setTypeface(null, Typeface.BOLD);
         title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
@@ -773,7 +773,7 @@ public class CreatePostActivity extends AppCompatActivity {
         root.setPadding((int) (24 * dp), (int) (20 * dp), (int) (24 * dp), (int) (24 * dp));
 
         TextView title = new TextView(this);
-        title.setText("⏳ Time-Capsule Post (#215)");
+        title.setText("⏳ Time-Capsule Post");
         title.setTextSize(18f);
         title.setTypeface(null, Typeface.BOLD);
         title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));

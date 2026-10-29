@@ -53,10 +53,10 @@
         android:title="📌 Read-Later Reminders" />
     <item
         android:id="@+id/action_time_travel_replay"
-        android:title="⏳ Time-Travel Chat Replay (#210)" />
+        android:title="⏳ Time-Travel Chat Replay" />
     <item
         android:id="@+id/action_p2p_minigames"
-        android:title="🎮 In-Chat P2P Minigames (#219)" />
+        android:title="🎮 In-Chat P2P Minigames" />
     <item
         android:id="@+id/action_clear_chat"
         android:title="Clear Chat" />

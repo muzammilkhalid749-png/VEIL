@@ -32,6 +32,7 @@ import com.m3.veil.utils.ImageLoader;
 import com.m3.veil.utils.VoicePlayerManager;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.content.Intent;
 import org.json.JSONObject;
 
@@ -326,6 +327,26 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     private int cachedCustomBubbleColor = 0;
     private float cachedTextSizeSp = 15.5f;
+    private float cachedCornerRadiusDp = 18.0f;
+
+    public void refreshAppearancePreferences() {
+        com.m3.veil.VeilApplication app = com.m3.veil.VeilApplication.getInstance();
+        if (app != null) {
+            try {
+                android.content.SharedPreferences appPrefs = app.getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
+                String accent = appPrefs.getString("chat_bubble_accent", null);
+                if (accent != null && !accent.isEmpty()) {
+                    this.cachedCustomBubbleColor = android.graphics.Color.parseColor(accent);
+                } else {
+                    this.cachedCustomBubbleColor = 0;
+                }
+                this.cachedTextSizeSp = appPrefs.getFloat("chat_text_size_sp", 15.5f);
+                this.cachedCornerRadiusDp = appPrefs.getFloat("chat_bubble_corner_radius_dp", 18.0f);
+                this.cachedCornerRadiusDp = appPrefs.getFloat("chat_bubble_corner_radius_dp", 18.0f);
+            } catch (Exception ignored) {}
+        }
+        notifyDataSetChanged();
+    }
     private final java.util.Map<String, Message> messageByIdCache = new java.util.HashMap<>();
     private int lastIndexedSize = -1;
 
@@ -864,6 +885,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         android.content.Context ctx = pollContainer.getContext();
         TextView subtitleView = pollContainer.findViewById(R.id.pollSubtitleText);
+        boolean isDarkBubble = false;
+        if (pollContainer.getParent() instanceof com.m3.veil.ui.views.ChatMessageCell) {
+            isDarkBubble = ((com.m3.veil.ui.views.ChatMessageCell) pollContainer.getParent()).isDarkBubble();
+        }
 
         try {
             org.json.JSONObject poll = new org.json.JSONObject(
@@ -913,7 +938,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     TextView tvVoteCount = optRow.findViewById(R.id.poll_option_vote_count);
                     ProgressBar ratioBar = optRow.findViewById(R.id.poll_vote_ratio);
 
-                    if (tvOptName != null) tvOptName.setText(optText);
+                    if (tvOptName != null) {
+                        tvOptName.setText(optText);
+                        tvOptName.setTextColor(isDarkBubble ? 0xFFF8FAFC : ContextCompat.getColor(ctx, R.color.message_text_primary));
+                    }
+                    if (tvVoteCount != null) {
+                        tvVoteCount.setTextColor(isDarkBubble ? 0xCCF8FAFC : ContextCompat.getColor(ctx, R.color.message_text_secondary));
+                    }
                     if (checkboxFrame != null) {
                         checkboxFrame.setBackgroundResource(votedByMe
                                 ? R.drawable.bg_poll_checkbox_checked
@@ -1444,6 +1475,39 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             if (callMessageContainer != null) callMessageContainer.setVisibility(View.GONE);
         }
 
+        private void applySentBubbleTheme(boolean isDark) {
+            Context ctx = itemView.getContext();
+            int textPrimary = isDark ? 0xFFF8FAFC : ContextCompat.getColor(ctx, R.color.message_text_primary);
+            int textSecondary = isDark ? 0xCCF8FAFC : ContextCompat.getColor(ctx, R.color.message_text_secondary);
+            int actionColor = isDark ? 0xFF818CF8 : ContextCompat.getColor(ctx, R.color.message_action_button);
+
+            if (timeText != null) timeText.setTextColor(textSecondary);
+            if (tvStarredBadge != null) tvStarredBadge.setTextColor(textSecondary);
+            if (tvVanishBadge != null) tvVanishBadge.setTextColor(textSecondary);
+            if (tvEditedBadge != null) tvEditedBadge.setTextColor(textSecondary);
+            if (voiceDurationText != null) voiceDurationText.setTextColor(textSecondary);
+            if (voiceSpeedButton != null) voiceSpeedButton.setTextColor(textPrimary);
+            if (documentFileName != null) documentFileName.setTextColor(textPrimary);
+            if (documentFileSize != null) documentFileSize.setTextColor(textSecondary);
+            if (locationTitle != null) locationTitle.setTextColor(textPrimary);
+            if (locationSubtitle != null) locationSubtitle.setTextColor(textSecondary);
+            if (contactName != null) contactName.setTextColor(textPrimary);
+            if (contactPhone != null) contactPhone.setTextColor(textSecondary);
+            if (contactActionMessage != null) contactActionMessage.setTextColor(actionColor);
+            if (contactActionSave != null) contactActionSave.setTextColor(actionColor);
+            if (pollQuestionText != null) pollQuestionText.setTextColor(textPrimary);
+            if (pollTotalVotesText != null) pollTotalVotesText.setTextColor(actionColor);
+            if (blinkTitleText != null) blinkTitleText.setTextColor(textPrimary);
+            if (callTitleText != null) callTitleText.setTextColor(textPrimary);
+            if (callSubtitleText != null) callSubtitleText.setTextColor(textSecondary);
+            if (tvLinkTitle != null) tvLinkTitle.setTextColor(textPrimary);
+            if (tvLinkDesc != null) tvLinkDesc.setTextColor(textSecondary);
+            if (replyQuoteText != null) replyQuoteText.setTextColor(textSecondary);
+            if (replyQuoteName != null) replyQuoteName.setTextColor(isDark ? 0xFF818CF8 : ContextCompat.getColor(ctx, R.color.message_quote_strip));
+            if (imageCaptionText != null) imageCaptionText.setTextColor(textPrimary);
+            if (videoCaptionText != null) videoCaptionText.setTextColor(textPrimary);
+        }
+
         public void bind(Message message, String time) {
             bind(message, time, false, "");
         }
@@ -1459,6 +1523,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             }
             timeText.setText(time);
             bindBubbleInfoBadges(message, tvStarredBadge, tvVanishBadge, tvEditedBadge);
+            boolean isDarkBubble = false;
             if (messageBubble instanceof com.m3.veil.ui.views.ChatMessageCell) {
                 com.m3.veil.ui.views.ChatMessageCell cell = (com.m3.veil.ui.views.ChatMessageCell) messageBubble;
                 int pos = getAdapterPosition() - 1;
@@ -1466,7 +1531,19 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 if (cachedCustomBubbleColor != 0) {
                     cell.setCustomBubbleColor(cachedCustomBubbleColor);
                 }
+                if (cachedCornerRadiusDp > 0) {
+                    cell.setCornerRadiusDp(cachedCornerRadiusDp);
+                }
+                isDarkBubble = cell.isDarkBubble();
+            } else {
+                Context ctx = itemView.getContext();
+                boolean isNight = (ctx.getResources().getConfiguration().uiMode 
+                        & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+                int bColor = cachedCustomBubbleColor != 0 ? cachedCustomBubbleColor
+                        : ContextCompat.getColor(ctx, R.color.message_bubble_sent);
+                isDarkBubble = androidx.core.graphics.ColorUtils.calculateLuminance(bColor) < 0.5;
             }
+            applySentBubbleTheme(isDarkBubble);
             attachDoubleTapAndLongPress(messageBubble, itemView, message);
             
             if ("deleted".equals(message.getType())) {
@@ -1919,6 +1996,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 if (documentActionIcon != null) {
                                     documentActionIcon.setVisibility(View.VISIBLE);
                                     documentActionIcon.setImageResource(R.drawable.ic_check);
+                                    documentActionIcon.setColorFilter(ContextCompat.getColor(itemView.getContext(), R.color.statusSuccess));
                                 }
                             }
                         }
@@ -2001,7 +2079,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 }
                 
                 messageText.setTypeface(null, android.graphics.Typeface.NORMAL);
-                messageText.setTextColor(itemView.getContext().getResources().getColor(R.color.message_text_primary));
+                messageText.setTextColor(isDarkBubble ? 0xFFF8FAFC : ContextCompat.getColor(itemView.getContext(), R.color.message_text_primary));
                 if (cachedTextSizeSp > 0 && messageText != null) {
                     messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, cachedTextSizeSp);
                 }
@@ -2357,6 +2435,40 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             if (callMessageContainer != null) callMessageContainer.setVisibility(View.GONE);
         }
 
+        private void applyReceivedBubbleTheme() {
+            Context ctx = itemView.getContext();
+            int textPrimary = ContextCompat.getColor(ctx, R.color.message_text_primary);
+            int textSecondary = ContextCompat.getColor(ctx, R.color.message_text_secondary);
+            int actionColor = ContextCompat.getColor(ctx, R.color.message_action_button);
+            int quoteStripColor = ContextCompat.getColor(ctx, R.color.message_quote_strip);
+
+            if (timeText != null) timeText.setTextColor(textSecondary);
+            if (tvStarredBadge != null) tvStarredBadge.setTextColor(textSecondary);
+            if (tvVanishBadge != null) tvVanishBadge.setTextColor(textSecondary);
+            if (tvEditedBadge != null) tvEditedBadge.setTextColor(textSecondary);
+            if (voiceDurationText != null) voiceDurationText.setTextColor(textSecondary);
+            if (voiceSpeedButton != null) voiceSpeedButton.setTextColor(textPrimary);
+            if (documentFileName != null) documentFileName.setTextColor(textPrimary);
+            if (documentFileSize != null) documentFileSize.setTextColor(textSecondary);
+            if (locationTitle != null) locationTitle.setTextColor(textPrimary);
+            if (locationSubtitle != null) locationSubtitle.setTextColor(textSecondary);
+            if (contactName != null) contactName.setTextColor(textPrimary);
+            if (contactPhone != null) contactPhone.setTextColor(textSecondary);
+            if (contactActionMessage != null) contactActionMessage.setTextColor(actionColor);
+            if (contactActionSave != null) contactActionSave.setTextColor(actionColor);
+            if (pollQuestionText != null) pollQuestionText.setTextColor(textPrimary);
+            if (pollTotalVotesText != null) pollTotalVotesText.setTextColor(actionColor);
+            if (blinkTitleText != null) blinkTitleText.setTextColor(textPrimary);
+            if (callTitleText != null) callTitleText.setTextColor(textPrimary);
+            if (callSubtitleText != null) callSubtitleText.setTextColor(textSecondary);
+            if (tvLinkTitle != null) tvLinkTitle.setTextColor(textPrimary);
+            if (tvLinkDesc != null) tvLinkDesc.setTextColor(textSecondary);
+            if (replyQuoteText != null) replyQuoteText.setTextColor(textSecondary);
+            if (replyQuoteName != null) replyQuoteName.setTextColor(quoteStripColor);
+            if (imageCaptionText != null) imageCaptionText.setTextColor(textPrimary);
+            if (videoCaptionText != null) videoCaptionText.setTextColor(textPrimary);
+        }
+
         public void bind(Message message, String time) {
             bind(message, time, false, "");
         }
@@ -2387,7 +2499,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         sName = (sid != null && sid.length() >= 4) ? ("Peer #" + sid.substring(0, 4)) : "Peer";
                     }
                     senderNameText.setText(sName);
-                    int[] palette = {0xFF38BDF8, 0xFFA855F7, 0xFF34D399, 0xFFFBBF24, 0xFFF472B6, 0xFFFB7185, 0xFF60A5FA};
+                    boolean isNight = (itemView.getContext().getResources().getConfiguration().uiMode 
+                            & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+                    int[] palette = isNight 
+                            ? new int[]{0xFF818CF8, 0xFFF472B6, 0xFF34D399, 0xFFFBBF24, 0xFF60A5FA, 0xFFA78BFA, 0xFF2DD4BF, 0xFFFB7185}
+                            : new int[]{0xFF4F46E5, 0xFFDB2777, 0xFF059669, 0xFFD97706, 0xFF2563EB, 0xFF7C3AED, 0xFF0D9488, 0xFFE11D48};
                     int hash = Math.abs((message.getSenderId() != null ? message.getSenderId() : sName).hashCode());
                     senderNameText.setTextColor(palette[hash % palette.length]);
                     senderNameText.setVisibility(View.VISIBLE);
@@ -2398,7 +2514,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             if (messageBubble instanceof com.m3.veil.ui.views.ChatMessageCell) {
                 com.m3.veil.ui.views.ChatMessageCell cell = (com.m3.veil.ui.views.ChatMessageCell) messageBubble;
                 cell.setMessageObject(message, false, clusterPos, true);
+                if (cachedCornerRadiusDp > 0) {
+                    cell.setCornerRadiusDp(cachedCornerRadiusDp);
+                }
             }
+            applyReceivedBubbleTheme();
             attachDoubleTapAndLongPress(messageBubble, itemView, message);
             
             if ("deleted".equals(message.getType())) {
@@ -2920,6 +3040,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 if (documentActionIcon != null) {
                                     documentActionIcon.setVisibility(View.VISIBLE);
                                     documentActionIcon.setImageResource(R.drawable.ic_check);
+                                    documentActionIcon.setColorFilter(ContextCompat.getColor(itemView.getContext(), R.color.statusSuccess));
                                 }
                             } else {
                                 documentProgressBar.setVisibility(View.GONE);
@@ -2927,6 +3048,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 if (documentActionIcon != null) {
                                     documentActionIcon.setVisibility(View.VISIBLE);
                                     documentActionIcon.setImageResource(docDownloadState == STATE_RETRY ? R.drawable.ic_undo : R.drawable.ic_download);
+                                    int iconColor = (docDownloadState == STATE_RETRY)
+                                            ? ContextCompat.getColor(itemView.getContext(), R.color.statusError)
+                                            : ContextCompat.getColor(itemView.getContext(), R.color.message_action_button);
+                                    documentActionIcon.setColorFilter(iconColor);
                                 }
                             }
                         }
@@ -3014,7 +3139,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 }
                 
                 messageText.setTypeface(null, android.graphics.Typeface.NORMAL);
-                messageText.setTextColor(itemView.getContext().getResources().getColor(R.color.message_text_primary));
+                messageText.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.message_text_primary));
                 if (cachedTextSizeSp > 0 && messageText != null) {
                     messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, cachedTextSizeSp);
                 }

@@ -434,6 +434,10 @@ public class ProfileFragment extends Fragment {
 
             int idx = parent.indexOfChild(storageView);
 
+            android.util.TypedValue outVal = new android.util.TypedValue();
+            requireContext().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outVal, true);
+            int selectableBg = outVal.resourceId;
+
             LinearLayout repostsRow = new LinearLayout(requireContext());
 
             repostsRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -444,7 +448,7 @@ public class ProfileFragment extends Fragment {
 
             repostsRow.setPadding((int) (16 * getResources().getDisplayMetrics().density), 0, (int) (16 * getResources().getDisplayMetrics().density), 0);
 
-            repostsRow.setBackgroundResource(R.drawable.button_primary_selector);
+            repostsRow.setBackgroundResource(selectableBg);
 
             repostsRow.setClickable(true);
 
@@ -460,7 +464,7 @@ public class ProfileFragment extends Fragment {
 
             iv.setImageResource(R.drawable.ic_share);
 
-            iv.setColorFilter(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+            iv.setColorFilter(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
 
             repostsRow.addView(iv);
 
@@ -474,7 +478,7 @@ public class ProfileFragment extends Fragment {
 
             tv.setLayoutParams(tvLp);
 
-            tv.setText("My Reposts & Quotes (#92)");
+            tv.setText("My Reposts & Quotes");
 
             tv.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
 
@@ -500,11 +504,16 @@ public class ProfileFragment extends Fragment {
 
             repostsRow.setOnClickListener(v -> openRepostsDialog());
 
-            parent.addView(repostsRow, idx + 1);
+            View div1 = new View(requireContext());
+            div1.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (int) (1 * getResources().getDisplayMetrics().density)));
+            div1.setBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorOutline));
+
+            parent.addView(div1, idx + 1);
+            parent.addView(repostsRow, idx + 2);
 
 
 
-            // Community Jury & Transparency (#193, #194, #196)
+            // Community Jury & Transparency
 
             LinearLayout juryRow = new LinearLayout(requireContext());
 
@@ -516,7 +525,7 @@ public class ProfileFragment extends Fragment {
 
             juryRow.setPadding((int) (16 * getResources().getDisplayMetrics().density), 0, (int) (16 * getResources().getDisplayMetrics().density), 0);
 
-            juryRow.setBackgroundResource(R.drawable.button_primary_selector);
+            juryRow.setBackgroundResource(selectableBg);
 
             juryRow.setClickable(true);
 
@@ -530,7 +539,7 @@ public class ProfileFragment extends Fragment {
 
             ivJury.setImageResource(R.drawable.ic_privacy);
 
-            ivJury.setColorFilter(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+            ivJury.setColorFilter(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
 
             juryRow.addView(ivJury);
 
@@ -544,7 +553,7 @@ public class ProfileFragment extends Fragment {
 
             tvJury.setLayoutParams(tvJuryLp);
 
-            tvJury.setText("Community Jury & Transparency (#193, #196)");
+            tvJury.setText("Community Jury & Transparency");
 
             tvJury.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
 
@@ -574,7 +583,12 @@ public class ProfileFragment extends Fragment {
 
             });
 
-            parent.addView(juryRow, idx + 2);
+            View div2 = new View(requireContext());
+            div2.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (int) (1 * getResources().getDisplayMetrics().density)));
+            div2.setBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorOutline));
+
+            parent.addView(div2, idx + 3);
+            parent.addView(juryRow, idx + 4);
 
         }
 
@@ -1514,7 +1528,7 @@ public class ProfileFragment extends Fragment {
 
         TextView tvTitle = new TextView(requireContext());
 
-        tvTitle.setText("🛡️ Live Cryptographic Privacy Score (#117)");
+        tvTitle.setText("🛡️ Live Cryptographic Privacy Score");
 
         tvTitle.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
 
@@ -1560,7 +1574,7 @@ public class ProfileFragment extends Fragment {
 
 
 
-        addPrivacyActionRow(itemsContainer, "🧅 Tor / SOCKS5 Proxy Bridge (#116)",
+        addPrivacyActionRow(itemsContainer, "🧅 Tor / SOCKS5 Proxy Bridge",
 
                 b.torRelayActive ? "Active • Strict Relay (No STUN IP Leaks)" : "Disabled • Direct P2P Mesh", v -> {
 
@@ -2591,7 +2605,7 @@ public class ProfileFragment extends Fragment {
 
         TextView tvTitle = new TextView(requireContext());
 
-        tvTitle.setText("🔄 My Reposts & Quotes (#92)");
+        tvTitle.setText("🔄 My Reposts & Quotes");
 
         tvTitle.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
 

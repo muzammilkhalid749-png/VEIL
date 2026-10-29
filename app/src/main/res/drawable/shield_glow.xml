@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
-    <solid android:color="@color/veil_accent" />
+    <gradient
+        android:type="radial"
+        android:gradientRadius="50%"
+        android:centerX="52%"
+        android:centerY="48%"
+        android:startColor="#5500F5FF"
+        android:centerColor="#284F46E5"
+        android:endColor="#00000000" />
 </shape>

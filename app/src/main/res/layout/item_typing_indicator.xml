@@ -29,7 +29,7 @@
             android:layout_width="6dp"
             android:layout_height="6dp"
             android:background="@drawable/circle_background"
-            android:backgroundTint="@color/text_primary" />
+            android:backgroundTint="@color/message_text_secondary" />
 
         <View
             android:id="@+id/dot2"
@@ -37,7 +37,7 @@
             android:layout_height="6dp"
             android:layout_marginStart="4dp"
             android:background="@drawable/circle_background"
-            android:backgroundTint="@color/text_primary" />
+            android:backgroundTint="@color/message_text_secondary" />
 
         <View
             android:id="@+id/dot3"
@@ -45,7 +45,7 @@
             android:layout_height="6dp"
             android:layout_marginStart="4dp"
             android:background="@drawable/circle_background"
-            android:backgroundTint="@color/text_primary" />
+            android:backgroundTint="@color/message_text_secondary" />
 
     </LinearLayout>
 

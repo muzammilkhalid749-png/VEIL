@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -248,13 +250,13 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
 
         // 2. Curated Themes Grid (12 presets)
         final String[] themeNames = {
-                "Default Night", "Midnight Abyss", "Cyber Indigo", "Emerald Matrix",
+                "Nordic Slate Frost", "Midnight Sapphire", "Cyber Indigo", "Emerald Matrix",
                 "Crimson Velvet", "Royal Gold", "Deep Ocean", "WhatsApp Dark",
                 "Sunset Horizon", "Oceanic Aqua", "Cyber Aurora", "Midnight Nebula"
         };
 
         final String[] themeValues = {
-                "#121212", "#0D1117", "#121026", "#091E1A",
+                "gradient:#F8FAFC:#EBEEF2", "gradient:#0B132B:#1C2541", "#121026", "#091E1A",
                 "#240B15", "#1F1905", "#081D2E", "#0B141B",
                 "gradient:#FF512F:#DD2476", "gradient:#00C9FF:#92FE9D",
                 "gradient:#8A2387:#E94057:#F27121", "gradient:#0F2027:#203A43:#2C5364"
@@ -379,16 +381,17 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
 
         // Default Reset Button
         MaterialButton btnReset = new MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
-        btnReset.setText("Reset to Default Night Theme");
+        btnReset.setText("Reset to Default Theme");
         btnReset.setCornerRadius((int) (14 * dp));
         LinearLayout.LayoutParams rLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         rLp.topMargin = (int) (8 * dp);
         btnReset.setLayoutParams(rLp);
         btnReset.setOnClickListener(v -> {
-            selectedWallpaperValue = "#121212";
-            selectedThemeName = "Default Night";
-            tvActiveThemeLabel.setText("Active Preset: Default Night");
+            boolean isNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+            selectedWallpaperValue = isNight ? "gradient:#0B132B:#1C2541" : "gradient:#F8FAFC:#EBEEF2";
+            selectedThemeName = isNight ? "Midnight Sapphire" : "Nordic Slate Frost";
+            tvActiveThemeLabel.setText("Active Preset: " + selectedThemeName);
             updateLivePreview();
             applyAndSyncTheme(ctx);
         });
@@ -435,6 +438,21 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
             }
         } catch (Exception ignored) {
             previewBackgroundBox.setBackgroundColor(0xFF121212);
+        }
+
+        if (previewDoodleOverlay != null) {
+            previewDoodleOverlay.setVisibility(doodleEnabled ? View.VISIBLE : View.GONE);
+            if (doodleEnabled) {
+                boolean isLight = selectedWallpaperValue != null && (selectedWallpaperValue.contains("#F8FAFC") || selectedWallpaperValue.contains("#EBEEF2"));
+                int tint = isLight ? Color.parseColor("#3D334155") : Color.parseColor("#3838BDF8");
+                Drawable d = ContextCompat.getDrawable(requireContext(), R.drawable.bg_chat_doodle_pattern);
+                if (d != null) {
+                    d = d.mutate();
+                    d.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+                    previewDoodleOverlay.setBackground(d);
+                    previewDoodleOverlay.setImageDrawable(null);
+                }
+            }
         }
     }
 

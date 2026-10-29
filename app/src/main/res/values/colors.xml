@@ -53,13 +53,14 @@
     <color name="attach_camera_icon">#F59E0B</color>
 
     <!-- Veil Signature Message Bubble Colors (Light Theme - Modern Indigo Aesthetic) -->
-    <color name="message_bubble_sent">#EEF2FF</color>
+    <color name="message_bubble_sent">#E0E7FE</color>
     <color name="message_bubble_received">#FFFFFF</color>
     <color name="message_text_primary">#0F172A</color>
     <color name="message_text_secondary">#64748B</color>
     <color name="message_status_sent">#94A3B8</color>
     <color name="message_status_read">#4F46E5</color>
-    <color name="message_inner_card_bg">#0D000000</color>
+    <color name="message_doc_badge_bg">#4F46E5</color>
+    <color name="message_inner_card_bg">#0A000000</color>
     <color name="message_divider">#14000000</color>
     <color name="message_action_button">#4F46E5</color>
     <color name="message_quote_strip">#4F46E5</color>
@@ -67,4 +68,5 @@
     <color name="voice_waveform_played">#4F46E5</color>
     <color name="voice_waveform_unplayed">#94A3B8</color>
     <color name="chat_wallpaper_bg">#F8FAFC</color>
+    <color name="chat_doodle_tint">#3D334155</color>
 </resources>

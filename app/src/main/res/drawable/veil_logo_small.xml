@@ -1,22 +1,307 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="32dp"
-    android:height="32dp"
-    android:viewportWidth="32"
-    android:viewportHeight="32">
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
 
-    <!-- Simplified version of the main logo -->
-    <path
-        android:fillColor="@color/veil_accent"
-        android:pathData="M 6,16 C 6,10 10,6 16,6 C 22,6 26,10 26,16 C 26,22 22,26 16,26 C 10,26 6,22 6,16 Z" />
+    <!--Centered & Scaled Up (1.22x) so it fills small 24dp–48dp UI slots crisply-->
+    <group
+        android:pivotX="100"
+        android:pivotY="95"
+        android:scaleX="1.22"
+        android:scaleY="1.22"
+        android:translateY="4">
 
-    <path
-        android:fillColor="@color/veil_primary"
-        android:pathData="M 16,16 C 16,12 18,10 22,10 C 26,10 28,12 28,16 C 28,20 26,22 22,22 C 18,22 16,20 16,16 Z" />
+        <!-- ============================================================= -->
+        <!-- 1. SCULPTED HOOD SHROUD & ROUNDED CAVITY (ZERO BOTTOM SPIKE)  -->
+        <!-- ============================================================= -->
 
-    <path
-        android:strokeColor="@color/text_primary"
-        android:strokeWidth="2"
-        android:pathData="M 16,16 L 22,16" />
+        <!-- Outer Hood Shroud Dome -->
+        <path
+            android:pathData="M 76,40 C 98,23 128,21 149,32 C 164,40 171,58 172,82 C 173,98 171,110 165,120 C 155,134 134,149 110,162 C 104,158 98,150 92,142 C 70,120 56,94 62,64 C 65,51 70,44 76,40 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="64"
+                    android:startY="24"
+                    android:endX="168"
+                    android:endY="162"
+                    android:startColor="#3B4382"
+                    android:centerColor="#212652"
+                    android:endColor="#0E122B" />
+            </aapt:attr>
+        </path>
+
+        <!-- Smooth Rounded Hood Cavity Behind Shield -->
+        <path
+            android:pathData="M 136,46 C 153,47 163,66 163,93 C 163,111 151,126 120,148 C 103,132 93,112 95,88 C 97,62 116,45 136,46 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="radial"
+                    android:centerX="127"
+                    android:centerY="94"
+                    android:gradientRadius="54"
+                    android:startColor="#194270"
+                    android:centerColor="#0A1730"
+                    android:endColor="#050814" />
+            </aapt:attr>
+        </path>
+
+        <!-- Sculpted Inner Cloth Pleat Valley 1 -->
+        <path
+            android:pathData="M 96,31 C 70,48 62,82 74,112 C 82,130 98,145 108,160 C 94,146 74,130 62,108 C 50,82 60,48 96,31 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="58"
+                    android:startY="34"
+                    android:endX="108"
+                    android:endY="160"
+                    android:startColor="#131735"
+                    android:endColor="#070A1A" />
+            </aapt:attr>
+        </path>
+
+        <!-- Sculpted Inner Cloth Pleat Ridge 1 -->
+        <path
+            android:pathData="M 102,31 C 76,50 68,84 80,112 C 88,130 102,144 110,159 C 100,145 84,130 75,112 C 63,84 71,50 102,31 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="70"
+                    android:startY="32"
+                    android:endX="110"
+                    android:endY="158"
+                    android:startColor="#956366F1"
+                    android:centerColor="#754F46E5"
+                    android:endColor="#0038BDF8" />
+            </aapt:attr>
+        </path>
+
+        <!-- Sculpted Inner Cloth Pleat Valley 2 -->
+        <path
+            android:pathData="M 120,38 C 92,54 82,86 92,114 C 98,130 108,142 115,154 C 104,142 90,128 84,110 C 76,84 88,52 120,38 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="76"
+                    android:startY="38"
+                    android:endX="115"
+                    android:endY="154"
+                    android:startColor="#131735"
+                    android:endColor="#070A1A" />
+            </aapt:attr>
+        </path>
+
+        <!-- Inner Cavity Crease Catching Cyan Bounce Light -->
+        <path
+            android:pathData="M 136,46 C 116,45 97,62 95,88 C 93,112 103,132 120,148 C 106,133 97,113 99,88 C 101,65 118,49 136,46 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="138"
+                    android:startY="44"
+                    android:endX="92"
+                    android:endY="148"
+                    android:startColor="#D038BDF8"
+                    android:centerColor="#806366F1"
+                    android:endColor="#001E1B4B" />
+            </aapt:attr>
+        </path>
+
+        <!-- ============================================================= -->
+        <!-- 2. LOWER-RIGHT COLLAR BLADE                                   -->
+        <!-- ============================================================= -->
+
+        <path
+            android:pathData="M 167,115 C 161,138 142,154 114,163 C 128,148 146,133 167,115 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="168"
+                    android:startY="114"
+                    android:endX="114"
+                    android:endY="163"
+                    android:startColor="#38BDF8"
+                    android:centerColor="#2563EB"
+                    android:endColor="#172554" />
+            </aapt:attr>
+        </path>
+
+        <path
+            android:pathData="M 167,115 C 161,138 142,154 114,163 C 138,152 156,136 164,118 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="168"
+                    android:startY="114"
+                    android:endX="114"
+                    android:endY="163"
+                    android:startColor="#A5F3FC"
+                    android:centerColor="#00F5FF"
+                    android:endColor="#000284C7" />
+            </aapt:attr>
+        </path>
+
+        <!-- ============================================================= -->
+        <!-- 3. CALLIGRAPHIC VARIABLE-WIDTH NEON CYAN HOOD RIM             -->
+        <!-- ============================================================= -->
+
+        <path
+            android:pathData="M 76,40 C 98,23 128,21 149,32 C 164,40 171,58 172,82 C 173,98 171,110 165,120 C 155,134 134,149 110,162 C 131,146 150,131 159,118 C 165,108 167,96 166,82 C 165,60 158,44 145,36 C 125,26 99,27 76,40 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="76"
+                    android:startY="24"
+                    android:endX="172"
+                    android:endY="158"
+                    android:startColor="#38BDF8"
+                    android:centerColor="#E0F2FE"
+                    android:endColor="#00F5FF" />
+            </aapt:attr>
+        </path>
+
+        <!-- ============================================================= -->
+        <!-- 4. SEAMLESS LEFT SPEECH-BUBBLE CRESCENT WING                  -->
+        <!-- ============================================================= -->
+
+        <!-- Main Indigo Crescent Body -->
+        <path
+            android:pathData="M 96,26 C 54,32 26,66 28,108 C 29,122 34,135 41,144 C 39,151 33,158 26,163 C 39,163 50,159 59,153 C 71,160 84,164 95,163 C 104,162 107,153 101,144 C 93,132 75,121 64,103 C 51,81 56,51 78,35 C 84,30 90,27 96,26 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="28"
+                    android:startY="26"
+                    android:endX="104"
+                    android:endY="164"
+                    android:startColor="#6366F1"
+                    android:centerColor="#4F46E5"
+                    android:endColor="#3730A3" />
+            </aapt:attr>
+        </path>
+
+        <!-- Continuous Outer 3D Bevel (Fades Smoothly Into Tail Tip) -->
+        <path
+            android:pathData="M 96,26 C 54,32 26,66 28,108 C 29,122 34,135 41,144 C 39,151 33,158 26,163 C 36,154 42,142 41,124 C 38,82 56,42 96,26 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="28"
+                    android:startY="26"
+                    android:endX="62"
+                    android:endY="162"
+                    android:startColor="#93C5FD"
+                    android:centerColor="#60A5FA"
+                    android:endColor="#004F46E5" />
+            </aapt:attr>
+        </path>
+
+        <!-- Inner S-Curve Specular Rim Highlight -->
+        <path
+            android:strokeWidth="1.8"
+            android:strokeLineCap="round"
+            android:pathData="M 96,26 C 90,27 84,30 78,35 C 56,51 51,81 64,103 C 75,121 93,132 101,144 C 107,153 104,162 95,163">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="96"
+                    android:startY="26"
+                    android:endX="102"
+                    android:endY="162"
+                    android:startColor="#BAE6FD"
+                    android:centerColor="#90818CF8"
+                    android:endColor="#306366F1" />
+            </aapt:attr>
+        </path>
+
+        <!-- ============================================================= -->
+        <!-- 5. HEROIC SPLIT-FACET CYAN SHIELD (INSIDE HOOD CAVITY)        -->
+        <!-- ============================================================= -->
+
+        <!-- Internal Radial Cyan Backlight Behind Shield -->
+        <path
+            android:pathData="M 93,60 L 161,60 L 161,128 L 93,128 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="radial"
+                    android:centerX="127"
+                    android:centerY="94"
+                    android:gradientRadius="34"
+                    android:startColor="#A500F5FF"
+                    android:centerColor="#380284C7"
+                    android:endColor="#00000000" />
+            </aapt:attr>
+        </path>
+
+        <!-- Shield Outer Cyan Bevel Base -->
+        <path
+            android:pathData="M 127,64 C 119,69.2 110.5,71.8 103.5,72.8 L 103.5,93.5 C 103.5,108.5 114,118.5 127,124.5 C 140,118.5 150.5,108.5 150.5,93.5 L 150.5,72.8 C 143.5,71.8 135,69.2 127,64 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="103"
+                    android:startY="64"
+                    android:endX="151"
+                    android:endY="124"
+                    android:startColor="#67E8F9"
+                    android:endColor="#0284C7" />
+            </aapt:attr>
+        </path>
+
+        <!-- Shield Left Facet (Ice Cyan) -->
+        <path
+            android:pathData="M 127,66.8 C 119.8,71.4 112,73.6 106,74.5 L 106,93.2 C 106,106.8 115.4,115.8 127,121.5 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="105"
+                    android:startY="67"
+                    android:endX="127"
+                    android:endY="121"
+                    android:startColor="#E0F2FE"
+                    android:centerColor="#67E8F9"
+                    android:endColor="#06B6D4" />
+            </aapt:attr>
+        </path>
+
+        <!-- Shield Right Facet (Electric Azure) -->
+        <path
+            android:pathData="M 127,66.8 L 127,121.5 C 138.6,115.8 148,106.8 148,93.2 L 148,74.5 C 142,73.6 134.2,71.4 127,66.8 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="127"
+                    android:startY="67"
+                    android:endX="149"
+                    android:endY="121"
+                    android:startColor="#38BDF8"
+                    android:centerColor="#0284C7"
+                    android:endColor="#0369A1" />
+            </aapt:attr>
+        </path>
+
+        <!-- Shield Crisp Specular Perimeter Stroke -->
+        <path
+            android:strokeWidth="2.0"
+            android:strokeLineJoin="round"
+            android:pathData="M 127,64 C 119,69.2 110.5,71.8 103.5,72.8 L 103.5,93.5 C 103.5,108.5 114,118.5 127,124.5 C 140,118.5 150.5,108.5 150.5,93.5 L 150.5,72.8 C 143.5,71.8 135,69.2 127,64 Z">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="103"
+                    android:startY="64"
+                    android:endX="151"
+                    android:endY="124"
+                    android:startColor="#FFFFFF"
+                    android:centerColor="#A5F3FC"
+                    android:endColor="#00F5FF" />
+            </aapt:attr>
+        </path>
+
+    </group>
 
 </vector>

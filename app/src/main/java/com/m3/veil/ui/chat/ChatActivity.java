@@ -736,7 +736,7 @@ public class ChatActivity extends AppCompatActivity {
         }
         applyChatWallpaper();
         updateChannelRoleComposerState();
-        updateRecipientHeader();
+        runOnUiThread(this::updateRecipientHeader);
         updatePresenceAndToolbarStatus();
         checkChatLockIfEnabled();
 
@@ -852,6 +852,11 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void updateRecipientHeader() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            runOnUiThread(this::updateRecipientHeader);
+            return;
+        }
+        if (isFinishing() || isDestroyed()) return;
         if (recipientId != null && messagesAdapter != null) {
             messagesAdapter.setRecipientId(recipientId);
         }
@@ -893,7 +898,7 @@ public class ChatActivity extends AppCompatActivity {
             });
         }
 
-        updateRecipientHeader();
+        runOnUiThread(this::updateRecipientHeader);
 
         findViewById(R.id.backButton).setOnClickListener(v -> finish());
 
@@ -2091,7 +2096,7 @@ public class ChatActivity extends AppCompatActivity {
         isRecipientOnline = user.isUserOnline();
         recipientLastSeenFormatted = user.getFormattedLastSeen();
         updatePresenceAndToolbarStatus();
-        updateRecipientHeader();
+        runOnUiThread(this::updateRecipientHeader);
     }
 
     private void fetchRecipientPublicKey() {
@@ -2112,7 +2117,7 @@ public class ChatActivity extends AppCompatActivity {
             chatId = com.m3.veil.webrtc.WebRtcManager.getChatId(currentUserId, recipientId);
         }
         if (chatId == null) return;
-        updateRecipientHeader();
+        runOnUiThread(this::updateRecipientHeader);
         dbExecutor.execute(() -> {
             com.m3.veil.model.Chat localChat = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
             String myOwnName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
@@ -2146,7 +2151,7 @@ public class ChatActivity extends AppCompatActivity {
             currentLocalChat = localChat;
             runOnUiThread(() -> {
                 if (!isFinishing() && !isDestroyed()) {
-                    updateRecipientHeader();
+                    runOnUiThread(this::updateRecipientHeader);
                     updatePresenceAndToolbarStatus();
                 }
             });
@@ -2202,7 +2207,7 @@ public class ChatActivity extends AppCompatActivity {
                 if (finalRecipientName != null) {
                     recipientName = finalRecipientName;
                 }
-                updateRecipientHeader();
+                runOnUiThread(this::updateRecipientHeader);
                 applyChatWallpaper();
                 updateChannelRoleComposerState();
                 updatePresenceAndToolbarStatus();
@@ -2217,7 +2222,7 @@ public class ChatActivity extends AppCompatActivity {
 
         android.content.SharedPreferences appPrefs = getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
         boolean amoled = appPrefs.getBoolean("amoled_pure_black", false);
-        boolean doodleEnabled = appPrefs.getBoolean("doodle_pattern_enabled", false);
+        boolean doodleEnabled = appPrefs.getBoolean("doodle_pattern_enabled", true);
         int wpDim = appPrefs.getInt("wallpaper_dim", 0);
 
         String rawWallpaper = currentLocalChat != null ? currentLocalChat.getWallpaperColor() : null;
@@ -2284,22 +2289,44 @@ public class ChatActivity extends AppCompatActivity {
                 }
                 chatRoot.setBackgroundColor(baseColor);
             } else {
-                int defaultBg = isNight ? (amoled ? android.graphics.Color.BLACK : ContextCompat.getColor(this, R.color.chat_wallpaper_bg))
-                        : ContextCompat.getColor(this, R.color.chat_wallpaper_bg);
-                chatRoot.setBackgroundColor(defaultBg);
+                applyDefaultWallpaperBackground(chatRoot, isNight, amoled);
             }
         } catch (Exception e) {
-            int fallback = isNight ? (amoled ? android.graphics.Color.BLACK : ContextCompat.getColor(this, R.color.chat_wallpaper_bg))
-                    : ContextCompat.getColor(this, R.color.chat_wallpaper_bg);
-            chatRoot.setBackgroundColor(fallback);
+            applyDefaultWallpaperBackground(chatRoot, isNight, amoled);
         }
 
         if (doodleOverlay != null) {
             doodleOverlay.setVisibility(doodleEnabled ? View.VISIBLE : View.GONE);
             if (doodleEnabled) {
-                int tintColor = isNight ? android.graphics.Color.parseColor("#22FFFFFF") : android.graphics.Color.parseColor("#18000000");
-                doodleOverlay.setColorFilter(tintColor, android.graphics.PorterDuff.Mode.SRC_IN);
+                int tintColor;
+                if (isNight) {
+                    tintColor = amoled ? android.graphics.Color.parseColor("#2638BDF8") : android.graphics.Color.parseColor("#3838BDF8");
+                } else {
+                    tintColor = android.graphics.Color.parseColor("#3D334155");
+                }
+                android.graphics.drawable.Drawable d = androidx.core.content.ContextCompat.getDrawable(this, R.drawable.bg_chat_doodle_pattern);
+                if (d != null) {
+                    d = d.mutate();
+                    d.setColorFilter(tintColor, android.graphics.PorterDuff.Mode.SRC_IN);
+                    doodleOverlay.setBackground(d);
+                    doodleOverlay.setImageDrawable(null);
+                }
             }
+        }
+        if (messagesAdapter != null) {
+            messagesAdapter.refreshAppearancePreferences();
+        }
+    }
+
+    private void applyDefaultWallpaperBackground(View chatRoot, boolean isNight, boolean amoled) {
+        if (isNight) {
+            if (amoled) {
+                chatRoot.setBackgroundColor(android.graphics.Color.BLACK);
+            } else {
+                chatRoot.setBackgroundResource(R.drawable.bg_wallpaper_midnight_sapphire);
+            }
+        } else {
+            chatRoot.setBackgroundResource(R.drawable.bg_wallpaper_nordic_frost);
         }
     }
 
@@ -2701,6 +2728,11 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void updatePresenceAndToolbarStatus() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            runOnUiThread(this::updatePresenceAndToolbarStatus);
+            return;
+        }
+        if (isFinishing() || isDestroyed()) return;
         if (messagesAdapter != null) {
             messagesAdapter.setTyping(isRecipientTypingState);
             if (isRecipientTypingState && messagesRecyclerView != null) {
@@ -4737,6 +4769,7 @@ public class ChatActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         isActivityResumed = true;
+        applyChatWallpaper();
         presenceHandler.removeCallbacks(presenceTicker);
         presenceHandler.post(presenceTicker);
         if (currentUserId != null) {
@@ -6255,7 +6288,7 @@ public class ChatActivity extends AppCompatActivity {
                 Toast.makeText(this, "Translation cleared", Toast.LENGTH_SHORT).show();
             });
         }
-        addSmartActionItem(root, "🌐 Offline Translate (#46 Zero-Cloud)", v -> {
+        addSmartActionItem(root, "🌐 Offline Translate (Zero-Cloud)", v -> {
             sheet.dismiss();
             showOfflineTranslateLanguagePicker(message);
         });
@@ -6471,7 +6504,7 @@ public class ChatActivity extends AppCompatActivity {
             }
         }
 
-        Toast.makeText(this, "⏳ Time-Travel Replay Started (#210)", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "⏳ Time-Travel Replay Started", Toast.LENGTH_SHORT).show();
         postNextReplayMessage();
     }
 
@@ -6735,7 +6768,7 @@ public class ChatActivity extends AppCompatActivity {
         root.addView(tvTitle);
 
         TextView tvSubtitle = new TextView(this);
-        tvSubtitle.setText("Zero-trace scoped channels inside this group (#71)");
+        tvSubtitle.setText("Zero-trace scoped channels inside this group");
         tvSubtitle.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
         tvSubtitle.setTextSize(13);
         tvSubtitle.setPadding(0, 4, 0, (int) (14 * getResources().getDisplayMetrics().density));
@@ -7018,7 +7051,7 @@ public class ChatActivity extends AppCompatActivity {
         root.addView(handle);
 
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("🏆 Group Member Achievements (#74)");
+        tvTitle.setText("🏆 Group Member Achievements");
         tvTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
         tvTitle.setTextSize(18);
         tvTitle.setTypeface(null, Typeface.BOLD);
@@ -7104,7 +7137,7 @@ public class ChatActivity extends AppCompatActivity {
         layout.setPadding(pad, pad, pad, pad * 2);
 
         TextView title = new TextView(this);
-        title.setText("⏰ Schedule Message / Channel Post (#80)");
+        title.setText("⏰ Schedule Message / Channel Post");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setTypeface(null, Typeface.BOLD);
@@ -7232,7 +7265,7 @@ public class ChatActivity extends AppCompatActivity {
         layout.setPadding(pad, pad, pad, pad * 2);
 
         TextView title = new TextView(this);
-        title.setText("📌 Read-Later Reminders (#178)");
+        title.setText("📌 Read-Later Reminders");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setTypeface(null, Typeface.BOLD);

@@ -178,7 +178,7 @@ public class P2PGameDrawerBottomSheet extends BottomSheetDialogFragment {
 
         // Title
         TextView title = new TextView(ctx);
-        title.setText("🎮 In-Chat P2P Minigames (#219)");
+        title.setText("🎮 In-Chat P2P Minigames");
         title.setTextSize(18f);
         title.setTypeface(null, Typeface.BOLD);
         title.setTextColor(ContextCompat.getColor(ctx, R.color.textPrimary));

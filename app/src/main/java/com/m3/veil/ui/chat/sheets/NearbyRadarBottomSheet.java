@@ -83,7 +83,7 @@ public class NearbyRadarBottomSheet extends BottomSheetDialogFragment implements
 
         // Header Title
         TextView tvTitle = new TextView(context);
-        tvTitle.setText("📡 Local Proximity Radar (#15, #17, #25)");
+        tvTitle.setText("📡 Local Proximity Radar");
         tvTitle.setTextColor(ContextCompat.getColor(context, R.color.textPrimary));
         tvTitle.setTextSize(18.5f);
         tvTitle.setTypeface(null, Typeface.BOLD);

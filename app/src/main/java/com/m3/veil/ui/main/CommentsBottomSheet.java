@@ -151,7 +151,7 @@ public class CommentsBottomSheet extends BottomSheetDialogFragment {
             // Quick Voice Confession Comment (#94)
             String[] dspFilters = {"Ghost Pitch (+4st)", "Cyber Synth", "Deep Shadow (-5st)"};
             new android.app.AlertDialog.Builder(requireContext())
-                    .setTitle("🎙️ Post Anonymous Voice Reply (#94)")
+                    .setTitle("🎙️ Post Anonymous Voice Reply")
                     .setItems(dspFilters, (d, which) -> {
                         String tag = "🎙️ [Voice Reply • " + dspFilters[which] + " • 0:06]";
                         VeilBoardController.getInstance(requireContext()).addComment(postId, tag, replyingToCommentId);

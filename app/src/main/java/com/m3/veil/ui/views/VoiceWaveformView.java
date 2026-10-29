@@ -40,8 +40,8 @@ public class VoiceWaveformView extends View {
     private boolean isDragging = false;
     private OnSeekListener seekListener;
 
-    private int playedColor = 0xFFFFFFFF;
-    private int unplayedColor = 0x66FFFFFF;
+    private int playedColor = 0xFF4F46E5;
+    private int unplayedColor = 0xFF94A3B8;
 
     public VoiceWaveformView(Context context) {
         super(context);
@@ -58,10 +58,39 @@ public class VoiceWaveformView extends View {
         init();
     }
 
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        updateThemeColors();
+    }
+
+    @Override
+    protected void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        updateThemeColors();
+        invalidate();
+    }
+
+    public void updateThemeColors() {
+        boolean isNight = (getResources().getConfiguration().uiMode 
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        if (isNight) {
+            playedColor = 0xFF818CF8;
+            unplayedColor = 0xFF64748B;
+        } else {
+            playedColor = 0xFF4F46E5;
+            unplayedColor = 0xFF94A3B8;
+        }
+        if (playedPaint != null) playedPaint.setColor(playedColor);
+        if (unplayedPaint != null) unplayedPaint.setColor(unplayedColor);
+    }
+
     private void init() {
         float density = getResources().getDisplayMetrics().density;
         barWidth = Math.max(2f, 2.8f * density);
         barSpacing = Math.max(1.5f, 1.8f * density);
+
+        updateThemeColors();
 
         playedPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         playedPaint.setStyle(Paint.Style.FILL);

@@ -462,9 +462,9 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
         div.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (16 * dp)));
         contentContainer.addView(div);
 
-        // Section B: Collectible Avatar Skins (#160)
+        // Section B: Collectible Avatar Skins
         TextView tvSkinsTitle = new TextView(ctx);
-        tvSkinsTitle.setText("🎭 Collectible Avatar Skins (#160)");
+        tvSkinsTitle.setText("🎭 Collectible Avatar Skins");
         tvSkinsTitle.setTextSize(16f);
         tvSkinsTitle.setTypeface(null, Typeface.BOLD);
         tvSkinsTitle.setTextColor(ContextCompat.getColor(ctx, R.color.textPrimary));

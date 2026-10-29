@@ -79,6 +79,15 @@ public class UserProfileActivity extends AppCompatActivity {
             return insets;
         });
 
+        boolean isNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        androidx.core.view.WindowInsetsControllerCompat insetsController =
+                androidx.core.view.WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        if (insetsController != null) {
+            insetsController.setAppearanceLightStatusBars(!isNight);
+            insetsController.setAppearanceLightNavigationBars(!isNight);
+        }
+
         peerUserId = getIntent().getStringExtra("userId");
         if (peerUserId != null && peerUserId.trim().isEmpty()) {
             peerUserId = null;
@@ -92,6 +101,11 @@ public class UserProfileActivity extends AppCompatActivity {
         Chat chat = chatId != null ? EncryptedChatDatabase.getInstance(this).getChat(chatId) : null;
         if (chat != null && chat.isGroup()) {
             isGroup = true;
+        }
+
+        TextView toolbarTitle = findViewById(R.id.toolbarTitle);
+        if (toolbarTitle != null) {
+            toolbarTitle.setText(isGroup ? "Group info" : "Contact info");
         }
 
         TextView nameText = findViewById(R.id.profileNameText);
@@ -371,10 +385,12 @@ public class UserProfileActivity extends AppCompatActivity {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding((int) (8 * dp), (int) (10 * dp), (int) (8 * dp), (int) (10 * dp));
+            row.setPadding((int) (16 * dp), (int) (10 * dp), (int) (16 * dp), (int) (10 * dp));
             row.setClickable(true);
             row.setFocusable(true);
-            row.setBackgroundResource(R.drawable.button_primary_selector);
+            android.util.TypedValue outValue = new android.util.TypedValue();
+            getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+            row.setBackgroundResource(outValue.resourceId);
 
             ImageView avatar = new ImageView(this);
             avatar.setLayoutParams(new LinearLayout.LayoutParams((int) (38 * dp), (int) (38 * dp)));
@@ -694,15 +710,13 @@ public class UserProfileActivity extends AppCompatActivity {
                 mediaCount++;
             }
         }
-        android.view.View btnMedia = findViewById(R.id.btnMedia);
-        if (btnMedia instanceof android.view.ViewGroup) {
-            android.view.ViewGroup vg = (android.view.ViewGroup) btnMedia;
-            if (vg.getChildCount() > 1 && vg.getChildAt(1) instanceof android.view.ViewGroup) {
-                android.view.ViewGroup inner = (android.view.ViewGroup) vg.getChildAt(1);
-                if (inner.getChildCount() > 1 && inner.getChildAt(1) instanceof TextView) {
-                    ((TextView) inner.getChildAt(1)).setText(mediaCount + " encrypted items & starred notes");
-                }
-            }
+        TextView tvMediaCount = findViewById(R.id.tvMediaCount);
+        if (tvMediaCount != null) {
+            tvMediaCount.setText(mediaCount + " items & media");
+        }
+        com.google.android.material.materialswitch.MaterialSwitch swMute = findViewById(R.id.switchMute);
+        if (swMute != null) {
+            swMute.setChecked(chat != null && chat.isMuted());
         }
     }
 
@@ -822,6 +836,10 @@ public class UserProfileActivity extends AppCompatActivity {
         Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
         boolean newMuted = chat == null || !chat.isMuted();
         EncryptedChatDatabase.getInstance(this).updateChatMuteStatus(chatId, newMuted);
+        com.google.android.material.materialswitch.MaterialSwitch swMute = findViewById(R.id.switchMute);
+        if (swMute != null) {
+            swMute.setChecked(newMuted);
+        }
         Toast.makeText(this, newMuted ? "Notifications muted" : "Notifications unmuted", Toast.LENGTH_SHORT).show();
     }
 
@@ -842,7 +860,7 @@ public class UserProfileActivity extends AppCompatActivity {
         } else {
             tvBlockUser.setText("Block User");
             tvBlockUser.setTextColor(ContextCompat.getColor(this, R.color.colorError));
-            ivBlockUser.setImageResource(R.drawable.ic_close);
+            ivBlockUser.setImageResource(R.drawable.ic_block);
             ivBlockUser.setColorFilter(ContextCompat.getColor(this, R.color.colorError));
         }
     }
@@ -1031,7 +1049,7 @@ public class UserProfileActivity extends AppCompatActivity {
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
     private void setupGroupActionOptions() {
-        LinearLayout membersLayout = findViewById(R.id.layoutGroupMembers);
+        View membersLayout = findViewById(R.id.layoutGroupMembers);
         if (membersLayout == null) return;
         ViewGroup parent = (ViewGroup) membersLayout.getParent();
         if (parent == null) return;
@@ -1049,20 +1067,20 @@ public class UserProfileActivity extends AppCompatActivity {
             showGroupInviteLinkSheet();
         }), insertIdx + 2);
 
-        parent.addView(createProfileOptionRow("📅 Group Events & Calendar (#68)", "RSVP, countdowns, and synchronized mesh events", R.drawable.ic_timer, v -> {
+        parent.addView(createProfileOptionRow("📅 Group Events & Calendar", "RSVP, countdowns, and synchronized mesh events", R.drawable.ic_timer, v -> {
             EventsCalendarBottomSheet sheet = EventsCalendarBottomSheet.newInstance(chatId, peerUserName != null ? peerUserName : "Group");
             sheet.show(getSupportFragmentManager(), "EventsCalendarBottomSheet");
         }), insertIdx + 3);
 
-        parent.addView(createProfileOptionRow("📁 Secret Sub-Groups & Topics (#71)", "Manage and join encrypted topic channels", R.drawable.ic_chat, v -> {
+        parent.addView(createProfileOptionRow("📁 Secret Sub-Groups & Topics", "Manage and join encrypted topic channels", R.drawable.ic_chat, v -> {
             showSubgroupsDialog();
         }), insertIdx + 4);
 
-        parent.addView(createProfileOptionRow("🎨 Group Themes & Wallpaper (#73)", "Customize theme and broadcast to group mesh", R.drawable.ic_appearance, v -> {
+        parent.addView(createProfileOptionRow("🎨 Group Themes & Wallpaper", "Customize theme and broadcast to group mesh", R.drawable.ic_appearance, v -> {
             showGroupThemesDialog();
         }), insertIdx + 5);
 
-        parent.addView(createProfileOptionRow("🏆 Group Achievements (#74)", "View cryptographic member reputation badges", R.drawable.ic_shield, v -> {
+        parent.addView(createProfileOptionRow("🏆 Group Achievements", "View cryptographic member reputation badges", R.drawable.ic_shield, v -> {
             showGroupAchievementsDialog();
         }), insertIdx + 6);
 
@@ -1075,7 +1093,7 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private void setupDirectChatAdvancedOptions() {
-        LinearLayout membersLayout = findViewById(R.id.layoutGroupMembers);
+        View membersLayout = findViewById(R.id.layoutGroupMembers);
         if (membersLayout == null) return;
         ViewGroup parent = (ViewGroup) membersLayout.getParent();
         if (parent == null) return;
@@ -1460,44 +1478,84 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private View createProfileOptionRow(String title, String subtitle, int iconRes, View.OnClickListener onClick) {
+        float dp = getResources().getDisplayMetrics().density;
+        com.google.android.material.card.MaterialCardView card = new com.google.android.material.card.MaterialCardView(this);
+        card.setCardBackgroundColor(ContextCompat.getColor(this, R.color.colorSurface));
+        card.setRadius(16 * dp);
+        card.setStrokeColor(ContextCompat.getColor(this, R.color.colorOutline));
+        card.setStrokeWidth((int) (1 * dp));
+        card.setCardElevation(0);
+
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardLp.setMargins((int) (16 * dp), 0, (int) (16 * dp), (int) (12 * dp));
+        card.setLayoutParams(cardLp);
+
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding((int) (16 * getResources().getDisplayMetrics().density), (int) (14 * getResources().getDisplayMetrics().density), (int) (16 * getResources().getDisplayMetrics().density), (int) (14 * getResources().getDisplayMetrics().density));
+        row.setPadding((int) (16 * dp), (int) (14 * dp), (int) (16 * dp), (int) (14 * dp));
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setBackgroundResource(R.drawable.button_primary_selector);
+        android.util.TypedValue outValue = new android.util.TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+        row.setBackgroundResource(outValue.resourceId);
         row.setClickable(true);
         row.setFocusable(true);
 
+        android.widget.FrameLayout iconFrame = new android.widget.FrameLayout(this);
+        int frameDim = (int) (40 * dp);
+        LinearLayout.LayoutParams frameLp = new LinearLayout.LayoutParams(frameDim, frameDim);
+        iconFrame.setLayoutParams(frameLp);
+        iconFrame.setBackgroundResource(R.drawable.bg_settings_icon_tint);
+
         ImageView iv = new ImageView(this);
-        int iconDim = (int) (24 * getResources().getDisplayMetrics().density);
-        LinearLayout.LayoutParams ivLp = new LinearLayout.LayoutParams(iconDim, iconDim);
-        ivLp.rightMargin = (int) (16 * getResources().getDisplayMetrics().density);
+        int iconDim = (int) (20 * dp);
+        android.widget.FrameLayout.LayoutParams ivLp = new android.widget.FrameLayout.LayoutParams(iconDim, iconDim);
+        ivLp.gravity = Gravity.CENTER;
         iv.setLayoutParams(ivLp);
         iv.setImageResource(iconRes);
         iv.setColorFilter(ContextCompat.getColor(this, R.color.colorPrimary));
-        row.addView(iv);
+        iconFrame.addView(iv);
+        row.addView(iconFrame);
 
         LinearLayout textCol = new LinearLayout(this);
         textCol.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        textLp.setMarginStart((int) (14 * dp));
         textCol.setLayoutParams(textLp);
 
         TextView tvTitle = new TextView(this);
         tvTitle.setText(title);
         tvTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
-        tvTitle.setTextSize(15.5f);
-        tvTitle.setTypeface(null, Typeface.BOLD);
+        tvTitle.setTextSize(15f);
+        tvTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         textCol.addView(tvTitle);
 
-        TextView tvSub = new TextView(this);
-        tvSub.setText(subtitle);
-        tvSub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
-        tvSub.setTextSize(12.5f);
-        textCol.addView(tvSub);
+        if (subtitle != null && !subtitle.isEmpty()) {
+            TextView tvSub = new TextView(this);
+            tvSub.setText(subtitle);
+            tvSub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+            tvSub.setTextSize(13f);
+            LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            subLp.topMargin = (int) (2 * dp);
+            tvSub.setLayoutParams(subLp);
+            textCol.addView(tvSub);
+        }
 
         row.addView(textCol);
+
+        ImageView chevron = new ImageView(this);
+        int chevDim = (int) (20 * dp);
+        LinearLayout.LayoutParams chevLp = new LinearLayout.LayoutParams(chevDim, chevDim);
+        chevron.setLayoutParams(chevLp);
+        chevron.setImageResource(R.drawable.ic_chevron_right);
+        chevron.setColorFilter(ContextCompat.getColor(this, R.color.textTertiary));
+        row.addView(chevron);
+
+        UiAnimator.attachSpringPress(row);
         row.setOnClickListener(onClick);
-        return row;
+        card.addView(row);
+        return card;
     }
 
     private void showSubgroupsDialog() {
@@ -1510,7 +1568,7 @@ public class UserProfileActivity extends AppCompatActivity {
         root.setPadding(padH, padV, padH, padV * 2);
 
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("📁 Secret Sub-Groups & Topics (#71)");
+        tvTitle.setText("📁 Secret Sub-Groups & Topics");
         tvTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
         tvTitle.setTextSize(18);
         tvTitle.setTypeface(null, Typeface.BOLD);
@@ -1714,7 +1772,7 @@ public class UserProfileActivity extends AppCompatActivity {
         root.setPadding(padH, padV, padH, padV * 2);
 
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("🎨 Group Themes & Wallpaper (#73)");
+        tvTitle.setText("🎨 Group Themes & Wallpaper");
         tvTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
         tvTitle.setTextSize(19);
         tvTitle.setTypeface(null, Typeface.BOLD);
@@ -1789,7 +1847,7 @@ public class UserProfileActivity extends AppCompatActivity {
         root.setPadding(padH, padV, padH, padV * 2);
 
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("🏆 Group Member Achievements (#74)");
+        tvTitle.setText("🏆 Group Member Achievements");
         tvTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
         tvTitle.setTextSize(18);
         tvTitle.setTypeface(null, Typeface.BOLD);
