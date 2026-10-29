@@ -1169,7 +1169,7 @@ public class PostDetailActivity extends AppCompatActivity {
                 "🔖 VeilBoard Thread",
                 0L
         );
-        Toast.makeText(this, "🔖 Thread saved to Encrypted SQLCipher Vault!", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "🔖 Thread bookmarked!", Toast.LENGTH_SHORT).show();
     }
 
     private void shareCurrentPost() {
@@ -1222,7 +1222,7 @@ public class PostDetailActivity extends AppCompatActivity {
     private void showPostMoreActionsSheet() {
         if (currentPost == null) return;
         String[] items = {
-                "🔖 Save Thread to Encrypted Vault",
+                "🔖 Bookmark Thread",
                 "📋 Copy Thread Text",
                 "🔄 Instant Repost to Profile",
                 "⚖️ Report Thread to Community Jury"

@@ -80,7 +80,7 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
     private static final long USERNAME_DEBOUNCE_MS = 260L;
 
     private static final String[] MOODS = {
-            "🛡️ Encrypted", "👻 Ghost Mode", "⚡ Active",
+            "✨ Available", "👻 Ghost Mode", "⚡ Active",
             "🌙 Do Not Disturb", "🔥 Building", "🕵️ Incognito", "💎 Sovereign"
     };
 
@@ -693,7 +693,7 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
         if (listener != null) {
             listener.onProfileUpdated();
         }
-        Toast.makeText(requireContext(), "Profile updated across encrypted vault & directory", Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), "Profile updated", Toast.LENGTH_SHORT).show();
         dismissAllowingStateLoss();
     }
 

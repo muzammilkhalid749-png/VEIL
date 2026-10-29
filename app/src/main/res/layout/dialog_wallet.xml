@@ -22,7 +22,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Veil Privacy Wallet"
+        android:text="Veil Wallet"
         android:textColor="@color/colorTextPrimary"
         android:textSize="20sp"
         android:textStyle="bold" />
@@ -59,7 +59,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="Level 1 • 0 XP • Encrypted Ledger"
+            android:text="Level 1 • 0 XP"
             android:textColor="#CCFFFFFF"
             android:textSize="12sp" />
     </LinearLayout>

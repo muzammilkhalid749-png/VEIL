@@ -29,7 +29,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Zero-knowledge, end-to-end encrypted WebRTC calling"
+        android:text="Crystal-clear voice and HD video calling"
         android:textColor="@color/textSecondary"
         android:textSize="13sp"
         android:layout_marginTop="2dp"
@@ -72,7 +72,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Start Encrypted Call"
+                    android:text="Start Call"
                     android:textColor="@color/textPrimary"
                     android:textSize="15.5sp"
                     android:fontFamily="sans-serif-medium" />
@@ -177,7 +177,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Clear Call Vault"
+                    android:text="Clear Call History"
                     android:textColor="#EF4444"
                     android:textSize="15.5sp"
                     android:fontFamily="sans-serif-medium" />
@@ -185,7 +185,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Wipe local encrypted call history permanently"
+                    android:text="Delete your local call history permanently"
                     android:textColor="@color/textSecondary"
                     android:textSize="12.5sp"
                     android:layout_marginTop="2dp" />

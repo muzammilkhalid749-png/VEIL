@@ -147,7 +147,11 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
 
         LinearLayout root = new LinearLayout(ctx);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundResource(R.drawable.bg_bottom_sheet_modern);
+        GradientDrawable rootBg = new GradientDrawable();
+        rootBg.setColor(isNightNow ? 0xFF161B26 : 0xFFFFFFFF);
+        float topRad = 24f * dp;
+        rootBg.setCornerRadii(new float[]{topRad, topRad, topRad, topRad, 0f, 0f, 0f, 0f});
+        root.setBackground(rootBg);
         int pad = (int) (18 * dp);
         root.setPadding(pad, (int) (12 * dp), pad, pad);
 
@@ -157,7 +161,10 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
         hLp.gravity = Gravity.CENTER_HORIZONTAL;
         hLp.bottomMargin = (int) (12 * dp);
         handle.setLayoutParams(hLp);
-        handle.setBackgroundResource(R.drawable.bg_voice_circle_incoming);
+        GradientDrawable handleBg = new GradientDrawable();
+        handleBg.setCornerRadius(2 * dp);
+        handleBg.setColor(isNightNow ? 0xFF475569 : 0xFFCBD5E1);
+        handle.setBackground(handleBg);
         root.addView(handle);
 
         // Header
@@ -285,10 +292,20 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
         row1.setLayoutParams(rowLp);
         row2.setLayoutParams(rowLp);
 
+        // Vivid swatch display colors so every swatch is clearly distinguishable in both Light & Dark mode
+        final int[] swatchDisplayColors = {
+                0xFF94A3B8, 0xFF1D4ED8, 0xFF6366F1, 0xFF10B981,
+                0xFFF43F5E, 0xFFF59E0B, 0xFF0EA5E9, 0xFF00A884,
+                0xFFEC4899, 0xFF06B6D4, 0xFFA855F7, 0xFF3B82F6
+        };
+
         int swatchDim = (int) (44 * dp);
+        final int selectedBorderColor = isNightNow ? Color.WHITE : 0xFF0F172A;
+        final int unselectedBorderColor = isNightNow ? 0x66FFFFFF : 0x55334155;
         for (int i = 0; i < themeValues.length; i++) {
             final String val = themeValues[i];
             final String name = themeNames[i];
+            final int vividColor = swatchDisplayColors[i];
 
             FrameLayout swatchWrapper = new FrameLayout(ctx);
             LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(0, swatchDim, 1f);
@@ -302,17 +319,9 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
 
             GradientDrawable gd = new GradientDrawable();
             gd.setCornerRadius(12 * dp);
-            if (val.startsWith("gradient:")) {
-                String[] colors = val.substring("gradient:".length()).split(":");
-                int[] cArr = new int[colors.length];
-                for (int c = 0; c < colors.length; c++) cArr[c] = Color.parseColor(colors[c]);
-                gd.setOrientation(GradientDrawable.Orientation.TOP_BOTTOM);
-                gd.setColors(cArr);
-            } else {
-                gd.setColor(Color.parseColor(val));
-            }
+            gd.setColor(vividColor);
             boolean isSelected = val.equals(selectedWallpaperValue);
-            gd.setStroke((int) (isSelected ? 3 * dp : 1 * dp), isSelected ? Color.WHITE : Color.parseColor("#44FFFFFF"));
+            gd.setStroke((int) (isSelected ? 3 * dp : 1.5f * dp), isSelected ? selectedBorderColor : unselectedBorderColor);
             swatch.setBackground(gd);
             swatchWrapper.addView(swatch);
 
@@ -325,7 +334,7 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
                     View sw = swatchViews.get(idx);
                     GradientDrawable d = (GradientDrawable) sw.getBackground();
                     boolean sel = themeValues[idx].equals(selectedWallpaperValue);
-                    d.setStroke((int) (sel ? 3 * dp : 1 * dp), sel ? Color.WHITE : Color.parseColor("#44FFFFFF"));
+                    d.setStroke((int) (sel ? 3 * dp : 1.5f * dp), sel ? selectedBorderColor : unselectedBorderColor);
                 }
             });
 

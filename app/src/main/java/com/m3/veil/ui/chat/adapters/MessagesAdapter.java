@@ -53,6 +53,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     private String currentUserId;
     private String recipientId;
     private String recipientName;
+    private String searchHighlightQuery = "";
+    private String activeSearchMessageId = null;
     private SimpleDateFormat timeFormat;
 
     public void setRecipientId(String recipientId) {
@@ -61,6 +63,40 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     public void setRecipientName(String recipientName) {
         this.recipientName = recipientName;
+    }
+
+    public void setSearchHighlightState(String query, String activeMessageId) {
+        String clean = query != null ? query.trim().toLowerCase(Locale.ROOT) : "";
+        boolean changed = !clean.equals(this.searchHighlightQuery)
+                || (activeMessageId == null ? this.activeSearchMessageId != null : !activeMessageId.equals(this.activeSearchMessageId));
+        this.searchHighlightQuery = clean;
+        this.activeSearchMessageId = activeMessageId;
+        if (changed) {
+            notifyDataSetChanged();
+        }
+    }
+
+    private CharSequence applySearchHighlightSpans(CharSequence base, Message message) {
+        if (searchHighlightQuery == null || searchHighlightQuery.isEmpty() || base == null || base.length() == 0) {
+            return base;
+        }
+        String lowerText = base.toString().toLowerCase(Locale.ROOT);
+        int idx = lowerText.indexOf(searchHighlightQuery);
+        if (idx < 0) {
+            return base;
+        }
+        android.text.SpannableStringBuilder ssb = new android.text.SpannableStringBuilder(base);
+        boolean isActiveMatch = message != null && message.getId() != null && message.getId().equals(activeSearchMessageId);
+        int bgColor = isActiveMatch ? 0xFFF59E0B : 0xCCFDE047;
+        int fgColor = 0xFF0F172A;
+        int qLen = searchHighlightQuery.length();
+        while (idx >= 0 && idx + qLen <= ssb.length()) {
+            ssb.setSpan(new android.text.style.BackgroundColorSpan(bgColor), idx, idx + qLen, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            ssb.setSpan(new android.text.style.ForegroundColorSpan(fgColor), idx, idx + qLen, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            ssb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), idx, idx + qLen, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            idx = lowerText.indexOf(searchHighlightQuery, idx + qLen);
+        }
+        return ssb;
     }
 
     public String resolveReplyQuoteSenderName(Message message, Message replyTo) {
@@ -312,7 +348,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         // 0ms fast-path for standard plain text messages (no regex or HTML parsing needed)
         if (!hasSpoiler && !hasMarkdown && !hasTranslation) {
-            return raw;
+            return applySearchHighlightSpans(raw, message);
         }
 
         boolean isRevealed = message.getId() != null && revealedSpoilers.contains(message.getId());
@@ -320,7 +356,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 + ":" + (hasTranslation ? message.getTranslatedText().hashCode() : 0);
         CharSequence cachedFormatted = RICH_TEXT_CACHE.get(cacheKey);
         if (cachedFormatted != null) {
-            return cachedFormatted;
+            return applySearchHighlightSpans(cachedFormatted, message);
         }
 
         String processedRaw = raw;
@@ -351,16 +387,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             html += "<br/><br/><small><font color='" + headerHex + "'>🌐 <b>[Translated — " + lang + "]</b></font></small><br/><font color='" + bodyHex + "'><i>" + transEscaped + "</i></font>";
             CharSequence res = androidx.core.text.HtmlCompat.fromHtml(html, androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT);
             RICH_TEXT_CACHE.put(cacheKey, res);
-            return res;
+            return applySearchHighlightSpans(res, message);
         }
 
         if (hasMarkdown) {
             CharSequence res = androidx.core.text.HtmlCompat.fromHtml(html, androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT);
             RICH_TEXT_CACHE.put(cacheKey, res);
-            return res;
+            return applySearchHighlightSpans(res, message);
         }
         RICH_TEXT_CACHE.put(cacheKey, processedRaw);
-        return processedRaw;
+        return applySearchHighlightSpans(processedRaw, message);
     }
 
     private int cachedCustomBubbleColor = 0;

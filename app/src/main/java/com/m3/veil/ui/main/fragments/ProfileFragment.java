@@ -228,12 +228,11 @@ public class ProfileFragment extends Fragment {
 
         Persona active = fm.getActivePersona();
         if (active != null && profileStatus != null) {
-            int score = fm.calculatePrivacyScore(true);
             boolean isPrimary = "persona_primary".equals(active.getPersonaId());
             if (isPrimary) {
-                profileStatus.setText(active.getMood() + " • 🛡️ Privacy " + score + "/100");
+                profileStatus.setText(active.getMood());
             } else {
-                profileStatus.setText("🎭 " + active.getDisplayName() + " (" + active.getMood() + ") • 🛡️ Privacy " + score + "/100");
+                profileStatus.setText("🎭 " + active.getDisplayName() + " (" + active.getMood() + ")");
             }
         }
     }
@@ -1282,7 +1281,7 @@ public class ProfileFragment extends Fragment {
 
             }
 
-            showToast("📦 Encrypted Vault Backup metadata copied (" + json.length() + " bytes)");
+            showToast("📦 Backup metadata copied (" + json.length() + " bytes)");
 
         });
 
@@ -1386,7 +1385,7 @@ public class ProfileFragment extends Fragment {
 
         EditText bodyInput = new EditText(requireContext());
 
-        bodyInput.setHint("Encrypted note content...");
+        bodyInput.setHint("Write your note...");
 
         bodyInput.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
 
@@ -1660,7 +1659,7 @@ public class ProfileFragment extends Fragment {
 
 
 
-        addPrivacyActionRow(itemsContainer, "🔐 Encrypted Notes Vault", "Open zero-knowledge encrypted notes & capsules", v -> {
+        addPrivacyActionRow(itemsContainer, "🔐 Personal Notes Vault", "Open saved notes & time capsules", v -> {
 
             sheet.dismiss();
 
@@ -2524,7 +2523,7 @@ public class ProfileFragment extends Fragment {
 
         tvTitle.setText("Log Out of VEIL");
 
-        tvMsg.setText("Are you sure you want to log out of VEIL? Your encrypted local session will be closed.");
+        tvMsg.setText("Are you sure you want to log out of VEIL?");
 
         btnConfirm.setText("Log Out");
 

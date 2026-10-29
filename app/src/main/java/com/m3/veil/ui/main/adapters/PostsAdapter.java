@@ -631,7 +631,7 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
             root.addView(title);
 
             String[] actions = {
-                    "🔖 Bookmark Post to Encrypted Vault",
+                    "🔖 Bookmark Post",
                     "🪙 Tip 5 VeilCoins Anonymously",
                     "➕ Append Node to Collaborative Chain",
                     "💬 1-Tap Anonymous DM with Author",
@@ -657,7 +657,7 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
                                     "🔖 Bookmark",
                                     0L
                             );
-                            Toast.makeText(context, "🔖 Saved to SQLCipher Encrypted Notes Vault!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(context, "🔖 Post bookmarked!", Toast.LENGTH_SHORT).show();
                             break;
                         case 1:
                             if (VeilBoardController.getInstance(context).tipAuthor(post.getId(), 5)) {

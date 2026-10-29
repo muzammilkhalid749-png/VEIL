@@ -134,7 +134,7 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
             btnCallLink.setLayoutParams(linkLp);
 
             TextView tvLinkTitle = new TextView(requireContext());
-            tvLinkTitle.setText("🔗 Create Encrypted P2P Call Link");
+            tvLinkTitle.setText("🔗 Create Call Link");
             tvLinkTitle.setTextSize(15f);
             tvLinkTitle.setTypeface(null, android.graphics.Typeface.BOLD);
             tvLinkTitle.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
@@ -169,7 +169,7 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
             btnGroupCall.addView(tvGrpTitle);
 
             TextView tvGrpSub = new TextView(requireContext());
-            tvGrpSub.setText("Select multiple contacts for a multi-peer SFrame encrypted voice or video call");
+            tvGrpSub.setText("Select multiple contacts for a group voice or video call");
             tvGrpSub.setTextSize(12.5f);
             tvGrpSub.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
             btnGroupCall.addView(tvGrpSub);
@@ -197,7 +197,7 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
         root.setPadding((int) (24 * dp), (int) (20 * dp), (int) (24 * dp), (int) (28 * dp));
 
         TextView title = new TextView(requireContext());
-        title.setText("🔗 Encrypted P2P Call Link");
+        title.setText("🔗 Call Link");
         title.setTextSize(18.5f);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
@@ -239,7 +239,7 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
             sheet.dismiss();
             Intent share = new Intent(Intent.ACTION_SEND);
             share.setType("text/plain");
-            share.putExtra(Intent.EXTRA_TEXT, "Join my encrypted VEIL P2P call: " + callLink);
+            share.putExtra(Intent.EXTRA_TEXT, "Join my VEIL call: " + callLink);
             startActivity(Intent.createChooser(share, "Share Call Link"));
         });
         root.addView(btnShare);
@@ -349,7 +349,7 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
                     if (!peers.isEmpty()) {
                         User chosen = peers.get(new Random().nextInt(peers.size()));
                         String name = chosen.getDisplayName() != null ? chosen.getDisplayName() : chosen.getUsername();
-                        Toast.makeText(getContext(), "🎲 Connecting encrypted call with @" + chosen.getUsername() + "...", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), "🎲 Connecting call with @" + chosen.getUsername() + "...", Toast.LENGTH_SHORT).show();
 
                         Intent intent = new Intent(getContext(), CallActivity.class);
                         intent.putExtra(CallActivity.EXTRA_CONTACT_ID, chosen.getUserId());
@@ -377,8 +377,8 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
         View btnConfirm = sheet.findViewById(R.id.btnDestructiveConfirm);
         View btnCancel = sheet.findViewById(R.id.btnDestructiveCancel);
 
-        if (tvTitle != null) tvTitle.setText("Clear Call Vault?");
-        if (tvMsg != null) tvMsg.setText("Permanently delete all call history from your local encrypted vault? This action cannot be reversed.");
+        if (tvTitle != null) tvTitle.setText("Clear Call History?");
+        if (tvMsg != null) tvMsg.setText("Permanently delete all call history? This action cannot be undone.");
         if (btnConfirm != null) {
             btnConfirm.setOnClickListener(v -> {
                 sheet.dismiss();
@@ -495,7 +495,7 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
         View btnCancel = sheet.findViewById(R.id.btnDestructiveCancel);
 
         if (tvTitle != null) tvTitle.setText("Delete Call Record?");
-        if (tvMsg != null) tvMsg.setText("Remove this encrypted call entry from your local history?");
+        if (tvMsg != null) tvMsg.setText("Remove this call entry from your history?");
         if (btnConfirm != null) {
             btnConfirm.setOnClickListener(v -> {
                 sheet.dismiss();

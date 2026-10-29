@@ -109,7 +109,7 @@
                             android:id="@+id/onlineStatus"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="End-to-End Encrypted"
+                            android:text="Tap here for info"
                             android:textColor="@color/veil_accent"
                             android:textSize="11sp"
                             android:ellipsize="end"
@@ -200,11 +200,34 @@
                 android:id="@+id/tvChatSearchCount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
+                android:layout_marginEnd="6dp"
                 android:textColor="@color/colorPrimary"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:text="" />
+
+            <ImageView
+                android:id="@+id/btnChatSearchUp"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:padding="5dp"
+                android:src="@drawable/ic_expand_less"
+                app:tint="@color/textPrimary"
+                android:contentDescription="Previous match"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/btnChatSearchDown"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:padding="5dp"
+                android:layout_marginEnd="2dp"
+                android:src="@drawable/ic_arrow_down"
+                app:tint="@color/textPrimary"
+                android:contentDescription="Next match"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:visibility="gone" />
 
             <ImageView
                 android:id="@+id/btnCloseChatSearch"

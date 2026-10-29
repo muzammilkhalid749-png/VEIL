@@ -31,7 +31,7 @@
         android:id="@+id/tvSharedMediaSubtitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Encrypted files, voice notes, and starred items in this chat"
+        android:text="Media, documents, voice notes, and starred items in this chat"
         android:textColor="@color/textSecondary"
         android:textSize="12.5sp"
         android:layout_marginBottom="14dp" />

@@ -47,7 +47,7 @@
                 android:id="@+id/tvThreadSubHeader"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Encrypted P2P Discussion Thread"
+                android:text="Community Discussion Thread"
                 android:textColor="@color/colorTextSecondary"
                 android:textSize="11sp" />
         </LinearLayout>

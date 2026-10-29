@@ -92,7 +92,7 @@
                     android:id="@+id/profileSubtitleText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="End-to-End Encrypted Contact"
+                    android:text="Veil Contact"
                     android:textColor="@color/textSecondary"
                     android:textSize="14sp"
                     android:textAlignment="center"

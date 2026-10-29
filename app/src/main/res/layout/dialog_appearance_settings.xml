@@ -106,7 +106,7 @@
                             android:id="@+id/tvPreviewIncomingText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Veil zero-trace encrypted chat ✨"
+                            android:text="Hey! How is your day going? ✨"
                             android:textColor="@color/colorTextPrimary"
                             android:textSize="14sp" />
                     </LinearLayout>
@@ -277,7 +277,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Superimpose subtle privacy doodle artwork onto wallpaper"
+                    android:text="Overlay subtle doodle pattern onto chat wallpaper"
                     android:textColor="@color/colorTextSecondary"
                     android:textSize="12sp" />
             </LinearLayout>

@@ -297,6 +297,10 @@ public class ChatActivity extends AppCompatActivity {
     private Handler vanishHandler;
     private Runnable vanishRunnable;
     private int highlightPosition = -1;
+    private final List<Integer> searchMatchPositions = new ArrayList<>();
+    private final List<String> searchMatchMessageIds = new ArrayList<>();
+    private int currentSearchMatchIdx = -1;
+    private String activeChatSearchQuery = "";
 
     private View inputContainer;
     private View recordingContainer;
@@ -927,18 +931,34 @@ public class ChatActivity extends AppCompatActivity {
             btnVideoCall.setOnClickListener(v -> startCall("video"));
         }
 
-        // In-Chat Message Search Bar (WhatsApp Style)
+        // In-Chat Message Search Bar (WhatsApp / Telegram Style with Up/Down Navigation & Highlight)
         View btnChatSearch = findViewById(R.id.btnChatSearch);
         View chatSearchBar = findViewById(R.id.chatSearchBar);
         EditText etChatSearch = findViewById(R.id.etChatSearch);
         TextView tvChatSearchCount = findViewById(R.id.tvChatSearchCount);
+        View btnChatSearchUp = findViewById(R.id.btnChatSearchUp);
+        View btnChatSearchDown = findViewById(R.id.btnChatSearchDown);
         View btnCloseChatSearch = findViewById(R.id.btnCloseChatSearch);
+
+        Runnable clearSearchState = () -> {
+            activeChatSearchQuery = "";
+            searchMatchPositions.clear();
+            searchMatchMessageIds.clear();
+            currentSearchMatchIdx = -1;
+            if (tvChatSearchCount != null) tvChatSearchCount.setText("");
+            if (btnChatSearchUp != null) btnChatSearchUp.setVisibility(View.GONE);
+            if (btnChatSearchDown != null) btnChatSearchDown.setVisibility(View.GONE);
+            if (messagesAdapter != null) messagesAdapter.setSearchHighlightState("", null);
+        };
 
         if (btnChatSearch != null && chatSearchBar != null && etChatSearch != null) {
             btnChatSearch.setOnClickListener(v -> {
                 if (chatSearchBar.getVisibility() == View.VISIBLE) {
                     etChatSearch.setText("");
+                    clearSearchState.run();
                     chatSearchBar.setVisibility(View.GONE);
+                    InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                    if (imm != null) imm.hideSoftInputFromWindow(etChatSearch.getWindowToken(), 0);
                 } else {
                     chatSearchBar.setVisibility(View.VISIBLE);
                     etChatSearch.requestFocus();
@@ -949,7 +969,30 @@ public class ChatActivity extends AppCompatActivity {
             if (btnCloseChatSearch != null) {
                 btnCloseChatSearch.setOnClickListener(v -> {
                     etChatSearch.setText("");
+                    clearSearchState.run();
                     chatSearchBar.setVisibility(View.GONE);
+                    InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                    if (imm != null) imm.hideSoftInputFromWindow(etChatSearch.getWindowToken(), 0);
+                });
+            }
+            if (btnChatSearchUp != null) {
+                btnChatSearchUp.setOnClickListener(v -> {
+                    if (searchMatchPositions.isEmpty()) return;
+                    currentSearchMatchIdx--;
+                    if (currentSearchMatchIdx < 0) {
+                        currentSearchMatchIdx = searchMatchPositions.size() - 1;
+                    }
+                    jumpToCurrentSearchMatch(tvChatSearchCount);
+                });
+            }
+            if (btnChatSearchDown != null) {
+                btnChatSearchDown.setOnClickListener(v -> {
+                    if (searchMatchPositions.isEmpty()) return;
+                    currentSearchMatchIdx++;
+                    if (currentSearchMatchIdx >= searchMatchPositions.size()) {
+                        currentSearchMatchIdx = 0;
+                    }
+                    jumpToCurrentSearchMatch(tvChatSearchCount);
                 });
             }
             etChatSearch.addTextChangedListener(new TextWatcher() {
@@ -958,26 +1001,39 @@ public class ChatActivity extends AppCompatActivity {
 
                 @Override
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    String q = s.toString().trim().toLowerCase();
+                    String q = s.toString().trim().toLowerCase(Locale.ROOT);
                     if (q.isEmpty() || messageList == null) {
-                        if (tvChatSearchCount != null) tvChatSearchCount.setText("");
+                        clearSearchState.run();
                         return;
                     }
-                    int matches = 0;
-                    int lastMatchAdapterPos = -1;
+                    activeChatSearchQuery = q;
+                    searchMatchPositions.clear();
+                    searchMatchMessageIds.clear();
                     for (int i = 0; i < messageList.size(); i++) {
                         Message m = messageList.get(i);
-                        if (m.getText() != null && m.getText().toLowerCase().contains(q)) {
-                            matches++;
-                            lastMatchAdapterPos = i + 1;
+                        if (m != null && !"deleted".equals(m.getType()) && m.getText() != null
+                                && m.getText().toLowerCase(Locale.ROOT).contains(q)) {
+                            searchMatchPositions.add(i + 1); // +1 for encryption header at index 0
+                            searchMatchMessageIds.add(m.getId());
                         }
                     }
-                    if (tvChatSearchCount != null) {
-                        tvChatSearchCount.setText(matches + (matches == 1 ? " match" : " matches"));
-                    }
-                    if (lastMatchAdapterPos != -1 && messagesRecyclerView != null) {
-                        highlightPosition = lastMatchAdapterPos;
-                        messagesRecyclerView.smoothScrollToPosition(lastMatchAdapterPos);
+                    if (btnChatSearchUp != null) btnChatSearchUp.setVisibility(View.VISIBLE);
+                    if (btnChatSearchDown != null) btnChatSearchDown.setVisibility(View.VISIBLE);
+
+                    if (searchMatchPositions.isEmpty()) {
+                        currentSearchMatchIdx = -1;
+                        if (tvChatSearchCount != null) {
+                            tvChatSearchCount.setText("0/0");
+                        }
+                        if (btnChatSearchUp != null) btnChatSearchUp.setAlpha(0.38f);
+                        if (btnChatSearchDown != null) btnChatSearchDown.setAlpha(0.38f);
+                        if (messagesAdapter != null) messagesAdapter.setSearchHighlightState(q, null);
+                    } else {
+                        if (btnChatSearchUp != null) btnChatSearchUp.setAlpha(1.0f);
+                        if (btnChatSearchDown != null) btnChatSearchDown.setAlpha(1.0f);
+                        // Start at the latest (bottom-most) matching message like WhatsApp/Telegram
+                        currentSearchMatchIdx = searchMatchPositions.size() - 1;
+                        jumpToCurrentSearchMatch(tvChatSearchCount);
                     }
                 }
 
@@ -2179,11 +2235,11 @@ public class ChatActivity extends AppCompatActivity {
                 if (currentUserId != null) parts.add(currentUserId);
                 if (!isGroupOrChan && recipientId != null) parts.add(recipientId);
                 String initialName = (recipientName != null && !recipientName.isEmpty() && (!recipientName.equals(myOwnName) || isGroupOrChan))
-                        ? recipientName : (isChan ? "Broadcast Channel" : (isGroupOrChan ? "Encrypted Group" : "Anonymous Peer"));
+                        ? recipientName : (isChan ? "Broadcast Channel" : (isGroupOrChan ? "Group Chat" : "Veil Contact"));
                 localChat = new com.m3.veil.model.Chat(
                         chatId,
                         initialName,
-                        isChan ? "📢 Encrypted Broadcast Channel" : (isGroupOrChan ? "🛡️ Encrypted Group Chat" : "🔒 End-to-End Encrypted P2P Chat"),
+                        isChan ? "📢 Broadcast Channel" : (isGroupOrChan ? "👥 Group Chat" : "Say hello 👋"),
                         Timestamp.now(),
                         "avatar_1",
                         0,
@@ -2266,24 +2322,41 @@ public class ChatActivity extends AppCompatActivity {
         });
     }
 
-    private boolean isWallpaperIncompatibleWithTheme(String wpValue, boolean isNight) {
+    private String resolveThemeAdaptiveWallpaper(String wpValue, boolean isNight) {
         if (wpValue == null || wpValue.trim().isEmpty() || "default".equalsIgnoreCase(wpValue.trim())) {
-            return true;
+            return null;
         }
-        String upper = wpValue.toUpperCase();
-        if (isNight) {
-            return upper.contains("#F8FAFC") || upper.contains("#EBEEF2")
-                    || upper.equals("#FAF7F2") || upper.equals("#F0FDF4")
-                    || upper.equals("#F0F9FF") || upper.equals("#FFF1F2");
-        } else {
-            return upper.contains("#0B132B") || upper.contains("#1C2541")
-                    || upper.equals("#0D1117") || upper.equals("#121212")
-                    || upper.equals("#000000") || upper.equals("#121026")
-                    || upper.equals("#091E1A") || upper.equals("#240B15")
-                    || upper.equals("#1F1905") || upper.equals("#081D2E")
-                    || upper.equals("#0B141B") || upper.equals("#2A1B0A")
-                    || upper.contains("#0F2027");
+        String upper = wpValue.trim().toUpperCase(Locale.ROOT);
+        // Pure default light or pure default dark presets adapt automatically to the active Light/Dark mode
+        if (upper.contains("#F8FAFC") || upper.contains("#EBEEF2")
+                || upper.equals("#FAF7F2") || upper.equals("#0D1117")
+                || upper.equals("#121212") || upper.equals("#000000")
+                || upper.contains("#0B132B") || upper.contains("#1C2541")) {
+            return null;
         }
+        // Adaptive custom themes: render rich dark gradients in Dark Mode and soft pastel gradients in Light Mode
+        if (upper.equals("#121026")) { // Cyber Indigo
+            return isNight ? "gradient:#121026:#1E1B4B" : "gradient:#E0E7FF:#C7D2FE";
+        }
+        if (upper.equals("#091E1A")) { // Emerald Matrix
+            return isNight ? "gradient:#091E1A:#064E3B" : "gradient:#D1FAE5:#A7F3D0";
+        }
+        if (upper.equals("#240B15")) { // Crimson Velvet
+            return isNight ? "gradient:#240B15:#4C0519" : "gradient:#FFE4E6:#FECDD3";
+        }
+        if (upper.equals("#1F1905")) { // Royal Gold
+            return isNight ? "gradient:#1F1905:#451A03" : "gradient:#FEF3C7:#FDE68A";
+        }
+        if (upper.equals("#081D2E")) { // Deep Ocean
+            return isNight ? "gradient:#081D2E:#0C4A6E" : "gradient:#E0F2FE:#BAE6FD";
+        }
+        if (upper.equals("#0B141B")) { // WhatsApp Classic
+            return isNight ? "#0B141B" : "#EFEAE2";
+        }
+        if (upper.contains("#0F2027") && !isNight) { // Midnight Nebula in Light Mode
+            return "gradient:#E2E8F0:#CBD5E1";
+        }
+        return wpValue;
     }
 
     private void applyChatWallpaper() {
@@ -2315,14 +2388,12 @@ public class ChatActivity extends AppCompatActivity {
         } else if (currentLocalChat != null) {
             rawWallpaper = currentLocalChat.getWallpaperColor();
         }
-        if (isWallpaperIncompatibleWithTheme(rawWallpaper, isNight)) {
-            rawWallpaper = null;
-        }
+        rawWallpaper = resolveThemeAdaptiveWallpaper(rawWallpaper, isNight);
 
         String wpType = (rawWallpaper != null && !rawWallpaper.isEmpty()) ? "custom" : appPrefs.getString("wallpaper_type", "default");
         String wpValue = (rawWallpaper != null && !rawWallpaper.isEmpty()) ? rawWallpaper : appPrefs.getString("wallpaper_value", null);
-        if (!"image".equals(wpType) && isWallpaperIncompatibleWithTheme(wpValue, isNight)) {
-            wpValue = null;
+        if (!"image".equals(wpType)) {
+            wpValue = resolveThemeAdaptiveWallpaper(wpValue, isNight);
         }
 
         try {
@@ -2760,7 +2831,7 @@ public class ChatActivity extends AppCompatActivity {
         MaterialButton btnCancel = view.findViewById(R.id.btnDestructiveCancel);
 
         tvTitle.setText("Clear Chat Messages");
-        tvMsg.setText("Are you sure you want to delete all messages in this chat from your local encrypted vault? This cannot be undone.");
+        tvMsg.setText("Are you sure you want to delete all messages in this chat? This cannot be undone.");
         btnConfirm.setText("Clear Messages");
 
         btnConfirm.setOnClickListener(v -> {
@@ -2768,7 +2839,7 @@ public class ChatActivity extends AppCompatActivity {
             messageList.clear();
             messagesAdapter.notifyDataSetChanged();
             com.m3.veil.database.EncryptedChatDatabase.getInstance(this).clearChatMessages(chatId);
-            Toast.makeText(this, "Chat cleared from encrypted vault", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Chat messages cleared", Toast.LENGTH_SHORT).show();
         });
 
         btnCancel.setOnClickListener(v -> sheet.dismiss());
@@ -2788,7 +2859,7 @@ public class ChatActivity extends AppCompatActivity {
         MaterialButton btnCancel = view.findViewById(R.id.btnDestructiveCancel);
 
         tvTitle.setText(isChatBlocked ? "Unblock User" : "Block User");
-        tvMsg.setText(isChatBlocked ? "Unblock this user to resume P2P encrypted messaging and calling?" : "Block this user from messaging or calling you?");
+        tvMsg.setText(isChatBlocked ? "Unblock this user to resume messaging and calling?" : "Block this user from messaging or calling you?");
         btnConfirm.setText(isChatBlocked ? "Unblock User" : "Block User");
 
         btnConfirm.setOnClickListener(v -> {
@@ -2875,8 +2946,8 @@ public class ChatActivity extends AppCompatActivity {
                     ? (memberCount == 1 ? " subscriber" : " subscribers")
                     : (memberCount == 1 ? " member" : " members"));
             String meshSuffix = connectedPeers > 0
-                    ? " • " + connectedPeers + " P2P online"
-                    : " • Encrypted Mesh";
+                    ? " • " + connectedPeers + " online"
+                    : "";
             onlineStatus.setText(subPrefix + countLabel + meshSuffix);
             onlineStatus.setTextColor(getResources().getColor(connectedPeers > 0 ? R.color.statusSuccess : R.color.text_secondary));
             if (ivStatusDot != null) ivStatusDot.setVisibility(connectedPeers > 0 ? View.VISIBLE : View.GONE);
@@ -3252,6 +3323,35 @@ public class ChatActivity extends AppCompatActivity {
         animatorSet.playTogether(scaleX, scaleY);
         animatorSet.setDuration(800);
         animatorSet.start();
+    }
+
+    private void jumpToCurrentSearchMatch(TextView tvChatSearchCount) {
+        if (searchMatchPositions.isEmpty() || currentSearchMatchIdx < 0 || currentSearchMatchIdx >= searchMatchPositions.size()) {
+            return;
+        }
+        int adapterPos = searchMatchPositions.get(currentSearchMatchIdx);
+        String msgId = searchMatchMessageIds.get(currentSearchMatchIdx);
+        if (tvChatSearchCount != null) {
+            tvChatSearchCount.setText((currentSearchMatchIdx + 1) + "/" + searchMatchPositions.size());
+        }
+        if (messagesAdapter != null) {
+            messagesAdapter.setSearchHighlightState(activeChatSearchQuery, msgId);
+        }
+        if (messagesRecyclerView != null) {
+            LinearLayoutManager lm = (LinearLayoutManager) messagesRecyclerView.getLayoutManager();
+            if (lm != null) {
+                int offset = messagesRecyclerView.getHeight() > 0 ? messagesRecyclerView.getHeight() / 3 : 160;
+                lm.scrollToPositionWithOffset(adapterPos, offset);
+            } else {
+                messagesRecyclerView.scrollToPosition(adapterPos);
+            }
+            messagesRecyclerView.postDelayed(() -> {
+                RecyclerView.ViewHolder holder = messagesRecyclerView.findViewHolderForAdapterPosition(adapterPos);
+                if (holder != null) {
+                    blinkView(holder);
+                }
+            }, 90);
+        }
     }
 
     private String resolveCleanReplySenderName(Message targetMsg) {
@@ -5529,7 +5629,7 @@ public class ChatActivity extends AppCompatActivity {
         if (optionsContainer == null) return;
 
         String[] descriptions = {
-                "Messages persist normally in encrypted database",
+                "Messages stay in chat unless deleted",
                 "Ultra-fast zero-trace vanishing for ephemeral secrets",
                 "Quick shredding for brief confidential chats",
                 "Medium-length conversation persistence",
@@ -5821,7 +5921,7 @@ public class ChatActivity extends AppCompatActivity {
             layout.addView(tvMsg);
 
             TextView tvWarn = new TextView(this);
-            tvWarn.setText("⚠️ This message will permanently self-destruct from the encrypted vault once closed.");
+            tvWarn.setText("⚠️ This view-once message will disappear once closed.");
             tvWarn.setTextColor(0xFFEF4444);
             tvWarn.setTextSize(12.5f);
             tvWarn.setPadding(0, 0, 0, (int) (20 * getResources().getDisplayMetrics().density));
@@ -7112,7 +7212,7 @@ public class ChatActivity extends AppCompatActivity {
         TextView tvSub = new TextView(this);
         tvSub.setText(hasExistingPin
                 ? "Enter new 4-digit PIN, or tap Remove PIN to unlock completely."
-                : "Set a 4-digit PIN required to open this conversation in your local encrypted vault.");
+                : "Set a 4-digit PIN required to open this conversation.");
         tvSub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
         tvSub.setTextSize(13);
         tvSub.setPadding(0, (int) (4 * getResources().getDisplayMetrics().density), 0, (int) (16 * getResources().getDisplayMetrics().density));
@@ -7271,7 +7371,7 @@ public class ChatActivity extends AppCompatActivity {
 
         if (subgroups.isEmpty()) {
             TextView emptyTv = new TextView(this);
-            emptyTv.setText("No sub-groups created yet. Tap the button above to start an encrypted topic thread.");
+            emptyTv.setText("No sub-groups created yet. Tap the button above to start a topic thread.");
             emptyTv.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
             emptyTv.setTextSize(13.5f);
             emptyTv.setPadding(0, (int) (16 * getResources().getDisplayMetrics().density), 0, 0);

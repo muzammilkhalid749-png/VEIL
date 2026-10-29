@@ -214,7 +214,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Veil Privacy Wallet"
+                        android:text="Veil Wallet"
                         android:textColor="@color/colorOnPrimaryContainer"
                         android:textSize="12sp"
                         android:fontFamily="sans-serif-medium" />

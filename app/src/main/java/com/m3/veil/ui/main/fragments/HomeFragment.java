@@ -1027,7 +1027,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         }
         VeilFeatureManager.getInstance(requireContext())
                 .addMyMediaStatus(localFilePath, safeCaption, "#1E293B");
-        Toast.makeText(requireContext(), "✅ Status posted · encrypted & visible for 24h", Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), "✅ Status posted · visible for 24h", Toast.LENGTH_SHORT).show();
         renderStatusTray();
     }
 
@@ -1259,12 +1259,12 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                         }
                                         chatTitle = (resolvedPeerName != null && !resolvedPeerName.isEmpty()) ? resolvedPeerName : null;
                                     } else if (chatTitle == null || chatTitle.isEmpty()) {
-                                        chatTitle = "channel".equals(chatType) ? "Broadcast Channel" : "Encrypted Group";
+                                        chatTitle = "channel".equals(chatType) ? "Broadcast Channel" : "Group Chat";
                                     }
 
                                     boolean shouldSyncMessages = false;
                                     if (existing == null) {
-                                        String initialTitle = chatTitle != null ? chatTitle : (isDirectChat ? "Veil Contact" : "Encrypted Group");
+                                        String initialTitle = chatTitle != null ? chatTitle : (isDirectChat ? "Veil Contact" : "Group Chat");
                                         Chat newGroup = new Chat(
                                                 gId,
                                                 initialTitle,
@@ -1552,7 +1552,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     if (existing == null) {
                                         Chat newChat = new Chat(
                                                 cId,
-                                                "Encrypted Chat",
+                                                "Veil Contact",
                                                 lastMsg != null ? lastMsg : "Direct chat created",
                                                 ts,
                                                 null,
@@ -1788,7 +1788,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                     tvEmptySubtitle.setText("No chats or messages matched \"" + searchQuery + "\"");
                 } else if ("unread".equals(activeFilter)) {
                     tvEmptyTitle.setText("All caught up!");
-                    tvEmptySubtitle.setText("You have no unread encrypted messages.");
+                    tvEmptySubtitle.setText("You have no unread messages.");
                 } else if ("secret".equals(activeFilter)) {
                     tvEmptyTitle.setText("Secret Vault is empty");
                     tvEmptySubtitle.setText("Long-press any conversation to move it to your hidden Secret Vault.");
@@ -1809,7 +1809,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         // If chat has a per-chat PIN lock, verify PIN before opening
         if (chat.getChatLockPin() != null && !chat.getChatLockPin().isEmpty()) {
-            showPinAuthModal("🔒 Unlock " + chat.getName(), "This conversation is encrypted & PIN protected", "Enter Chat PIN", (pin, dialog, layout) -> {
+            showPinAuthModal("🔒 Unlock " + chat.getName(), "This conversation is PIN protected", "Enter Chat PIN", (pin, dialog, layout) -> {
                 if (chat.getChatLockPin().equals(pin)) {
                     dialog.dismiss();
                     openChatScreen(chat, true);
@@ -2091,7 +2091,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         if (msgs == null || msgs.isEmpty()) {
             TextView empty = new TextView(requireContext());
-            empty.setText("No messages in local encrypted vault yet.");
+            empty.setText("No messages in this conversation yet.");
             empty.setTextColor(ContextCompat.getColor(requireContext(), R.color.textSecondary));
             empty.setTextSize(13.5f);
             msgBox.addView(empty);
@@ -2391,7 +2391,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     private void showVanishTimerDialog(Chat chat) {
         if (getContext() == null || chat == null) return;
         String[] labels = {
-                "Off (Permanent encrypted storage)",
+                "Off (Messages stay until deleted)",
                 "⚡ 30 Seconds after seen",
                 "⏱️ 5 Minutes",
                 "⏱️ 1 Hour",
@@ -2475,7 +2475,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         if (tvTitle != null) tvTitle.setText("Delete Chat?");
         if (tvMsg != null) {
-            tvMsg.setText("Are you sure you want to wipe this encrypted conversation from your device? All messages and attachments will be shredded.");
+            tvMsg.setText("Are you sure you want to delete this conversation from your device? All messages and attachments will be removed.");
         }
         if (btnConfirm != null) {
             btnConfirm.setText("Delete & Shred");

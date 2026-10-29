@@ -182,7 +182,7 @@ public class UserProfileActivity extends AppCompatActivity {
             boolean isChan = (chat != null && chat.isChannel()) || (chatId != null && chatId.startsWith("channel_"));
             String descText = (chat != null && chat.getDescription() != null && !chat.getDescription().isEmpty())
                     ? chat.getDescription()
-                    : (isChan ? "End-to-End Encrypted Broadcast Channel" : "End-to-End Encrypted Group");
+                    : (isChan ? "Broadcast Channel" : "Group Chat");
             if (profileSubtitle != null) profileSubtitle.setText(descText);
             android.view.View groupMembersLayout = findViewById(R.id.layoutGroupMembers);
             if (groupMembersLayout != null) groupMembersLayout.setVisibility(android.view.View.VISIBLE);
@@ -888,16 +888,16 @@ public class UserProfileActivity extends AppCompatActivity {
         MaterialButton btnConfirm = sheet.findViewById(R.id.btnDestructiveConfirm);
         MaterialButton btnCancel = sheet.findViewById(R.id.btnDestructiveCancel);
 
-        if (tvTitle != null) tvTitle.setText("Clear Encrypted Chat?");
+        if (tvTitle != null) tvTitle.setText("Clear Chat?");
         if (tvMsg != null) {
-            tvMsg.setText("Are you sure you want to wipe all messages in this local conversation? This operation permanently shreds all SQLCipher encrypted data blocks.");
+            tvMsg.setText("Are you sure you want to clear all messages in this conversation? This action cannot be undone.");
         }
         if (btnConfirm != null) {
-            btnConfirm.setText("Clear & Shred");
+            btnConfirm.setText("Clear Chat");
             btnConfirm.setOnClickListener(v -> {
                 sheet.dismiss();
                 EncryptedChatDatabase.getInstance(this).clearChatMessages(chatId);
-                Toast.makeText(this, "Chat wiped from local SQLCipher vault", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Chat messages cleared", Toast.LENGTH_SHORT).show();
             });
         }
         if (btnCancel != null) {
@@ -961,7 +961,7 @@ public class UserProfileActivity extends AppCompatActivity {
 
         String[] options = {"Off", "10 Seconds", "1 Minute", "1 Hour", "24 Hours", "7 Days", "30 Days"};
         String[] descriptions = {
-                "Messages persist normally in encrypted database",
+                "Messages stay in chat unless deleted",
                 "Ultra-fast zero-trace vanishing for ephemeral secrets",
                 "Quick shredding for brief confidential chats",
                 "Medium-length conversation persistence",
@@ -1072,12 +1072,12 @@ public class UserProfileActivity extends AppCompatActivity {
             sheet.show(getSupportFragmentManager(), "EventsCalendarBottomSheet");
         }), insertIdx + 3);
 
-        parent.addView(createProfileOptionRow("📁 Secret Sub-Groups & Topics", "Manage and join encrypted topic channels", R.drawable.ic_chat, v -> {
+        parent.addView(createProfileOptionRow("📁 Sub-Groups & Topics", "Manage and join topic channels", R.drawable.ic_chat, v -> {
             showSubgroupsDialog();
         }), insertIdx + 4);
 
         parent.addView(createProfileOptionRow("🎨 Group Themes & Wallpaper", "Customize theme and broadcast to group mesh", R.drawable.ic_appearance, v -> {
-            showGroupThemesDialog();
+            showThemesAndWallpaperDialog(true);
         }), insertIdx + 5);
 
         parent.addView(createProfileOptionRow("🏆 Group Achievements", "View cryptographic member reputation badges", R.drawable.ic_shield, v -> {
@@ -1104,10 +1104,10 @@ public class UserProfileActivity extends AppCompatActivity {
         }), insertIdx);
 
         parent.addView(createProfileOptionRow("🎨 Custom Chat Theme & Wallpaper", "Personalize background colors & sync chat theme", R.drawable.ic_appearance, v -> {
-            showGroupThemesDialog();
+            showThemesAndWallpaperDialog(false);
         }), insertIdx + 1);
 
-        parent.addView(createProfileOptionRow("⚙️ Advanced Chat & Privacy Settings", "Read receipts, screenshot shield, auto-translate & export", R.drawable.ic_settings, v -> {
+        parent.addView(createProfileOptionRow("⚙️ Advanced Chat Settings", "Read receipts, screenshot shield, auto-translate & export", R.drawable.ic_settings, v -> {
             Intent intent = new Intent(this, ChatSettingsActivity.class);
             intent.putExtra("chatId", chatId);
             intent.putExtra("userId", peerUserId);
@@ -1363,7 +1363,7 @@ public class UserProfileActivity extends AppCompatActivity {
             sheet.dismiss();
             Intent sendIntent = new Intent(Intent.ACTION_SEND);
             sendIntent.setType("text/plain");
-            sendIntent.putExtra(Intent.EXTRA_TEXT, "Join \"" + (peerUserName != null ? peerUserName : "Encrypted Group") + "\" on VEIL P2P Mesh: " + currentLink[0]);
+            sendIntent.putExtra(Intent.EXTRA_TEXT, "Join \"" + (peerUserName != null ? peerUserName : "Group Chat") + "\" on VEIL: " + currentLink[0]);
             startActivity(Intent.createChooser(sendIntent, "Share Group Invite Link"));
         });
         root.addView(btnShare);
@@ -1575,7 +1575,7 @@ public class UserProfileActivity extends AppCompatActivity {
         root.addView(tvTitle);
 
         TextView tvSubtitle = new TextView(this);
-        tvSubtitle.setText("End-to-end encrypted topic threads inside this group");
+        tvSubtitle.setText("Topic threads inside this group");
         tvSubtitle.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
         tvSubtitle.setTextSize(13);
         tvSubtitle.setPadding(0, 4, 0, (int) (14 * getResources().getDisplayMetrics().density));
@@ -1640,7 +1640,7 @@ public class UserProfileActivity extends AppCompatActivity {
                         Chat topicChat = new Chat(
                                 subChatId,
                                 "#" + sg.title + " (" + (peerUserName != null ? peerUserName : "Group") + ")",
-                                sg.description != null ? sg.description : "Encrypted topic thread",
+                                sg.description != null ? sg.description : "Topic thread",
                                 com.google.firebase.Timestamp.now(),
                                 null,
                                 0,
@@ -1742,15 +1742,23 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private void showGroupThemesDialog() {
+        showThemesAndWallpaperDialog(isGroup);
+    }
+
+    private void showThemesAndWallpaperDialog(boolean forGroup) {
+        boolean isNight = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(this);
+        float dp = getResources().getDisplayMetrics().density;
+
         String[] names = {
                 "Default (Auto Light / Dark Theme)",
-                "Nordic Slate Frost (Light)",
-                "Midnight Sapphire (Dark)",
-                "Cyber Indigo (#121026)",
-                "Emerald Matrix (#091E1A)",
-                "Crimson Velvet (#240B15)",
-                "Royal Gold (#1F1905)",
-                "Deep Ocean (#081D2E)"
+                "Nordic Slate Frost",
+                "Midnight Sapphire",
+                "Cyber Indigo",
+                "Emerald Matrix",
+                "Crimson Velvet",
+                "Royal Gold",
+                "Deep Ocean",
+                "WhatsApp Classic"
         };
         String[] hexes = {
                 "default",
@@ -1760,80 +1768,207 @@ public class UserProfileActivity extends AppCompatActivity {
                 "#091E1A",
                 "#240B15",
                 "#1F1905",
-                "#081D2E"
+                "#081D2E",
+                "#0B141B"
         };
+        // Vivid, high-contrast dot swatch colors so every theme dot is unmistakably visible in both Light & Dark mode
+        int[] dotColors = {
+                0xFF3B82F6, // Default Royal Blue
+                0xFF94A3B8, // Nordic Slate Blue-Grey
+                0xFF1D4ED8, // Midnight Sapphire Blue
+                0xFF6366F1, // Cyber Indigo
+                0xFF10B981, // Emerald Matrix Green
+                0xFFF43F5E, // Crimson Velvet Rose
+                0xFFF59E0B, // Royal Gold Amber
+                0xFF0EA5E9, // Deep Ocean Cyan
+                0xFF00A884  // WhatsApp Classic Teal
+        };
+
+        String currentWp = chatId != null
+                ? EncryptedChatDatabase.getInstance(this).getChatWallpaper(chatId)
+                : null;
+        if (currentWp == null || currentWp.trim().isEmpty()) {
+            currentWp = "default";
+        }
 
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundResource(R.drawable.bottom_sheet_background);
-        int padH = (int) (24 * getResources().getDisplayMetrics().density);
-        int padV = (int) (16 * getResources().getDisplayMetrics().density);
+
+        android.graphics.drawable.GradientDrawable sheetBg = new android.graphics.drawable.GradientDrawable();
+        sheetBg.setColor(isNight ? 0xFF161B26 : 0xFFFFFFFF);
+        float topRadius = 24f * dp;
+        sheetBg.setCornerRadii(new float[]{topRadius, topRadius, topRadius, topRadius, 0f, 0f, 0f, 0f});
+        root.setBackground(sheetBg);
+
+        int padH = (int) (22 * dp);
+        int padV = (int) (16 * dp);
         root.setPadding(padH, padV, padH, padV * 2);
 
+        // Drag handle
+        View handle = new View(this);
+        LinearLayout.LayoutParams hLp = new LinearLayout.LayoutParams((int) (40 * dp), (int) (4 * dp));
+        hLp.gravity = Gravity.CENTER_HORIZONTAL;
+        hLp.bottomMargin = (int) (14 * dp);
+        handle.setLayoutParams(hLp);
+        android.graphics.drawable.GradientDrawable handleBg = new android.graphics.drawable.GradientDrawable();
+        handleBg.setCornerRadius(2 * dp);
+        handleBg.setColor(isNight ? 0xFF475569 : 0xFFCBD5E1);
+        handle.setBackground(handleBg);
+        root.addView(handle);
+
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("🎨 Group Themes & Wallpaper");
-        tvTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        tvTitle.setText(forGroup ? "🎨 Group Themes & Wallpaper" : "🎨 Custom Chat Theme & Wallpaper");
+        tvTitle.setTextColor(isNight ? 0xFFF8FAFC : 0xFF0F172A);
         tvTitle.setTextSize(19);
         tvTitle.setTypeface(null, Typeface.BOLD);
         root.addView(tvTitle);
 
         TextView tvSub = new TextView(this);
-        tvSub.setText("Select a theme to synchronize across all peers in this group");
-        tvSub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+        tvSub.setText(forGroup
+                ? "Select an adaptive theme to synchronize across all members in this group"
+                : "Personalize background & theme colors for this conversation (Light & Dark adaptive)");
+        tvSub.setTextColor(isNight ? 0xFF94A3B8 : 0xFF64748B);
         tvSub.setTextSize(13);
-        tvSub.setPadding(0, 4, 0, (int) (16 * getResources().getDisplayMetrics().density));
+        tvSub.setPadding(0, (int) (4 * dp), 0, (int) (14 * dp));
         root.addView(tvSub);
+
+        ScrollView scrollView = new ScrollView(this);
+        LinearLayout listContainer = new LinearLayout(this);
+        listContainer.setOrientation(LinearLayout.VERTICAL);
 
         for (int i = 0; i < names.length; i++) {
             final String hex = hexes[i];
             final String name = names[i];
+            final int dotColor = dotColors[i];
+            final boolean isSelected = hex.equalsIgnoreCase(currentWp)
+                    || ("default".equals(hex) && "default".equalsIgnoreCase(currentWp));
 
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(0, (int) (10 * getResources().getDisplayMetrics().density), 0, (int) (10 * getResources().getDisplayMetrics().density));
+            int rPadH = (int) (12 * dp);
+            int rPadV = (int) (10 * dp);
+            row.setPadding(rPadH, rPadV, rPadH, rPadV);
 
-            View swatch = new View(this);
-            int sDim = (int) (24 * getResources().getDisplayMetrics().density);
+            android.graphics.drawable.GradientDrawable rowBg = new android.graphics.drawable.GradientDrawable();
+            rowBg.setCornerRadius(12 * dp);
+            if (isSelected) {
+                rowBg.setColor(isNight ? 0xFF1E293B : 0xFFEFF6FF);
+                rowBg.setStroke((int) (1.5f * dp), 0xFF3B82F6);
+            } else {
+                rowBg.setColor(Color.TRANSPARENT);
+            }
+            row.setBackground(rowBg);
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            rowLp.bottomMargin = (int) (4 * dp);
+            row.setLayoutParams(rowLp);
+
+            // Vivid circular color dot with contrasting border
+            TextView swatch = new TextView(this);
+            int sDim = (int) (30 * dp);
             LinearLayout.LayoutParams swatchLp = new LinearLayout.LayoutParams(sDim, sDim);
-            swatchLp.rightMargin = (int) (12 * getResources().getDisplayMetrics().density);
+            swatchLp.rightMargin = (int) (14 * dp);
+            swatchLp.setMarginEnd((int) (14 * dp));
             swatch.setLayoutParams(swatchLp);
+            swatch.setGravity(Gravity.CENTER);
+            swatch.setTextColor(Color.WHITE);
+            swatch.setTextSize(13f);
+            swatch.setTypeface(null, Typeface.BOLD);
+            if (isSelected) {
+                swatch.setText("✓");
+            }
             android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
-            gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            gd.setColor("default".equals(hex) ? ContextCompat.getColor(this, R.color.colorPrimary) : Color.parseColor(hex));
-            gd.setStroke(2, Color.WHITE);
+            gd.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            gd.setCornerRadius(sDim / 2f);
+            gd.setSize(sDim, sDim);
+            gd.setColor(dotColor);
+            gd.setStroke((int) (2 * dp), isNight ? 0xFFFFFFFF : 0xFF1E293B);
             swatch.setBackground(gd);
             row.addView(swatch);
 
             TextView tvName = new TextView(this);
             tvName.setText(name);
-            tvName.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+            tvName.setTextColor(isNight ? 0xFFF8FAFC : 0xFF0F172A);
             tvName.setTextSize(15.5f);
+            if (isSelected) {
+                tvName.setTypeface(null, Typeface.BOLD);
+            }
+            LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            tvName.setLayoutParams(nameLp);
             row.addView(tvName);
 
             row.setOnClickListener(v -> {
                 sheet.dismiss();
                 String dbHex = "default".equals(hex) ? null : hex;
-                EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, dbHex);
-                try {
-                    org.json.JSONObject payload = new org.json.JSONObject();
-                    payload.put("action", "group_theme_sync");
-                    payload.put("groupId", chatId);
-                    payload.put("themeHex", hex);
-                    payload.put("themeName", name);
-                    com.m3.veil.webrtc.VeilPacket packet = new com.m3.veil.webrtc.VeilPacket(
-                            com.m3.veil.webrtc.VeilPacket.LANE_CTRL,
-                            com.m3.veil.webrtc.VeilPacket.TYPE_GROUP_SETTINGS,
-                            payload.toString()
-                    );
-                    WebRtcManager.getInstance(this).broadcastPacket(packet);
-                } catch (Throwable ignored) {}
-                Toast.makeText(this, "Group theme updated & synced across mesh!", Toast.LENGTH_SHORT).show();
+                if (chatId != null) {
+                    EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, dbHex);
+                    Chat localChat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
+                    if (localChat != null) {
+                        localChat.setWallpaperColor(dbHex);
+                        EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(localChat);
+                    }
+                    Chat cachedDialog = com.m3.veil.manager.VeilMessagesController.getInstance(this).getDialog(chatId);
+                    if (cachedDialog != null) {
+                        cachedDialog.setWallpaperColor(dbHex);
+                    }
+                }
+                if (forGroup) {
+                    try {
+                        org.json.JSONObject payload = new org.json.JSONObject();
+                        payload.put("action", "group_theme_sync");
+                        payload.put("groupId", chatId);
+                        payload.put("themeHex", hex);
+                        payload.put("themeName", name);
+                        com.m3.veil.webrtc.VeilPacket packet = new com.m3.veil.webrtc.VeilPacket(
+                                com.m3.veil.webrtc.VeilPacket.LANE_CTRL,
+                                com.m3.veil.webrtc.VeilPacket.TYPE_GROUP_SETTINGS,
+                                payload.toString()
+                        );
+                        WebRtcManager.getInstance(this).broadcastPacket(packet);
+                    } catch (Throwable ignored) {}
+                    Toast.makeText(this, "Group theme & wallpaper updated!", Toast.LENGTH_SHORT).show();
+                } else {
+                    if (peerUserId != null && !peerUserId.isEmpty() && chatId != null) {
+                        Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
+                        WebRtcManager.getInstance(this).sendChatSettingPacket(
+                                peerUserId,
+                                chatId,
+                                chat != null ? chat.getVanishTimer() : 0L,
+                                chat != null && chat.getVanishMode() != null ? chat.getVanishMode() : "after_send",
+                                name,
+                                hex
+                        );
+                    }
+                    Toast.makeText(this, "Chat theme & wallpaper updated!", Toast.LENGTH_SHORT).show();
+                }
             });
-            root.addView(row);
+            listContainer.addView(row);
         }
 
+        com.google.android.material.button.MaterialButton btnAdvanced =
+                new com.google.android.material.button.MaterialButton(this);
+        btnAdvanced.setText("✨ Open Live Preview & Dimming Studio");
+        btnAdvanced.setAllCaps(false);
+        btnAdvanced.setCornerRadius((int) (12 * dp));
+        btnAdvanced.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary));
+        btnAdvanced.setTextColor(Color.WHITE);
+        LinearLayout.LayoutParams advLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        advLp.topMargin = (int) (12 * dp);
+        btnAdvanced.setLayoutParams(advLp);
+        btnAdvanced.setOnClickListener(v -> {
+            sheet.dismiss();
+            com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet liveSheet =
+                    com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet.newInstance(chatId, peerUserId, forGroup);
+            liveSheet.show(getSupportFragmentManager(), "ThemeWallpaperBottomSheet");
+        });
+        listContainer.addView(btnAdvanced);
+
+        scrollView.addView(listContainer);
+        root.addView(scrollView);
         sheet.setContentView(root);
         sheet.show();
     }

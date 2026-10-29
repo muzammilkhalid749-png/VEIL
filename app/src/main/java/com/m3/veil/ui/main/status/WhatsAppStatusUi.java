@@ -392,7 +392,7 @@ public final class WhatsAppStatusUi {
             emptyCard.addView(tvEmptyH);
 
             TextView tvEmptySub = new TextView(ctx);
-            tvEmptySub.setText("Encrypted status updates from your contacts will appear here. Updates automatically disappear after 24 hours.");
+            tvEmptySub.setText("Status updates from your contacts will appear here. Updates automatically disappear after 24 hours.");
             tvEmptySub.setTextSize(13.5f);
             tvEmptySub.setTextColor(androidx.core.content.ContextCompat.getColor(ctx, R.color.textSecondary));
             tvEmptySub.setGravity(Gravity.CENTER);
