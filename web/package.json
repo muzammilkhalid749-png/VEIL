@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "tail -f /dev/null | vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "tail -f /dev/null | vite preview"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

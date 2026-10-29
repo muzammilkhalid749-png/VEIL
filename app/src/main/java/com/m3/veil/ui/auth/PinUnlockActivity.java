@@ -60,7 +60,7 @@ public class PinUnlockActivity extends AppCompatActivity {
     private void resolveTargetPinLengthAsync() {
         String masterPin = VeilFeatureManager.getInstance(this).getMasterPin();
         if (masterPin != null && !masterPin.isEmpty()) {
-            cachedTargetPinLength = masterPin.length();
+            cachedTargetPinLength = Math.max(4, Math.min(8, masterPin.trim().length()));
             updatePinDots();
             return;
         }
@@ -80,7 +80,7 @@ public class PinUnlockActivity extends AppCompatActivity {
                 SharedPreferences fallback = getSharedPreferences(PREFS_NAME + "_fallback", MODE_PRIVATE);
                 resolved = fallback.getInt("pin_length", 6);
             }
-            final int finalLen = Math.max(4, Math.min(6, resolved));
+            final int finalLen = Math.max(4, Math.min(8, resolved));
             cachedTargetPinLength = finalLen;
             runOnUiThread(() -> {
                 if (!isFinishing() && !isDestroyed()) {
@@ -133,7 +133,7 @@ public class PinUnlockActivity extends AppCompatActivity {
 
     private void handleNumberInput(String number) {
         if (isVerifying) return;
-        int maxDigits = Math.max(4, Math.min(6, cachedTargetPinLength));
+        int maxDigits = Math.max(4, Math.min(8, cachedTargetPinLength));
         if (enteredPin.length() < maxDigits) {
             enteredPin.append(number);
             updatePinDots();
@@ -175,17 +175,19 @@ public class PinUnlockActivity extends AppCompatActivity {
         String decoyPin = VeilFeatureManager.getInstance(this).getDecoyPin();
         if (decoyPin != null && !decoyPin.isEmpty() && decoyPin.equals(pinAttempt)) {
             isVerifying = false;
+            com.m3.veil.manager.PresenceManager.getInstance().markSessionPinUnlocked(true);
             VeilFeatureManager.getInstance(this).activateDecoyVault(true);
             Toast.makeText(this, "Welcome back", Toast.LENGTH_SHORT).show();
-            navigateToMain();
+            navigateToMain(true);
             return;
         }
 
         // 2. Check Master PIN in VeilFeatureManager
         if (VeilFeatureManager.getInstance(this).verifyMasterPin(pinAttempt)) {
             isVerifying = false;
+            com.m3.veil.manager.PresenceManager.getInstance().markSessionPinUnlocked(true);
             VeilFeatureManager.getInstance(this).activateDecoyVault(false);
-            navigateToMain();
+            navigateToMain(false);
             return;
         }
 
@@ -233,9 +235,10 @@ public class PinUnlockActivity extends AppCompatActivity {
 
                 runOnUiThread(() -> {
                     isVerifying = false;
+                    com.m3.veil.manager.PresenceManager.getInstance().markSessionPinUnlocked(true);
                     VeilFeatureManager.getInstance(PinUnlockActivity.this).setMasterPin(pinAttempt);
                     VeilFeatureManager.getInstance(PinUnlockActivity.this).activateDecoyVault(false);
-                    navigateToMain();
+                    navigateToMain(false);
                 });
             } catch (Exception e) {
                 runOnUiThread(this::onIncorrectPin);
@@ -268,7 +271,13 @@ public class PinUnlockActivity extends AppCompatActivity {
                 .start();
     }
 
-    private void navigateToMain() {
+    private void navigateToMain(boolean forceRestartMain) {
+        boolean unlockExistingTask = getIntent() != null && getIntent().getBooleanExtra("unlock_existing_task", false);
+        if (unlockExistingTask && !forceRestartMain && !isTaskRoot()) {
+            finish();
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+            return;
+        }
         Intent intent = new Intent(this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
@@ -284,7 +293,7 @@ public class PinUnlockActivity extends AppCompatActivity {
         if (pinDotsContainer == null) return;
         pinDotsContainer.removeAllViews();
 
-        int totalDots = Math.max(4, Math.min(6, cachedTargetPinLength));
+        int totalDots = Math.max(4, Math.min(8, cachedTargetPinLength));
         int pinLength = enteredPin.length();
         for (int i = 0; i < totalDots; i++) {
             View dot = new View(this);

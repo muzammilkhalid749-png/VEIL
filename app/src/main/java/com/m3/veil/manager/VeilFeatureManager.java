@@ -835,7 +835,7 @@ public class VeilFeatureManager {
         if (keystoreActive) score += 20;
 
         // 2. PIN Lock configured (+15)
-        boolean pinConfigured = mainPrefs.getString("app_pin", null) != null;
+        boolean pinConfigured = isAppLockPinEnabled();
         if (pinConfigured) score += 15;
 
         // 3. Decoy Panic PIN configured (+15)
@@ -977,17 +977,146 @@ public class VeilFeatureManager {
         return p != null && !p.isEmpty();
     }
 
+    /**
+     * Checks whether App Lock PIN is enabled via either PrivacySettingsActivity ("app_pin" in VeilPrefs)
+     * or PinSetupActivity ("pin_set" + "encrypted_mek" in EncryptedSharedPreferences).
+     */
+    public boolean isAppLockPinEnabled() {
+        if (hasMasterPin()) {
+            return true;
+        }
+        try {
+            SharedPreferences fallback = appContext.getSharedPreferences("veil_encrypted_prefs_fallback", Context.MODE_PRIVATE);
+            if (fallback.getBoolean("pin_set", false) && fallback.getString("encrypted_mek", null) != null) {
+                return true;
+            }
+        } catch (Throwable ignored) {}
+        try {
+            String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(
+                    androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
+            SharedPreferences encPrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
+                    "veil_encrypted_prefs",
+                    masterKeyAlias,
+                    appContext,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
+            return encPrefs.getBoolean("pin_set", false) && encPrefs.getString("encrypted_mek", null) != null;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    public int getMasterPinLength() {
+        String pin = getMasterPin();
+        if (pin != null && !pin.isEmpty()) {
+            return Math.max(4, Math.min(8, pin.trim().length()));
+        }
+        try {
+            String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(
+                    androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
+            SharedPreferences encPrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
+                    "veil_encrypted_prefs",
+                    masterKeyAlias,
+                    appContext,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
+            return Math.max(4, Math.min(8, encPrefs.getInt("pin_length", 6)));
+        } catch (Throwable ignored) {
+            SharedPreferences fallback = appContext.getSharedPreferences("veil_encrypted_prefs_fallback", Context.MODE_PRIVATE);
+            return Math.max(4, Math.min(8, fallback.getInt("pin_length", 6)));
+        }
+    }
+
     public void setMasterPin(String pin) {
         if (pin == null || pin.trim().isEmpty()) {
             mainPrefs.edit().remove("app_pin").apply();
+            try {
+                appContext.getSharedPreferences("veil_encrypted_prefs_fallback", Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("pin_set", false)
+                        .remove("encrypted_mek")
+                        .apply();
+            } catch (Throwable ignored) {}
+            try {
+                String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(
+                        androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
+                SharedPreferences encPrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
+                        "veil_encrypted_prefs",
+                        masterKeyAlias,
+                        appContext,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+                encPrefs.edit()
+                        .putBoolean("pin_set", false)
+                        .remove("encrypted_mek")
+                        .apply();
+            } catch (Throwable ignored) {}
         } else {
-            mainPrefs.edit().putString("app_pin", pin.trim()).apply();
+            String trimmed = pin.trim();
+            mainPrefs.edit().putString("app_pin", trimmed).apply();
+            try {
+                appContext.getSharedPreferences("veil_encrypted_prefs_fallback", Context.MODE_PRIVATE)
+                        .edit()
+                        .putInt("pin_length", trimmed.length())
+                        .putBoolean("pin_set", true)
+                        .apply();
+            } catch (Throwable ignored) {}
         }
     }
 
     public boolean verifyMasterPin(String input) {
         String saved = getMasterPin();
         return saved != null && saved.equals(input != null ? input.trim() : "");
+    }
+
+    public boolean verifyAppLockPin(String input) {
+        if (input == null || input.trim().isEmpty()) return false;
+        String trimmed = input.trim();
+        if (verifyMasterPin(trimmed)) {
+            return true;
+        }
+        try {
+            SharedPreferences sharedPreferences;
+            try {
+                String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(
+                        androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
+                sharedPreferences = androidx.security.crypto.EncryptedSharedPreferences.create(
+                        "veil_encrypted_prefs",
+                        masterKeyAlias,
+                        appContext,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+            } catch (Exception secEx) {
+                sharedPreferences = appContext.getSharedPreferences("veil_encrypted_prefs_fallback", Context.MODE_PRIVATE);
+            }
+            String encryptedMekStr = sharedPreferences.getString("encrypted_mek", null);
+            String saltStr = sharedPreferences.getString("salt", null);
+            String ivStr = sharedPreferences.getString("iv", null);
+            if (encryptedMekStr == null || saltStr == null || ivStr == null) {
+                return false;
+            }
+            byte[] salt = android.util.Base64.decode(saltStr, android.util.Base64.DEFAULT);
+            byte[] iv = android.util.Base64.decode(ivStr, android.util.Base64.DEFAULT);
+            byte[] encryptedMek = android.util.Base64.decode(encryptedMekStr, android.util.Base64.DEFAULT);
+
+            javax.crypto.SecretKeyFactory factory = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            javax.crypto.spec.PBEKeySpec spec = new javax.crypto.spec.PBEKeySpec(
+                    trimmed.toCharArray(), salt, 100000, 256
+            );
+            javax.crypto.SecretKey kek = factory.generateSecret(spec);
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            javax.crypto.spec.GCMParameterSpec gcmSpec = new javax.crypto.spec.GCMParameterSpec(128, iv);
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, kek, gcmSpec);
+            cipher.doFinal(encryptedMek);
+            setMasterPin(trimmed);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     public String getSecretVaultPassword() {

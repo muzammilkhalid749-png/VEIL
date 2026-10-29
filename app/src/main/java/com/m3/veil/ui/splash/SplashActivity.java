@@ -200,8 +200,7 @@ public class SplashActivity extends AppCompatActivity {
                 parent.setClipChildren(false);
                 parent.setClipToPadding(false);
             }
-            splashLogo.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-            whisperLogoDrawable = new CloakedWhisperLogoDrawable();
+            whisperLogoDrawable = new CloakedWhisperLogoDrawable(splashLogo);
             splashLogo.setImageDrawable(whisperLogoDrawable);
 
             splashLogo.setScaleX(0.84f);
@@ -228,16 +227,9 @@ public class SplashActivity extends AppCompatActivity {
         new Thread(() -> {
             try {
                 SovereignIdentityAndDirectoryEngine.getInstance(getApplicationContext());
-                String masterKeyAlias = androidx.security.crypto.MasterKeys.getOrCreate(
-                        androidx.security.crypto.MasterKeys.AES256_GCM_SPEC);
-                android.content.SharedPreferences securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
-                        "veil_pin_prefs",
-                        masterKeyAlias,
-                        getApplicationContext(),
-                        androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                        androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                );
-                cachedPinLockEnabled = (securePrefs.getString("pin_hash", null) != null);
+                cachedPinLockEnabled = com.m3.veil.manager.VeilFeatureManager
+                        .getInstance(getApplicationContext())
+                        .isAppLockPinEnabled();
             } catch (Throwable t) {
                 Log.w(TAG, "Subsystem warm-up notice: " + t.getMessage());
             }
@@ -430,8 +422,14 @@ public class SplashActivity extends AppCompatActivity {
     }
 
     private void navigateToMainOrPinLock() {
-        Class<?> destination = cachedPinLockEnabled ? PinUnlockActivity.class : MainActivity.class;
-        navigateToActivity(destination);
+        boolean pinEnabled = cachedPinLockEnabled
+                || com.m3.veil.manager.VeilFeatureManager.getInstance(this).isAppLockPinEnabled();
+        if (pinEnabled) {
+            com.m3.veil.manager.PresenceManager.getInstance().markSessionPinUnlocked(false);
+            navigateToActivity(PinUnlockActivity.class);
+        } else {
+            navigateToActivity(MainActivity.class);
+        }
     }
 
     private void navigateToUsernameActivity(String userId) {
@@ -559,11 +557,13 @@ public class SplashActivity extends AppCompatActivity {
 
         private final LinearGradient sheenGradient;
         private final Matrix sheenMatrix = new Matrix();
+        private final View hostView;
 
         private ValueAnimator revealAnimator;
         private ValueAnimator idleAnimator;
 
-        CloakedWhisperLogoDrawable() {
+        CloakedWhisperLogoDrawable(View hostView) {
+            this.hostView = hostView;
             buildFlawlessGeometry();
 
             // 1. Sculpted Shroud & Smooth Rounded Hood Cavity
@@ -809,6 +809,7 @@ public class SplashActivity extends AppCompatActivity {
                 rimProgress = modernOut.getInterpolation(clamp01((t - 0.18f) / 0.58f));
                 shieldProgress = gentleSpring.getInterpolation(clamp01((t - 0.34f) / 0.56f));
                 invalidateSelf();
+                if (hostView != null) hostView.invalidate();
             });
             revealAnimator.addListener(new AnimatorListenerAdapter() {
                 @Override
@@ -827,6 +828,7 @@ public class SplashActivity extends AppCompatActivity {
             idleAnimator.addUpdateListener(anim -> {
                 idlePhase = (float) anim.getAnimatedValue();
                 invalidateSelf();
+                if (hostView != null) hostView.invalidate();
             });
             idleAnimator.start();
         }
@@ -948,6 +950,7 @@ public class SplashActivity extends AppCompatActivity {
                     float sheenOffset = 60f + idlePhase * 160f;
                     sheenMatrix.setTranslate(sheenOffset, sheenOffset);
                     sheenGradient.setLocalMatrix(sheenMatrix);
+                    glassSheenPaint.setShader(sheenGradient);
                     glassSheenPaint.setAlpha((int) (180 * alphaScale));
                     canvas.drawPath(shieldOuterBevelPath, glassSheenPaint);
                 }

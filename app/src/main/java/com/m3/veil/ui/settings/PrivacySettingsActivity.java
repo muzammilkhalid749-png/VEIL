@@ -229,8 +229,8 @@ public class PrivacySettingsActivity extends AppCompatActivity {
         if (summary.length() == 0) summary.append("Standard Protection");
         tvPrivacyScoreSummary.setText(summary.toString());
 
-        if (featureManager.hasMasterPin()) {
-            tvMasterPinStatus.setText("Active (4-digit PIN)");
+        if (featureManager.isAppLockPinEnabled()) {
+            tvMasterPinStatus.setText("Active (" + featureManager.getMasterPinLength() + "-digit App Lock PIN)");
             tvMasterPinStatus.setTextColor(getColor(R.color.colorPrimary));
         } else {
             tvMasterPinStatus.setText("Not configured (Recommended)");
@@ -270,10 +270,11 @@ public class PrivacySettingsActivity extends AppCompatActivity {
     // ==========================================
 
     private void handleMasterPinClick() {
-        if (!featureManager.hasMasterPin()) {
-            promptSetNewPin("Set Master PIN", "Enter a 4-digit PIN for VEIL:", pin -> {
+        if (!featureManager.isAppLockPinEnabled()) {
+            promptSetNewPin("Set App Lock Master PIN", "Enter a 4 to 6-digit PIN to lock VEIL:", pin -> {
                 featureManager.setMasterPin(pin);
-                Toast.makeText(this, "Master PIN set successfully", Toast.LENGTH_SHORT).show();
+                com.m3.veil.manager.PresenceManager.getInstance().markSessionPinUnlocked(true);
+                Toast.makeText(this, "App Lock Master PIN set (" + pin.length() + " digits)", Toast.LENGTH_SHORT).show();
                 refreshUi();
             });
         } else {
@@ -282,13 +283,15 @@ public class PrivacySettingsActivity extends AppCompatActivity {
                         .setTitle("Master PIN Options")
                         .setItems(new CharSequence[]{"Change Master PIN", "Remove Master PIN"}, (dialog, which) -> {
                             if (which == 0) {
-                                promptSetNewPin("Change Master PIN", "Enter new 4-digit PIN:", newPin -> {
+                                promptSetNewPin("Change Master PIN", "Enter new 4 to 6-digit PIN:", newPin -> {
                                     featureManager.setMasterPin(newPin);
-                                    Toast.makeText(this, "Master PIN updated", Toast.LENGTH_SHORT).show();
+                                    com.m3.veil.manager.PresenceManager.getInstance().markSessionPinUnlocked(true);
+                                    Toast.makeText(this, "Master PIN updated (" + newPin.length() + " digits)", Toast.LENGTH_SHORT).show();
                                     refreshUi();
                                 });
                             } else {
                                 featureManager.setMasterPin(null);
+                                com.m3.veil.manager.PresenceManager.getInstance().markSessionPinUnlocked(false);
                                 Toast.makeText(this, "Master PIN removed", Toast.LENGTH_SHORT).show();
                                 refreshUi();
                             }
@@ -523,8 +526,8 @@ public class PrivacySettingsActivity extends AppCompatActivity {
         btnCancel.setOnClickListener(view -> dialog.dismiss());
         btnConfirm.setOnClickListener(view -> {
             String entered = etPin.getText() != null ? etPin.getText().toString().trim() : "";
-            if (entered.length() < 4) {
-                Toast.makeText(this, "PIN must be at least 4 digits", Toast.LENGTH_SHORT).show();
+            if (entered.length() < 4 || entered.length() > 6) {
+                Toast.makeText(this, "PIN must be 4 to 6 digits", Toast.LENGTH_SHORT).show();
                 return;
             }
             dialog.dismiss();
@@ -582,7 +585,7 @@ public class PrivacySettingsActivity extends AppCompatActivity {
         btnCancel.setOnClickListener(view -> dialog.dismiss());
         btnConfirm.setOnClickListener(view -> {
             String entered = etPin.getText() != null ? etPin.getText().toString().trim() : "";
-            if (featureManager.verifyMasterPin(entered)) {
+            if (featureManager.verifyAppLockPin(entered)) {
                 dialog.dismiss();
                 onSuccess.run();
             } else {

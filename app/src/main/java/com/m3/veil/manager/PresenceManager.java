@@ -46,6 +46,8 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
     private android.content.Context context;
     private int activityCount = 0;
     private boolean isForeground = false;
+    private volatile boolean sessionPinUnlocked = false;
+    private volatile long lastBackgroundTimestampMs = 0L;
     private Runnable heartbeatRunnable;
 
     private PresenceManager() { }
@@ -68,6 +70,31 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
         }
     }
 
+    public void markSessionPinUnlocked(boolean unlocked) {
+        this.sessionPinUnlocked = unlocked;
+        if (unlocked) {
+            this.lastBackgroundTimestampMs = 0L;
+        }
+    }
+
+    public boolean isSessionPinUnlocked() {
+        return sessionPinUnlocked;
+    }
+
+    private boolean isPinExemptActivity(@NonNull Activity activity) {
+        String name = activity.getClass().getSimpleName();
+        return "SplashActivity".equals(name)
+                || "PinUnlockActivity".equals(name)
+                || "PinSetupActivity".equals(name)
+                || "PhoneAuthActivity".equals(name)
+                || "OTPVerificationActivity".equals(name)
+                || "OnboardingActivity".equals(name)
+                || "UsernameActivity".equals(name)
+                || "RecoveryPhraseActivity".equals(name)
+                || "RestoreAnonymousActivity".equals(name)
+                || "CallActivity".equals(name);
+    }
+
     private String resolveCurrentUid() {
         String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
         if ((uid == null || uid.isEmpty()) && this.context != null) {
@@ -78,10 +105,31 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
 
     @Override
     public void onActivityStarted(@NonNull Activity activity) {
+        boolean wasBackground = (activityCount == 0 && !isForeground);
         activityCount++;
-        if (activityCount == 1 && !isForeground) {
+        if (wasBackground) {
             isForeground = true;
+            if (lastBackgroundTimestampMs > 0L && (System.currentTimeMillis() - lastBackgroundTimestampMs) >= 800L) {
+                sessionPinUnlocked = false;
+            }
             onAppForeground();
+        }
+
+        if (!isPinExemptActivity(activity) && !sessionPinUnlocked && this.context != null) {
+            try {
+                if (AuthManager.getInstance().isLoggedIn(this.context)
+                        && VeilFeatureManager.getInstance(this.context).isAppLockPinEnabled()) {
+                    android.content.Intent lockIntent = new android.content.Intent(
+                            activity, com.m3.veil.ui.auth.PinUnlockActivity.class);
+                    lockIntent.putExtra("unlock_existing_task", true);
+                    lockIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            | android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    activity.startActivity(lockIntent);
+                    activity.overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "PIN lock gate check warning: " + t.getMessage());
+            }
         }
     }
 
@@ -90,6 +138,7 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
         activityCount = Math.max(0, activityCount - 1);
         if (activityCount == 0 && isForeground) {
             isForeground = false;
+            lastBackgroundTimestampMs = System.currentTimeMillis();
             onAppBackground();
         }
     }
@@ -114,6 +163,7 @@ public class PresenceManager implements Application.ActivityLifecycleCallbacks {
 
     public void markOfflineOnSignOut() {
         stopHeartbeat();
+        sessionPinUnlocked = false;
         String uid = resolveCurrentUid();
         if (uid != null && !uid.isEmpty()) {
             publishPresence(uid, false);

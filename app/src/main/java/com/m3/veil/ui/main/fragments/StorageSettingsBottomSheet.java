@@ -69,7 +69,7 @@ public class StorageSettingsBottomSheet extends BottomSheetDialogFragment {
 
         btnClearCache.setOnClickListener(v -> clearCache());
 
-        switchAutoDownloadWifi.setChecked(prefs.getBoolean("auto_download_wifi", true));
+        switchAutoDownloadWifi.setChecked(prefs.getBoolean("auto_download_wifi", false));
         switchAutoDownloadWifi.setOnCheckedChangeListener((b, isChecked) -> {
             prefs.edit().putBoolean("auto_download_wifi", isChecked).apply();
             Toast.makeText(requireContext(), isChecked ? "Wi-Fi auto-download enabled" : "Wi-Fi auto-download disabled", Toast.LENGTH_SHORT).show();

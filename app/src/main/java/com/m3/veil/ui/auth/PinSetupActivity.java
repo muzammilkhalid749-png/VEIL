@@ -306,6 +306,7 @@ public class PinSetupActivity extends AppCompatActivity {
         editor.apply();
 
         com.m3.veil.manager.VeilFeatureManager.getInstance(this).setMasterPin(initialPin);
+        com.m3.veil.manager.PresenceManager.getInstance().markSessionPinUnlocked(true);
     }
 
     private void storeMEKInKeystore(SecretKey mek) throws Exception {

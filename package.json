@@ -1,0 +1,12 @@
+{
+  "name": "veil-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "build": "npm --prefix web run build",
+    "lint": "npm --prefix web run lint",
+    "preview": "node dev-server.mjs",
+    "start": "node dev-server.mjs"
+  }
+}
