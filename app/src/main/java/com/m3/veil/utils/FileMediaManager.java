@@ -222,31 +222,57 @@ public class FileMediaManager {
     }
 
     public static int getDocumentBadgeColor(String extension) {
-        if (extension == null) return 0xFF64748B;
+        if (extension == null) return 0xFF4F46E5;
         String ext = extension.toLowerCase(java.util.Locale.ROOT).replace(".", "");
         switch (ext) {
             case "pdf":
+            case "epub":
+            case "mobi":
                 return 0xFFEF4444; // Red
             case "doc":
             case "docx":
-            case "txt":
+            case "odt":
             case "rtf":
-                return 0xFF3B82F6; // Blue
+                return 0xFF2563EB; // Royal Blue
+            case "txt":
+            case "md":
+            case "log":
+                return 0xFF475569; // Slate
             case "xls":
             case "xlsx":
+            case "ods":
             case "csv":
-                return 0xFF10B981; // Green
+            case "tsv":
+                return 0xFF059669; // Emerald Green
             case "ppt":
             case "pptx":
-                return 0xFFF59E0B; // Orange
+            case "odp":
+                return 0xFFD97706; // Amber Orange
             case "zip":
             case "rar":
             case "7z":
             case "tar":
             case "gz":
-                return 0xFF8B5CF6; // Purple
+            case "bz2":
+                return 0xFF7C3AED; // Violet Purple
             case "apk":
-                return 0xFF059669; // Emerald Teal
+            case "aab":
+            case "exe":
+            case "dmg":
+                return 0xFF0D9488; // Teal
+            case "json":
+            case "xml":
+            case "html":
+            case "htm":
+            case "js":
+            case "ts":
+            case "java":
+            case "kt":
+            case "py":
+            case "c":
+            case "cpp":
+            case "sql":
+                return 0xFF4338CA; // Deep Indigo
             case "mp4":
             case "mkv":
             case "mov":
@@ -258,15 +284,17 @@ public class FileMediaManager {
             case "png":
             case "webp":
             case "gif":
-                return 0xFF0EA5E9; // Sky Blue
+            case "svg":
+                return 0xFF0284C7; // Sky Blue
             case "mp3":
             case "wav":
             case "aac":
             case "flac":
             case "m4a":
-                return 0xFFEC4899; // Pink
+            case "ogg":
+                return 0xFFDB2777; // Pink
             default:
-                return 0xFF64748B; // Slate
+                return 0xFF4F46E5; // Indigo Default
         }
     }
 

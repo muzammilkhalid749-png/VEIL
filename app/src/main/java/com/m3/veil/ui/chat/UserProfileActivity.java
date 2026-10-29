@@ -1743,23 +1743,23 @@ public class UserProfileActivity extends AppCompatActivity {
 
     private void showGroupThemesDialog() {
         String[] names = {
-                "Default Night (#121212)",
-                "Midnight Abyss (#0D1117)",
+                "Default (Auto Light / Dark Theme)",
+                "Nordic Slate Frost (Light)",
+                "Midnight Sapphire (Dark)",
                 "Cyber Indigo (#121026)",
                 "Emerald Matrix (#091E1A)",
                 "Crimson Velvet (#240B15)",
                 "Royal Gold (#1F1905)",
-                "Solar Amber (#2A1B0A)",
                 "Deep Ocean (#081D2E)"
         };
         String[] hexes = {
-                "#121212",
+                "default",
+                "#F8FAFC",
                 "#0D1117",
                 "#121026",
                 "#091E1A",
                 "#240B15",
                 "#1F1905",
-                "#2A1B0A",
                 "#081D2E"
         };
 
@@ -1801,7 +1801,7 @@ public class UserProfileActivity extends AppCompatActivity {
             swatch.setLayoutParams(swatchLp);
             android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
             gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            gd.setColor(Color.parseColor(hex));
+            gd.setColor("default".equals(hex) ? ContextCompat.getColor(this, R.color.colorPrimary) : Color.parseColor(hex));
             gd.setStroke(2, Color.WHITE);
             swatch.setBackground(gd);
             row.addView(swatch);
@@ -1814,7 +1814,8 @@ public class UserProfileActivity extends AppCompatActivity {
 
             row.setOnClickListener(v -> {
                 sheet.dismiss();
-                EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, hex);
+                String dbHex = "default".equals(hex) ? null : hex;
+                EncryptedChatDatabase.getInstance(this).updateChatWallpaper(chatId, dbHex);
                 try {
                     org.json.JSONObject payload = new org.json.JSONObject();
                     payload.put("action", "group_theme_sync");

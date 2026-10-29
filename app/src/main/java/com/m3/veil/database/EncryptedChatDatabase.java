@@ -1553,12 +1553,40 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     public synchronized void updateChatWallpaper(String chatId, String colorHex) {
         if (chatId == null) return;
+        String normalized = (colorHex == null || colorHex.trim().isEmpty() || "default".equalsIgnoreCase(colorHex.trim())) ? null : colorHex.trim();
         Chat cached = ramChatCache.get(chatId);
-        if (cached != null) cached.setWallpaperColor(colorHex);
+        if (cached != null) cached.setWallpaperColor(normalized);
+        try {
+            Chat ctrlCached = com.m3.veil.manager.VeilMessagesController.getInstance(context).getCachedDialogImmediate(chatId);
+            if (ctrlCached != null) ctrlCached.setWallpaperColor(normalized);
+        } catch (Throwable ignored) {}
         SQLiteDatabase db = getEncryptedDb();
         ContentValues cv = new ContentValues();
-        cv.put(COL_CHAT_WALLPAPER, colorHex);
+        cv.put(COL_CHAT_WALLPAPER, normalized);
         db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{chatId});
+        notifyChatsChanged();
+    }
+
+    public synchronized void resetAllChatWallpapersToThemeDefault() {
+        for (Chat c : ramChatCache.values()) {
+            if (c != null) {
+                String wp = c.getWallpaperColor();
+                if (wp != null && !wp.startsWith("file:") && !wp.startsWith("content:") && !wp.startsWith("/")) {
+                    c.setWallpaperColor(null);
+                }
+            }
+        }
+        try {
+            SQLiteDatabase db = getEncryptedDb();
+            ContentValues cv = new ContentValues();
+            cv.putNull(COL_CHAT_WALLPAPER);
+            db.update(TABLE_CHATS, cv,
+                    COL_CHAT_WALLPAPER + " IS NOT NULL AND "
+                            + COL_CHAT_WALLPAPER + " NOT LIKE 'file:%' AND "
+                            + COL_CHAT_WALLPAPER + " NOT LIKE 'content:%' AND "
+                            + COL_CHAT_WALLPAPER + " NOT LIKE '/%'",
+                    null);
+        } catch (Exception ignored) {}
         notifyChatsChanged();
     }
 
@@ -1574,7 +1602,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             cursor = db.query(TABLE_CHATS, new String[]{COL_CHAT_WALLPAPER}, COL_CHAT_ID + "=?", new String[]{chatId}, null, null, null);
             if (cursor != null && cursor.moveToFirst()) {
                 String wp = cursor.getString(0);
-                if (cached != null && wp != null) {
+                if (cached != null) {
                     cached.setWallpaperColor(wp);
                 }
                 return wp;

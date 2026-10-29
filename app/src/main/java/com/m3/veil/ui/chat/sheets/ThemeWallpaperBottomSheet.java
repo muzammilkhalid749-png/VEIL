@@ -83,10 +83,18 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
     private TextView tvOutgoingBubble;
     private TextView tvActiveThemeLabel;
 
-    private String selectedWallpaperValue = "#121212";
-    private String selectedThemeName = "Default Night";
+    private String selectedWallpaperValue = "default";
+    private String selectedThemeName = "Default (Auto Light/Dark)";
     private boolean doodleEnabled = true;
     private int currentDimPercent = 0;
+
+    private boolean isDarkThemeActive(Context ctx) {
+        SharedPreferences prefs = ctx.getSharedPreferences("veil_appearance_prefs", Context.MODE_PRIVATE);
+        int themeMode = prefs.getInt("theme_mode", androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        if (themeMode == androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES) return true;
+        if (themeMode == androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO) return false;
+        return (ctx.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    }
 
     public void setOnWallpaperAppliedListener(OnWallpaperAppliedListener listener) {
         this.listener = listener;
@@ -122,10 +130,14 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
         Context ctx = requireContext();
         float dp = getResources().getDisplayMetrics().density;
 
+        boolean isNightNow = isDarkThemeActive(ctx);
+        selectedWallpaperValue = "default";
+        selectedThemeName = isNightNow ? "Default (Midnight Sapphire)" : "Default (Nordic Slate Frost)";
         if (chatId != null) {
             String savedWp = EncryptedChatDatabase.getInstance(ctx).getChatWallpaper(chatId);
-            if (savedWp != null && !savedWp.isEmpty()) {
+            if (savedWp != null && !savedWp.isEmpty() && !"default".equals(savedWp)) {
                 selectedWallpaperValue = savedWp;
+                selectedThemeName = "Custom Chat Theme";
             }
         }
 
@@ -388,9 +400,9 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
         rLp.topMargin = (int) (8 * dp);
         btnReset.setLayoutParams(rLp);
         btnReset.setOnClickListener(v -> {
-            boolean isNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
-            selectedWallpaperValue = isNight ? "gradient:#0B132B:#1C2541" : "gradient:#F8FAFC:#EBEEF2";
-            selectedThemeName = isNight ? "Midnight Sapphire" : "Nordic Slate Frost";
+            boolean isNight = isDarkThemeActive(ctx);
+            selectedWallpaperValue = "default";
+            selectedThemeName = isNight ? "Default (Midnight Sapphire)" : "Default (Nordic Slate Frost)";
             tvActiveThemeLabel.setText("Active Preset: " + selectedThemeName);
             updateLivePreview();
             applyAndSyncTheme(ctx);
@@ -405,10 +417,17 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void updateLivePreview() {
-        if (previewBackgroundBox == null) return;
+        if (previewBackgroundBox == null || getContext() == null) return;
+        boolean isNight = isDarkThemeActive(requireContext());
+        String effectiveWp = selectedWallpaperValue;
+        if (effectiveWp == null || effectiveWp.isEmpty() || "default".equals(effectiveWp)
+                || (isNight && (effectiveWp.contains("#F8FAFC") || effectiveWp.contains("#EBEEF2")))
+                || (!isNight && (effectiveWp.contains("#0B132B") || effectiveWp.contains("#1C2541") || "#121212".equalsIgnoreCase(effectiveWp) || "#0D1117".equalsIgnoreCase(effectiveWp)))) {
+            effectiveWp = isNight ? "gradient:#0B132B:#1C2541" : "gradient:#F8FAFC:#EBEEF2";
+        }
         try {
-            if (selectedWallpaperValue.startsWith("gradient:")) {
-                String[] colors = selectedWallpaperValue.substring("gradient:".length()).split(":");
+            if (effectiveWp.startsWith("gradient:")) {
+                String[] colors = effectiveWp.substring("gradient:".length()).split(":");
                 int[] cArr = new int[colors.length];
                 for (int i = 0; i < colors.length; i++) {
                     int c = Color.parseColor(colors[i]);
@@ -424,8 +443,8 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
                 }
                 GradientDrawable gd = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, cArr);
                 previewBackgroundBox.setBackground(gd);
-            } else if (selectedWallpaperValue.startsWith("#")) {
-                int base = Color.parseColor(selectedWallpaperValue);
+            } else if (effectiveWp.startsWith("#")) {
+                int base = Color.parseColor(effectiveWp);
                 if (currentDimPercent > 0) {
                     float factor = Math.max(0.15f, 1.0f - (currentDimPercent / 100f));
                     base = Color.rgb(
@@ -437,13 +456,13 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
                 previewBackgroundBox.setBackgroundColor(base);
             }
         } catch (Exception ignored) {
-            previewBackgroundBox.setBackgroundColor(0xFF121212);
+            previewBackgroundBox.setBackgroundResource(isNight ? R.drawable.bg_wallpaper_midnight_sapphire : R.drawable.bg_wallpaper_nordic_frost);
         }
 
         if (previewDoodleOverlay != null) {
             previewDoodleOverlay.setVisibility(doodleEnabled ? View.VISIBLE : View.GONE);
             if (doodleEnabled) {
-                boolean isLight = selectedWallpaperValue != null && (selectedWallpaperValue.contains("#F8FAFC") || selectedWallpaperValue.contains("#EBEEF2"));
+                boolean isLight = effectiveWp.contains("#F8FAFC") || effectiveWp.contains("#EBEEF2");
                 int tint = isLight ? Color.parseColor("#3D334155") : Color.parseColor("#3838BDF8");
                 Drawable d = ContextCompat.getDrawable(requireContext(), R.drawable.bg_chat_doodle_pattern);
                 if (d != null) {
@@ -457,11 +476,12 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void applyAndSyncTheme(Context ctx) {
+        String dbValue = "default".equals(selectedWallpaperValue) ? null : selectedWallpaperValue;
         if (chatId != null) {
-            EncryptedChatDatabase.getInstance(ctx).updateChatWallpaper(chatId, selectedWallpaperValue);
+            EncryptedChatDatabase.getInstance(ctx).updateChatWallpaper(chatId, dbValue);
             Chat chat = EncryptedChatDatabase.getInstance(ctx).getChat(chatId);
             if (chat != null) {
-                chat.setWallpaperColor(selectedWallpaperValue);
+                chat.setWallpaperColor(dbValue);
                 EncryptedChatDatabase.getInstance(ctx).saveOrUpdateChat(chat);
             }
 
@@ -485,7 +505,7 @@ public class ThemeWallpaperBottomSheet extends BottomSheetDialogFragment {
         }
 
         if (listener != null) {
-            listener.onWallpaperApplied(selectedWallpaperValue);
+            listener.onWallpaperApplied(dbValue);
         }
         Toast.makeText(ctx, "🎨 Applied & synced " + selectedThemeName + " theme!", Toast.LENGTH_SHORT).show();
         dismiss();

@@ -2215,6 +2215,26 @@ public class ChatActivity extends AppCompatActivity {
         });
     }
 
+    private boolean isWallpaperIncompatibleWithTheme(String wpValue, boolean isNight) {
+        if (wpValue == null || wpValue.trim().isEmpty() || "default".equalsIgnoreCase(wpValue.trim())) {
+            return true;
+        }
+        String upper = wpValue.toUpperCase();
+        if (isNight) {
+            return upper.contains("#F8FAFC") || upper.contains("#EBEEF2")
+                    || upper.equals("#FAF7F2") || upper.equals("#F0FDF4")
+                    || upper.equals("#F0F9FF") || upper.equals("#FFF1F2");
+        } else {
+            return upper.contains("#0B132B") || upper.contains("#1C2541")
+                    || upper.equals("#0D1117") || upper.equals("#121212")
+                    || upper.equals("#000000") || upper.equals("#121026")
+                    || upper.equals("#091E1A") || upper.equals("#240B15")
+                    || upper.equals("#1F1905") || upper.equals("#081D2E")
+                    || upper.equals("#0B141B") || upper.equals("#2A1B0A")
+                    || upper.contains("#0F2027");
+        }
+    }
+
     private void applyChatWallpaper() {
         View chatRoot = findViewById(R.id.chat_root);
         ImageView doodleOverlay = findViewById(R.id.chatDoodleOverlay);
@@ -2225,17 +2245,34 @@ public class ChatActivity extends AppCompatActivity {
         boolean doodleEnabled = appPrefs.getBoolean("doodle_pattern_enabled", true);
         int wpDim = appPrefs.getInt("wallpaper_dim", 0);
 
-        String rawWallpaper = currentLocalChat != null ? currentLocalChat.getWallpaperColor() : null;
-        if ((rawWallpaper == null || rawWallpaper.isEmpty()) && chatId != null) {
+        int themeMode = appPrefs.getInt("theme_mode", androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        boolean isNight;
+        if (themeMode == androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES) {
+            isNight = true;
+        } else if (themeMode == androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO) {
+            isNight = false;
+        } else {
+            isNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        }
+
+        String rawWallpaper = null;
+        if (chatId != null) {
             rawWallpaper = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChatWallpaper(chatId);
-            if (rawWallpaper != null && currentLocalChat != null) {
+            if (currentLocalChat != null) {
                 currentLocalChat.setWallpaperColor(rawWallpaper);
             }
+        } else if (currentLocalChat != null) {
+            rawWallpaper = currentLocalChat.getWallpaperColor();
         }
+        if (isWallpaperIncompatibleWithTheme(rawWallpaper, isNight)) {
+            rawWallpaper = null;
+        }
+
         String wpType = (rawWallpaper != null && !rawWallpaper.isEmpty()) ? "custom" : appPrefs.getString("wallpaper_type", "default");
         String wpValue = (rawWallpaper != null && !rawWallpaper.isEmpty()) ? rawWallpaper : appPrefs.getString("wallpaper_value", null);
-
-        boolean isNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        if (!"image".equals(wpType) && isWallpaperIncompatibleWithTheme(wpValue, isNight)) {
+            wpValue = null;
+        }
 
         try {
             if (wpValue != null && wpValue.startsWith("gradient:")) {
@@ -2274,9 +2311,7 @@ public class ChatActivity extends AppCompatActivity {
                     }
                     chatRoot.setBackground(d);
                 } else {
-                    int defaultBg = isNight ? (amoled ? android.graphics.Color.BLACK : ContextCompat.getColor(this, R.color.chat_wallpaper_bg))
-                            : ContextCompat.getColor(this, R.color.chat_wallpaper_bg);
-                    chatRoot.setBackgroundColor(defaultBg);
+                    applyDefaultWallpaperBackground(chatRoot, isNight, amoled);
                 }
             } else if (wpValue != null && wpValue.startsWith("#")) {
                 int baseColor = android.graphics.Color.parseColor(wpValue);

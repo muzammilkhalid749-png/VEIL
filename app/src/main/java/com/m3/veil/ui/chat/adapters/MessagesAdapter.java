@@ -330,6 +330,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     private float cachedCornerRadiusDp = 18.0f;
 
     public void refreshAppearancePreferences() {
+        PREINFLATED_SENT_VIEWS.clear();
+        PREINFLATED_RECEIVED_VIEWS.clear();
         com.m3.veil.VeilApplication app = com.m3.veil.VeilApplication.getInstance();
         if (app != null) {
             try {
@@ -341,7 +343,6 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     this.cachedCustomBubbleColor = 0;
                 }
                 this.cachedTextSizeSp = appPrefs.getFloat("chat_text_size_sp", 15.5f);
-                this.cachedCornerRadiusDp = appPrefs.getFloat("chat_bubble_corner_radius_dp", 18.0f);
                 this.cachedCornerRadiusDp = appPrefs.getFloat("chat_bubble_corner_radius_dp", 18.0f);
             } catch (Exception ignored) {}
         }
@@ -487,8 +488,17 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         });
     }
 
+    private static volatile int lastPoolNightMask = -1;
+
     private static View obtainPreinflatedView(@NonNull ViewGroup parent, int layoutResId, java.util.concurrent.ConcurrentLinkedQueue<View> pool) {
         Context activityContext = parent.getContext();
+        int currentNightMask = activityContext.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        if (lastPoolNightMask != -1 && lastPoolNightMask != currentNightMask) {
+            PREINFLATED_SENT_VIEWS.clear();
+            PREINFLATED_RECEIVED_VIEWS.clear();
+        }
+        lastPoolNightMask = currentNightMask;
+
         View cached = pool.poll();
         if (pool.size() < MAX_PREINFLATED_POOL_SIZE / 2) {
             prewarmViewPool(activityContext);
@@ -505,6 +515,82 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         View inflated = LayoutInflater.from(itemThemed).inflate(layoutResId, parent, false);
         inflated.setTag(R.id.dateHeaderContainer, itemMutable);
         return inflated;
+    }
+
+    private static void styleDocumentBubbleCard(
+            Context ctx,
+            View docContainer,
+            View iconContainer,
+            TextView extBadge,
+            TextView fileNameView,
+            TextView fileSizeView,
+            ImageView actionIcon,
+            ProgressBar progressBar,
+            String ext,
+            boolean isDarkBubble,
+            boolean isOutgoing) {
+        if (ctx == null || docContainer == null) return;
+        float dp = ctx.getResources().getDisplayMetrics().density;
+
+        if (docContainer instanceof ViewGroup && ((ViewGroup) docContainer).getChildCount() > 0) {
+            View innerCard = ((ViewGroup) docContainer).getChildAt(0);
+            if (innerCard != null) {
+                android.graphics.drawable.GradientDrawable cardBg = new android.graphics.drawable.GradientDrawable();
+                cardBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                cardBg.setCornerRadius(12f * dp);
+                if (isDarkBubble) {
+                    cardBg.setColor(isOutgoing ? 0x29000000 : 0xFF162032);
+                    cardBg.setStroke(Math.max(1, (int) dp), isOutgoing ? 0x33FFFFFF : 0xFF26354D);
+                } else {
+                    cardBg.setColor(isOutgoing ? 0xCCFFFFFF : 0xFFF1F5F9);
+                    cardBg.setStroke(Math.max(1, (int) dp), isOutgoing ? 0x264F46E5 : 0xFFCBD5E1);
+                }
+                innerCard.setBackground(cardBg);
+            }
+        }
+
+        int badgeColor = FileMediaManager.getDocumentBadgeColor(ext);
+        if (iconContainer != null) {
+            android.graphics.drawable.GradientDrawable badgeBg = new android.graphics.drawable.GradientDrawable();
+            badgeBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            badgeBg.setCornerRadius(10f * dp);
+            badgeBg.setColor(badgeColor);
+            iconContainer.setBackgroundTintList(null);
+            iconContainer.setBackground(badgeBg);
+            if (iconContainer instanceof ViewGroup) {
+                ViewGroup vg = (ViewGroup) iconContainer;
+                for (int i = 0; i < vg.getChildCount(); i++) {
+                    View child = vg.getChildAt(i);
+                    if (child instanceof ImageView) {
+                        ((ImageView) child).setColorFilter(android.graphics.Color.WHITE);
+                    }
+                }
+            }
+        }
+        if (extBadge != null) {
+            extBadge.setTextColor(android.graphics.Color.WHITE);
+        }
+
+        int primaryTextColor = isDarkBubble ? 0xFFF8FAFC : 0xFF0F172A;
+        int secondaryTextColor = isDarkBubble ? 0xCCE2E8F0 : 0xFF475569;
+        if (fileNameView != null) {
+            fileNameView.setTextColor(primaryTextColor);
+        }
+        if (fileSizeView != null) {
+            fileSizeView.setTextColor(secondaryTextColor);
+        }
+        if (progressBar != null) {
+            int progressColor = isDarkBubble ? 0xFF38BDF8 : badgeColor;
+            progressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(progressColor));
+            progressBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                    isDarkBubble ? 0x33FFFFFF : 0x260F172A));
+        }
+        if (actionIcon != null) {
+            android.graphics.drawable.GradientDrawable actionBg = new android.graphics.drawable.GradientDrawable();
+            actionBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            actionBg.setColor(isDarkBubble ? 0x22FFFFFF : 0x140F172A);
+            actionIcon.setBackground(actionBg);
+        }
     }
 
     public static void detachContextFromView(View view) {
@@ -1961,10 +2047,19 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             documentExtensionBadge.setText(ext);
                             documentExtensionBadge.setVisibility(View.VISIBLE);
                         }
-                        if (documentIconContainer != null) {
-                            int badgeColor = FileMediaManager.getDocumentBadgeColor(ext);
-                            documentIconContainer.setBackgroundTintList(android.content.res.ColorStateList.valueOf(badgeColor));
-                        }
+                        styleDocumentBubbleCard(
+                                itemView.getContext(),
+                                documentMessageContainer,
+                                documentIconContainer,
+                                documentExtensionBadge,
+                                documentFileName,
+                                documentFileSize,
+                                documentActionIcon,
+                                documentProgressBar,
+                                ext,
+                                isDarkBubble,
+                                true
+                        );
                         if (size.isEmpty()) {
                             String fallbackSize = message.getFormattedMediaSize();
                             if (!fallbackSize.isEmpty()) size = fallbackSize;
@@ -1996,7 +2091,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 if (documentActionIcon != null) {
                                     documentActionIcon.setVisibility(View.VISIBLE);
                                     documentActionIcon.setImageResource(R.drawable.ic_check);
-                                    documentActionIcon.setColorFilter(ContextCompat.getColor(itemView.getContext(), R.color.statusSuccess));
+                                    documentActionIcon.setColorFilter(isDarkBubble ? 0xFF34D399 : ContextCompat.getColor(itemView.getContext(), R.color.statusSuccess));
                                 }
                             }
                         }
@@ -2158,6 +2253,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     reactionsText.setVisibility(View.GONE);
                 }
                 
+                applySentBubbleTheme(isDarkBubble);
                 itemView.setOnLongClickListener(v -> {
                     if (longClickListener != null) {
                         longClickListener.onMessageLongClick(message, itemView);
@@ -2999,10 +3095,26 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             documentExtensionBadge.setText(ext);
                             documentExtensionBadge.setVisibility(View.VISIBLE);
                         }
-                        if (documentIconContainer != null) {
-                            int badgeColor = FileMediaManager.getDocumentBadgeColor(ext);
-                            documentIconContainer.setBackgroundTintList(android.content.res.ColorStateList.valueOf(badgeColor));
+                        boolean isRecDarkBubble;
+                        if (messageBubble instanceof com.m3.veil.ui.views.ChatMessageCell) {
+                            isRecDarkBubble = ((com.m3.veil.ui.views.ChatMessageCell) messageBubble).isDarkBubble();
+                        } else {
+                            int recBColor = ContextCompat.getColor(itemView.getContext(), R.color.message_bubble_received);
+                            isRecDarkBubble = androidx.core.graphics.ColorUtils.calculateLuminance(recBColor) < 0.5;
                         }
+                        styleDocumentBubbleCard(
+                                itemView.getContext(),
+                                documentMessageContainer,
+                                documentIconContainer,
+                                documentExtensionBadge,
+                                documentFileName,
+                                documentFileSize,
+                                documentActionIcon,
+                                documentProgressBar,
+                                ext,
+                                isRecDarkBubble,
+                                false
+                        );
                         if (size.isEmpty()) {
                             String fallbackSize = message.getFormattedMediaSize();
                             if (!fallbackSize.isEmpty()) size = fallbackSize;
@@ -3040,7 +3152,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 if (documentActionIcon != null) {
                                     documentActionIcon.setVisibility(View.VISIBLE);
                                     documentActionIcon.setImageResource(R.drawable.ic_check);
-                                    documentActionIcon.setColorFilter(ContextCompat.getColor(itemView.getContext(), R.color.statusSuccess));
+                                    documentActionIcon.setColorFilter(isRecDarkBubble ? 0xFF34D399 : ContextCompat.getColor(itemView.getContext(), R.color.statusSuccess));
                                 }
                             } else {
                                 documentProgressBar.setVisibility(View.GONE);
@@ -3050,7 +3162,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                     documentActionIcon.setImageResource(docDownloadState == STATE_RETRY ? R.drawable.ic_undo : R.drawable.ic_download);
                                     int iconColor = (docDownloadState == STATE_RETRY)
                                             ? ContextCompat.getColor(itemView.getContext(), R.color.statusError)
-                                            : ContextCompat.getColor(itemView.getContext(), R.color.message_action_button);
+                                            : (isRecDarkBubble ? 0xFF818CF8 : ContextCompat.getColor(itemView.getContext(), R.color.message_action_button));
                                     documentActionIcon.setColorFilter(iconColor);
                                 }
                             }
@@ -3204,6 +3316,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     reactionsText.setVisibility(View.GONE);
                 }
                 
+                applyReceivedBubbleTheme();
                 itemView.setOnLongClickListener(v -> {
                     if (longClickListener != null) {
                         longClickListener.onMessageLongClick(message, itemView);

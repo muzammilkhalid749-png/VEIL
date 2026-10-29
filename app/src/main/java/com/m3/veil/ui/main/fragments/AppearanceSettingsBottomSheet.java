@@ -235,13 +235,36 @@ public class AppearanceSettingsBottomSheet extends BottomSheetDialogFragment {
         applyPreviewTextSize(sliderChatTextSize.getValue());
     }
 
+    private boolean isDarkThemeActive() {
+        int themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        if (themeMode == AppCompatDelegate.MODE_NIGHT_YES) return true;
+        if (themeMode == AppCompatDelegate.MODE_NIGHT_NO) return false;
+        return (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    private boolean isOppositeThemePreset(String wpValue, boolean isNight) {
+        if (wpValue == null || wpValue.isEmpty() || "default".equals(wpValue)) return true;
+        String upper = wpValue.toUpperCase();
+        if (isNight) {
+            return upper.contains("#F8FAFC") || upper.contains("#EBEEF2")
+                    || upper.equals("#FAF7F2") || upper.equals("#F0FDF4")
+                    || upper.equals("#F0F9FF") || upper.equals("#FFF1F2");
+        } else {
+            return upper.contains("#0B132B") || upper.contains("#1C2541")
+                    || upper.equals("#0D1117") || upper.equals("#121212")
+                    || upper.equals("#000000");
+        }
+    }
+
     private void renderWallpaperPreview(String wpType, String wpValue) {
+        boolean isNight = isDarkThemeActive();
         if ("image".equals(wpType) && wpValue != null && !wpValue.isEmpty()) {
             ivPreviewWallpaper.setVisibility(View.VISIBLE);
             try {
                 ivPreviewWallpaper.setImageURI(Uri.parse(wpValue));
             } catch (Exception ignored) {}
-        } else if ("gradient".equals(wpType) && wpValue != null && wpValue.startsWith("gradient:")) {
+        } else if ("gradient".equals(wpType) && wpValue != null && wpValue.startsWith("gradient:")
+                && !isOppositeThemePreset(wpValue, isNight)) {
             ivPreviewWallpaper.setVisibility(View.GONE);
             try {
                 String[] parts = wpValue.substring("gradient:".length()).split(":");
@@ -252,18 +275,18 @@ public class AppearanceSettingsBottomSheet extends BottomSheetDialogFragment {
                 GradientDrawable gd = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, colors);
                 previewWallpaperContainer.setBackground(gd);
             } catch (Exception e) {
-                previewWallpaperContainer.setBackgroundColor(Color.parseColor("#0D1117"));
+                previewWallpaperContainer.setBackgroundResource(isNight ? R.drawable.bg_wallpaper_midnight_sapphire : R.drawable.bg_wallpaper_nordic_frost);
             }
-        } else if ("color".equals(wpType) && wpValue != null && !wpValue.isEmpty()) {
+        } else if ("color".equals(wpType) && wpValue != null && !wpValue.isEmpty()
+                && !isOppositeThemePreset(wpValue, isNight)) {
             ivPreviewWallpaper.setVisibility(View.GONE);
             try {
                 previewWallpaperContainer.setBackgroundColor(Color.parseColor(wpValue));
             } catch (Exception e) {
-                previewWallpaperContainer.setBackgroundColor(Color.parseColor("#0D1117"));
+                previewWallpaperContainer.setBackgroundResource(isNight ? R.drawable.bg_wallpaper_midnight_sapphire : R.drawable.bg_wallpaper_nordic_frost);
             }
         } else {
             ivPreviewWallpaper.setVisibility(View.GONE);
-            boolean isNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
             boolean amoled = prefs.getBoolean("amoled_pure_black", false);
             if (isNight) {
                 if (amoled) {
@@ -323,7 +346,19 @@ public class AppearanceSettingsBottomSheet extends BottomSheetDialogFragment {
             } else if (checkedId == R.id.rbThemeDark) {
                 newMode = AppCompatDelegate.MODE_NIGHT_YES;
             }
-            prefs.edit().putInt("theme_mode", newMode).apply();
+            SharedPreferences.Editor editor = prefs.edit().putInt("theme_mode", newMode);
+            boolean targetIsNight = (newMode == AppCompatDelegate.MODE_NIGHT_YES)
+                    || (newMode == AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                    && (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES);
+            String curWpType = prefs.getString("wallpaper_type", "default");
+            String curWpVal = prefs.getString("wallpaper_value", null);
+            if (!"image".equals(curWpType) && isOppositeThemePreset(curWpVal, targetIsNight)) {
+                editor.putString("wallpaper_type", "default").remove("wallpaper_value");
+            }
+            editor.apply();
+            try {
+                com.m3.veil.database.EncryptedChatDatabase.getInstance(requireContext()).resetAllChatWallpapersToThemeDefault();
+            } catch (Exception ignored) {}
             AppCompatDelegate.setDefaultNightMode(newMode);
             renderWallpaperPreview(prefs.getString("wallpaper_type", "default"), prefs.getString("wallpaper_value", null));
         });
