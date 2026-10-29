@@ -211,15 +211,11 @@ public class Message {
 
     @com.google.firebase.firestore.Exclude
     public static boolean isMediaRequiringActionToRead(String type) {
-        if (type == null) return false;
-        return "voice".equalsIgnoreCase(type)
-            || "image".equalsIgnoreCase(type)
-            || "video".equalsIgnoreCase(type)
-            || "document".equalsIgnoreCase(type);
+        return false;
     }
 
     @com.google.firebase.firestore.Exclude
     public boolean isMediaRequiringActionToRead() {
-        return isMediaRequiringActionToRead(this.type);
+        return isBlink() && !isBlinkViewed();
     }
 }

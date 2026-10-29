@@ -795,19 +795,29 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     }
 
     private void updateStatusIcon(ImageView iconView, Message message) {
+        updateStatusIcon(iconView, message, false);
+    }
+
+    private void updateStatusIcon(ImageView iconView, Message message, boolean isDarkBubble) {
         if (iconView == null || message == null) return;
+        int sentColor = isDarkBubble
+                ? 0xCCF8FAFC
+                : ContextCompat.getColor(iconView.getContext(), R.color.message_status_sent);
+        int readColor = isDarkBubble
+                ? 0xFF38BDF8
+                : ContextCompat.getColor(iconView.getContext(), R.color.message_status_read);
         if (message.isPending()) {
             iconView.setImageResource(R.drawable.ic_timer);
-            iconView.setColorFilter(iconView.getContext().getResources().getColor(R.color.message_status_sent));
+            iconView.setColorFilter(sentColor);
         } else if (message.isRead()) {
             iconView.setImageResource(R.drawable.ic_check_double);
-            iconView.setColorFilter(iconView.getContext().getResources().getColor(R.color.message_status_read));
+            iconView.setColorFilter(readColor);
         } else if (message.isDelivered()) {
             iconView.setImageResource(R.drawable.ic_check_double);
-            iconView.setColorFilter(iconView.getContext().getResources().getColor(R.color.message_status_sent));
+            iconView.setColorFilter(sentColor);
         } else {
             iconView.setImageResource(R.drawable.ic_check);
-            iconView.setColorFilter(iconView.getContext().getResources().getColor(R.color.message_status_sent));
+            iconView.setColorFilter(sentColor);
         }
     }
 
@@ -1607,6 +1617,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     dateHeaderContainer.setVisibility(View.GONE);
                 }
             }
+            if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
+            if (statusIcon != null) statusIcon.setVisibility(View.VISIBLE);
             timeText.setText(time);
             bindBubbleInfoBadges(message, tvStarredBadge, tvVanishBadge, tvEditedBadge);
             boolean isDarkBubble = false;
@@ -1649,7 +1661,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                 statusIcon.setVisibility(View.VISIBLE);
                 if (!"call".equals(message.getType())) {
-                    updateStatusIcon(statusIcon, message);
+                    updateStatusIcon(statusIcon, message, isDarkBubble);
                 }
                 bindBlinkCard(message, true, blinkMessageContainer, blinkBadgeIcon, blinkProgressBar, blinkTitleText, blinkSubtitleText);
                 itemView.setOnLongClickListener(v -> {
@@ -2183,9 +2195,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 } else {
                     if (statusIcon != null) {
                         statusIcon.setVisibility(View.VISIBLE);
-                        if (!"call".equals(message.getType())) {
-                    updateStatusIcon(statusIcon, message);
-                }
+                        updateStatusIcon(statusIcon, message, isDarkBubble);
                     }
                 }
                 
@@ -2233,7 +2243,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 }
                 
                 if (!"call".equals(message.getType())) {
-                    updateStatusIcon(statusIcon, message);
+                    updateStatusIcon(statusIcon, message, isDarkBubble);
                 }
                 
                 if (message.getReactions() != null && !message.getReactions().isEmpty()) {
@@ -2578,6 +2588,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     dateHeaderContainer.setVisibility(View.GONE);
                 }
             }
+            if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
             timeText.setText(time);
             bindBubbleInfoBadges(message, tvStarredBadge, tvVanishBadge, tvEditedBadge);
             int pos = getAdapterPosition() - 1;
