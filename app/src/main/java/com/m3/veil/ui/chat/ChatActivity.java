@@ -1998,10 +1998,11 @@ public class ChatActivity extends AppCompatActivity {
         } else if (requestCode == REQ_PICK_VIDEO && resultCode == RESULT_OK && data != null) {
             Uri selectedMediaUri = data.getData();
             if (selectedMediaUri != null) {
-                TrimVideo.activity(selectedMediaUri.toString())
-                        .setTrimType(TrimType.DEFAULT)
-                        .setHideSeekBar(true)
-                        .start(this, videoTrimResultLauncher);
+                Intent editIntent = new Intent(this, MediaEditActivity.class);
+                editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, selectedMediaUri);
+                editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, "video");
+                startActivityForResult(editIntent, REQ_MEDIA_EDIT);
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
             }
         } else if (requestCode == REQ_PICK_DOCUMENT && resultCode == RESULT_OK && data != null) {
             Uri docUri = data.getData();

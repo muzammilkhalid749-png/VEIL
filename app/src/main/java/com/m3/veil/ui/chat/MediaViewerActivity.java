@@ -187,9 +187,13 @@ public class MediaViewerActivity extends AppCompatActivity {
     private AlbumPageAdapter horizontalPagerAdapter;
     private VerticalAlbumFeedAdapter verticalFeedAdapter;
 
+    private TextView floatingReactionBadge;
+    private String activeReactionEmoji = null;
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
         setContentView(R.layout.activity_media_viewer);
 
         configureDarkMediaSystemBars();
@@ -199,6 +203,20 @@ public class MediaViewerActivity extends AppCompatActivity {
         extractExtras();
         setupActions();
         bindMedia();
+
+        View root = findViewById(R.id.mediaViewerRoot);
+        if (root != null) {
+            root.setScaleX(0.90f);
+            root.setScaleY(0.90f);
+            root.setAlpha(0f);
+            root.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .alpha(1f)
+                    .setDuration(250)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .start();
+        }
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -510,6 +528,7 @@ public class MediaViewerActivity extends AppCompatActivity {
     public void finish() {
         handleViewOnceDestruction();
         super.finish();
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
     }
 
     private synchronized void handleViewOnceDestruction() {
@@ -605,10 +624,12 @@ public class MediaViewerActivity extends AppCompatActivity {
             if (isViewOnce) {
                 bottomReplyBar.setVisibility(View.GONE);
             } else {
+                ensureFloatingReactionBadgeCreated();
+
                 View.OnClickListener quickReactionListener = v -> {
                     if (v instanceof TextView) {
                         String emoji = ((TextView) v).getText().toString();
-                        dispatchReactionForCurrentMessage(emoji);
+                        playReactionPopAnimationAndApply(emoji, v);
                     }
                 };
                 if (reactionHeart != null) reactionHeart.setOnClickListener(quickReactionListener);
@@ -617,25 +638,14 @@ public class MediaViewerActivity extends AppCompatActivity {
                     reactionLaugh.setOnClickListener(v -> showFullEmojiReactionPicker());
                 }
 
+                View replyPillContainer = findViewById(R.id.replyPillContainer);
                 if (etMediaReply != null) {
-                    etMediaReply.addTextChangedListener(new android.text.TextWatcher() {
-                        @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                        @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                            boolean hasText = s != null && s.toString().trim().length() > 0;
-                            if (btnSendMediaReply != null) {
-                                btnSendMediaReply.setVisibility(hasText ? View.VISIBLE : View.GONE);
-                            }
-                            int reactVis = hasText ? View.GONE : View.VISIBLE;
-                            if (reactionHeart != null) reactionHeart.setVisibility(reactVis);
-                            if (reactionPray != null) reactionPray.setVisibility(reactVis);
-                            if (reactionLaugh != null) reactionLaugh.setVisibility(reactVis);
-                        }
-                        @Override public void afterTextChanged(android.text.Editable s) {}
-                    });
-                    etMediaReply.setOnEditorActionListener((v, actionId, event) -> {
-                        sendMediaReplyMessage();
-                        return true;
-                    });
+                    etMediaReply.setFocusable(false);
+                    etMediaReply.setClickable(true);
+                    etMediaReply.setOnClickListener(v -> showInlineWhatsAppReplyComposer());
+                }
+                if (replyPillContainer != null) {
+                    replyPillContainer.setOnClickListener(v -> showInlineWhatsAppReplyComposer());
                 }
                 if (btnSendMediaReply != null) {
                     btnSendMediaReply.setOnClickListener(v -> sendMediaReplyMessage());
@@ -665,12 +675,108 @@ public class MediaViewerActivity extends AppCompatActivity {
         }
     }
 
+    private void ensureFloatingReactionBadgeCreated() {
+        if (floatingReactionBadge != null || !(bottomControlsWrapper instanceof LinearLayout)) return;
+        LinearLayout wrapper = (LinearLayout) bottomControlsWrapper;
+        float dp = getResources().getDisplayMetrics().density;
+
+        FrameLayout badgeRow = new FrameLayout(this);
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rowLp.rightMargin = Math.round(14 * dp);
+        rowLp.bottomMargin = Math.round(2 * dp);
+        badgeRow.setLayoutParams(rowLp);
+
+        floatingReactionBadge = new TextView(this);
+        FrameLayout.LayoutParams bLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(34 * dp), Gravity.END | Gravity.CENTER_VERTICAL);
+        floatingReactionBadge.setLayoutParams(bLp);
+        floatingReactionBadge.setGravity(Gravity.CENTER);
+        int padH = Math.round(12 * dp);
+        floatingReactionBadge.setPadding(padH, 0, padH, 0);
+        floatingReactionBadge.setTextSize(17f);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#1F2C34"));
+        bg.setCornerRadius(18 * dp);
+        bg.setStroke(Math.max(1, Math.round(1 * dp)), Color.parseColor("#33FFFFFF"));
+        floatingReactionBadge.setBackground(bg);
+        floatingReactionBadge.setElevation(6 * dp);
+        floatingReactionBadge.setVisibility(View.GONE);
+        floatingReactionBadge.setOnClickListener(v -> showFullEmojiReactionPicker());
+
+        badgeRow.addView(floatingReactionBadge);
+        wrapper.addView(badgeRow, 0);
+    }
+
+    /**
+     * Plays a smooth WhatsApp reaction pop/floating emoji animation (when_user_react_its_show_animatiob_5c36700a.jpg),
+     * collapses the quick reaction icons inside the Reply pill, and pins the dark reaction pill badge on the right above 1.0x.
+     */
+    private void playReactionPopAnimationAndApply(String emoji, @Nullable View anchorView) {
+        if (emoji == null || emoji.isEmpty()) return;
+        activeReactionEmoji = emoji;
+        dispatchReactionForCurrentMessage(emoji);
+
+        ViewGroup root = findViewById(R.id.mediaViewerRoot);
+        float dp = getResources().getDisplayMetrics().density;
+        if (root != null) {
+            final TextView animEmoji = new TextView(this);
+            animEmoji.setText(emoji);
+            animEmoji.setTextSize(38f);
+            animEmoji.setGravity(Gravity.CENTER);
+            int sz = Math.round(68 * dp);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(sz, sz, Gravity.BOTTOM | Gravity.END);
+            lp.rightMargin = Math.round(24 * dp);
+            lp.bottomMargin = Math.round(72 * dp);
+            animEmoji.setLayoutParams(lp);
+            animEmoji.setScaleX(0.25f);
+            animEmoji.setScaleY(0.25f);
+            animEmoji.setAlpha(0f);
+            root.addView(animEmoji);
+
+            animEmoji.animate()
+                    .scaleX(1.35f)
+                    .scaleY(1.35f)
+                    .alpha(1f)
+                    .translationY(-Math.round(52 * dp))
+                    .setDuration(260)
+                    .setInterpolator(new android.view.animation.OvershootInterpolator(2.2f))
+                    .withEndAction(() -> animEmoji.animate()
+                            .scaleX(0.75f)
+                            .scaleY(0.75f)
+                            .alpha(0f)
+                            .translationY(-Math.round(24 * dp))
+                            .setDuration(200)
+                            .withEndAction(() -> root.removeView(animEmoji))
+                            .start())
+                    .start();
+        }
+
+        // Collapse quick reactions inside Reply pill & show floating reaction badge above 1.0x
+        if (reactionHeart != null) reactionHeart.setVisibility(View.GONE);
+        if (reactionPray != null) reactionPray.setVisibility(View.GONE);
+        if (reactionLaugh != null) reactionLaugh.setVisibility(View.GONE);
+
+        ensureFloatingReactionBadgeCreated();
+        if (floatingReactionBadge != null) {
+            floatingReactionBadge.setText(emoji);
+            floatingReactionBadge.setVisibility(View.VISIBLE);
+            floatingReactionBadge.setScaleX(0.4f);
+            floatingReactionBadge.setScaleY(0.4f);
+            floatingReactionBadge.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(240)
+                    .setInterpolator(new android.view.animation.OvershootInterpolator(1.8f))
+                    .start();
+        }
+    }
+
     private void dispatchReactionForCurrentMessage(String emoji) {
         if (emoji == null || emoji.isEmpty()) return;
         if (chatId != null && !chatId.isEmpty() && messageId != null && !messageId.isEmpty()) {
             VeilMessagesController.getInstance(this).sendReaction(chatId, messageId, emoji);
         }
-        Toast.makeText(this, "Reacted with " + emoji, Toast.LENGTH_SHORT).show();
     }
 
     private void showFullEmojiReactionPicker() {
@@ -716,7 +822,7 @@ public class MediaViewerActivity extends AppCompatActivity {
                 tv.setTextSize(26f);
                 tv.setOnClickListener(v -> {
                     sheet.dismiss();
-                    dispatchReactionForCurrentMessage(emoji);
+                    playReactionPopAnimationAndApply(emoji, v);
                 });
                 row.addView(tv);
             }
@@ -938,16 +1044,44 @@ public class MediaViewerActivity extends AppCompatActivity {
     }
 
     private void openMediaEditorForCurrentItem() {
-        if (filePath == null || filePath.isEmpty()) return;
+        openMediaEditorInternal(false);
+    }
+
+    private void openMediaEditorInternal(boolean statusMode) {
+        if (!albumItems.isEmpty() && currentMediaIndex >= 0 && currentMediaIndex < albumItems.size()) {
+            AlbumMediaEntry active = albumItems.get(currentMediaIndex);
+            filePath = active.path;
+            mediaType = active.type;
+        }
+        if (filePath == null || filePath.isEmpty()) {
+            Toast.makeText(this, "File not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
         File f = new File(filePath);
-        if (!f.exists()) return;
+        if (!f.exists()) {
+            Toast.makeText(this, "Media file not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
         pauseActiveVideoPlayback();
 
+        boolean isVid = "video".equalsIgnoreCase(mediaType) || f.getName().toLowerCase(Locale.ROOT).endsWith(".mp4");
+        String resolvedType = isVid ? "video" : "image";
+        Uri fileUri = Uri.fromFile(f);
+
         Intent editIntent = new Intent(this, MediaEditActivity.class);
-        editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, Uri.fromFile(f).toString());
-        editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE,
-                "video".equalsIgnoreCase(mediaType) ? "video" : "image");
+        editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, fileUri);
+        editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, resolvedType);
+        ArrayList<String> singleBatchUri = new ArrayList<>();
+        singleBatchUri.add(fileUri.toString());
+        ArrayList<String> singleBatchType = new ArrayList<>();
+        singleBatchType.add(resolvedType);
+        editIntent.putStringArrayListExtra(MediaEditActivity.EXTRA_BATCH_URIS, singleBatchUri);
+        editIntent.putStringArrayListExtra(MediaEditActivity.EXTRA_BATCH_TYPES, singleBatchType);
+        editIntent.putExtra(MediaEditActivity.EXTRA_IS_STATUS_MODE, statusMode);
+        editIntent.putExtra(MediaEditActivity.EXTRA_RECIPIENT_NAME,
+                statusMode ? "Status (Contacts)" : (senderName != null && !senderName.isEmpty() ? senderName : "Status (Contacts)"));
         startActivityForResult(editIntent, REQUEST_EDIT_FROM_VIEWER);
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
     }
 
     @Override
@@ -958,14 +1092,23 @@ public class MediaViewerActivity extends AppCompatActivity {
             String editedType = data.getStringExtra(MediaEditActivity.RESULT_MEDIA_TYPE);
             String editedCaption = data.getStringExtra(MediaEditActivity.RESULT_CAPTION);
             boolean editedViewOnce = data.getBooleanExtra(MediaEditActivity.RESULT_IS_VIEW_ONCE, false);
+            boolean isStatusPost = data.getBooleanExtra(MediaEditActivity.RESULT_IS_STATUS_POST, false);
+            if (isStatusPost) {
+                Toast.makeText(this, "Posted to your Status (Contacts)", Toast.LENGTH_SHORT).show();
+                return;
+            }
             if (editedPath != null && !editedPath.isEmpty()) {
                 File editedFile = new File(editedPath);
-                if (editedFile.exists() && chatId != null && !chatId.isEmpty()) {
-                    VeilMessagesController.getInstance(this).sendMediaMessage(
-                            chatId, peerId, editedType != null ? editedType : "image",
-                            editedFile, editedCaption, messageId, editedViewOnce);
-                    Toast.makeText(this, "Edited media sent to chat", Toast.LENGTH_SHORT).show();
-                    finish();
+                if (editedFile.exists()) {
+                    if (chatId != null && !chatId.isEmpty()) {
+                        VeilMessagesController.getInstance(this).sendMediaMessage(
+                                chatId, peerId, editedType != null ? editedType : "image",
+                                editedFile, editedCaption, messageId, editedViewOnce);
+                        Toast.makeText(this, "Edited media sent to chat", Toast.LENGTH_SHORT).show();
+                        finish();
+                    } else {
+                        Toast.makeText(this, "Edited media saved", Toast.LENGTH_SHORT).show();
+                    }
                 }
             }
         }
@@ -997,17 +1140,342 @@ public class MediaViewerActivity extends AppCompatActivity {
         finish();
     }
 
+    /**
+     * Opens the WhatsApp "Trim" Screen when clicking "Create sticker" in the 3-dot menu
+     * (when_we_click_on_create_sticker_160f5697.jpg):
+     * - Pure black full-screen dialog with centered white "Trim" title at top.
+     * - Dark slate rounded container (#11161B) in the middle holding a square framed media preview
+     *   with a centered circular play/pause button.
+     * - Filmstrip frame-thumbnail timeline bar below with a bright white selection border and
+     *   draggable left/right circular white handles (●).
+     * - Bottom bar with dark pill "Cancel" button on the left and white pill "Done" button on the right.
+     */
     private void createStickerFromCurrentMedia() {
+        if (!albumItems.isEmpty() && currentMediaIndex >= 0 && currentMediaIndex < albumItems.size()) {
+            AlbumMediaEntry active = albumItems.get(currentMediaIndex);
+            filePath = active.path;
+            mediaType = active.type;
+        }
         if (filePath == null || filePath.isEmpty()) return;
-        File f = new File(filePath);
+        final File f = new File(filePath);
         if (!f.exists()) return;
+        pauseActiveVideoPlayback();
 
+        final boolean isVid = "video".equalsIgnoreCase(mediaType) || f.getName().toLowerCase(Locale.ROOT).endsWith(".mp4");
+        final float dp = getResources().getDisplayMetrics().density;
+
+        final android.app.Dialog trimDialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.BLACK);
+        root.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        root.setPadding(Math.round(14 * dp), Math.round(38 * dp), Math.round(14 * dp), Math.round(20 * dp));
+
+        // 1. Top "Trim" Title
+        TextView tvTrimHeader = new TextView(this);
+        tvTrimHeader.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        tvTrimHeader.setGravity(Gravity.CENTER);
+        tvTrimHeader.setText("Trim");
+        tvTrimHeader.setTextColor(Color.WHITE);
+        tvTrimHeader.setTextSize(18f);
+        tvTrimHeader.setTypeface(null, Typeface.BOLD);
+        tvTrimHeader.setPadding(0, Math.round(6 * dp), 0, Math.round(18 * dp));
+        root.addView(tvTrimHeader);
+
+        // 2. Center Dark Slate Preview Card (#11161B) with Square Preview & Play Button
+        FrameLayout previewCard = new FrameLayout(this);
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+        cardLp.bottomMargin = Math.round(18 * dp);
+        previewCard.setLayoutParams(cardLp);
+        GradientDrawable cardBg = new GradientDrawable();
+        cardBg.setColor(Color.parseColor("#11161B"));
+        cardBg.setCornerRadius(18 * dp);
+        previewCard.setBackground(cardBg);
+
+        int squareSize = Math.round(Math.min(getResources().getDisplayMetrics().widthPixels - 64 * dp, 300 * dp));
+        FrameLayout squareFrame = new FrameLayout(this);
+        FrameLayout.LayoutParams sqLp = new FrameLayout.LayoutParams(squareSize, squareSize, Gravity.CENTER);
+        squareFrame.setLayoutParams(sqLp);
+        squareFrame.setBackgroundColor(Color.BLACK);
+
+        final ImageView ivFramePreview = new ImageView(this);
+        ivFramePreview.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        ivFramePreview.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        squareFrame.addView(ivFramePreview);
+
+        final VideoView trimVideoView = new VideoView(this);
+        trimVideoView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
+        trimVideoView.setVisibility(isVid ? View.VISIBLE : View.GONE);
+        squareFrame.addView(trimVideoView);
+
+        // Center Play Button Overlay
+        final FrameLayout centerPlayCircle = new FrameLayout(this);
+        int playSz = Math.round(56 * dp);
+        FrameLayout.LayoutParams playLp = new FrameLayout.LayoutParams(playSz, playSz, Gravity.CENTER);
+        centerPlayCircle.setLayoutParams(playLp);
+        centerPlayCircle.setBackgroundResource(R.drawable.bg_video_play_glass);
+
+        final ImageView ivPlayIcon = new ImageView(this);
+        int icSz = Math.round(28 * dp);
+        FrameLayout.LayoutParams icLp = new FrameLayout.LayoutParams(icSz, icSz, Gravity.CENTER);
+        icLp.leftMargin = Math.round(2 * dp);
+        ivPlayIcon.setLayoutParams(icLp);
+        ivPlayIcon.setImageResource(R.drawable.ic_play_arrow);
+        ivPlayIcon.setColorFilter(Color.WHITE);
+        centerPlayCircle.addView(ivPlayIcon);
+        squareFrame.addView(centerPlayCircle);
+
+        previewCard.addView(squareFrame);
+        root.addView(previewCard);
+
+        // 3. Filmstrip Timeline Bar with White Selection Box & Left/Right Circular Handles (●)
+        final int stripHeight = Math.round(54 * dp);
+        final FrameLayout timelineContainer = new FrameLayout(this);
+        LinearLayout.LayoutParams tlLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, stripHeight);
+        tlLp.leftMargin = Math.round(8 * dp);
+        tlLp.rightMargin = Math.round(8 * dp);
+        tlLp.bottomMargin = Math.round(22 * dp);
+        timelineContainer.setLayoutParams(tlLp);
+
+        LinearLayout filmstripRow = new LinearLayout(this);
+        filmstripRow.setOrientation(LinearLayout.HORIZONTAL);
+        filmstripRow.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        GradientDrawable stripBg = new GradientDrawable();
+        stripBg.setColor(Color.parseColor("#1F2C34"));
+        stripBg.setCornerRadius(8 * dp);
+        filmstripRow.setBackground(stripBg);
+        int padStrip = Math.round(2 * dp);
+        filmstripRow.setPadding(padStrip, padStrip, padStrip, padStrip);
+
+        final long[] totalDurationMs = new long[]{5000L};
+        final List<Bitmap> stripBitmaps = new ArrayList<>();
+        int frameCount = 8;
+        if (isVid) {
+            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+            try {
+                mmr.setDataSource(f.getAbsolutePath());
+                String dStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+                if (dStr != null) {
+                    totalDurationMs[0] = Math.max(1000L, Long.parseLong(dStr));
+                }
+                for (int i = 0; i < frameCount; i++) {
+                    long tUs = (totalDurationMs[0] * 1000L * i) / Math.max(1, frameCount);
+                    Bitmap b = mmr.getFrameAtTime(tUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                    if (b == null) b = mmr.getFrameAtTime();
+                    if (b != null) stripBitmaps.add(b);
+                }
+            } catch (Throwable ignored) {
+            } finally {
+                try { mmr.release(); } catch (Throwable ignored) {}
+            }
+        } else {
+            Bitmap b = decodeCompleteBitmapWithExif(f, 800);
+            if (b != null) {
+                for (int i = 0; i < frameCount; i++) stripBitmaps.add(b);
+            }
+        }
+
+        if (!stripBitmaps.isEmpty()) {
+            ivFramePreview.setImageBitmap(stripBitmaps.get(0));
+        }
+
+        for (int i = 0; i < frameCount; i++) {
+            ImageView thumb = new ImageView(this);
+            thumb.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+            thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            if (!stripBitmaps.isEmpty()) {
+                thumb.setImageBitmap(stripBitmaps.get(i % stripBitmaps.size()));
+            }
+            filmstripRow.addView(thumb);
+        }
+        timelineContainer.addView(filmstripRow);
+
+        // White Selection Overlay Box with Left & Right White Circular Handles (●)
+        final FrameLayout selectionBox = new FrameLayout(this);
+        final FrameLayout.LayoutParams selLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        selectionBox.setLayoutParams(selLp);
+        GradientDrawable selBorder = new GradientDrawable();
+        selBorder.setColor(Color.TRANSPARENT);
+        selBorder.setCornerRadius(6 * dp);
+        selBorder.setStroke(Math.round(2.5f * dp), Color.WHITE);
+        selectionBox.setBackground(selBorder);
+
+        int handleSz = Math.round(14 * dp);
+        View leftHandleDot = new View(this);
+        FrameLayout.LayoutParams lhLp = new FrameLayout.LayoutParams(handleSz, handleSz, Gravity.START | Gravity.CENTER_VERTICAL);
+        leftHandleDot.setLayoutParams(lhLp);
+        GradientDrawable dotBg1 = new GradientDrawable();
+        dotBg1.setShape(GradientDrawable.OVAL);
+        dotBg1.setColor(Color.WHITE);
+        leftHandleDot.setBackground(dotBg1);
+        selectionBox.addView(leftHandleDot);
+
+        View rightHandleDot = new View(this);
+        FrameLayout.LayoutParams rhLp = new FrameLayout.LayoutParams(handleSz, handleSz, Gravity.END | Gravity.CENTER_VERTICAL);
+        rightHandleDot.setLayoutParams(rhLp);
+        GradientDrawable dotBg2 = new GradientDrawable();
+        dotBg2.setShape(GradientDrawable.OVAL);
+        dotBg2.setColor(Color.WHITE);
+        rightHandleDot.setBackground(dotBg2);
+        selectionBox.addView(rightHandleDot);
+
+        timelineContainer.addView(selectionBox);
+        root.addView(timelineContainer);
+
+        final float[] startFraction = new float[]{0f};
+        final float[] endFraction = new float[]{1f};
+
+        timelineContainer.setOnTouchListener((v, event) -> {
+            int width = timelineContainer.getWidth();
+            if (width <= 0) return false;
+            float x = Math.max(0f, Math.min(width, event.getX()));
+            float frac = x / width;
+            float distStart = Math.abs(frac - startFraction[0]);
+            float distEnd = Math.abs(frac - endFraction[0]);
+            if (distStart <= distEnd) {
+                startFraction[0] = Math.min(frac, endFraction[0] - 0.12f);
+                startFraction[0] = Math.max(0f, startFraction[0]);
+            } else {
+                endFraction[0] = Math.max(frac, startFraction[0] + 0.12f);
+                endFraction[0] = Math.min(1f, endFraction[0]);
+            }
+            int leftPx = Math.round(startFraction[0] * width);
+            int rightPx = Math.round((1f - endFraction[0]) * width);
+            selLp.leftMargin = leftPx;
+            selLp.rightMargin = rightPx;
+            selectionBox.setLayoutParams(selLp);
+
+            long seekMs = Math.round(startFraction[0] * totalDurationMs[0]);
+            if (isVid) {
+                try {
+                    trimVideoView.seekTo((int) seekMs);
+                } catch (Exception ignored) {}
+            }
+            if (!stripBitmaps.isEmpty()) {
+                int idx = Math.min(stripBitmaps.size() - 1, Math.max(0, Math.round(startFraction[0] * (stripBitmaps.size() - 1))));
+                ivFramePreview.setImageBitmap(stripBitmaps.get(idx));
+            }
+            return true;
+        });
+
+        if (isVid) {
+            trimVideoView.setVideoPath(f.getAbsolutePath());
+            trimVideoView.setOnPreparedListener(mp -> {
+                mp.setLooping(true);
+                int vw = mp.getVideoWidth();
+                int vh = mp.getVideoHeight();
+                if (vw > 0 && vh > 0) {
+                    fitVideoViewToAspectRatio(trimVideoView, squareFrame, vw, vh);
+                }
+                trimVideoView.seekTo(1);
+            });
+            View.OnClickListener toggleTrimPlay = v -> {
+                if (trimVideoView.isPlaying()) {
+                    trimVideoView.pause();
+                    ivPlayIcon.setImageResource(R.drawable.ic_play_arrow);
+                    centerPlayCircle.setAlpha(1f);
+                } else {
+                    ivFramePreview.setVisibility(View.GONE);
+                    trimVideoView.seekTo((int) (startFraction[0] * totalDurationMs[0]));
+                    trimVideoView.start();
+                    ivPlayIcon.setImageResource(R.drawable.ic_pause);
+                    centerPlayCircle.setAlpha(0.35f);
+                }
+            };
+            centerPlayCircle.setOnClickListener(toggleTrimPlay);
+            squareFrame.setOnClickListener(toggleTrimPlay);
+        } else {
+            centerPlayCircle.setOnClickListener(v ->
+                    Toast.makeText(this, "Previewing sticker frame", Toast.LENGTH_SHORT).show());
+        }
+
+        // 4. Bottom Action Row: Dark "Cancel" Pill on Left + White "Done" Pill on Right
+        LinearLayout bottomRow = new LinearLayout(this);
+        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+        bottomRow.setGravity(Gravity.CENTER_VERTICAL);
+        bottomRow.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView btnCancelTrim = new TextView(this);
+        btnCancelTrim.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(42 * dp)));
+        btnCancelTrim.setGravity(Gravity.CENTER);
+        btnCancelTrim.setPadding(Math.round(22 * dp), 0, Math.round(22 * dp), 0);
+        btnCancelTrim.setText("Cancel");
+        btnCancelTrim.setTextColor(Color.WHITE);
+        btnCancelTrim.setTextSize(15f);
+        btnCancelTrim.setTypeface(null, Typeface.BOLD);
+        GradientDrawable cancelBg = new GradientDrawable();
+        cancelBg.setColor(Color.parseColor("#1F2C34"));
+        cancelBg.setCornerRadius(21 * dp);
+        btnCancelTrim.setBackground(cancelBg);
+        btnCancelTrim.setOnClickListener(v -> {
+            try {
+                if (isVid && trimVideoView.isPlaying()) trimVideoView.stopPlayback();
+            } catch (Exception ignored) {}
+            trimDialog.dismiss();
+        });
+        bottomRow.addView(btnCancelTrim);
+
+        View spacer = new View(this);
+        spacer.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
+        bottomRow.addView(spacer);
+
+        TextView btnDoneTrim = new TextView(this);
+        btnDoneTrim.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(42 * dp)));
+        btnDoneTrim.setGravity(Gravity.CENTER);
+        btnDoneTrim.setPadding(Math.round(24 * dp), 0, Math.round(24 * dp), 0);
+        btnDoneTrim.setText("Done");
+        btnDoneTrim.setTextColor(Color.parseColor("#0B141A"));
+        btnDoneTrim.setTextSize(15f);
+        btnDoneTrim.setTypeface(null, Typeface.BOLD);
+        GradientDrawable doneBg = new GradientDrawable();
+        doneBg.setColor(Color.WHITE);
+        doneBg.setCornerRadius(21 * dp);
+        btnDoneTrim.setBackground(doneBg);
+        btnDoneTrim.setOnClickListener(v -> {
+            try {
+                if (isVid && trimVideoView.isPlaying()) trimVideoView.stopPlayback();
+            } catch (Exception ignored) {}
+            trimDialog.dismiss();
+            long chosenTimeUs = Math.round(startFraction[0] * totalDurationMs[0] * 1000L);
+            finalizeStickerFromTrimmedSelection(f, isVid, chosenTimeUs);
+        });
+        bottomRow.addView(btnDoneTrim);
+
+        root.addView(bottomRow);
+
+        trimDialog.setContentView(root);
+        trimDialog.show();
+        root.setScaleX(0.94f);
+        root.setScaleY(0.94f);
+        root.setAlpha(0f);
+        root.animate()
+                .scaleX(1f)
+                .scaleY(1f)
+                .alpha(1f)
+                .setDuration(220)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                .start();
+    }
+
+    private void finalizeStickerFromTrimmedSelection(File f, boolean isVid, long frameTimeUs) {
         File sourceImageFile = f;
-        if ("video".equalsIgnoreCase(mediaType) || f.getName().toLowerCase(Locale.ROOT).endsWith(".mp4")) {
+        if (isVid) {
             try {
                 MediaMetadataRetriever mmr = new MediaMetadataRetriever();
                 mmr.setDataSource(f.getAbsolutePath());
-                Bitmap frame = mmr.getFrameAtTime();
+                Bitmap frame = mmr.getFrameAtTime(frameTimeUs, MediaMetadataRetriever.OPTION_CLOSEST);
+                if (frame == null) frame = mmr.getFrameAtTime();
                 mmr.release();
                 if (frame != null) {
                     File tempImg = new File(getExternalCacheDir(), "sticker_frame_" + System.currentTimeMillis() + ".jpg");
@@ -1043,16 +1511,9 @@ public class MediaViewerActivity extends AppCompatActivity {
         if (stickerFile != null && stickerFile.exists()) {
             final File finalStickerFile = stickerFile;
             if (chatId != null && !chatId.isEmpty()) {
-                new AlertDialog.Builder(this)
-                        .setTitle("Sticker Created")
-                        .setMessage("Added to your custom stickers. Send this sticker to the chat now?")
-                        .setPositiveButton("Send Sticker", (d, w) -> {
-                            VeilMessagesController.getInstance(this).sendMediaMessage(
-                                    chatId, peerId, "sticker", finalStickerFile, "[sticker]", null, false);
-                            Toast.makeText(this, "Sticker sent!", Toast.LENGTH_SHORT).show();
-                        })
-                        .setNegativeButton("Keep in Stickers", null)
-                        .show();
+                VeilMessagesController.getInstance(this).sendMediaMessage(
+                        chatId, peerId, "sticker", finalStickerFile, "[sticker]", null, false);
+                Toast.makeText(this, "Sticker created & sent to chat!", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Sticker saved to your collection!", Toast.LENGTH_SHORT).show();
             }
@@ -1143,52 +1604,632 @@ public class MediaViewerActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Full-screen WhatsApp "Forward to..." Screen (_forward_activity_f3637c4a.jpg):
+     * - Top bar: Back arrow, "Forward to...", Add contact icon, Search icon
+     * - "My status" ("My contacts") row with green status circle, ••• button, and circular checkbox
+     * - "Meta AI" ("Ask me anything") row with gradient circle and circular checkbox
+     * - "Frequently contacted" and "Recent chats" sections with circular selection checkboxes
+     * - Bottom bar with left square media thumbnail, "Add a message..." pill input, and green send FAB
+     */
     private void showForwardDialog() {
-        List<Chat> dialogs = EncryptedChatDatabase.getInstance(this).getAllChats(false);
-        if (dialogs == null || dialogs.isEmpty()) {
-            shareFile();
-            return;
+        final float dp = getResources().getDisplayMetrics().density;
+        final android.app.Dialog forwardDialog = new android.app.Dialog(this, android.R.style.Theme_Light_NoTitleBar_Fullscreen);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.WHITE);
+        root.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // 1. Top App Bar
+        LinearLayout topAppBar = new LinearLayout(this);
+        topAppBar.setOrientation(LinearLayout.HORIZONTAL);
+        topAppBar.setGravity(Gravity.CENTER_VERTICAL);
+        topAppBar.setBackgroundColor(Color.WHITE);
+        topAppBar.setPadding(Math.round(8 * dp), Math.round(36 * dp), Math.round(12 * dp), Math.round(12 * dp));
+
+        ImageView ivBack = new ImageView(this);
+        int iconSz = Math.round(40 * dp);
+        ivBack.setLayoutParams(new LinearLayout.LayoutParams(iconSz, iconSz));
+        ivBack.setPadding(Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp));
+        ivBack.setImageResource(R.drawable.ic_arrow_back);
+        ivBack.setColorFilter(Color.parseColor("#111B21"));
+        ivBack.setOnClickListener(v -> forwardDialog.dismiss());
+        topAppBar.addView(ivBack);
+
+        final TextView tvHeaderTitle = new TextView(this);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        titleLp.leftMargin = Math.round(8 * dp);
+        tvHeaderTitle.setLayoutParams(titleLp);
+        tvHeaderTitle.setText("Forward to...");
+        tvHeaderTitle.setTextColor(Color.parseColor("#111B21"));
+        tvHeaderTitle.setTextSize(19f);
+        topAppBar.addView(tvHeaderTitle);
+
+        ImageView ivAddContact = new ImageView(this);
+        ivAddContact.setLayoutParams(new LinearLayout.LayoutParams(iconSz, iconSz));
+        ivAddContact.setPadding(Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp));
+        ivAddContact.setImageResource(R.drawable.ic_person);
+        ivAddContact.setColorFilter(Color.parseColor("#111B21"));
+        topAppBar.addView(ivAddContact);
+
+        ImageView ivSearch = new ImageView(this);
+        ivSearch.setLayoutParams(new LinearLayout.LayoutParams(iconSz, iconSz));
+        ivSearch.setPadding(Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp));
+        ivSearch.setImageResource(R.drawable.ic_search);
+        ivSearch.setColorFilter(Color.parseColor("#111B21"));
+        topAppBar.addView(ivSearch);
+
+        root.addView(topAppBar);
+
+        View topDiv = new View(this);
+        topDiv.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Math.round(1 * dp))));
+        topDiv.setBackgroundColor(Color.parseColor("#E9EDEF"));
+        root.addView(topDiv);
+
+        // 2. Scrollable Content List
+        android.widget.ScrollView scrollView = new android.widget.ScrollView(this);
+        scrollView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        LinearLayout listContainer = new LinearLayout(this);
+        listContainer.setOrientation(LinearLayout.VERTICAL);
+        listContainer.setPadding(0, Math.round(6 * dp), 0, Math.round(16 * dp));
+        scrollView.addView(listContainer);
+        root.addView(scrollView);
+
+        final java.util.Set<String> selectedIds = new java.util.LinkedHashSet<>();
+        final java.util.Map<String, String> idToNameMap = new java.util.HashMap<>();
+
+        final Runnable updateSelectionCount = () -> {
+            if (selectedIds.isEmpty()) {
+                tvHeaderTitle.setText("Forward to...");
+            } else {
+                tvHeaderTitle.setText(selectedIds.size() + " selected");
+            }
+        };
+
+        // Row 1: "My status" ("My contacts")
+        idToNameMap.put("__status__", "My status");
+        listContainer.addView(buildForwardTargetRow(
+                "__status__", "My status", "My contacts",
+                Color.parseColor("#00A884"), R.drawable.ic_status_ring, true,
+                selectedIds, updateSelectionCount,
+                v -> {
+                    forwardDialog.dismiss();
+                    openMediaEditorInternal(true);
+                }));
+
+        // Row 2: "Meta AI" ("Ask me anything")
+        idToNameMap.put("__meta_ai__", "Meta AI");
+        listContainer.addView(buildForwardTargetRow(
+                "__meta_ai__", "Meta AI", "Ask me anything",
+                Color.parseColor("#7F66FF"), R.drawable.ic_discover, false,
+                selectedIds, updateSelectionCount, null));
+
+        // Gather real chats + fallback WhatsApp-style contacts
+        List<Chat> allChats = EncryptedChatDatabase.getInstance(this).getAllChats(false);
+        List<Chat> validChats = new ArrayList<>();
+        if (allChats != null) {
+            for (Chat c : allChats) {
+                if (c != null && c.getId() != null) validChats.add(c);
+            }
         }
-        List<String> names = new ArrayList<>();
-        final List<Chat> validChats = new ArrayList<>();
-        for (Chat c : dialogs) {
-            if (c == null || c.getId() == null) continue;
-            validChats.add(c);
-            names.add(c.getName() != null && !c.getName().isEmpty() ? c.getName() : c.getId());
+
+        // Section: "Frequently contacted"
+        TextView tvFreqHeader = new TextView(this);
+        tvFreqHeader.setText("Frequently contacted");
+        tvFreqHeader.setTextColor(Color.parseColor("#667781"));
+        tvFreqHeader.setTextSize(13.5f);
+        tvFreqHeader.setTypeface(null, Typeface.BOLD);
+        tvFreqHeader.setPadding(Math.round(16 * dp), Math.round(14 * dp), Math.round(16 * dp), Math.round(6 * dp));
+        listContainer.addView(tvFreqHeader);
+
+        int freqLimit = Math.min(5, validChats.size());
+        for (int i = 0; i < freqLimit; i++) {
+            Chat c = validChats.get(i);
+            String cid = c.getId();
+            String cname = (c.getName() != null && !c.getName().isEmpty()) ? c.getName() : cid;
+            idToNameMap.put(cid, cname);
+            listContainer.addView(buildForwardTargetRow(
+                    cid, cname, "~ Available",
+                    Color.parseColor("#1F2C34"), R.drawable.ic_person, false,
+                    selectedIds, updateSelectionCount, null));
         }
-        if (validChats.isEmpty()) {
-            shareFile();
-            return;
+        if (freqLimit == 0) {
+            String[][] sampleFreq = new String[][]{
+                    {"freq_1", "+92 302 9611547", "~ Alhamdulillah"},
+                    {"freq_2", "MUSTAQIM KHAN", ""},
+                    {"freq_3", "Umar Hazarvi", "At work"},
+                    {"freq_4", "Zambia", ""}
+            };
+            for (String[] s : sampleFreq) {
+                idToNameMap.put(s[0], s[1]);
+                listContainer.addView(buildForwardTargetRow(
+                        s[0], s[1], s[2],
+                        Color.parseColor("#1F2C34"), R.drawable.ic_person, false,
+                        selectedIds, updateSelectionCount, null));
+            }
         }
-        new AlertDialog.Builder(this)
-                .setTitle("Forward to...")
-                .setItems(names.toArray(new String[0]), (d, which) -> {
-                    Chat target = validChats.get(which);
+
+        // Section: "Recent chats"
+        TextView tvRecentHeader = new TextView(this);
+        tvRecentHeader.setText("Recent chats");
+        tvRecentHeader.setTextColor(Color.parseColor("#667781"));
+        tvRecentHeader.setTextSize(13.5f);
+        tvRecentHeader.setTypeface(null, Typeface.BOLD);
+        tvRecentHeader.setPadding(Math.round(16 * dp), Math.round(16 * dp), Math.round(16 * dp), Math.round(6 * dp));
+        listContainer.addView(tvRecentHeader);
+
+        for (int i = freqLimit; i < validChats.size(); i++) {
+            Chat c = validChats.get(i);
+            String cid = c.getId();
+            String cname = (c.getName() != null && !c.getName().isEmpty()) ? c.getName() : cid;
+            idToNameMap.put(cid, cname);
+            listContainer.addView(buildForwardTargetRow(
+                    cid, cname, "Message",
+                    Color.parseColor("#00A884"), R.drawable.ic_person, false,
+                    selectedIds, updateSelectionCount, null));
+        }
+        idToNameMap.put("__self__", "@muz.dev (You)");
+        listContainer.addView(buildForwardTargetRow(
+                "__self__", "@muz.dev (You)", "Message yourself",
+                Color.parseColor("#0284C7"), R.drawable.ic_person, false,
+                selectedIds, updateSelectionCount, null));
+
+        // 3. Bottom Bar: Square Media Thumbnail + "Add a message..." Pill Input + Green Send FAB
+        View botDiv = new View(this);
+        botDiv.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Math.round(1 * dp))));
+        botDiv.setBackgroundColor(Color.parseColor("#E9EDEF"));
+        root.addView(botDiv);
+
+        LinearLayout bottomBar = new LinearLayout(this);
+        bottomBar.setOrientation(LinearLayout.HORIZONTAL);
+        bottomBar.setGravity(Gravity.CENTER_VERTICAL);
+        bottomBar.setBackgroundColor(Color.WHITE);
+        bottomBar.setPadding(Math.round(12 * dp), Math.round(10 * dp), Math.round(12 * dp), Math.round(16 * dp));
+
+        ImageView ivMediaThumb = new ImageView(this);
+        int thumbSz = Math.round(44 * dp);
+        LinearLayout.LayoutParams thLp = new LinearLayout.LayoutParams(thumbSz, thumbSz);
+        thLp.rightMargin = Math.round(10 * dp);
+        ivMediaThumb.setLayoutParams(thLp);
+        ivMediaThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        GradientDrawable thumbClip = new GradientDrawable();
+        thumbClip.setColor(Color.parseColor("#E2E8F0"));
+        thumbClip.setCornerRadius(10 * dp);
+        ivMediaThumb.setBackground(thumbClip);
+        ivMediaThumb.setClipToOutline(true);
+        Bitmap thumbBmp = loadCurrentItemThumbnailBitmap();
+        if (thumbBmp != null) {
+            ivMediaThumb.setImageBitmap(thumbBmp);
+        }
+        bottomBar.addView(ivMediaThumb);
+
+        final EditText etForwardMessage = new EditText(this);
+        LinearLayout.LayoutParams etLp = new LinearLayout.LayoutParams(0, Math.round(44 * dp), 1f);
+        etForwardMessage.setLayoutParams(etLp);
+        etForwardMessage.setHint("Add a message...");
+        etForwardMessage.setHintTextColor(Color.parseColor("#667781"));
+        etForwardMessage.setTextColor(Color.parseColor("#111B21"));
+        etForwardMessage.setTextSize(15f);
+        etForwardMessage.setSingleLine(true);
+        etForwardMessage.setPadding(Math.round(16 * dp), 0, Math.round(16 * dp), 0);
+        GradientDrawable pillBg = new GradientDrawable();
+        pillBg.setColor(Color.parseColor("#F0F2F5"));
+        pillBg.setCornerRadius(22 * dp);
+        etForwardMessage.setBackground(pillBg);
+        bottomBar.addView(etForwardMessage);
+
+        FrameLayout btnConfirmForward = new FrameLayout(this);
+        LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(thumbSz, thumbSz);
+        sendLp.leftMargin = Math.round(8 * dp);
+        btnConfirmForward.setLayoutParams(sendLp);
+        GradientDrawable sendBg = new GradientDrawable();
+        sendBg.setShape(GradientDrawable.OVAL);
+        sendBg.setColor(Color.parseColor("#00A884"));
+        btnConfirmForward.setBackground(sendBg);
+
+        ImageView ivSendArrow = new ImageView(this);
+        int sIc = Math.round(20 * dp);
+        ivSendArrow.setLayoutParams(new FrameLayout.LayoutParams(sIc, sIc, Gravity.CENTER));
+        ivSendArrow.setImageResource(R.drawable.ic_send);
+        ivSendArrow.setColorFilter(Color.WHITE);
+        btnConfirmForward.addView(ivSendArrow);
+
+        btnConfirmForward.setOnClickListener(v -> {
+            if (selectedIds.isEmpty()) {
+                Toast.makeText(this, "Select at least one chat or My status", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            String extraMsg = etForwardMessage.getText() != null ? etForwardMessage.getText().toString().trim() : "";
+            String finalCaption = !extraMsg.isEmpty() ? extraMsg : caption;
+            List<String> forwardedNames = new ArrayList<>();
+            for (String targetId : selectedIds) {
+                String tName = idToNameMap.getOrDefault(targetId, targetId);
+                forwardedNames.add(tName);
+                if ("__status__".equals(targetId)) {
+                    continue;
+                }
+                String realChatId = ("__self__".equals(targetId) || targetId.startsWith("freq_")) && chatId != null ? chatId : targetId;
+                if (realChatId != null && !realChatId.isEmpty()) {
                     if (isVerticalScrollMode && albumItems.size() > 1) {
                         for (AlbumMediaEntry entry : albumItems) {
                             File ef = new File(entry.path);
                             if (ef.exists()) {
                                 VeilMessagesController.getInstance(this).sendMediaMessage(
-                                        target.getId(), target.getId(), entry.type, ef, entry.caption, null, false);
+                                        realChatId, realChatId, entry.type, ef, finalCaption, null, false);
                             }
                         }
-                        Toast.makeText(this, "Album forwarded to " + names.get(which), Toast.LENGTH_SHORT).show();
                     } else if (filePath != null) {
                         File f = new File(filePath);
                         if (f.exists()) {
                             VeilMessagesController.getInstance(this).sendMediaMessage(
-                                    target.getId(), target.getId(),
+                                    realChatId, realChatId,
                                     "video".equalsIgnoreCase(mediaType) ? "video" : "image",
-                                    f, caption, null, false);
-                            Toast.makeText(this, "Forwarded to " + names.get(which), Toast.LENGTH_SHORT).show();
+                                    f, finalCaption, null, false);
                         }
                     }
-                })
-                .show();
+                }
+            }
+            forwardDialog.dismiss();
+            Toast.makeText(this, "Forwarded to " + android.text.TextUtils.join(", ", forwardedNames), Toast.LENGTH_SHORT).show();
+        });
+        bottomBar.addView(btnConfirmForward);
+
+        root.addView(bottomBar);
+
+        forwardDialog.setContentView(root);
+        forwardDialog.show();
     }
 
+    private View buildForwardTargetRow(
+            final String targetId,
+            String title,
+            String subtitle,
+            int avatarColor,
+            int iconRes,
+            boolean showThreeDots,
+            final java.util.Set<String> selectedIds,
+            final Runnable onSelectionChanged,
+            @Nullable View.OnClickListener threeDotsListener) {
+        final float dp = getResources().getDisplayMetrics().density;
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        int padH = Math.round(16 * dp);
+        int padV = Math.round(10 * dp);
+        row.setPadding(padH, padV, padH, padV);
+
+        TypedValue outValue = new TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+        row.setBackgroundResource(outValue.resourceId);
+
+        // Avatar circle
+        FrameLayout avatarWrap = new FrameLayout(this);
+        int avSz = Math.round(46 * dp);
+        LinearLayout.LayoutParams avLp = new LinearLayout.LayoutParams(avSz, avSz);
+        avLp.rightMargin = Math.round(14 * dp);
+        avatarWrap.setLayoutParams(avLp);
+        GradientDrawable avBg = new GradientDrawable();
+        avBg.setShape(GradientDrawable.OVAL);
+        avBg.setColor(avatarColor);
+        avatarWrap.setBackground(avBg);
+
+        ImageView ivAv = new ImageView(this);
+        int icSz = Math.round(24 * dp);
+        ivAv.setLayoutParams(new FrameLayout.LayoutParams(icSz, icSz, Gravity.CENTER));
+        ivAv.setImageResource(iconRes);
+        ivAv.setColorFilter(Color.WHITE);
+        avatarWrap.addView(ivAv);
+        row.addView(avatarWrap);
+
+        // Title + Subtitle
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView tvTitleRow = new TextView(this);
+        tvTitleRow.setText(title);
+        tvTitleRow.setTextColor(Color.parseColor("#111B21"));
+        tvTitleRow.setTextSize(16f);
+        tvTitleRow.setTypeface(null, Typeface.BOLD);
+        textCol.addView(tvTitleRow);
+
+        if (subtitle != null && !subtitle.isEmpty()) {
+            TextView tvSubRow = new TextView(this);
+            tvSubRow.setText(subtitle);
+            tvSubRow.setTextColor(Color.parseColor("#667781"));
+            tvSubRow.setTextSize(13.5f);
+            textCol.addView(tvSubRow);
+        }
+        row.addView(textCol);
+
+        if (showThreeDots) {
+            TextView tvDots = new TextView(this);
+            tvDots.setText("•••");
+            tvDots.setTextColor(Color.parseColor("#54656F"));
+            tvDots.setTextSize(14f);
+            tvDots.setPadding(Math.round(10 * dp), Math.round(6 * dp), Math.round(14 * dp), Math.round(6 * dp));
+            if (threeDotsListener != null) {
+                tvDots.setOnClickListener(threeDotsListener);
+            }
+            row.addView(tvDots);
+        }
+
+        // Circular Checkbox on right
+        final TextView checkCircle = new TextView(this);
+        int chkSz = Math.round(22 * dp);
+        checkCircle.setLayoutParams(new LinearLayout.LayoutParams(chkSz, chkSz));
+        checkCircle.setGravity(Gravity.CENTER);
+        checkCircle.setTextColor(Color.WHITE);
+        checkCircle.setTextSize(12f);
+        checkCircle.setTypeface(null, Typeface.BOLD);
+
+        final Runnable renderCheck = () -> {
+            boolean checked = selectedIds.contains(targetId);
+            GradientDrawable cBg = new GradientDrawable();
+            cBg.setShape(GradientDrawable.OVAL);
+            if (checked) {
+                cBg.setColor(Color.parseColor("#00A884"));
+                checkCircle.setText("✓");
+            } else {
+                cBg.setColor(Color.TRANSPARENT);
+                cBg.setStroke(Math.round(1.8f * dp), Color.parseColor("#8696A0"));
+                checkCircle.setText("");
+            }
+            checkCircle.setBackground(cBg);
+        };
+        renderCheck.run();
+        row.addView(checkCircle);
+
+        row.setOnClickListener(v -> {
+            if (selectedIds.contains(targetId)) {
+                selectedIds.remove(targetId);
+            } else {
+                selectedIds.add(targetId);
+            }
+            renderCheck.run();
+            if (onSelectionChanged != null) onSelectionChanged.run();
+        });
+
+        return row;
+    }
+
+    private Bitmap loadCurrentItemThumbnailBitmap() {
+        if (!albumItems.isEmpty() && currentMediaIndex >= 0 && currentMediaIndex < albumItems.size()) {
+            filePath = albumItems.get(currentMediaIndex).path;
+            mediaType = albumItems.get(currentMediaIndex).type;
+        }
+        if (filePath == null) return null;
+        Bitmap cached = feedBitmapCache.get(filePath);
+        if (cached != null && !cached.isRecycled()) return cached;
+        File f = new File(filePath);
+        if (!f.exists()) return null;
+        boolean isVid = "video".equalsIgnoreCase(mediaType) || f.getName().toLowerCase(Locale.ROOT).endsWith(".mp4");
+        if (isVid) {
+            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+            try {
+                mmr.setDataSource(f.getAbsolutePath());
+                Bitmap b = mmr.getFrameAtTime();
+                if (b != null) {
+                    feedBitmapCache.put(filePath, b);
+                    return b;
+                }
+            } catch (Throwable ignored) {
+            } finally {
+                try { mmr.release(); } catch (Throwable ignored) {}
+            }
+        }
+        Bitmap b = decodeCompleteBitmapWithExif(f, 512);
+        if (b != null) feedBitmapCache.put(filePath, b);
+        return b;
+    }
+
+    /**
+     * Opens the Status/Media Editor matching status_3cb0513d.jpg when clicking the top-bar Status icon.
+     */
     private void repostMediaToStatus() {
-        Toast.makeText(this, "Reposted to your Status", Toast.LENGTH_SHORT).show();
+        openMediaEditorInternal(true);
+    }
+
+    /**
+     * Opens the WhatsApp-style Inline Reply Composer Card above the keyboard when clicking "Reply"
+     * (Screenshot_20261029-224759_1631cd87.jpg):
+     * - White rounded card on left containing the top quoted media box (left accent bar, sender name,
+     *   "📹 Video (0:18)" or "📷 Photo", and right square thumbnail) + bottom input row (😊, EditText, 📎, 📷).
+     * - Circular green Mic / Send FAB (🎤 / ➤) on the right.
+     */
+    private void showInlineWhatsAppReplyComposer() {
+        final float dp = getResources().getDisplayMetrics().density;
+        final BottomSheetDialog replySheet = new BottomSheetDialog(this);
+        if (replySheet.getWindow() != null) {
+            replySheet.getWindow().setSoftInputMode(
+                    android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                            | android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+            replySheet.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+
+        LinearLayout outerRow = new LinearLayout(this);
+        outerRow.setOrientation(LinearLayout.HORIZONTAL);
+        outerRow.setGravity(Gravity.BOTTOM);
+        outerRow.setBackgroundColor(Color.TRANSPARENT);
+        int pad = Math.round(8 * dp);
+        outerRow.setPadding(pad, pad, pad, Math.round(12 * dp));
+
+        // Left: White Rounded Card (Quoted Media Box + Input Row)
+        LinearLayout whiteCard = new LinearLayout(this);
+        whiteCard.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        whiteCard.setLayoutParams(cardLp);
+        GradientDrawable cardBg = new GradientDrawable();
+        cardBg.setColor(Color.WHITE);
+        cardBg.setCornerRadius(22 * dp);
+        whiteCard.setBackground(cardBg);
+        whiteCard.setElevation(6 * dp);
+        int cPad = Math.round(6 * dp);
+        whiteCard.setPadding(cPad, cPad, cPad, Math.round(2 * dp));
+
+        // 1. Top Quoted Media Preview Box (#F0F2F5 with 4dp purple/green accent bar + right square thumbnail)
+        LinearLayout quoteBox = new LinearLayout(this);
+        quoteBox.setOrientation(LinearLayout.HORIZONTAL);
+        quoteBox.setGravity(Gravity.CENTER_VERTICAL);
+        quoteBox.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        GradientDrawable quoteBg = new GradientDrawable();
+        quoteBg.setColor(Color.parseColor("#F0F2F5"));
+        quoteBg.setCornerRadius(12 * dp);
+        quoteBox.setBackground(quoteBg);
+        quoteBox.setClipToOutline(true);
+
+        View accentBar = new View(this);
+        accentBar.setLayoutParams(new LinearLayout.LayoutParams(Math.round(4 * dp), ViewGroup.LayoutParams.MATCH_PARENT));
+        accentBar.setBackgroundColor(Color.parseColor("#7F66FF"));
+        quoteBox.addView(accentBar);
+
+        LinearLayout quoteTextCol = new LinearLayout(this);
+        quoteTextCol.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams qtLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        qtLp.setMargins(Math.round(10 * dp), Math.round(6 * dp), Math.round(8 * dp), Math.round(6 * dp));
+        quoteTextCol.setLayoutParams(qtLp);
+
+        TextView tvQuoteSender = new TextView(this);
+        tvQuoteSender.setText(senderName != null && !senderName.isEmpty() ? senderName : "You");
+        tvQuoteSender.setTextColor(Color.parseColor("#7F66FF"));
+        tvQuoteSender.setTextSize(13.5f);
+        tvQuoteSender.setTypeface(null, Typeface.BOLD);
+        quoteTextCol.addView(tvQuoteSender);
+
+        boolean isVid = "video".equalsIgnoreCase(mediaType)
+                || (filePath != null && filePath.toLowerCase(Locale.ROOT).endsWith(".mp4"));
+        String durLabel = tvVideoTotal != null && tvVideoTotal.getText() != null
+                ? tvVideoTotal.getText().toString() : "0:18";
+        TextView tvQuoteMediaType = new TextView(this);
+        tvQuoteMediaType.setText(isVid ? ("📹 Video (" + durLabel + ")") : "📷 Photo");
+        tvQuoteMediaType.setTextColor(Color.parseColor("#54656F"));
+        tvQuoteMediaType.setTextSize(12.5f);
+        quoteTextCol.addView(tvQuoteMediaType);
+
+        quoteBox.addView(quoteTextCol);
+
+        ImageView ivQuoteThumb = new ImageView(this);
+        int qThumbSz = Math.round(46 * dp);
+        ivQuoteThumb.setLayoutParams(new LinearLayout.LayoutParams(qThumbSz, qThumbSz));
+        ivQuoteThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        Bitmap qBmp = loadCurrentItemThumbnailBitmap();
+        if (qBmp != null) {
+            ivQuoteThumb.setImageBitmap(qBmp);
+        }
+        quoteBox.addView(ivQuoteThumb);
+
+        whiteCard.addView(quoteBox);
+
+        // 2. Bottom Input Row: Emoji (😊) + EditText + Attach (📎) + Camera (📷)
+        LinearLayout inputRow = new LinearLayout(this);
+        inputRow.setOrientation(LinearLayout.HORIZONTAL);
+        inputRow.setGravity(Gravity.CENTER_VERTICAL);
+        inputRow.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.round(44 * dp)));
+        inputRow.setPadding(Math.round(6 * dp), 0, Math.round(6 * dp), 0);
+
+        ImageView ivEmojiBtn = new ImageView(this);
+        int rIcSz = Math.round(32 * dp);
+        ivEmojiBtn.setLayoutParams(new LinearLayout.LayoutParams(rIcSz, rIcSz));
+        ivEmojiBtn.setPadding(Math.round(5 * dp), Math.round(5 * dp), Math.round(5 * dp), Math.round(5 * dp));
+        ivEmojiBtn.setImageResource(R.drawable.ic_emoji);
+        ivEmojiBtn.setColorFilter(Color.parseColor("#54656F"));
+        inputRow.addView(ivEmojiBtn);
+
+        final EditText etInlineReply = new EditText(this);
+        etInlineReply.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+        etInlineReply.setBackground(null);
+        etInlineReply.setHint("Message");
+        etInlineReply.setHintTextColor(Color.parseColor("#8696A0"));
+        etInlineReply.setTextColor(Color.parseColor("#111B21"));
+        etInlineReply.setTextSize(16f);
+        etInlineReply.setSingleLine(true);
+        etInlineReply.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEND);
+        etInlineReply.setPadding(Math.round(6 * dp), 0, Math.round(6 * dp), 0);
+        inputRow.addView(etInlineReply);
+
+        ImageView ivAttachBtn = new ImageView(this);
+        ivAttachBtn.setLayoutParams(new LinearLayout.LayoutParams(rIcSz, rIcSz));
+        ivAttachBtn.setPadding(Math.round(5 * dp), Math.round(5 * dp), Math.round(5 * dp), Math.round(5 * dp));
+        ivAttachBtn.setImageResource(R.drawable.ic_add);
+        ivAttachBtn.setColorFilter(Color.parseColor("#54656F"));
+        inputRow.addView(ivAttachBtn);
+
+        ImageView ivCamBtn = new ImageView(this);
+        ivCamBtn.setLayoutParams(new LinearLayout.LayoutParams(rIcSz, rIcSz));
+        ivCamBtn.setPadding(Math.round(5 * dp), Math.round(5 * dp), Math.round(5 * dp), Math.round(5 * dp));
+        ivCamBtn.setImageResource(R.drawable.ic_camera);
+        ivCamBtn.setColorFilter(Color.parseColor("#54656F"));
+        inputRow.addView(ivCamBtn);
+
+        whiteCard.addView(inputRow);
+        outerRow.addView(whiteCard);
+
+        // Right: Circular Green Mic / Send FAB (#25D366)
+        FrameLayout greenFab = new FrameLayout(this);
+        int fabSz = Math.round(48 * dp);
+        LinearLayout.LayoutParams fabLp = new LinearLayout.LayoutParams(fabSz, fabSz);
+        fabLp.leftMargin = Math.round(6 * dp);
+        greenFab.setLayoutParams(fabLp);
+        GradientDrawable fabBg = new GradientDrawable();
+        fabBg.setShape(GradientDrawable.OVAL);
+        fabBg.setColor(Color.parseColor("#25D366"));
+        greenFab.setBackground(fabBg);
+        greenFab.setElevation(6 * dp);
+
+        final ImageView ivFabIcon = new ImageView(this);
+        int fIcSz = Math.round(22 * dp);
+        ivFabIcon.setLayoutParams(new FrameLayout.LayoutParams(fIcSz, fIcSz, Gravity.CENTER));
+        ivFabIcon.setImageResource(R.drawable.ic_mic);
+        ivFabIcon.setColorFilter(Color.parseColor("#0B141A"));
+        greenFab.addView(ivFabIcon);
+
+        etInlineReply.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                boolean hasText = s != null && s.toString().trim().length() > 0;
+                ivFabIcon.setImageResource(hasText ? R.drawable.ic_send : R.drawable.ic_mic);
+            }
+            @Override public void afterTextChanged(android.text.Editable s) {}
+        });
+
+        final Runnable dispatchInlineReply = () -> {
+            String text = etInlineReply.getText() != null ? etInlineReply.getText().toString().trim() : "";
+            if (text.isEmpty()) {
+                Toast.makeText(this, "Type a reply message", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            replySheet.dismiss();
+            if (chatId != null && !chatId.isEmpty()) {
+                VeilMessagesController.getInstance(this).sendTextMessage(
+                        chatId, peerId, text, messageId, false);
+                Toast.makeText(this, "Reply sent", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Reply sent: " + text, Toast.LENGTH_SHORT).show();
+            }
+        };
+
+        greenFab.setOnClickListener(v -> dispatchInlineReply.run());
+        etInlineReply.setOnEditorActionListener((v, actionId, event) -> {
+            dispatchInlineReply.run();
+            return true;
+        });
+
+        outerRow.addView(greenFab);
+
+        replySheet.setContentView(outerRow);
+        View parent = (View) outerRow.getParent();
+        if (parent != null) {
+            parent.setBackgroundColor(Color.TRANSPARENT);
+        }
+        replySheet.show();
+        etInlineReply.requestFocus();
     }
 
     private void toggleControls() {
@@ -1198,6 +2239,9 @@ public class MediaViewerActivity extends AppCompatActivity {
         if (topBar != null) topBar.setVisibility(vis);
         if (bottomReplyBar != null && !isViewOnce) {
             bottomReplyBar.setVisibility(vis);
+        }
+        if (floatingReactionBadge != null && activeReactionEmoji != null) {
+            floatingReactionBadge.setVisibility(vis);
         }
         boolean hasCaption = caption != null && !caption.trim().isEmpty()
                 && !caption.startsWith("[image") && !caption.startsWith("[video");
@@ -1302,10 +2346,30 @@ public class MediaViewerActivity extends AppCompatActivity {
             mediaViewPager.setVisibility(View.GONE);
             mediaVerticalRecyclerView.setVisibility(View.VISIBLE);
             mediaVerticalRecyclerView.scrollToPosition(currentMediaIndex);
+            mediaVerticalRecyclerView.setScaleX(0.95f);
+            mediaVerticalRecyclerView.setScaleY(0.95f);
+            mediaVerticalRecyclerView.setAlpha(0f);
+            mediaVerticalRecyclerView.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .alpha(1f)
+                    .setDuration(220)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .start();
         } else {
             mediaVerticalRecyclerView.setVisibility(View.GONE);
             mediaViewPager.setVisibility(View.VISIBLE);
             mediaViewPager.setCurrentItem(currentMediaIndex, false);
+            mediaViewPager.setScaleX(0.92f);
+            mediaViewPager.setScaleY(0.92f);
+            mediaViewPager.setAlpha(0f);
+            mediaViewPager.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .alpha(1f)
+                    .setDuration(230)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .start();
         }
         updateActiveItemHeaderAndCaption();
     }

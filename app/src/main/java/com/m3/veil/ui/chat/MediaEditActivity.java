@@ -55,11 +55,14 @@ public class MediaEditActivity extends AppCompatActivity {
     public static final String EXTRA_MEDIA_TYPE = "extra_media_type";
     public static final String EXTRA_BATCH_URIS = "extra_batch_uris";
     public static final String EXTRA_BATCH_TYPES = "extra_batch_types";
+    public static final String EXTRA_IS_STATUS_MODE = "extra_is_status_mode";
+    public static final String EXTRA_RECIPIENT_NAME = "extra_recipient_name";
 
     public static final String RESULT_EDITED_FILE_PATH = "result_edited_file_path";
     public static final String RESULT_MEDIA_TYPE = "result_media_type";
     public static final String RESULT_CAPTION = "result_caption";
     public static final String RESULT_IS_VIEW_ONCE = "result_is_view_once";
+    public static final String RESULT_IS_STATUS_POST = "result_is_status_post";
     public static final String RESULT_EDITED_BATCH_PATHS = "result_edited_batch_paths";
     public static final String RESULT_EDITED_BATCH_TYPES = "result_edited_batch_types";
 
@@ -117,9 +120,13 @@ public class MediaEditActivity extends AppCompatActivity {
     private Uri mediaUri;
     private GestureDetector horizontalSwipeDetector;
 
+    private boolean isStatusMode = false;
+    private String recipientLabel = "Status (Contacts)";
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_media_edit);
 
@@ -139,6 +146,19 @@ public class MediaEditActivity extends AppCompatActivity {
         }
 
         configureDarkMediaSystemBars();
+
+        if (mainView != null) {
+            mainView.setScaleX(0.92f);
+            mainView.setScaleY(0.92f);
+            mainView.setAlpha(0f);
+            mainView.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .alpha(1f)
+                    .setDuration(240)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .start();
+        }
     }
 
     private void configureDarkMediaSystemBars() {
@@ -271,27 +291,113 @@ public class MediaEditActivity extends AppCompatActivity {
                 photoEditor.undo();
             }
         });
+
+        View recipientStatusPill = findViewById(R.id.recipientStatusPill);
+        TextView tvRecipientStatusLabel = findViewById(R.id.tvRecipientStatusLabel);
+        if (tvRecipientStatusLabel != null) {
+            tvRecipientStatusLabel.setText(recipientLabel);
+        }
+        if (recipientStatusPill != null) {
+            recipientStatusPill.setOnClickListener(v -> {
+                String[] choices = new String[]{"Status (Contacts)", "Status (Close Friends)", recipientLabel != null && !recipientLabel.startsWith("Status") ? recipientLabel : "Current Chat"};
+                new android.app.AlertDialog.Builder(this)
+                        .setTitle("Share audience")
+                        .setItems(choices, (d, which) -> {
+                            recipientLabel = choices[which];
+                            isStatusMode = recipientLabel.startsWith("Status");
+                            if (tvRecipientStatusLabel != null) {
+                                tvRecipientStatusLabel.setText(recipientLabel);
+                            }
+                        })
+                        .show();
+            });
+        }
+        View btnMentionTag = findViewById(R.id.btnMentionTag);
+        if (btnMentionTag != null) {
+            btnMentionTag.setOnClickListener(v -> {
+                if (captionEditText != null) {
+                    int pos = Math.max(0, captionEditText.getSelectionStart());
+                    captionEditText.getText().insert(pos, "@");
+                    captionEditText.requestFocus();
+                }
+            });
+        }
+    }
+
+    private Uri parseFlexibleUri(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return null;
+        String trimmed = raw.trim();
+        if (trimmed.startsWith("/")) {
+            return Uri.fromFile(new File(trimmed));
+        }
+        return Uri.parse(trimmed);
+    }
+
+    private String inferMediaType(Uri uri, String explicitType) {
+        if (explicitType != null && !explicitType.trim().isEmpty()) {
+            return explicitType.toLowerCase(java.util.Locale.ROOT).startsWith("video") ? "video" : "image";
+        }
+        if (uri != null) {
+            String s = uri.toString().toLowerCase(java.util.Locale.ROOT);
+            if (s.endsWith(".mp4") || s.endsWith(".mkv") || s.endsWith(".mov") || s.endsWith(".webm") || s.contains("video")) {
+                return "video";
+            }
+            try {
+                String mime = getContentResolver().getType(uri);
+                if (mime != null && mime.toLowerCase(java.util.Locale.ROOT).startsWith("video")) {
+                    return "video";
+                }
+            } catch (Throwable ignored) {}
+        }
+        return "image";
     }
 
     private void extractMediaBatchFromIntent() {
         batchItems.clear();
         Intent intent = getIntent();
-        ArrayList<String> rawUris = intent.getStringArrayListExtra(EXTRA_BATCH_URIS);
+        if (intent == null) return;
+
+        isStatusMode = intent.getBooleanExtra(EXTRA_IS_STATUS_MODE, false);
+        String customRecipient = intent.getStringExtra(EXTRA_RECIPIENT_NAME);
+        if (customRecipient != null && !customRecipient.trim().isEmpty()) {
+            recipientLabel = customRecipient;
+        } else {
+            recipientLabel = "Status (Contacts)";
+        }
+
         ArrayList<String> rawTypes = intent.getStringArrayListExtra(EXTRA_BATCH_TYPES);
-        if (rawUris != null && !rawUris.isEmpty()) {
-            for (int i = 0; i < rawUris.size(); i++) {
-                String uStr = rawUris.get(i);
-                if (uStr == null || uStr.isEmpty()) continue;
-                Uri u = uStr.startsWith("/") ? Uri.fromFile(new File(uStr)) : Uri.parse(uStr);
-                String t = (rawTypes != null && i < rawTypes.size()) ? rawTypes.get(i) : "image";
+        Bundle extras = intent.getExtras();
+        Object rawBatchObj = extras != null ? extras.get(EXTRA_BATCH_URIS) : null;
+        if (rawBatchObj instanceof List<?>) {
+            List<?> rawList = (List<?>) rawBatchObj;
+            for (int i = 0; i < rawList.size(); i++) {
+                Object elem = rawList.get(i);
+                Uri u = null;
+                if (elem instanceof Uri) {
+                    u = (Uri) elem;
+                } else if (elem instanceof String) {
+                    u = parseFlexibleUri((String) elem);
+                }
+                if (u == null) continue;
+                String t = (rawTypes != null && i < rawTypes.size()) ? rawTypes.get(i) : inferMediaType(u, null);
                 batchItems.add(new BatchEditItem(u, t));
             }
         }
+
         if (batchItems.isEmpty()) {
-            Uri singleUri = intent.getParcelableExtra(EXTRA_MEDIA_URI);
+            Uri singleUri = null;
+            Object rawSingle = extras != null ? extras.get(EXTRA_MEDIA_URI) : null;
+            if (rawSingle instanceof Uri) {
+                singleUri = (Uri) rawSingle;
+            } else if (rawSingle instanceof String) {
+                singleUri = parseFlexibleUri((String) rawSingle);
+            }
+            if (singleUri == null) {
+                singleUri = intent.getData();
+            }
             String singleType = intent.getStringExtra(EXTRA_MEDIA_TYPE);
             if (singleUri != null) {
-                batchItems.add(new BatchEditItem(singleUri, singleType != null ? singleType : "image"));
+                batchItems.add(new BatchEditItem(singleUri, inferMediaType(singleUri, singleType)));
             }
         }
         currentBatchIndex = 0;
@@ -640,13 +746,24 @@ public class MediaEditActivity extends AppCompatActivity {
 
     private void setupVideoEditor() {
         videoView.setVisibility(View.VISIBLE);
-        photoEditorView.setVisibility(View.GONE);
+        photoEditorView.setVisibility(View.VISIBLE);
+        photoEditorView.setBackgroundColor(Color.TRANSPARENT);
+        if (photoEditorView.getSource() != null) {
+            photoEditorView.getSource().setImageDrawable(null);
+        }
+        if (photoEditor == null) {
+            photoEditor = new PhotoEditor.Builder(this, photoEditorView)
+                    .setPinchTextScalable(true)
+                    .build();
+        } else {
+            photoEditor.clearAllViews();
+        }
 
         findViewById(R.id.btnCrop).setVisibility(View.GONE);
-        findViewById(R.id.btnEmoji).setVisibility(View.GONE);
-        findViewById(R.id.btnText).setVisibility(View.GONE);
-        findViewById(R.id.btnDraw).setVisibility(View.GONE);
-        findViewById(R.id.btnUndo).setVisibility(View.GONE);
+        findViewById(R.id.btnEmoji).setVisibility(View.VISIBLE);
+        findViewById(R.id.btnText).setVisibility(View.VISIBLE);
+        findViewById(R.id.btnDraw).setVisibility(View.VISIBLE);
+        findViewById(R.id.btnUndo).setVisibility(View.VISIBLE);
         if (btnCensorChip != null) btnCensorChip.setVisibility(View.GONE);
         if (btnMuteAudioChip != null) btnMuteAudioChip.setVisibility(View.VISIBLE);
 
@@ -842,6 +959,7 @@ public class MediaEditActivity extends AppCompatActivity {
         data.putExtra(RESULT_EDITED_FILE_PATH, filePath);
         data.putExtra(RESULT_MEDIA_TYPE, type);
         data.putExtra(RESULT_IS_VIEW_ONCE, isViewOnce);
+        data.putExtra(RESULT_IS_STATUS_POST, isStatusMode);
         if (batchPaths != null && !batchPaths.isEmpty()) {
             data.putStringArrayListExtra(RESULT_EDITED_BATCH_PATHS, batchPaths);
             data.putStringArrayListExtra(RESULT_EDITED_BATCH_TYPES, batchTypes);
@@ -851,6 +969,12 @@ public class MediaEditActivity extends AppCompatActivity {
         data.putExtra(RESULT_CAPTION, caption);
         setResult(RESULT_OK, data);
         finish();
+    }
+
+    @Override
+    public void finish() {
+        super.finish();
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
     }
 
     @Override

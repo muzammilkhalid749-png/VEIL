@@ -35,59 +35,55 @@
         android:paddingTop="32dp"
         android:paddingBottom="16dp"
         android:paddingHorizontal="16dp"
-        android:gravity="end"
+        android:gravity="end|center_vertical"
         android:clipToPadding="false"
         app:layout_constraintTop_toTopOf="parent">
 
-        <!-- Shadows added by using a background drawable with shadow or Tint with shadow (using a wrapper or elevation) -->
-        <!-- Easiest way in pure XML is elevation and a very subtle shadow, or just drop shadow on the vector tint -->
-        <!-- We'll just rely on elevation for now -->
-        
         <ImageView
             android:id="@+id/btnUndo"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginEnd="20dp"
-            android:padding="4dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="10dp"
+            android:padding="8dp"
             android:src="@drawable/ic_undo"
             android:background="@drawable/bg_circle_translucent"
             app:tint="@android:color/white" />
 
         <ImageView
             android:id="@+id/btnCrop"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginEnd="20dp"
-            android:padding="4dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="10dp"
+            android:padding="8dp"
             android:src="@drawable/ic_crop"
             android:background="@drawable/bg_circle_translucent"
             app:tint="@android:color/white" />
 
         <ImageView
             android:id="@+id/btnEmoji"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginEnd="20dp"
-            android:padding="4dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="10dp"
+            android:padding="8dp"
             android:src="@drawable/ic_emoji"
             android:background="@drawable/bg_circle_translucent"
             app:tint="@android:color/white" />
 
         <ImageView
             android:id="@+id/btnText"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginEnd="20dp"
-            android:padding="4dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="10dp"
+            android:padding="8dp"
             android:src="@drawable/ic_text"
             android:background="@drawable/bg_circle_translucent"
             app:tint="@android:color/white" />
 
         <ImageView
             android:id="@+id/btnDraw"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:padding="4dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
             android:src="@drawable/ic_draw"
             android:background="@drawable/bg_circle_translucent"
             app:tint="@android:color/white" />
@@ -95,11 +91,11 @@
 
     <ImageView
         android:id="@+id/btnClose"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_marginStart="16dp"
         android:layout_marginTop="32dp"
-        android:padding="4dp"
+        android:padding="8dp"
         android:src="@drawable/ic_close"
         android:background="@drawable/bg_circle_translucent"
         app:tint="@android:color/white"
@@ -205,61 +201,132 @@
             android:orientation="horizontal" />
     </HorizontalScrollView>
 
+    <!-- WhatsApp Two-Row Bottom Composer (status_3cb0513d.jpg: Caption Pill Row + Status/Recipient & Green Send FAB Row) -->
     <LinearLayout
         android:id="@+id/bottomBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp"
-        android:layout_marginBottom="16dp"
-        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="14dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
-        <EditText
-            android:id="@+id/captionEditText"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:hint="Add a caption..."
-            android:textColorHint="#99FFFFFF"
-            android:textColor="@android:color/white"
-            android:background="@drawable/bg_message_input"
-            android:paddingHorizontal="20dp"
-            android:paddingVertical="12dp"
-            android:elevation="4dp" />
+        <!-- Row 1: Dark Rounded Caption Pill ([🖼+] Add a caption... [@] [①]) -->
+        <LinearLayout
+            android:id="@+id/captionPillWrap"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_media_glass_chip"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="10dp">
 
-        <FrameLayout
-            android:id="@+id/btnViewOnce"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/bg_circle_translucent"
-            android:clickable="true"
-            android:focusable="true">
+            <ImageView
+                android:id="@+id/btnAddMoreMedia"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_image"
+                app:tint="#CFD8DC" />
+
+            <EditText
+                android:id="@+id/captionEditText"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:background="@null"
+                android:hint="Add a caption..."
+                android:singleLine="true"
+                android:textColorHint="#99FFFFFF"
+                android:textColor="@android:color/white"
+                android:textSize="15.5sp" />
 
             <TextView
-                android:id="@+id/tvViewOnceBadge"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_gravity="center"
-                android:background="@drawable/bg_view_once_ring"
+                android:id="@+id/btnMentionTag"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:gravity="center"
-                android:text="1"
-                android:textColor="#00A884"
-                android:textSize="13sp"
+                android:text="@"
+                android:textColor="#CFD8DC"
+                android:textSize="18sp"
                 android:textStyle="bold" />
-        </FrameLayout>
 
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/btnSend"
-            android:layout_width="wrap_content"
+            <FrameLayout
+                android:id="@+id/btnViewOnce"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_marginStart="4dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    android:id="@+id/tvViewOnceBadge"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_view_once_ring"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="#00A884"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Row 2: Left Status/Recipient Pill ([◎ Status (Contacts)]) + Right Green Circular Send FAB (➤) -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:src="@drawable/ic_send"
-            app:backgroundTint="@color/veil_accent"
-            app:tint="@android:color/white"
-            android:layout_marginStart="12dp"
-            app:elevation="4dp" />
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/recipientStatusPill"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_media_glass_chip"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="14dp">
+
+                <ImageView
+                    android:id="@+id/ivRecipientStatusIcon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_status_ring"
+                    app:tint="#CFD8DC" />
+
+                <TextView
+                    android:id="@+id/tvRecipientStatusLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="Status (Contacts)"
+                    android:textColor="@android:color/white"
+                    android:textSize="13.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/btnSend"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_send"
+                app:backgroundTint="#25D366"
+                app:tint="#0B141A"
+                app:fabCustomSize="48dp"
+                app:maxImageSize="22dp"
+                app:elevation="4dp" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- DRAWING & TEXT STATE UI OVERLAYS -->
