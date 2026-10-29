@@ -1126,26 +1126,63 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         tile.addView(iv);
 
         boolean hasMoreScrim = (tileIndex == 3 && totalCount > 4);
+        int dlState = message != null ? downloadStates.getOrDefault(message.getId(), STATE_IDLE) : STATE_IDLE;
+        int dlProgress = message != null ? downloadProgresses.getOrDefault(message.getId(), 0) : 0;
+        boolean isTransferring = message != null && ((message.isPending() && !message.isDelivered() && !message.isRead())
+                || (dlState == STATE_DOWNLOADING && dlProgress < 100));
 
-        if (isVideoTile && !hasMoreScrim) {
-            FrameLayout playPill = new FrameLayout(context);
-            int pSize = Math.round(38f * dp);
+        if ((isVideoTile || isTransferring) && !hasMoreScrim) {
+            FrameLayout centerPill = new FrameLayout(context);
+            int pSize = Math.round(42f * dp);
             FrameLayout.LayoutParams pLp = new FrameLayout.LayoutParams(pSize, pSize, android.view.Gravity.CENTER);
-            playPill.setLayoutParams(pLp);
+            centerPill.setLayoutParams(pLp);
             android.graphics.drawable.GradientDrawable pBg = new android.graphics.drawable.GradientDrawable();
             pBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
             pBg.setColor(0x99000000);
-            playPill.setBackground(pBg);
-            ImageView playIcon = new ImageView(context);
-            int icSz = Math.round(20f * dp);
-            playIcon.setLayoutParams(new FrameLayout.LayoutParams(icSz, icSz, android.view.Gravity.CENTER));
-            playIcon.setImageResource(R.drawable.ic_play_arrow);
-            playIcon.setColorFilter(0xFFFFFFFF);
-            playPill.addView(playIcon);
-            tile.addView(playPill);
+            centerPill.setBackground(pBg);
 
-            String durLabel = albumTileDurationCache.get(itemPath);
-            if (durLabel != null && !durLabel.isEmpty()) {
+            if (isTransferring) {
+                ProgressBar ring = new ProgressBar(context);
+                int rSz = Math.round(38f * dp);
+                ring.setLayoutParams(new FrameLayout.LayoutParams(rSz, rSz, android.view.Gravity.CENTER));
+                ring.setIndeterminate(true);
+                ring.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(0xFF22C55E));
+                centerPill.addView(ring);
+
+                ImageView cancelIcon = new ImageView(context);
+                int cSz = Math.round(16f * dp);
+                cancelIcon.setLayoutParams(new FrameLayout.LayoutParams(cSz, cSz, android.view.Gravity.CENTER));
+                cancelIcon.setImageResource(R.drawable.ic_close);
+                cancelIcon.setColorFilter(0xFFFFFFFF);
+                centerPill.addView(cancelIcon);
+                centerPill.setOnClickListener(v -> {
+                    if (mediaDownloadClickListener != null && message != null) {
+                        mediaDownloadClickListener.onMediaCancelClick(message);
+                    }
+                });
+            } else {
+                ImageView playIcon = new ImageView(context);
+                int icSz = Math.round(22f * dp);
+                playIcon.setLayoutParams(new FrameLayout.LayoutParams(icSz, icSz, android.view.Gravity.CENTER));
+                playIcon.setImageResource(R.drawable.ic_play_arrow);
+                playIcon.setColorFilter(0xFFFFFFFF);
+                centerPill.addView(playIcon);
+            }
+            tile.addView(centerPill);
+        }
+
+        if (isVideoTile && !hasMoreScrim) {
+            String badgeLabel = null;
+            if (isTransferring && !itemPath.isEmpty()) {
+                File f = new File(itemPath);
+                if (f.exists() && f.length() > 0) {
+                    badgeLabel = String.format(Locale.US, "%.1f MB", f.length() / (1024f * 1024f));
+                }
+            }
+            if (badgeLabel == null || badgeLabel.isEmpty()) {
+                badgeLabel = albumTileDurationCache.get(itemPath);
+            }
+            if (badgeLabel != null && !badgeLabel.isEmpty()) {
                 TextView tvVidDur = new TextView(context);
                 FrameLayout.LayoutParams dLp = new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -1154,12 +1191,45 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 int m = Math.round(6f * dp);
                 dLp.setMargins(m, m, m, m);
                 tvVidDur.setLayoutParams(dLp);
-                tvVidDur.setText("🎥 " + durLabel);
+                tvVidDur.setText("🎥 " + badgeLabel);
                 tvVidDur.setTextColor(0xFFFFFFFF);
                 tvVidDur.setTextSize(10.5f);
                 tvVidDur.setShadowLayer(3f, 0f, 1f, 0xCC000000);
                 tile.addView(tvVidDur);
             }
+        }
+
+        // Per-tile bottom-right timestamp + tick badge (matches WhatsApp Screenshot1.jpg)
+        if (!hasMoreScrim && time != null && !time.isEmpty()) {
+            LinearLayout timeRow = new LinearLayout(context);
+            timeRow.setOrientation(LinearLayout.HORIZONTAL);
+            timeRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            FrameLayout.LayoutParams tLp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.Gravity.BOTTOM | android.view.Gravity.END);
+            int m = Math.round(5f * dp);
+            tLp.setMargins(m, m, m, m);
+            timeRow.setLayoutParams(tLp);
+
+            TextView tvTileTime = new TextView(context);
+            tvTileTime.setText(time);
+            tvTileTime.setTextColor(0xFFFFFFFF);
+            tvTileTime.setTextSize(10f);
+            tvTileTime.setShadowLayer(3f, 0f, 1f, 0xDD000000);
+            timeRow.addView(tvTileTime);
+
+            boolean isMine = "You".equalsIgnoreCase(senderLabel);
+            if (isMine && message != null) {
+                ImageView tickIv = new ImageView(context);
+                int tickSz = Math.round(13f * dp);
+                LinearLayout.LayoutParams tickLp = new LinearLayout.LayoutParams(tickSz, tickSz);
+                tickLp.leftMargin = Math.round(3f * dp);
+                tickIv.setLayoutParams(tickLp);
+                updateOverlayStatusIcon(tickIv, message);
+                timeRow.addView(tickIv);
+            }
+            tile.addView(timeRow);
         }
 
         if (hasMoreScrim) {
@@ -2342,6 +2412,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 && !message.getText().equals("[image message]")
                                 && !message.getText().equals("[video message]");
 
+                        boolean isAlbumCollage = extractAlbumItems(message) != null;
                         bindGroupedAlbumGridOverlay(itemView.getContext(), imageCardView, message, "You", time, hasCaption);
 
                         if (hasCaption) {
@@ -2357,6 +2428,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                             if (statusIcon != null) statusIcon.setVisibility(View.VISIBLE);
+                        } else if (isAlbumCollage) {
+                            // Multi-item album collage renders per-tile timestamps & ticks directly inside each tile
+                            if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
+                            if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
+                            if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.GONE);
                         } else {
                             if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
                             if (imageOverlayPill != null) {
@@ -2370,7 +2446,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
                         boolean handledGif = isGif && com.m3.veil.utils.VeilStickerGifEngine.bindGifToImageView(
                                 itemView.getContext(), message, localSentMedia, messageImage, imageProgressBar);
-                        if (!handledGif) {
+                        if (!handledGif && !isAlbumCollage) {
                             if (message.getThumbnail() != null && !message.getThumbnail().isEmpty()) {
                                 Bitmap thumb = BlurUtils.getBlurredThumbnail(itemView.getContext(), message.getThumbnail());
                                 if (thumb != null) {
@@ -2398,6 +2474,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 messageImage,
                                 imageProgressBar
                             );
+                        } else if (isAlbumCollage && imageProgressBar != null) {
+                            imageProgressBar.setVisibility(View.GONE);
                         }
 
                         View.OnClickListener openPhoto = v -> {
@@ -2428,7 +2506,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 downloadStates.put(message.getId(), STATE_DOWNLOADED);
                             }
                         }
-                        final boolean isSending = !isInlinePresetGif && ((message.isPending() && !message.isDelivered() && !message.isRead())
+                        final boolean isSending = !isAlbumCollage && !isInlinePresetGif && ((message.isPending() && !message.isDelivered() && !message.isRead())
                                 || (dlState == STATE_DOWNLOADING && progress < 100));
 
                         if (imageDownloadOverlay != null) {
