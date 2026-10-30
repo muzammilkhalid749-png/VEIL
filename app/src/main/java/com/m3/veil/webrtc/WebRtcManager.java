@@ -1309,6 +1309,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             return;
          }
 
+         if ("p2p_notify".equals(type)) {
+            com.m3.veil.services.VeilHybridNotificationManager.getInstance(this.context)
+                    .onInboundDirectP2PNotifyFrame(peerId, json);
+            return;
+         }
+
          if ("chat".equals(type) || (type.isEmpty() && json.has("id") && json.has("chatId"))) {
             JSONObject p = json.has("payload") ? json.getJSONObject("payload") : json;
             String msgId = p.getString("id");

@@ -3252,6 +3252,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         imageMessageContainer.setVisibility(View.VISIBLE);
                         imageMessageContainer.setPadding(0, 0, 0, 0);
                         imageMessageContainer.setBackground(null);
+                        bindGroupedAlbumGridOverlay(itemView.getContext(), imageCardView, null, "You", time, true);
+                        bindPairedStickerOverlay(itemView.getContext(), imageCardView, message, null, true);
                         if (imageCardView instanceof com.google.android.material.card.MaterialCardView) {
                             com.google.android.material.card.MaterialCardView mcv = (com.google.android.material.card.MaterialCardView) imageCardView;
                             mcv.setStrokeWidth(0);
@@ -3267,7 +3269,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
                         if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
 
-                        int[] emojiDims = com.m3.veil.utils.VeilStickerGifEngine.computeAnimatedEmojiSizePx(itemView.getContext());
+                        int[] emojiDims = com.m3.veil.utils.VeilStickerGifEngine.computeAnimatedEmojiSizePx(itemView.getContext(), message);
                         com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, emojiDims[0], emojiDims[1]);
 
                         if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
@@ -3282,13 +3284,17 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
                         View.OnClickListener emojiBurstClick = v -> {
                             if (messageImage != null) {
+                                int combo = 1;
                                 android.graphics.drawable.Drawable d = messageImage.getDrawable();
                                 if (d instanceof com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) {
-                                    ((com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) d).triggerTapBurst();
+                                    combo = ((com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) d).triggerTapBurst();
                                 }
-                                v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
-                                messageImage.animate().scaleX(1.22f).scaleY(1.22f).setDuration(120)
-                                        .withEndAction(() -> messageImage.animate().scaleX(1.0f).scaleY(1.0f).setDuration(160).start())
+                                v.performHapticFeedback(combo >= 3
+                                        ? android.view.HapticFeedbackConstants.LONG_PRESS
+                                        : android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                                float peakScale = Math.min(1.36f, 1.20f + combo * 0.03f);
+                                messageImage.animate().scaleX(peakScale).scaleY(peakScale).setDuration(110)
+                                        .withEndAction(() -> messageImage.animate().scaleX(1.0f).scaleY(1.0f).setDuration(170).start())
                                         .start();
                             }
                         };
@@ -4657,6 +4663,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         imageMessageContainer.setVisibility(View.VISIBLE);
                         imageMessageContainer.setPadding(0, 0, 0, 0);
                         imageMessageContainer.setBackground(null);
+                        bindGroupedAlbumGridOverlay(itemView.getContext(), imageCardView, null, "Contact", time, false);
+                        bindPairedStickerOverlay(itemView.getContext(), imageCardView, message, null, false);
                         if (imageCardView instanceof com.google.android.material.card.MaterialCardView) {
                             com.google.android.material.card.MaterialCardView mcv = (com.google.android.material.card.MaterialCardView) imageCardView;
                             mcv.setStrokeWidth(0);
@@ -4672,7 +4680,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
                         if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
 
-                        int[] emojiDims = com.m3.veil.utils.VeilStickerGifEngine.computeAnimatedEmojiSizePx(itemView.getContext());
+                        int[] emojiDims = com.m3.veil.utils.VeilStickerGifEngine.computeAnimatedEmojiSizePx(itemView.getContext(), message);
                         com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, emojiDims[0], emojiDims[1]);
 
                         if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
@@ -4686,13 +4694,17 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
                         View.OnClickListener emojiBurstClick = v -> {
                             if (messageImage != null) {
+                                int combo = 1;
                                 android.graphics.drawable.Drawable d = messageImage.getDrawable();
                                 if (d instanceof com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) {
-                                    ((com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) d).triggerTapBurst();
+                                    combo = ((com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) d).triggerTapBurst();
                                 }
-                                v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
-                                messageImage.animate().scaleX(1.22f).scaleY(1.22f).setDuration(120)
-                                        .withEndAction(() -> messageImage.animate().scaleX(1.0f).scaleY(1.0f).setDuration(160).start())
+                                v.performHapticFeedback(combo >= 3
+                                        ? android.view.HapticFeedbackConstants.LONG_PRESS
+                                        : android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                                float peakScale = Math.min(1.36f, 1.20f + combo * 0.03f);
+                                messageImage.animate().scaleX(peakScale).scaleY(peakScale).setDuration(110)
+                                        .withEndAction(() -> messageImage.animate().scaleX(1.0f).scaleY(1.0f).setDuration(170).start())
                                         .start();
                             }
                         };

@@ -274,6 +274,9 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.m3.veil.action.HYBRID_DIRECT_REPLY" />
+                <action android:name="com.m3.veil.action.HYBRID_MARK_READ" />
+                <action android:name="com.m3.veil.action.HYBRID_MUTE_CHAT" />
             </intent-filter>
         </receiver>
 

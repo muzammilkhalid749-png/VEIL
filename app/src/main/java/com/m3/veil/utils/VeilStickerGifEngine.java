@@ -302,11 +302,12 @@ public class VeilStickerGifEngine {
             if (text == null || text.trim().isEmpty()) return false;
             String trimmed = text.trim();
             if (trimmed.startsWith("[") && trimmed.endsWith("]")) return false;
-            if (isSingleEmojiOnly(trimmed)) return true;
+            List<String> clusters = extractEmojiClusters(trimmed, 4);
+            if (!clusters.isEmpty() && clusters.size() <= 3) return true;
             try {
                 com.m3.veil.ui.views.VeilAdvancedTextView.EmojiAnalysisResult result =
                         com.m3.veil.ui.views.VeilAdvancedTextView.analyzeEmojis(trimmed);
-                return result != null && result.isEmojiOnly && result.emojiCount == 1;
+                return result != null && result.isEmojiOnly && result.emojiCount >= 1 && result.emojiCount <= 3;
             } catch (Throwable ignored) {
                 return false;
             }
@@ -314,35 +315,83 @@ public class VeilStickerGifEngine {
         return false;
     }
 
-    public static boolean isSingleEmojiOnly(@Nullable String text) {
-        if (text == null) return false;
+    /**
+     * Parses a pure-emoji string into individual grapheme clusters (handling ZWJ, skin tones,
+     * variation selectors, and keycaps). Returns an empty list if any non-emoji text is present.
+     */
+    @NonNull
+    public static List<String> extractEmojiClusters(@Nullable String text, int maxAllowed) {
+        List<String> result = new ArrayList<>();
+        if (text == null) return result;
         String s = text.trim();
-        if (s.isEmpty()) return false;
+        if (s.isEmpty() || s.length() > 42) return result;
+
         int len = s.length();
-        int emojiCount = 0;
         int i = 0;
+        StringBuilder currentCluster = null;
+        boolean expectJoinerTarget = false;
+
         while (i < len) {
             int cp = Character.codePointAt(s, i);
             int charCount = Character.charCount(cp);
-            i += charCount;
 
-            // Variation selectors, ZWJ, skin tones continue the current emoji cluster
-            if (cp == 0x200D || cp == 0xFE0E || cp == 0xFE0F || (cp >= 0x1F3FB && cp <= 0x1F3FF) || cp == 0x20E3) {
+            if (Character.isWhitespace(cp)) {
+                i += charCount;
                 continue;
             }
 
-            if (isEmojiCodePoint(cp)) {
-                emojiCount++;
-                if (emojiCount > 1) return false; // Strictly single emoji only!
+            if (cp == 0x200D) {
+                // Zero-Width Joiner continues current emoji sequence
+                if (currentCluster == null) return new ArrayList<>();
+                currentCluster.appendCodePoint(cp);
+                expectJoinerTarget = true;
+                i += charCount;
+                continue;
+            }
+
+            if (cp == 0xFE0E || cp == 0xFE0F || (cp >= 0x1F3FB && cp <= 0x1F3FF) || cp == 0x20E3) {
+                if (currentCluster == null) return new ArrayList<>();
+                currentCluster.appendCodePoint(cp);
+                i += charCount;
+                continue;
+            }
+
+            if (isEmojiCodePoint(cp) || (cp >= '0' && cp <= '9' && i + charCount < len && Character.codePointAt(s, i + charCount) == 0x20E3)) {
+                if (currentCluster == null) {
+                    currentCluster = new StringBuilder();
+                } else if (!expectJoinerTarget) {
+                    result.add(currentCluster.toString());
+                    if (result.size() >= maxAllowed) {
+                        return new ArrayList<>();
+                    }
+                    currentCluster = new StringBuilder();
+                }
+                currentCluster.appendCodePoint(cp);
+                expectJoinerTarget = false;
+                i += charCount;
             } else {
-                return false;
+                // Non-emoji character encountered -> not a pure emoji message
+                return new ArrayList<>();
             }
         }
-        return emojiCount == 1;
+
+        if (currentCluster != null && currentCluster.length() > 0) {
+            result.add(currentCluster.toString());
+        }
+        if (result.size() > maxAllowed) {
+            return new ArrayList<>();
+        }
+        return result;
+    }
+
+    public static boolean isSingleEmojiOnly(@Nullable String text) {
+        List<String> clusters = extractEmojiClusters(text, 2);
+        return clusters.size() == 1;
     }
 
     public static boolean isSingleOrDoubleEmoji(@Nullable String text) {
-        return isSingleEmojiOnly(text);
+        List<String> clusters = extractEmojiClusters(text, 3);
+        return !clusters.isEmpty() && clusters.size() <= 2;
     }
 
     public static boolean isEmojiCodePoint(int cp) {
@@ -368,16 +417,40 @@ public class VeilStickerGifEngine {
     }
 
     public static int[] computeAnimatedEmojiSizePx(@NonNull Context context) {
+        return computeAnimatedEmojiSizePx(context, null);
+    }
+
+    public static int[] computeAnimatedEmojiSizePx(@NonNull Context context, @Nullable Message message) {
         float dp = context.getResources().getDisplayMetrics().density;
-        int size = Math.round(180 * dp);
+        String emoji = extractAnimatedEmoji(message);
+        List<String> clusters = extractEmojiClusters(emoji, 3);
+        int count = clusters.size();
+        if (count == 2) {
+            return new int[]{Math.round(212 * dp), Math.round(138 * dp)};
+        } else if (count >= 3) {
+            return new int[]{Math.round(248 * dp), Math.round(120 * dp)};
+        }
+        int size = Math.round(168 * dp);
         return new int[]{size, size};
     }
 
     public static void bindAnimatedEmojiToImageView(@NonNull Context context, @Nullable Message message, @NonNull ImageView imageView) {
         String emoji = extractAnimatedEmoji(message);
+        String bindKey = "veil_anim_emoji_" + (message != null && message.getId() != null ? message.getId() : "") + "_" + emoji;
+        Object existingTag = imageView.getTag();
+        if (bindKey.equals(existingTag) && imageView.getDrawable() instanceof com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) {
+            com.m3.veil.ui.views.VeilAnimatedEmojiDrawable existing =
+                    (com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) imageView.getDrawable();
+            if (!existing.isRunning()) {
+                existing.start();
+            }
+            return;
+        }
         com.m3.veil.ui.views.VeilAnimatedEmojiDrawable drawable =
                 new com.m3.veil.ui.views.VeilAnimatedEmojiDrawable(context, emoji);
+        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         imageView.setImageDrawable(drawable);
+        imageView.setTag(bindKey);
         drawable.start();
     }
 

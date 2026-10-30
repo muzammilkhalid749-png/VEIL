@@ -758,6 +758,7 @@ public class ChatActivity extends AppCompatActivity {
 
         com.m3.veil.manager.VeilMessagesController.getInstance(this).addObserver(messagesControllerObserver);
         com.m3.veil.manager.VeilMessagesController.getInstance(this).setActiveChatIdInForeground(chatId);
+        com.m3.veil.services.VeilHybridNotificationManager.getInstance(this).clearChatNotification(chatId);
         com.m3.veil.database.EncryptedChatDatabase.getInstance(this).addListener(localDbListener);
 
         // 2. Build views and bind pre-cached messages synchronously for instant Frame 1 render

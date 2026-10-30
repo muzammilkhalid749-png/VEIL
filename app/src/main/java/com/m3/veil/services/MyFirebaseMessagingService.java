@@ -119,6 +119,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
                 // 4. Zero-Knowledge P2P Mesh Wake Tickle ("wake_up", "mesh_wake", "chat_message")
                 if ("wake_up".equals(type) || "mesh_wake".equals(type) || "chat_message".equals(type) || type == null) {
+                    VeilHybridNotificationManager.getInstance(this).onFirebaseWakeOrPushReceived(data);
                     handleBlindMeshWakeUp(senderId, chatId, mailbox);
                     return;
                 }

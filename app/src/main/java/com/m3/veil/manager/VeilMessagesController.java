@@ -457,11 +457,16 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                             String jsonPayloadStr = buildJsonFallbackString(dialogId, msg);
                             for (String peer : targetPeers) {
                                 VeilPacket pkt = new VeilPacket(VeilPacket.LANE_MSG, VeilPacket.TYPE_CHAT_MESSAGE, jsonPayloadStr);
-                                if (!WebRtcManager.getInstance(mContext).sendPacket(peer, pkt)) {
+                                if (WebRtcManager.getInstance(mContext).sendPacket(peer, pkt)) {
+                                    com.m3.veil.services.VeilHybridNotificationManager.getInstance(mContext)
+                                            .sendDirectP2PNotificationFrame(peer, dialogId, msg);
+                                } else {
                                     try {
                                         com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(
                                                 peer, "p2p_chat", new org.json.JSONObject(jsonPayloadStr));
                                     } catch (Exception ignored) {}
+                                    com.m3.veil.services.VeilHybridNotificationManager.getInstance(mContext)
+                                            .dispatchCloudFallbackWakePush(peer, dialogId, msg);
                                     WebRtcManager.getInstance(mContext).initiateConnection(peer);
                                 }
                             }
@@ -1284,19 +1289,27 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                             VeilPacket pkt = new VeilPacket(VeilPacket.LANE_MSG, VeilPacket.TYPE_CHAT_MESSAGE, jsonPayloadStr);
                             transmitted = WebRtcManager.getInstance(mContext).sendPacket(peer, pkt);
                         }
-                        if ((localFile == null || !localFile.exists() || (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()))
-                                && jsonPayloadStr.length() <= 32768) {
-                            try {
-                                com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(
-                                        peer, "p2p_chat", new org.json.JSONObject(jsonPayloadStr));
-                            } catch (Exception ignored) {}
-                        }
                     }
 
                     if (transmitted) {
                         anyTransmitted = true;
+                        // PATH A: Peer is actively connected over P2P DataChannel ->
+                        // Dispatch real-time P2P notification frame directly over WebRTC without relying on Firebase!
+                        com.m3.veil.services.VeilHybridNotificationManager.getInstance(mContext)
+                                .sendDirectP2PNotificationFrame(peer, dialogId, msg);
                     } else {
                         if (hasNetwork) {
+                            // PATH B: Peer is NOT connected over P2P ->
+                            // Automatically fall back to Firebase Signaling + Cloud Wake Push
+                            if ((localFile == null || !localFile.exists() || (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()))
+                                    && jsonPayloadStr.length() <= 32768) {
+                                try {
+                                    com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(
+                                            peer, "p2p_chat", new org.json.JSONObject(jsonPayloadStr));
+                                } catch (Exception ignored) {}
+                            }
+                            com.m3.veil.services.VeilHybridNotificationManager.getInstance(mContext)
+                                    .dispatchCloudFallbackWakePush(peer, dialogId, msg);
                             WebRtcManager.getInstance(mContext).initiateConnection(peer);
                         }
 
@@ -3198,6 +3211,11 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 WebRtcManager.getInstance(mContext).sendReceipt(peerId, message.getId(), true, isChatOpenInForeground);
             });
 
+            // Trigger Hybrid Notification Engine (deduplicated across P2P & Firebase)
+            final boolean viaDirectP2P = WebRtcManager.getInstance(mContext).isPeerConnected(peerId);
+            com.m3.veil.services.VeilHybridNotificationManager.getInstance(mContext)
+                    .onInboundMessageForNotification(dialogId, peerId, message, viaDirectP2P);
+
             // Notify UI
             runOnUI(() -> {
                 for (MessagesObserver obs : mObservers) {
@@ -3609,6 +3627,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
      * Marks all messages in a dialog as read and broadcasts READ_ACK packets.
      */
     public void markDialogAsRead(String dialogId, String recipientId) {
+        if (dialogId != null) {
+            com.m3.veil.services.VeilHybridNotificationManager.getInstance(mContext)
+                    .clearChatNotification(dialogId);
+        }
         if (dialogId == null || !dialogId.equals(mActiveChatIdInForeground)) return;
 
         mStageQueue.post(() -> {

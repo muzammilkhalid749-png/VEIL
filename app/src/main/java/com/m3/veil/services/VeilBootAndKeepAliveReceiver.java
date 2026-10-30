@@ -35,6 +35,14 @@ public class VeilBootAndKeepAliveReceiver extends BroadcastReceiver {
         String action = intent.getAction();
         Log.i(TAG, "Received broadcast intent: " + action);
 
+        if (VeilHybridNotificationManager.ACTION_DIRECT_REPLY.equals(action)
+                || VeilHybridNotificationManager.ACTION_MARK_READ.equals(action)
+                || VeilHybridNotificationManager.ACTION_MUTE_CHAT.equals(action)) {
+            VeilHybridNotificationManager.getInstance(context.getApplicationContext())
+                    .handleNotificationActionIntent(intent);
+            return;
+        }
+
         if (Intent.ACTION_BOOT_COMPLETED.equals(action)
                 || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)
                 || "android.intent.action.QUICKBOOT_POWERON".equals(action)
