@@ -179,23 +179,53 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                 @Override
                 public void onPeerTyping(String dialogId, String peerId, boolean isTyping) {
                     if (!isAdded() || getActivity() == null) return;
-                    requireActivity().runOnUiThread(() -> {
-                        for (Chat c : displayedChats) {
-                            if (!c.isGroup() && c.getParticipants() != null && c.getParticipants().contains(peerId)) {
-                                c.setTyping(isTyping);
-                            }
-                        }
-                        if (chatsAdapter != null) {
-                            chatsAdapter.notifyDataSetChanged();
-                        }
-                    });
+                    requireActivity().runOnUiThread(() -> updateChatTypingIndicator(dialogId, peerId, isTyping));
                 }
             };
+
+    private void updateChatTypingIndicator(String dialogId, String peerId, boolean isTyping) {
+        boolean changed = false;
+        for (Chat c : allLocalChats) {
+            if (matchesTypingChat(c, dialogId, peerId)) {
+                c.setTyping(isTyping);
+                changed = true;
+            }
+        }
+        for (Chat c : displayedChats) {
+            if (matchesTypingChat(c, dialogId, peerId)) {
+                c.setTyping(isTyping);
+                changed = true;
+            }
+        }
+        if (changed && chatsAdapter != null) {
+            chatsAdapter.notifyDataSetChanged();
+        }
+    }
+
+    private boolean matchesTypingChat(Chat c, String dialogId, String peerId) {
+        if (c == null) return false;
+        String cid = c.getId();
+        if (dialogId != null && !dialogId.isEmpty() && dialogId.equals(cid)) {
+            return true;
+        }
+        if (!c.isGroup() && peerId != null && !peerId.isEmpty()) {
+            if (c.getParticipants() != null && c.getParticipants().contains(peerId)) {
+                return true;
+            }
+            if (cid != null && !cid.startsWith("group_") && !cid.startsWith("channel_") && cid.contains(peerId)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private final WebRtcManager.P2PEventListener p2pListener = new WebRtcManager.P2PEventListener() {
         @Override
         public void onMessageReceived(String peerId, Message message) {
-            if (isAdded()) requireActivity().runOnUiThread(() -> loadLocalEncryptedChats());
+            if (isAdded()) requireActivity().runOnUiThread(() -> {
+                updateChatTypingIndicator(message != null ? message.getChatId() : null, peerId, false);
+                loadLocalEncryptedChats();
+            });
         }
 
         @Override
@@ -205,17 +235,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         @Override
         public void onPeerTyping(String peerId, boolean isTyping) {
-            if (!isAdded()) return;
-            requireActivity().runOnUiThread(() -> {
-                for (Chat c : displayedChats) {
-                    if (!c.isGroup() && c.getParticipants() != null && c.getParticipants().contains(peerId)) {
-                        c.setTyping(isTyping);
-                    }
-                }
-                if (chatsAdapter != null) {
-                    chatsAdapter.notifyDataSetChanged();
-                }
-            });
+            if (!isAdded() || getActivity() == null) return;
+            requireActivity().runOnUiThread(() -> updateChatTypingIndicator(null, peerId, isTyping));
         }
 
         @Override
@@ -814,6 +835,16 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                     if (c.getId() != null && prewarmIdx < 12) {
                         com.m3.veil.manager.VeilMessagesController.getInstance(ctx).prewarmDialog(c.getId());
                         prewarmIdx++;
+                    }
+                    String chatPeerId = null;
+                    if (!c.isGroup() && c.getId() != null && c.getId().contains("_") && myUid != null) {
+                        String[] sp = c.getId().split("_");
+                        if (sp.length == 2) {
+                            chatPeerId = sp[0].equals(myUid) ? sp[1] : sp[0];
+                        }
+                    }
+                    if (com.m3.veil.manager.VeilMessagesController.getInstance(ctx).isDialogTyping(c.getId(), chatPeerId)) {
+                        c.setTyping(true);
                     }
                     if (!c.isGroup() && c.getId() != null && !c.getId().startsWith("group_") && !c.getId().startsWith("channel_")) {
                         String curName = c.getName();

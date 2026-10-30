@@ -2894,7 +2894,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             try {
                 List<String> targets = resolveTargetPeers(dialogId, recipientId, null);
                 for (String peer : targets) {
-                    WebRtcManager.getInstance(mContext).sendTyping(peer, isTyping);
+                    WebRtcManager.getInstance(mContext).sendTyping(peer, dialogId, isTyping);
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Failed to send typing indicator", e);
@@ -3358,13 +3358,17 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             Iterator<Map.Entry<String, Long>> iter = mTypingWaves.entrySet().iterator();
             while (iter.hasNext()) {
                 Map.Entry<String, Long> entry = iter.next();
-                if (now - entry.getValue() > 3000) { // 3 second typing decay
+                if (now - entry.getValue() > 4500) { // 4.5 second typing decay
                     iter.remove();
                     String key = entry.getKey();
-                    String[] parts = key.split(":");
-                    if (parts.length == 2) {
-                        String dialogId = parts[0];
-                        String peerId = parts[1];
+                    int sep = key.lastIndexOf(':');
+                    if (sep > 0 && sep < key.length() - 1) {
+                        String dialogId = key.substring(0, sep);
+                        String peerId = key.substring(sep + 1);
+                        Chat d = mDialogsDict.get(dialogId);
+                        if (d != null) {
+                            d.setTyping(false);
+                        }
                         runOnUI(() -> {
                             for (MessagesObserver obs : mObservers) {
                                 obs.onPeerTyping(dialogId, peerId, false);
@@ -3391,6 +3395,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         ? message.getReceiverId()
                         : WebRtcManager.getChatId(getCurrentUserId(), peerId));
             message.setChatId(dialogId);
+            onPeerTypingInDialog(dialogId, peerId, false);
 
             // Observe logical clock
             observeRemoteLamportClock(message.getTimestamp() != null ? message.getTimestamp().toDate().getTime() : System.currentTimeMillis());
@@ -3537,7 +3542,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     public void onPeerTyping(String peerId, boolean isTyping) {
         if (peerId == null) return;
         String dialogId = WebRtcManager.getChatId(getCurrentUserId(), peerId);
-        String key = dialogId + ":" + peerId;
+        onPeerTypingInDialog(dialogId, peerId, isTyping);
+    }
+
+    public void onPeerTypingInDialog(String dialogId, String peerId, boolean isTyping) {
+        if (peerId == null) return;
+        String resolvedDialogId = (dialogId != null && !dialogId.isEmpty())
+                ? dialogId
+                : WebRtcManager.getChatId(getCurrentUserId(), peerId);
+        String key = resolvedDialogId + ":" + peerId;
 
         if (isTyping) {
             mTypingWaves.put(key, System.currentTimeMillis());
@@ -3545,11 +3558,45 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             mTypingWaves.remove(key);
         }
 
+        Chat d = mDialogsDict.get(resolvedDialogId);
+        if (d != null) {
+            d.setTyping(isTyping);
+        }
+
+        final String finalDialogId = resolvedDialogId;
         runOnUI(() -> {
             for (MessagesObserver obs : mObservers) {
-                obs.onPeerTyping(dialogId, peerId, isTyping);
+                obs.onPeerTyping(finalDialogId, peerId, isTyping);
             }
         });
+    }
+
+    public boolean isDialogTyping(String dialogId, String peerId) {
+        long now = System.currentTimeMillis();
+        if (dialogId != null && !dialogId.isEmpty() && peerId != null && !peerId.isEmpty()) {
+            Long ts = mTypingWaves.get(dialogId + ":" + peerId);
+            if (ts != null && (now - ts <= 4500)) {
+                return true;
+            }
+        }
+        if (dialogId != null && !dialogId.isEmpty()) {
+            String prefix = dialogId + ":";
+            for (Map.Entry<String, Long> e : mTypingWaves.entrySet()) {
+                if (e.getKey().startsWith(prefix) && e.getValue() != null && (now - e.getValue() <= 4500)) {
+                    return true;
+                }
+            }
+        }
+        if (peerId != null && !peerId.isEmpty() && (dialogId == null || !dialogId.startsWith("group_"))) {
+            String suffix = ":" + peerId;
+            for (Map.Entry<String, Long> e : mTypingWaves.entrySet()) {
+                if (e.getKey().endsWith(suffix) && !e.getKey().startsWith("group_")
+                        && e.getValue() != null && (now - e.getValue() <= 4500)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override

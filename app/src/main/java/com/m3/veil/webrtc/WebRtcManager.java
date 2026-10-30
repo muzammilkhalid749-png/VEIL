@@ -1564,13 +1564,20 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          } else if (!"peer_leaving".equals(type) && !"disconnect".equals(type)) {
             if ("typing".equals(type)) {
                boolean isTyping = json.optBoolean("isTyping", false);
-               if (peerId != null) {
-                  this.peerTypingStates.put(peerId, isTyping);
+               String typingChatId = json.optString("chatId", null);
+               String senderPeer = json.optString("senderId", peerId);
+               final String effectivePeer = (senderPeer != null && !senderPeer.isEmpty()) ? senderPeer : peerId;
+               if (effectivePeer != null) {
+                  this.peerTypingStates.put(effectivePeer, isTyping);
+               }
+               if (typingChatId != null && !typingChatId.isEmpty()) {
+                  com.m3.veil.manager.VeilMessagesController.getInstance(this.context)
+                          .onPeerTypingInDialog(typingChatId, effectivePeer, isTyping);
                }
 
                this.mainHandler.post(() -> {
                   for(P2PEventListener l : WebRtcManager.this.listeners) {
-                     l.onPeerTyping(peerId, isTyping);
+                     l.onPeerTyping(effectivePeer, isTyping);
                   }
 
                });
@@ -3078,22 +3085,53 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    }
 
    public void sendTyping(String peerId, boolean isTyping) {
+      this.sendTyping(peerId, null, isTyping);
+   }
+
+   public void sendTyping(String peerId, String chatId, boolean isTyping) {
+      if (peerId == null || peerId.isEmpty()) {
+         return;
+      }
       if (!VeilFeatureManager.getInstance(this.context).isStealthTypingEnabled()) {
+         String effectiveChatId = (chatId != null && !chatId.isEmpty())
+                 ? chatId : getChatId(this.currentUserId, peerId);
          VeilPacket packet = new VeilPacket((byte)0, (short)3, new byte[]{(byte)(isTyping ? 1 : 0)});
-         if (!this.sendPacket(peerId, packet)) {
+         boolean sentBinary = this.sendPacket(peerId, packet);
+         try {
+            JSONObject json = new JSONObject();
+            json.put("type", "typing");
+            json.put("isTyping", isTyping);
+            if (this.currentUserId != null) {
+               json.put("senderId", this.currentUserId);
+            }
+            if (effectiveChatId != null) {
+               json.put("chatId", effectiveChatId);
+            }
             DataChannel dc = this.getChannelForLane(peerId, (byte)0);
+            boolean sentJsonOverDc = false;
             if (dc != null && dc.state() == State.OPEN) {
-               try {
-                  JSONObject json = new JSONObject();
-                  json.put("type", "typing");
-                  json.put("isTyping", isTyping);
-                  byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
-                  dc.send(new DataChannel.Buffer(ByteBuffer.wrap(bytes), false));
-               } catch (Exception var7) {
+               byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
+               sentJsonOverDc = dc.send(new DataChannel.Buffer(ByteBuffer.wrap(bytes), false));
+            }
+            // Always dispatch via sub-50ms Nostr/WebSocket ephemeral signal so typing works
+            // even when peer is on HomeFragment chat list or WebRTC ICE is still connecting
+            JSONObject sig = new JSONObject();
+            sig.put("signalId", "typ_" + this.currentUserId + "_" + System.nanoTime());
+            sig.put("type", "p2p_action");
+            sig.put("from", this.currentUserId != null ? this.currentUserId : "");
+            sig.put("to", peerId);
+            sig.put("timestamp", System.currentTimeMillis());
+            sig.put("payload", json.toString());
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context)
+                    .sendEphemeralSignal(peerId, sig, null);
+            if (!sentBinary && !sentJsonOverDc) {
+               SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", json);
+               if (isTyping) {
+                  this.initiateConnection(peerId);
                }
             }
+         } catch (Exception ignored) {
          }
-
       }
    }
 

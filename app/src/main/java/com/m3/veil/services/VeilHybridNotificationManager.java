@@ -803,121 +803,302 @@ public class VeilHybridNotificationManager {
         } catch (Throwable ignored) {}
     }
 
-    /**
-     * Plays a psychoacoustically satisfying, organic tactile "bubble-droplet pop"
-     * when the user sends a message in ChatActivity.
-     *
-     * Acoustic architecture (58 ms total, zero distortion):
-     *  1. 0–4 ms: Subtle warm wooden tactile transient (1050 Hz damped impulse) for instant touch feedback.
-     *  2. 0–58 ms: Organic air-bubble pop whose pitch snaps rapidly from 260 Hz -> 680 Hz in the first 22 ms
-     *     (natural bubble cavity resonance curve) using a pure sine wave + 5% warm 2nd harmonic,
-     *     peaking cleanly at 30,000 PCM amplitude without square-wave clipping.
-     */
+    public static final String KEY_CHAT_SOUND_SET = "chat_sound_set_index"; // 1..5
+
+    public static int getSelectedSoundSet(@NonNull Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
+        int set = prefs.getInt(KEY_CHAT_SOUND_SET, 1);
+        return (set >= 1 && set <= 5) ? set : 1;
+    }
+
+    public static void setSelectedSoundSet(@NonNull Context context, int setIndex) {
+        int clamped = Math.max(1, Math.min(5, setIndex));
+        SharedPreferences prefs = context.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putInt(KEY_CHAT_SOUND_SET, clamped).apply();
+    }
+
+    public static String getSoundSetName(int setIndex) {
+        switch (setIndex) {
+            case 2: return "Set 2: Silk Air-Whoosh & Dewdrop (iMessage Style)";
+            case 3: return "Set 3: Micro-Snap & Twin Crystal (Telegram Style)";
+            case 4: return "Set 4: Rosewood Tap & Velvet Triad (Studio Chord)";
+            case 5: return "Set 5: Studio Pulse & Octave Ping (Minimalist)";
+            case 1:
+            default: return "Set 1: Organic Bubble & Kalimba (WhatsApp Style)";
+        }
+    }
+
+    public void previewSoundSet(int setIndex, boolean isSend) {
+        final int clamped = Math.max(1, Math.min(5, setIndex));
+        new Thread(() -> {
+            try {
+                short[] pcm = isSend ? synthesizeSentPcm(clamped, 44100) : synthesizeReceivedPcm(clamped, 44100);
+                playSynthesizedPcm(pcm, 44100);
+            } catch (Throwable ignored) {}
+        }, "VeilSoundPreview").start();
+    }
+
     public void playMessageSentSound() {
         try {
             SharedPreferences prefs = mContext.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
             if (!prefs.getBoolean(NotificationSettingsActivity.KEY_INAPP_SOUNDS, true)) {
                 return;
             }
+            final int soundSet = getSelectedSoundSet(mContext);
             new Thread(() -> {
                 try {
-                    final int sampleRate = 44100;
-                    final int durationMs = 58;
-                    final int numSamples = (sampleRate * durationMs) / 1000;
-                    final short[] pcm = new short[numSamples];
-                    double phase = 0.0;
-                    double clickPhase = 0.0;
-                    for (int i = 0; i < numSamples; i++) {
-                        double t = (double) i / sampleRate; // time in seconds
-                        double progress = (double) i / numSamples;
-
-                        // Natural bubble/droplet pitch curve: fast initial upward snap (265 Hz -> 685 Hz)
-                        // that locks into the resonant sweet spot within ~22ms
-                        double pitchCurve = 1.0 - Math.exp(-t / 0.011);
-                        double freq = 265.0 + 420.0 * pitchCurve;
-                        phase += (2.0 * Math.PI * freq) / sampleRate;
-
-                        // Smooth 2.5ms raised-cosine attack + clean natural acoustic decay
-                        double attack = (t < 0.0025)
-                                ? 0.5 * (1.0 - Math.cos(Math.PI * (t / 0.0025)))
-                                : 1.0;
-                        double decay = Math.exp(-t / 0.0165) * (1.0 - Math.pow(progress, 3.0));
-                        double env = attack * decay;
-
-                        // Pure, warm fundamental (94%) + subtle 2nd harmonic (6%) — zero harshness
-                        double body = Math.sin(phase) * 0.94 + Math.sin(phase * 2.0) * 0.06;
-
-                        // Micro tactile knock in the first 4ms so the send button feels physically responsive
-                        clickPhase += (2.0 * Math.PI * 1080.0) / sampleRate;
-                        double clickEnv = Math.exp(-t / 0.0016);
-                        double tactileClick = Math.sin(clickPhase) * clickEnv * 0.18;
-
-                        double sample = (body * env + tactileClick) * 30200.0;
-                        pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
-                    }
-                    playSynthesizedPcm(pcm, sampleRate);
+                    short[] pcm = synthesizeSentPcm(soundSet, 44100);
+                    playSynthesizedPcm(pcm, 44100);
                 } catch (Throwable ignored) {}
             }, "VeilSentSound").start();
         } catch (Throwable ignored) {}
     }
 
-    /**
-     * Plays a warm, dopamine-rewarding acoustic marimba/kalimba double-pop (C5 -> G5 perfect fifth)
-     * when a message arrives in the active foreground chat.
-     *
-     * Acoustic architecture (96 ms total, zero distortion):
-     *  - Note 1 (0–34 ms): Soft wooden mallet tap at 523.25 Hz (C5) with fast natural damping.
-     *  - Note 2 (32–96 ms): Bright, consonant perfect-fifth bloom at 783.99 Hz (G5) with a delicate
-     *    transient sparkle (1568 Hz octave harmonic that decays in 8 ms) for a crisp "water-drop / kalimba" finish.
-     */
     public void playMessageReceivedInChatSound() {
         try {
             SharedPreferences prefs = mContext.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
             if (!prefs.getBoolean(NotificationSettingsActivity.KEY_INAPP_SOUNDS, true)) {
                 return;
             }
+            final int soundSet = getSelectedSoundSet(mContext);
             new Thread(() -> {
                 try {
-                    final int sampleRate = 44100;
-                    final int durationMs = 96;
-                    final int numSamples = (sampleRate * durationMs) / 1000;
-                    final short[] pcm = new short[numSamples];
-                    final double note2StartSec = 0.032; // Second note starts at 32ms
-                    double phase1 = 0.0;
-                    double phase2 = 0.0;
-
-                    for (int i = 0; i < numSamples; i++) {
-                        double t = (double) i / sampleRate;
-                        double out = 0.0;
-
-                        // Note 1: Warm C5 (523.25 Hz) wooden tap
-                        double freq1 = 523.25;
-                        phase1 += (2.0 * Math.PI * freq1) / sampleRate;
-                        double attack1 = (t < 0.002) ? 0.5 * (1.0 - Math.cos(Math.PI * (t / 0.002))) : 1.0;
-                        double decay1 = Math.exp(-t / 0.013);
-                        double sparkle1 = Math.sin(phase1 * 2.0) * 0.10 * Math.exp(-t / 0.005);
-                        out += (Math.sin(phase1) * 0.90 + sparkle1) * attack1 * decay1 * 0.78;
-
-                        // Note 2: Consonant G5 (783.99 Hz) perfect-fifth bloom overlapping naturally at 32ms
-                        if (t >= note2StartSec) {
-                            double t2 = t - note2StartSec;
-                            double tailProgress = t2 / ((durationMs / 1000.0) - note2StartSec);
-                            double freq2 = 783.99;
-                            phase2 += (2.0 * Math.PI * freq2) / sampleRate;
-                            double attack2 = (t2 < 0.0022) ? 0.5 * (1.0 - Math.cos(Math.PI * (t2 / 0.0022))) : 1.0;
-                            double decay2 = Math.exp(-t2 / 0.019) * (1.0 - Math.pow(Math.min(1.0, tailProgress), 3.0));
-                            // Delicate crystal-droplet octave harmonic on the initial mallet strike
-                            double sparkle2 = Math.sin(phase2 * 2.0) * 0.12 * Math.exp(-t2 / 0.006);
-                            out += (Math.sin(phase2) * 0.92 + sparkle2) * attack2 * decay2 * 0.96;
-                        }
-
-                        double sample = out * 30500.0;
-                        pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
-                    }
-                    playSynthesizedPcm(pcm, sampleRate);
+                    short[] pcm = synthesizeReceivedPcm(soundSet, 44100);
+                    playSynthesizedPcm(pcm, 44100);
                 } catch (Throwable ignored) {}
             }, "VeilRecvSound").start();
         } catch (Throwable ignored) {}
+    }
+
+    private short[] synthesizeSentPcm(int setIndex, int sampleRate) {
+        if (setIndex == 2) {
+            // Set 2: Silk Air-Whoosh & Dewdrop (72ms smooth upward glide 340 -> 880 Hz + breathy air transient)
+            int durationMs = 72;
+            int numSamples = (sampleRate * durationMs) / 1000;
+            short[] pcm = new short[numSamples];
+            double phase = 0.0;
+            long seed = 0x5EED2026L;
+            double lpNoise = 0.0;
+            for (int i = 0; i < numSamples; i++) {
+                double t = (double) i / sampleRate;
+                double p = (double) i / numSamples;
+                double freq = 340.0 + 540.0 * Math.pow(p, 1.35);
+                phase += (2.0 * Math.PI * freq) / sampleRate;
+                double attack = (t < 0.005) ? 0.5 * (1.0 - Math.cos(Math.PI * (t / 0.005))) : 1.0;
+                double env = attack * Math.sin(Math.PI * p) * Math.exp(-t / 0.042);
+                seed = (seed * 6364136223846793005L + 1442695040888963407L);
+                double white = ((seed >>> 33) / (double) (1L << 31)) - 1.0;
+                lpNoise = lpNoise * 0.82 + white * 0.18;
+                double air = lpNoise * Math.sin(Math.PI * p) * 0.16;
+                double tone = (Math.sin(phase) * 0.92 + Math.sin(phase * 2.0) * 0.08) * env;
+                double sample = (tone + air) * 29800.0;
+                pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
+            }
+            return pcm;
+        } else if (setIndex == 3) {
+            // Set 3: Micro-Snap & Twin Crystal (38ms ultra-tight tactile pop 185 -> 555 Hz in 8ms)
+            int durationMs = 38;
+            int numSamples = (sampleRate * durationMs) / 1000;
+            short[] pcm = new short[numSamples];
+            double phase = 0.0;
+            double snapPhase = 0.0;
+            for (int i = 0; i < numSamples; i++) {
+                double t = (double) i / sampleRate;
+                double p = (double) i / numSamples;
+                double freq = 185.0 + 370.0 * (1.0 - Math.exp(-t / 0.0075));
+                phase += (2.0 * Math.PI * freq) / sampleRate;
+                snapPhase += (2.0 * Math.PI * 1320.0) / sampleRate;
+                double attack = (t < 0.0015) ? (t / 0.0015) : 1.0;
+                double decay = Math.exp(-t / 0.011) * (1.0 - p * p);
+                double snap = Math.sin(snapPhase) * Math.exp(-t / 0.0012) * 0.25;
+                double sample = (Math.sin(phase) * attack * decay + snap) * 30500.0;
+                pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
+            }
+            return pcm;
+        } else if (setIndex == 4) {
+            // Set 4: Rosewood Tap (48ms deep warm woodblock knock 210 -> 420 Hz)
+            int durationMs = 48;
+            int numSamples = (sampleRate * durationMs) / 1000;
+            short[] pcm = new short[numSamples];
+            double phase = 0.0;
+            double woodPhase = 0.0;
+            for (int i = 0; i < numSamples; i++) {
+                double t = (double) i / sampleRate;
+                double p = (double) i / numSamples;
+                double freq = 210.0 + 210.0 * (1.0 - Math.exp(-t / 0.009));
+                phase += (2.0 * Math.PI * freq) / sampleRate;
+                woodPhase += (2.0 * Math.PI * 630.0) / sampleRate;
+                double attack = (t < 0.002) ? 0.5 * (1.0 - Math.cos(Math.PI * (t / 0.002))) : 1.0;
+                double decay = Math.exp(-t / 0.014) * (1.0 - p * p);
+                double woodTap = Math.sin(woodPhase) * Math.exp(-t / 0.0035) * 0.22;
+                double sample = (Math.sin(phase) * 0.92 * attack * decay + woodTap) * 30400.0;
+                pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
+            }
+            return pcm;
+        } else if (setIndex == 5) {
+            // Set 5: Studio Pulse (42ms minimalist pure sub-harmonic pulse 300 -> 600 Hz)
+            int durationMs = 42;
+            int numSamples = (sampleRate * durationMs) / 1000;
+            short[] pcm = new short[numSamples];
+            double phase = 0.0;
+            for (int i = 0; i < numSamples; i++) {
+                double t = (double) i / sampleRate;
+                double p = (double) i / numSamples;
+                double freq = 300.0 + 300.0 * (1.0 - Math.exp(-t / 0.0095));
+                phase += (2.0 * Math.PI * freq) / sampleRate;
+                double attack = (t < 0.0022) ? 0.5 * (1.0 - Math.cos(Math.PI * (t / 0.0022))) : 1.0;
+                double decay = Math.exp(-t / 0.0135) * (1.0 - Math.pow(p, 2.5));
+                double sample = Math.sin(phase) * attack * decay * 29600.0;
+                pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
+            }
+            return pcm;
+        } else {
+            // Set 1 (Default): Organic Bubble & Kalimba (58ms water-bubble pop 265 -> 685 Hz)
+            int durationMs = 58;
+            int numSamples = (sampleRate * durationMs) / 1000;
+            short[] pcm = new short[numSamples];
+            double phase = 0.0;
+            double clickPhase = 0.0;
+            for (int i = 0; i < numSamples; i++) {
+                double t = (double) i / sampleRate;
+                double progress = (double) i / numSamples;
+                double pitchCurve = 1.0 - Math.exp(-t / 0.011);
+                double freq = 265.0 + 420.0 * pitchCurve;
+                phase += (2.0 * Math.PI * freq) / sampleRate;
+                double attack = (t < 0.0025) ? 0.5 * (1.0 - Math.cos(Math.PI * (t / 0.0025))) : 1.0;
+                double decay = Math.exp(-t / 0.0165) * (1.0 - Math.pow(progress, 3.0));
+                double body = Math.sin(phase) * 0.94 + Math.sin(phase * 2.0) * 0.06;
+                clickPhase += (2.0 * Math.PI * 1080.0) / sampleRate;
+                double tactileClick = Math.sin(clickPhase) * Math.exp(-t / 0.0016) * 0.18;
+                double sample = (body * attack * decay + tactileClick) * 30200.0;
+                pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
+            }
+            return pcm;
+        }
+    }
+
+    private short[] synthesizeReceivedPcm(int setIndex, int sampleRate) {
+        if (setIndex == 2) {
+            // Set 2: Crystalline Dewdrop (85ms pure A5 880 Hz with warm 440 Hz sub-body + 1760 Hz glass shimmer)
+            int durationMs = 85;
+            int numSamples = (sampleRate * durationMs) / 1000;
+            short[] pcm = new short[numSamples];
+            double phase = 0.0;
+            for (int i = 0; i < numSamples; i++) {
+                double t = (double) i / sampleRate;
+                double p = (double) i / numSamples;
+                phase += (2.0 * Math.PI * 880.0) / sampleRate;
+                double attack = (t < 0.002) ? 0.5 * (1.0 - Math.cos(Math.PI * (t / 0.002))) : 1.0;
+                double decay = Math.exp(-t / 0.022) * (1.0 - Math.pow(p, 3.0));
+                double sub = Math.sin(phase * 0.5) * 0.22 * Math.exp(-t / 0.015);
+                double shimmer = Math.sin(phase * 2.0) * 0.14 * Math.exp(-t / 0.005);
+                double sample = (Math.sin(phase) * 0.84 + sub + shimmer) * attack * decay * 30400.0;
+                pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
+            }
+            return pcm;
+        } else if (setIndex == 3) {
+            // Set 3: Twin Crystal Major Third (78ms F5 698.46 Hz -> A5 880 Hz at 22ms)
+            int durationMs = 78;
+            int numSamples = (sampleRate * durationMs) / 1000;
+            short[] pcm = new short[numSamples];
+            double p1 = 0.0, p2 = 0.0;
+            for (int i = 0; i < numSamples; i++) {
+                double t = (double) i / sampleRate;
+                double out = 0.0;
+                p1 += (2.0 * Math.PI * 698.46) / sampleRate;
+                double a1 = (t < 0.0018) ? (t / 0.0018) : 1.0;
+                out += Math.sin(p1) * a1 * Math.exp(-t / 0.011) * 0.78;
+                if (t >= 0.022) {
+                    double t2 = t - 0.022;
+                    p2 += (2.0 * Math.PI * 880.0) / sampleRate;
+                    double a2 = (t2 < 0.0018) ? (t2 / 0.0018) : 1.0;
+                    out += (Math.sin(p2) * 0.90 + Math.sin(p2 * 2.0) * 0.10 * Math.exp(-t2 / 0.004))
+                            * a2 * Math.exp(-t2 / 0.016) * 0.96;
+                }
+                double sample = out * 30400.0;
+                pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
+            }
+            return pcm;
+        } else if (setIndex == 4) {
+            // Set 4: Velvet Triad (110ms rolled D-Major micro-arpeggio: D5 587.33 -> F#5 739.99 -> A5 880.0)
+            int durationMs = 110;
+            int numSamples = (sampleRate * durationMs) / 1000;
+            short[] pcm = new short[numSamples];
+            double p1 = 0.0, p2 = 0.0, p3 = 0.0;
+            for (int i = 0; i < numSamples; i++) {
+                double t = (double) i / sampleRate;
+                double out = 0.0;
+                p1 += (2.0 * Math.PI * 587.33) / sampleRate;
+                double a1 = (t < 0.002) ? (t / 0.002) : 1.0;
+                out += Math.sin(p1) * a1 * Math.exp(-t / 0.016) * 0.62;
+                if (t >= 0.018) {
+                    double t2 = t - 0.018;
+                    p2 += (2.0 * Math.PI * 739.99) / sampleRate;
+                    double a2 = (t2 < 0.002) ? (t2 / 0.002) : 1.0;
+                    out += Math.sin(p2) * a2 * Math.exp(-t2 / 0.018) * 0.68;
+                }
+                if (t >= 0.036) {
+                    double t3 = t - 0.036;
+                    p3 += (2.0 * Math.PI * 880.0) / sampleRate;
+                    double a3 = (t3 < 0.002) ? (t3 / 0.002) : 1.0;
+                    out += (Math.sin(p3) * 0.92 + Math.sin(p3 * 2.0) * 0.08 * Math.exp(-t3 / 0.005))
+                            * a3 * Math.exp(-t3 / 0.022) * 0.85;
+                }
+                double sample = out * 30200.0;
+                pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
+            }
+            return pcm;
+        } else if (setIndex == 5) {
+            // Set 5: Octave Ping (68ms minimalist E5 659.25 Hz -> E6 1318.5 Hz at 20ms)
+            int durationMs = 68;
+            int numSamples = (sampleRate * durationMs) / 1000;
+            short[] pcm = new short[numSamples];
+            double p1 = 0.0, p2 = 0.0;
+            for (int i = 0; i < numSamples; i++) {
+                double t = (double) i / sampleRate;
+                double out = 0.0;
+                p1 += (2.0 * Math.PI * 659.25) / sampleRate;
+                double a1 = (t < 0.002) ? (t / 0.002) : 1.0;
+                out += Math.sin(p1) * a1 * Math.exp(-t / 0.011) * 0.80;
+                if (t >= 0.020) {
+                    double t2 = t - 0.020;
+                    p2 += (2.0 * Math.PI * 1318.51) / sampleRate;
+                    double a2 = (t2 < 0.002) ? (t2 / 0.002) : 1.0;
+                    out += Math.sin(p2) * a2 * Math.exp(-t2 / 0.014) * 0.85;
+                }
+                double sample = out * 29800.0;
+                pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
+            }
+            return pcm;
+        } else {
+            // Set 1 (Default): Warm Kalimba Perfect-Fifth (96ms C5 523.25 Hz -> G5 783.99 Hz at 32ms)
+            int durationMs = 96;
+            int numSamples = (sampleRate * durationMs) / 1000;
+            short[] pcm = new short[numSamples];
+            double note2StartSec = 0.032;
+            double phase1 = 0.0, phase2 = 0.0;
+            for (int i = 0; i < numSamples; i++) {
+                double t = (double) i / sampleRate;
+                double out = 0.0;
+                phase1 += (2.0 * Math.PI * 523.25) / sampleRate;
+                double attack1 = (t < 0.002) ? 0.5 * (1.0 - Math.cos(Math.PI * (t / 0.002))) : 1.0;
+                double decay1 = Math.exp(-t / 0.013);
+                double sparkle1 = Math.sin(phase1 * 2.0) * 0.10 * Math.exp(-t / 0.005);
+                out += (Math.sin(phase1) * 0.90 + sparkle1) * attack1 * decay1 * 0.78;
+                if (t >= note2StartSec) {
+                    double t2 = t - note2StartSec;
+                    double tailProgress = t2 / ((durationMs / 1000.0) - note2StartSec);
+                    phase2 += (2.0 * Math.PI * 783.99) / sampleRate;
+                    double attack2 = (t2 < 0.0022) ? 0.5 * (1.0 - Math.cos(Math.PI * (t2 / 0.0022))) : 1.0;
+                    double decay2 = Math.exp(-t2 / 0.019) * (1.0 - Math.pow(Math.min(1.0, tailProgress), 3.0));
+                    double sparkle2 = Math.sin(phase2 * 2.0) * 0.12 * Math.exp(-t2 / 0.006);
+                    out += (Math.sin(phase2) * 0.92 + sparkle2) * attack2 * decay2 * 0.96;
+                }
+                double sample = out * 30500.0;
+                pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
+            }
+            return pcm;
+        }
     }
 
     private void playSynthesizedPcm(@NonNull short[] pcm, int sampleRate) {

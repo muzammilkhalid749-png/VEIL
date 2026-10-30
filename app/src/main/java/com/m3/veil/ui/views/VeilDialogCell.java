@@ -412,6 +412,13 @@ public class VeilDialogCell extends View {
         this.mChat = chat;
         this.mCurrentUserId = currentUserId != null ? currentUserId : "";
         this.mUseSeparator = useSeparator;
+        try {
+            String peerIdForTyp = extractPeerId(chat);
+            if (com.m3.veil.manager.VeilMessagesController.getInstance(getContext())
+                    .isDialogTyping(chat.getId(), peerIdForTyp)) {
+                chat.setTyping(true);
+            }
+        } catch (Throwable ignored) {}
 
         // Avatar initials & deterministic gradient
         String name = chat.getName() != null && !chat.getName().trim().isEmpty()
