@@ -16,6 +16,9 @@ public class UserPrivacy {
     private int autoDeleteMessagesDays;
     private int autoDeleteStoriesHours;
     private boolean dataCollectionConsent;
+    private boolean showUsernameInGroup = false;
+    private String allowMentions = "everyone";
+    private String whoCanMessageMe = "everyone"; // "everyone", "contacts", "nobody"
 
     public UserPrivacy() {
         // Default constructor for Firestore
@@ -85,4 +88,13 @@ public class UserPrivacy {
 
     public boolean isDataCollectionConsent() { return dataCollectionConsent; }
     public void setDataCollectionConsent(boolean dataCollectionConsent) { this.dataCollectionConsent = dataCollectionConsent; }
+
+    public boolean isShowUsernameInGroup() { return showUsernameInGroup; }
+    public void setShowUsernameInGroup(boolean showUsernameInGroup) { this.showUsernameInGroup = showUsernameInGroup; }
+
+    public String getAllowMentions() { return allowMentions; }
+    public void setAllowMentions(String allowMentions) { this.allowMentions = allowMentions; }
+
+    public String getWhoCanMessageMe() { return whoCanMessageMe != null ? whoCanMessageMe : "everyone"; }
+    public void setWhoCanMessageMe(String whoCanMessageMe) { this.whoCanMessageMe = whoCanMessageMe; }
 }

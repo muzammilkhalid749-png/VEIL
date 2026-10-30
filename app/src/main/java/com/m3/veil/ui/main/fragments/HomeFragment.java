@@ -84,7 +84,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     private ImageView btnClearSearch;
 
     private TextView chipFilterAll, chipFilterUnread, chipFilterGroups,
-            chipFilterVanish, chipFilterPinned, chipFilterSecret, chipFilterStatus;
+            chipFilterRequests, chipFilterVanish, chipFilterPinned, chipFilterSecret, chipFilterStatus;
 
     // WhatsApp Status tray & vertical feed
     private View statusTraySection;
@@ -309,6 +309,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         chipFilterAll = view.findViewById(R.id.chipFilterAll);
         chipFilterUnread = view.findViewById(R.id.chipFilterUnread);
         chipFilterGroups = view.findViewById(R.id.chipFilterGroups);
+        chipFilterRequests = view.findViewById(R.id.chipFilterRequests);
         chipFilterVanish = view.findViewById(R.id.chipFilterVanish);
         chipFilterPinned = view.findViewById(R.id.chipFilterPinned);
         chipFilterSecret = view.findViewById(R.id.chipFilterSecret);
@@ -474,6 +475,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                 activeFilter = "unread";
             } else if (id == R.id.chipFilterGroups) {
                 activeFilter = "groups";
+            } else if (id == R.id.chipFilterRequests) {
+                activeFilter = "requests";
             } else if (id == R.id.chipFilterVanish) {
                 activeFilter = "vanish";
             } else if (id == R.id.chipFilterPinned) {
@@ -502,6 +505,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         if (chipFilterAll != null) chipFilterAll.setOnClickListener(filterClickListener);
         if (chipFilterUnread != null) chipFilterUnread.setOnClickListener(filterClickListener);
         if (chipFilterGroups != null) chipFilterGroups.setOnClickListener(filterClickListener);
+        if (chipFilterRequests != null) chipFilterRequests.setOnClickListener(filterClickListener);
         if (chipFilterVanish != null) chipFilterVanish.setOnClickListener(filterClickListener);
         if (chipFilterPinned != null) chipFilterPinned.setOnClickListener(filterClickListener);
         if (chipFilterSecret != null) chipFilterSecret.setOnClickListener(filterClickListener);
@@ -579,6 +583,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         styleChip(chipFilterAll, "all".equals(activeFilter));
         styleChip(chipFilterUnread, "unread".equals(activeFilter));
         styleChip(chipFilterGroups, "groups".equals(activeFilter));
+        styleChip(chipFilterRequests, "requests".equals(activeFilter));
         styleChip(chipFilterVanish, "vanish".equals(activeFilter));
         styleChip(chipFilterPinned, "pinned".equals(activeFilter));
         styleChip(chipFilterSecret, "secret".equals(activeFilter));
@@ -881,13 +886,21 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     private void updateFilterCounts() {
         int unreadTotal = 0;
         int secretTotal = 0;
+        int requestsTotal = 0;
         for (Chat c : allLocalChats) {
             if (c.isArchived()) continue;
+            if (c.isRequest()) {
+                requestsTotal++;
+                continue;
+            }
             if (c.isSecret()) {
                 secretTotal++;
                 continue;
             }
             if (c.getUnreadCount() > 0) unreadTotal++;
+        }
+        if (chipFilterRequests != null) {
+            chipFilterRequests.setText(requestsTotal > 0 ? "📥 Requests (" + requestsTotal + ")" : "📥 Requests");
         }
         if (chipFilterUnread != null) {
             chipFilterUnread.setText(unreadTotal > 0 ? "Unread (" + unreadTotal + ")" : "Unread");
@@ -914,6 +927,14 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                 if (!c.isSecret()) continue;
             } else {
                 if (c.isSecret()) continue;
+            }
+
+            // Message Requests isolation: request chats ONLY appear in "requests" chip
+            // and are excluded from "all" and other chips until user accepts
+            if ("requests".equals(activeFilter)) {
+                if (!c.isRequest()) continue;
+            } else {
+                if (c.isRequest()) continue;
             }
 
             if ("unread".equals(activeFilter) && c.getUnreadCount() <= 0) continue;

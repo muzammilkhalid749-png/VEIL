@@ -63,6 +63,12 @@ public class PrivacySettingsActivity extends AppCompatActivity {
 
     private MaterialButton btnInstantSecureWipe;
 
+    private LinearLayout rowWhoCanMessageMe;
+    private TextView tvWhoCanMessageStatus;
+    private LinearLayout rowWhoCanMention;
+    private TextView tvWhoCanMentionStatus;
+    private SwitchCompat switchShowUsernameInGroup;
+
     private VeilFeatureManager featureManager;
     private EncryptedChatDatabase chatDb;
 
@@ -110,6 +116,12 @@ public class PrivacySettingsActivity extends AppCompatActivity {
         tvBlockedCount = findViewById(R.id.tvBlockedCount);
 
         btnInstantSecureWipe = findViewById(R.id.btnInstantSecureWipe);
+
+        rowWhoCanMessageMe = findViewById(R.id.rowWhoCanMessageMe);
+        tvWhoCanMessageStatus = findViewById(R.id.tvWhoCanMessageStatus);
+        rowWhoCanMention = findViewById(R.id.rowWhoCanMention);
+        tvWhoCanMentionStatus = findViewById(R.id.tvWhoCanMentionStatus);
+        switchShowUsernameInGroup = findViewById(R.id.switchShowUsernameInGroup);
     }
 
     private void setupListeners() {
@@ -142,6 +154,26 @@ public class PrivacySettingsActivity extends AppCompatActivity {
 
         rowBlockedUsers.setOnClickListener(v -> showBlockedUsersSheet());
         btnInstantSecureWipe.setOnClickListener(v -> showInstantSecureWipeDialog());
+
+        if (rowWhoCanMessageMe != null) {
+            rowWhoCanMessageMe.setOnClickListener(v -> showWhoCanMessageMeDialog());
+        }
+        if (rowWhoCanMention != null) {
+            rowWhoCanMention.setOnClickListener(v -> showWhoCanMentionDialog());
+        }
+        if (switchShowUsernameInGroup != null) {
+            switchShowUsernameInGroup.setOnCheckedChangeListener((btn, isChecked) -> {
+                getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                        .edit().putBoolean("group_show_username", isChecked).apply();
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(this);
+                if (manifest != null) {
+                    manifest.showUsernameInGroup = isChecked;
+                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.saveLocalProfile(this, manifest);
+                }
+                refreshUi();
+            });
+        }
 
         appendAutoLockAndDeadManSwitchControls();
     }
@@ -263,6 +295,36 @@ public class PrivacySettingsActivity extends AppCompatActivity {
 
         int blockedCount = chatDb.getBlockedChatsCount();
         tvBlockedCount.setText(blockedCount + (blockedCount == 1 ? " contact" : " contacts"));
+
+        if (tvWhoCanMessageStatus != null) {
+            String msgVal = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                    .getString("privacy_who_can_message", "everyone");
+            if ("contacts".equalsIgnoreCase(msgVal)) {
+                tvWhoCanMessageStatus.setText("My Contacts");
+            } else if ("nobody".equalsIgnoreCase(msgVal)) {
+                tvWhoCanMessageStatus.setText("Nobody (Message Requests)");
+            } else {
+                tvWhoCanMessageStatus.setText("Everyone");
+            }
+        }
+
+        if (tvWhoCanMentionStatus != null) {
+            String mentionVal = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                    .getString("privacy_allow_mentions", "everyone");
+            if ("contacts".equalsIgnoreCase(mentionVal)) {
+                tvWhoCanMentionStatus.setText("My Contacts");
+            } else if ("nobody".equalsIgnoreCase(mentionVal)) {
+                tvWhoCanMentionStatus.setText("Nobody");
+            } else {
+                tvWhoCanMentionStatus.setText("Everyone");
+            }
+        }
+
+        if (switchShowUsernameInGroup != null) {
+            boolean showUsername = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                    .getBoolean("group_show_username", false);
+            switchShowUsernameInGroup.setChecked(showUsername);
+        }
     }
 
     // ==========================================
@@ -458,6 +520,72 @@ public class PrivacySettingsActivity extends AppCompatActivity {
     // ==========================================
     // INSTANT CRYPTOGRAPHIC SECURE WIPE
     // ==========================================
+
+    private void showWhoCanMessageMeDialog() {
+        final String[] options = {"Everyone", "My Contacts", "Nobody (Message Requests)"};
+        final String[] values = {"everyone", "contacts", "nobody"};
+        String currentVal = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                .getString("privacy_who_can_message", "everyone");
+        int selectedIndex = 0;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equalsIgnoreCase(currentVal)) {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Who Can Message You")
+                .setSingleChoiceItems(options, selectedIndex, (dialog, which) -> {
+                    String selected = values[which];
+                    getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                            .edit().putString("privacy_who_can_message", selected).apply();
+                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(this);
+                    if (manifest != null) {
+                        manifest.whoCanMessageMe = selected;
+                        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.saveLocalProfile(this, manifest);
+                    }
+                    dialog.dismiss();
+                    refreshUi();
+                    Toast.makeText(this, "Messaging privacy updated: " + options[which], Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showWhoCanMentionDialog() {
+        final String[] options = {"Everyone", "My Contacts", "Nobody"};
+        final String[] values = {"everyone", "contacts", "nobody"};
+        String currentVal = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                .getString("privacy_allow_mentions", "everyone");
+        int selectedIndex = 0;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equalsIgnoreCase(currentVal)) {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Who Can Mention You")
+                .setSingleChoiceItems(options, selectedIndex, (dialog, which) -> {
+                    String selected = values[which];
+                    getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                            .edit().putString("privacy_allow_mentions", selected).apply();
+                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(this);
+                    if (manifest != null) {
+                        manifest.allowMentions = selected;
+                        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.saveLocalProfile(this, manifest);
+                    }
+                    dialog.dismiss();
+                    refreshUi();
+                    Toast.makeText(this, "Mention privacy updated: " + options[which], Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
 
     private void showInstantSecureWipeDialog() {
         new MaterialAlertDialogBuilder(this)

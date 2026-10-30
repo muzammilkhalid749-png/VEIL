@@ -411,14 +411,37 @@ public class UserProfileActivity extends AppCompatActivity {
             tvName.setTextSize(15f);
             tvName.setTypeface(null, Typeface.BOLD);
             tvName.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
-            String label = pId.equals(currentUserId) ? "You (" + pId.substring(0, Math.min(8, pId.length())) + ")" : pId;
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                    EncryptedChatDatabase.getInstance(this).getSovereignProfileManifest(pId);
+            if (pId.equals(currentUserId)) {
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest myProfile =
+                        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(this);
+                if (myProfile != null) manifest = myProfile;
+            }
+            boolean preferUsername = manifest != null && manifest.showUsernameInGroup;
+            String handle = (manifest != null && manifest.username != null && !manifest.username.isEmpty())
+                    ? manifest.username : null;
+            String profileName = manifest != null && manifest.displayName != null && !manifest.displayName.isEmpty()
+                    ? manifest.displayName : (pId.length() >= 4 ? "Peer #" + pId.substring(0, 4) : "Peer");
+
+            String label = preferUsername && handle != null && !handle.isEmpty()
+                    ? ("@" + handle.replace("@", "") + (pId.equals(currentUserId) ? " (You)" : ""))
+                    : (profileName + (pId.equals(currentUserId) ? " (You)" : ""));
+            String subLabel = preferUsername && handle != null && !handle.isEmpty()
+                    ? profileName
+                    : ((handle != null && !handle.isEmpty()) ? "@" + handle.replace("@", "") : "P2P Mesh Peer");
             tvName.setText(label);
             info.addView(tvName);
 
             TextView tvSub = new TextView(this);
             tvSub.setTextSize(12f);
             tvSub.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
-            tvSub.setText("P2P Mesh Peer");
+            tvSub.setText(subLabel);
+            if (manifest != null && manifest.avatarBase64 != null && !manifest.avatarBase64.isEmpty()) {
+                avatar.setPadding(0, 0, 0, 0);
+                avatar.clearColorFilter();
+                com.m3.veil.utils.VeilAvatarLoader.loadAvatar(avatar, manifest.avatarBase64, label, false);
+            }
             info.addView(tvSub);
 
             row.addView(info);
@@ -440,14 +463,22 @@ public class UserProfileActivity extends AppCompatActivity {
             FirebaseFirestore.getInstance().collection("users").document(pId).get()
                     .addOnSuccessListener(uDoc -> {
                         if (uDoc.exists()) {
+                            boolean userPrefersUsername = Boolean.TRUE.equals(uDoc.getBoolean("showUsernameInGroup"));
                             String name = uDoc.getString("displayName");
-                            if (name == null || name.isEmpty()) name = uDoc.getString("username");
-                            if (name != null) {
+                            String uHandle = uDoc.getString("username");
+                            if (name == null || name.isEmpty()) name = uHandle;
+                            if (name == null) name = "Peer";
+
+                            if (userPrefersUsername && uHandle != null && !uHandle.isEmpty()) {
+                                String finalTitle = "@" + uHandle.replace("@", "") + (pId.equals(currentUserId) ? " (You)" : "");
+                                tvName.setText(finalTitle);
+                                tvSub.setText(name);
+                                resolvedDisplayName[0] = finalTitle;
+                            } else {
+                                String finalTitle = name + (pId.equals(currentUserId) ? " (You)" : "");
+                                tvName.setText(finalTitle);
+                                if (uHandle != null) tvSub.setText("@" + uHandle.replace("@", ""));
                                 resolvedDisplayName[0] = name;
-                                String finalName = pId.equals(currentUserId) ? name + " (You)" : name;
-                                tvName.setText(finalName);
-                                String handle = uDoc.getString("username");
-                                if (handle != null) tvSub.setText("@" + handle);
                             }
                             String av = uDoc.getString("avatarBase64");
                             if (av == null || av.isEmpty()) av = uDoc.getString("avatarUrl");
@@ -758,6 +789,21 @@ public class UserProfileActivity extends AppCompatActivity {
         badge.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
         badge.setGravity(Gravity.CENTER);
         container.addView(badge);
+
+        String sasEmojis = EncryptionManager.generateSafetyEmojis(currentUserId, peerUserId != null ? peerUserId : chatId);
+        TextView tvSas = new TextView(this);
+        tvSas.setText(sasEmojis);
+        tvSas.setTextSize(30f);
+        tvSas.setGravity(Gravity.CENTER);
+        tvSas.setPadding(0, 16, 0, 4);
+        container.addView(tvSas);
+
+        TextView tvSasHint = new TextView(this);
+        tvSasHint.setText("Visual SAS Emoji Fingerprint (Instant Match)");
+        tvSasHint.setTextSize(11.5f);
+        tvSasHint.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
+        tvSasHint.setGravity(Gravity.CENTER);
+        container.addView(tvSasHint);
 
         TextView codeView = new TextView(this);
         codeView.setText(safetyNumber);

@@ -1,6 +1,10 @@
 package com.google.firebase.firestore;
 
 public class FieldValue {
+    public static Object delete() {
+        return null;
+    }
+
     public static Object serverTimestamp() {
         return new java.util.Date();
     }

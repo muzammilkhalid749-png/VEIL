@@ -1384,6 +1384,19 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                if (adminId != null && !adminId.isEmpty()) newChat.setAdminId(adminId);
                String desc = p.optString("description", null);
                if (desc != null && !desc.isEmpty()) newChat.setDescription(desc);
+
+               if (!isGroup) {
+                   String whoCanMessage = this.context.getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                           .getString("privacy_who_can_message", "everyone");
+                   if ("nobody".equalsIgnoreCase(whoCanMessage)) {
+                       newChat.setRequest(true);
+                   } else if ("contacts".equalsIgnoreCase(whoCanMessage)) {
+                       if (!isKnownPeerOrContact(peerId, senderName)) {
+                           newChat.setRequest(true);
+                       }
+                   }
+               }
+
                EncryptedChatDatabase.getInstance(this.context).saveOrUpdateChat(newChat);
             } else {
                if (isGroup && incomingParts.size() > (existingChat.getParticipants() != null ? existingChat.getParticipants().size() : 0)) {
@@ -1408,6 +1421,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                existingChat.setUnreadCount(existingChat.getUnreadCount() + 1);
                existingChat.setLastMessage(text);
                existingChat.setLastMessageTime(new Timestamp(new Date(timestamp)));
+               if (isGroup && isUserMentionedInText(text)) {
+                   existingChat.setUnreadMentionsCount(existingChat.getUnreadMentionsCount() + 1);
+               }
                EncryptedChatDatabase.getInstance(this.context).saveOrUpdateChat(existingChat);
                EncryptedChatDatabase.getInstance(this.context).incrementChatTrustScore(chatId, 2);
             }
@@ -1418,6 +1434,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             }
             Message message = new Message(msgId, actualSenderId, isGroup ? chatId : this.currentUserId, text, new Timestamp(new Date(timestamp)), msgType);
             message.setChatId(chatId);
+            message.setPreferUsername(p.optBoolean("preferUsername", false));
+            if (p.has("senderUsername")) {
+               message.setSenderUsername(p.optString("senderUsername", null));
+            }
             message.setDelivered(true);
             message.setRead(false);
             message.setReplyToMessageId(replyId);
@@ -1715,6 +1735,17 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      json.optBoolean("voteRemove", true),
                      json.optString("jurorId", peerId)
                );
+            } else if ("request_accepted".equals(type) || ("control".equals(type) && "request_accepted".equals(json.optString("action")))) {
+               String targetChatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
+               EncryptedChatDatabase.getInstance(this.context).updateChatRequestStatus(targetChatId, false);
+               Chat c = EncryptedChatDatabase.getInstance(this.context).getChat(targetChatId);
+               if (c != null) {
+                   c.setRequest(false);
+                   EncryptedChatDatabase.getInstance(this.context).saveOrUpdateChat(c);
+               }
+               new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                   android.widget.Toast.makeText(this.context, "Your message request was accepted! 🤝", android.widget.Toast.LENGTH_SHORT).show();
+               });
             } else if (!"gossip_post".equals(type) && !"gossip_sync".equals(type)) {
                if ("call_signal".equals(type)) {
                   String action = json.optString("action");
@@ -1907,6 +1938,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             p.put("chatId", chatId);
             p.put("senderId", this.currentUserId);
             p.put("senderName", message.getSenderName() != null ? message.getSenderName() : VeilFeatureManager.getInstance(this.context).getActivePersona().getDisplayName());
+            p.put("preferUsername", message.isPreferUsername());
+            if (message.getSenderUsername() != null) {
+               p.put("senderUsername", message.getSenderUsername());
+            }
             p.put("text", message.getText());
             p.put("msgType", message.getType());
             p.put("timestamp", message.getTimestamp() != null ? message.getTimestamp().toDate().getTime() : System.currentTimeMillis());
@@ -2707,6 +2742,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      p.put("chatId", resolvedChatId);
                      p.put("senderId", this.currentUserId);
                      p.put("senderName", msg.getSenderName() != null ? msg.getSenderName() : VeilFeatureManager.getInstance(this.context).getActivePersona().getDisplayName());
+                     p.put("preferUsername", msg.isPreferUsername());
+                     if (msg.getSenderUsername() != null) {
+                         p.put("senderUsername", msg.getSenderUsername());
+                     }
                      p.put("text", msg.getText());
                      p.put("msgType", msg.getType());
                      p.put("timestamp", msg.getTimestamp() != null ? msg.getTimestamp().toDate().getTime() : System.currentTimeMillis());
@@ -3905,5 +3944,62 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          }
       });
    }
+
+    private boolean isKnownPeerOrContact(String peerId, String senderName) {
+        if (peerId == null) return false;
+        try {
+            List<Chat> chats = EncryptedChatDatabase.getInstance(this.context).getAllChats();
+            if (chats != null) {
+                for (Chat c : chats) {
+                    if (c != null && !c.isRequest() && c.getParticipants() != null && c.getParticipants().contains(peerId)) {
+                        return true;
+                    }
+                }
+            }
+            if (androidx.core.content.ContextCompat.checkSelfPermission(this.context, android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                if (senderName != null && !senderName.isEmpty()) {
+                    android.net.Uri uri = android.net.Uri.withAppendedPath(android.provider.ContactsContract.Contacts.CONTENT_FILTER_URI, android.net.Uri.encode(senderName));
+                    try (android.database.Cursor cursor = this.context.getContentResolver().query(uri, new String[]{android.provider.ContactsContract.Contacts._ID}, null, null, null)) {
+                        if (cursor != null && cursor.moveToFirst()) {
+                            return true;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    public void sendRequestAcceptedAck(String peerId, String chatId) {
+        if (peerId == null) return;
+        try {
+            JSONObject json = new JSONObject();
+            json.put("type", "request_accepted");
+            json.put("action", "request_accepted");
+            json.put("chatId", chatId);
+            json.put("peerId", this.currentUserId);
+            json.put("timestamp", System.currentTimeMillis());
+            SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", json);
+            this.depositOfflineActionEnvelope(peerId, json.toString());
+        } catch (Exception ignored) {}
+    }
+
+    private boolean isUserMentionedInText(String text) {
+        if (text == null || !text.contains("@")) return false;
+        try {
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest myManifest =
+                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(this.context);
+            if (myManifest != null && myManifest.username != null && !myManifest.username.isEmpty()) {
+                String u = myManifest.username.toLowerCase(java.util.Locale.ROOT).replace("@", "");
+                if (text.toLowerCase(java.util.Locale.ROOT).contains("@" + u)) {
+                    return true;
+                }
+            }
+            if (this.currentUserId != null && text.contains(this.currentUserId)) {
+                return true;
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
 
 }

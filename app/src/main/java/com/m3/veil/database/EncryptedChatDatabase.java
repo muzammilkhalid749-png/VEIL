@@ -64,6 +64,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     private static final String COL_CHAT_MUTED = "is_muted";
     private static final String COL_CHAT_ARCHIVED = "is_archived";
     private static final String COL_CHAT_SECRET = "is_secret";
+    private static final String COL_CHAT_REQUEST = "is_request";
+    private static final String COL_CHAT_UNREAD_MENTIONS = "unread_mentions";
     private static final String COL_CHAT_LOCK_PIN = "chat_lock_pin";
     private static final String COL_CHAT_WALLPAPER = "wallpaper_color";
     private static final String COL_CHAT_SLOW_MODE = "slow_mode_sec";
@@ -272,6 +274,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     public static final String COL_SM_VEIL_COINS = "veil_coins";
     public static final String COL_SM_PERSONAS_JSON = "personas_json";
     public static final String COL_SM_PUBLIC_KEY = "public_key_base64";
+    public static final String COL_SM_SHOW_USERNAME_IN_GROUP = "show_username_in_group";
+    public static final String COL_SM_ALLOW_MENTIONS = "allow_mentions";
     public static final String COL_SM_UPDATED_AT = "updated_at";
     public static final String COL_SM_SIGNATURE = "signature";
 
@@ -528,6 +532,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 COL_CHAT_MUTED + " INTEGER DEFAULT 0, " +
                 COL_CHAT_ARCHIVED + " INTEGER DEFAULT 0, " +
                 COL_CHAT_SECRET + " INTEGER DEFAULT 0, " +
+                COL_CHAT_REQUEST + " INTEGER DEFAULT 0, " +
+            COL_CHAT_UNREAD_MENTIONS + " INTEGER DEFAULT 0, " +
                 COL_CHAT_LOCK_PIN + " TEXT, " +
                 COL_CHAT_WALLPAPER + " TEXT, " +
                 COL_CHAT_SLOW_MODE + " INTEGER DEFAULT 0, " +
@@ -873,6 +879,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             ensureColumnExists(db, TABLE_CHATS, COL_CHAT_MUTED, "INTEGER DEFAULT 0");
             ensureColumnExists(db, TABLE_CHATS, COL_CHAT_ARCHIVED, "INTEGER DEFAULT 0");
             ensureColumnExists(db, TABLE_CHATS, COL_CHAT_SECRET, "INTEGER DEFAULT 0");
+            ensureColumnExists(db, TABLE_CHATS, COL_CHAT_REQUEST, "INTEGER DEFAULT 0");
+        ensureColumnExists(db, TABLE_CHATS, COL_CHAT_UNREAD_MENTIONS, "INTEGER DEFAULT 0");
             ensureColumnExists(db, TABLE_CHATS, COL_CHAT_LOCK_PIN, "TEXT");
             ensureColumnExists(db, TABLE_CHATS, COL_CHAT_WALLPAPER, "TEXT");
             ensureColumnExists(db, TABLE_CHATS, COL_CHAT_SLOW_MODE, "INTEGER DEFAULT 0");
@@ -1081,6 +1089,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         cv.put(COL_CHAT_MUTED, chat.isMuted() ? 1 : 0);
         cv.put(COL_CHAT_ARCHIVED, chat.isArchived() ? 1 : 0);
         cv.put(COL_CHAT_SECRET, chat.isSecret() ? 1 : 0);
+        cv.put(COL_CHAT_REQUEST, chat.isRequest() ? 1 : 0);
+        cv.put(COL_CHAT_UNREAD_MENTIONS, chat.getUnreadMentionsCount());
         cv.put(COL_CHAT_LOCK_PIN, chat.getChatLockPin());
         cv.put(COL_CHAT_WALLPAPER, chat.getWallpaperColor());
         cv.put(COL_CHAT_SLOW_MODE, chat.getSlowModeSec());
@@ -1274,6 +1284,15 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         notifyChatsChanged();
     }
 
+    public static String generateDirectChatId(String uid1, String uid2) {
+        if (uid1 == null && uid2 == null) return "";
+        if (uid1 == null) return uid2;
+        if (uid2 == null) return uid1;
+        java.util.List<String> ids = java.util.Arrays.asList(uid1, uid2);
+        java.util.Collections.sort(ids);
+        return ids.get(0) + "_" + ids.get(1);
+    }
+
     public synchronized Chat getChat(String chatId) {
         if (chatId == null) return null;
         Chat cached = ramChatCache.get(chatId);
@@ -1333,6 +1352,10 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         if (archivedIdx != -1) chat.setArchived(cursor.getInt(archivedIdx) == 1);
         int secretIdx = cursor.getColumnIndex(COL_CHAT_SECRET);
         if (secretIdx != -1) chat.setSecret(cursor.getInt(secretIdx) == 1);
+        int requestIdx = cursor.getColumnIndex(COL_CHAT_REQUEST);
+        if (requestIdx != -1) chat.setRequest(cursor.getInt(requestIdx) == 1);
+        int mentionsIdx = cursor.getColumnIndex(COL_CHAT_UNREAD_MENTIONS);
+        if (mentionsIdx != -1) chat.setUnreadMentionsCount(cursor.getInt(mentionsIdx));
         int lockPinIdx = cursor.getColumnIndex(COL_CHAT_LOCK_PIN);
         if (lockPinIdx != -1) chat.setChatLockPin(cursor.getString(lockPinIdx));
         int wallpaperIdx = cursor.getColumnIndex(COL_CHAT_WALLPAPER);
@@ -1538,6 +1561,18 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         Chat cached = ramChatCache.get(chatId);
         if (cached != null) cached.setSecret(secret);
         updateSingleChatColumn(chatId, COL_CHAT_SECRET, secret ? 1 : 0);
+    }
+
+    public synchronized void updateChatRequestStatus(String chatId, boolean isRequest) {
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null) cached.setRequest(isRequest);
+        updateSingleChatColumn(chatId, COL_CHAT_REQUEST, isRequest ? 1 : 0);
+    }
+
+    public synchronized void updateChatUnreadMentions(String chatId, int count) {
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null) cached.setUnreadMentionsCount(count);
+        updateSingleChatColumn(chatId, COL_CHAT_UNREAD_MENTIONS, Math.max(0, count));
     }
 
     public synchronized void updateChatLockPin(String chatId, String pin) {
@@ -1879,12 +1914,27 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         if (msg == null) return;
         Map<String, String> reactions = msg.getReactions();
         if (reactions == null) reactions = new HashMap<>();
-        if (emoji == null || emoji.isEmpty()) {
+        if (emoji == null || emoji.trim().isEmpty()) {
             reactions.remove(userId);
+            if (!userId.startsWith("anon_") && userId.length() >= 4) {
+                reactions.remove("anon_" + userId.substring(0, Math.min(4, userId.length())));
+            }
         } else {
-            reactions.put(userId, emoji);
+            reactions.put(userId, emoji.trim());
         }
-        msg.setReactions(reactions);
+        // Purge any empty, null or whitespace reactions
+        Iterator<Map.Entry<String, String>> it = reactions.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, String> entry = it.next();
+            if (entry.getValue() == null || entry.getValue().trim().isEmpty()) {
+                it.remove();
+            }
+        }
+        if (reactions.isEmpty()) {
+            msg.setReactions(null);
+        } else {
+            msg.setReactions(reactions);
+        }
         saveMessage(chatId, msg);
     }
 
@@ -4263,9 +4313,13 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 COL_SM_VEIL_COINS + " INTEGER, " +
                 COL_SM_PERSONAS_JSON + " TEXT, " +
                 COL_SM_PUBLIC_KEY + " TEXT, " +
+                COL_SM_SHOW_USERNAME_IN_GROUP + " INTEGER DEFAULT 0, " +
+                COL_SM_ALLOW_MENTIONS + " TEXT DEFAULT 'everyone', " +
                 COL_SM_UPDATED_AT + " INTEGER, " +
                 COL_SM_SIGNATURE + " TEXT" +
                 ");");
+        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_SHOW_USERNAME_IN_GROUP, "INTEGER DEFAULT 0");
+        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_ALLOW_MENTIONS, "TEXT DEFAULT 'everyone'");
         ContentValues cv = new ContentValues();
         cv.put(COL_SM_UID, manifest.uid);
         cv.put(COL_SM_USERNAME, manifest.username);
@@ -4278,6 +4332,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         cv.put(COL_SM_VEIL_COINS, manifest.veilCoins);
         cv.put(COL_SM_PERSONAS_JSON, manifest.personasJsonArray);
         cv.put(COL_SM_PUBLIC_KEY, manifest.publicKeyBase64);
+        cv.put(COL_SM_SHOW_USERNAME_IN_GROUP, manifest.showUsernameInGroup ? 1 : 0);
+        cv.put(COL_SM_ALLOW_MENTIONS, manifest.allowMentions != null ? manifest.allowMentions : "everyone");
         cv.put(COL_SM_UPDATED_AT, manifest.updatedAtTimestamp);
         cv.put(COL_SM_SIGNATURE, manifest.signature);
         db.insertWithOnConflict(TABLE_SOVEREIGN_MANIFEST, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
@@ -4298,35 +4354,98 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 COL_SM_VEIL_COINS + " INTEGER, " +
                 COL_SM_PERSONAS_JSON + " TEXT, " +
                 COL_SM_PUBLIC_KEY + " TEXT, " +
+                COL_SM_SHOW_USERNAME_IN_GROUP + " INTEGER DEFAULT 0, " +
+                COL_SM_ALLOW_MENTIONS + " TEXT DEFAULT 'everyone', " +
                 COL_SM_UPDATED_AT + " INTEGER, " +
                 COL_SM_SIGNATURE + " TEXT" +
                 ");");
+        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_SHOW_USERNAME_IN_GROUP, "INTEGER DEFAULT 0");
+        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_ALLOW_MENTIONS, "TEXT DEFAULT 'everyone'");
         Cursor c = db.query(TABLE_SOVEREIGN_MANIFEST, null, COL_SM_UID + " = ?", new String[]{uid}, null, null, null);
         if (c != null) {
             try {
                 if (c.moveToFirst()) {
-                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest m =
-                            new com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest();
-                    m.uid = c.getString(c.getColumnIndexOrThrow(COL_SM_UID));
-                    m.username = c.getString(c.getColumnIndexOrThrow(COL_SM_USERNAME));
-                    m.displayName = c.getString(c.getColumnIndexOrThrow(COL_SM_DISPLAY_NAME));
-                    m.bio = c.getString(c.getColumnIndexOrThrow(COL_SM_BIO));
-                    m.avatarBase64 = c.getString(c.getColumnIndexOrThrow(COL_SM_AVATAR_BASE64));
-                    m.mood = c.getString(c.getColumnIndexOrThrow(COL_SM_MOOD));
-                    m.xp = c.getLong(c.getColumnIndexOrThrow(COL_SM_XP));
-                    m.karma = c.getLong(c.getColumnIndexOrThrow(COL_SM_KARMA));
-                    m.veilCoins = c.getLong(c.getColumnIndexOrThrow(COL_SM_VEIL_COINS));
-                    m.personasJsonArray = c.getString(c.getColumnIndexOrThrow(COL_SM_PERSONAS_JSON));
-                    m.publicKeyBase64 = c.getString(c.getColumnIndexOrThrow(COL_SM_PUBLIC_KEY));
-                    m.updatedAtTimestamp = c.getLong(c.getColumnIndexOrThrow(COL_SM_UPDATED_AT));
-                    m.signature = c.getString(c.getColumnIndexOrThrow(COL_SM_SIGNATURE));
-                    return m;
+                    return cursorToSovereignProfileManifest(c);
                 }
             } finally {
                 c.close();
             }
         }
         return null;
+    }
+
+    public synchronized com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest getSovereignProfileManifestByUsername(String username) {
+        if (username == null || username.trim().isEmpty()) return null;
+        String clean = username.trim();
+        while (clean.startsWith("@")) clean = clean.substring(1).trim();
+        if (clean.isEmpty()) return null;
+        SQLiteDatabase db = getEncryptedDb();
+        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_SOVEREIGN_MANIFEST + " (" +
+                COL_SM_UID + " TEXT PRIMARY KEY, " +
+                COL_SM_USERNAME + " TEXT, " +
+                COL_SM_DISPLAY_NAME + " TEXT, " +
+                COL_SM_BIO + " TEXT, " +
+                COL_SM_AVATAR_BASE64 + " TEXT, " +
+                COL_SM_MOOD + " TEXT, " +
+                COL_SM_XP + " INTEGER, " +
+                COL_SM_KARMA + " INTEGER, " +
+                COL_SM_VEIL_COINS + " INTEGER, " +
+                COL_SM_PERSONAS_JSON + " TEXT, " +
+                COL_SM_PUBLIC_KEY + " TEXT, " +
+                COL_SM_SHOW_USERNAME_IN_GROUP + " INTEGER DEFAULT 0, " +
+                COL_SM_ALLOW_MENTIONS + " TEXT DEFAULT 'everyone', " +
+                COL_SM_UPDATED_AT + " INTEGER, " +
+                COL_SM_SIGNATURE + " TEXT" +
+                ");");
+        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_SHOW_USERNAME_IN_GROUP, "INTEGER DEFAULT 0");
+        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_ALLOW_MENTIONS, "TEXT DEFAULT 'everyone'");
+        Cursor c = db.query(TABLE_SOVEREIGN_MANIFEST, null, "LOWER(" + COL_SM_USERNAME + ") = ?", new String[]{clean.toLowerCase(java.util.Locale.ROOT)}, null, null, null);
+        if (c != null) {
+            try {
+                if (c.moveToFirst()) {
+                    return cursorToSovereignProfileManifest(c);
+                }
+            } finally {
+                c.close();
+            }
+        }
+        return null;
+    }
+
+    private com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest cursorToSovereignProfileManifest(Cursor c) {
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest m =
+                new com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest();
+        int uidIdx = c.getColumnIndex(COL_SM_UID);
+        if (uidIdx != -1) m.uid = c.getString(uidIdx);
+        int unIdx = c.getColumnIndex(COL_SM_USERNAME);
+        if (unIdx != -1) m.username = c.getString(unIdx);
+        int dnIdx = c.getColumnIndex(COL_SM_DISPLAY_NAME);
+        if (dnIdx != -1) m.displayName = c.getString(dnIdx);
+        int bioIdx = c.getColumnIndex(COL_SM_BIO);
+        if (bioIdx != -1) m.bio = c.getString(bioIdx);
+        int avIdx = c.getColumnIndex(COL_SM_AVATAR_BASE64);
+        if (avIdx != -1) m.avatarBase64 = c.getString(avIdx);
+        int moodIdx = c.getColumnIndex(COL_SM_MOOD);
+        if (moodIdx != -1) m.mood = c.getString(moodIdx);
+        int xpIdx = c.getColumnIndex(COL_SM_XP);
+        if (xpIdx != -1) m.xp = c.getLong(xpIdx);
+        int karmaIdx = c.getColumnIndex(COL_SM_KARMA);
+        if (karmaIdx != -1) m.karma = c.getLong(karmaIdx);
+        int vcIdx = c.getColumnIndex(COL_SM_VEIL_COINS);
+        if (vcIdx != -1) m.veilCoins = c.getLong(vcIdx);
+        int pjIdx = c.getColumnIndex(COL_SM_PERSONAS_JSON);
+        if (pjIdx != -1) m.personasJsonArray = c.getString(pjIdx);
+        int pkIdx = c.getColumnIndex(COL_SM_PUBLIC_KEY);
+        if (pkIdx != -1) m.publicKeyBase64 = c.getString(pkIdx);
+        int showUnIdx = c.getColumnIndex(COL_SM_SHOW_USERNAME_IN_GROUP);
+        if (showUnIdx != -1) m.showUsernameInGroup = c.getInt(showUnIdx) == 1;
+        int allowMIdx = c.getColumnIndex(COL_SM_ALLOW_MENTIONS);
+        if (allowMIdx != -1) m.allowMentions = c.getString(allowMIdx);
+        int upIdx = c.getColumnIndex(COL_SM_UPDATED_AT);
+        if (upIdx != -1) m.updatedAtTimestamp = c.getLong(upIdx);
+        int sigIdx = c.getColumnIndex(COL_SM_SIGNATURE);
+        if (sigIdx != -1) m.signature = c.getString(sigIdx);
+        return m;
     }
 
     public synchronized List<com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest> searchSovereignProfileManifests(String query) {

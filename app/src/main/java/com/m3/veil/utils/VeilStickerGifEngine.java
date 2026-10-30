@@ -50,6 +50,12 @@ import java.util.Locale;
 public class VeilStickerGifEngine {
 
     private static final LruCache<String, int[]> DIMENSION_CACHE = new LruCache<>(256);
+    private static final LruCache<String, Boolean> STICKER_DETECTION_CACHE = new LruCache<>(512);
+    private static final LruCache<String, Bitmap> DIE_CUT_STICKER_CACHE = new LruCache<>(64);
+    public static final int MAX_AUTO_PLAY_LOOPS = 3;
+    private static final long AUTO_PLAY_WINDOW_MS = 8500L;
+    private static final java.util.concurrent.ConcurrentHashMap<String, Long> FIRST_AUTO_PLAY_START_MS =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     // =========================================================================
     // 1. DYNAMIC MEDIA BUBBLE ASPECT-RATIO ENGINE (WHATSAPP / TELEGRAM PARITY)
@@ -283,17 +289,219 @@ public class VeilStickerGifEngine {
         if (message == null) return false;
         if ("sticker".equalsIgnoreCase(message.getType())) return true;
         String text = message.getText();
-        if (text != null) {
+        String trimmed = text != null ? text.trim() : "";
+        return (trimmed.startsWith("[STICKER:") && trimmed.endsWith("]"))
+                || "[sticker]".equalsIgnoreCase(trimmed);
+    }
+
+    public static boolean isAnimatedEmojiMessage(@Nullable Message message) {
+        if (message == null) return false;
+        if ("animated_emoji".equalsIgnoreCase(message.getType())) return true;
+        if (message.getType() == null || "text".equalsIgnoreCase(message.getType())) {
+            String text = message.getText();
+            if (text == null || text.trim().isEmpty()) return false;
             String trimmed = text.trim();
-            if (trimmed.startsWith("[STICKER:") && trimmed.endsWith("]")) {
-                return true;
+            if (trimmed.startsWith("[") && trimmed.endsWith("]")) return false;
+            if (isSingleEmojiOnly(trimmed)) return true;
+            try {
+                com.m3.veil.ui.views.VeilAdvancedTextView.EmojiAnalysisResult result =
+                        com.m3.veil.ui.views.VeilAdvancedTextView.analyzeEmojis(trimmed);
+                return result != null && result.isEmojiOnly && result.emojiCount == 1;
+            } catch (Throwable ignored) {
+                return false;
             }
         }
         return false;
     }
 
+    public static boolean isSingleEmojiOnly(@Nullable String text) {
+        if (text == null) return false;
+        String s = text.trim();
+        if (s.isEmpty()) return false;
+        int len = s.length();
+        int emojiCount = 0;
+        int i = 0;
+        while (i < len) {
+            int cp = Character.codePointAt(s, i);
+            int charCount = Character.charCount(cp);
+            i += charCount;
+
+            // Variation selectors, ZWJ, skin tones continue the current emoji cluster
+            if (cp == 0x200D || cp == 0xFE0E || cp == 0xFE0F || (cp >= 0x1F3FB && cp <= 0x1F3FF) || cp == 0x20E3) {
+                continue;
+            }
+
+            if (isEmojiCodePoint(cp)) {
+                emojiCount++;
+                if (emojiCount > 1) return false; // Strictly single emoji only!
+            } else {
+                return false;
+            }
+        }
+        return emojiCount == 1;
+    }
+
+    public static boolean isSingleOrDoubleEmoji(@Nullable String text) {
+        return isSingleEmojiOnly(text);
+    }
+
+    public static boolean isEmojiCodePoint(int cp) {
+        return (cp >= 0x1F600 && cp <= 0x1F64F) // Emoticons
+                || (cp >= 0x1F300 && cp <= 0x1F5FF) // Misc Symbols and Pictographs
+                || (cp >= 0x1F680 && cp <= 0x1F6FF) // Transport and Map
+                || (cp >= 0x1F700 && cp <= 0x1F77F) // Alchemical
+                || (cp >= 0x1F780 && cp <= 0x1F7FF) // Geometric Extended
+                || (cp >= 0x1F800 && cp <= 0x1F8FF) // Supplemental Arrows
+                || (cp >= 0x1F900 && cp <= 0x1F9FF) // Supplemental Symbols (🥹, 🫡, etc.)
+                || (cp >= 0x1FA00 && cp <= 0x1FAFF) // Symbols Extended-A
+                || (cp >= 0x1F1E6 && cp <= 0x1F1FF) // Regional indicators (flags)
+                || (cp >= 0x2600 && cp <= 0x27BF)   // Misc symbols & Dingbats (❤️, 🔥, etc.)
+                || (cp >= 0x2300 && cp <= 0x23FF)   // Misc Technical
+                || (cp >= 0x2B50 && cp <= 0x2B55)
+                || cp == 0x203C || cp == 0x2049 || cp == 0x2122 || cp == 0x2139
+                || cp == 0x2934 || cp == 0x2935 || cp == 0x3030 || cp == 0x303D || cp == 0x3297 || cp == 0x3299;
+    }
+
+    public static String extractAnimatedEmoji(@Nullable Message message) {
+        if (message == null || message.getText() == null) return "❤️";
+        return message.getText().trim();
+    }
+
+    public static int[] computeAnimatedEmojiSizePx(@NonNull Context context) {
+        float dp = context.getResources().getDisplayMetrics().density;
+        int size = Math.round(180 * dp);
+        return new int[]{size, size};
+    }
+
+    public static void bindAnimatedEmojiToImageView(@NonNull Context context, @Nullable Message message, @NonNull ImageView imageView) {
+        String emoji = extractAnimatedEmoji(message);
+        com.m3.veil.ui.views.VeilAnimatedEmojiDrawable drawable =
+                new com.m3.veil.ui.views.VeilAnimatedEmojiDrawable(context, emoji);
+        imageView.setImageDrawable(drawable);
+        drawable.start();
+    }
+
+    public static boolean hasTransparentCorners(@Nullable Bitmap bmp) {
+        if (bmp == null || bmp.getWidth() < 4 || bmp.getHeight() < 4) return false;
+        int w = bmp.getWidth();
+        int h = bmp.getHeight();
+        int transparentCount = 0;
+        if (Color.alpha(bmp.getPixel(0, 0)) < 40) transparentCount++;
+        if (Color.alpha(bmp.getPixel(w - 1, 0)) < 40) transparentCount++;
+        if (Color.alpha(bmp.getPixel(0, h - 1)) < 40) transparentCount++;
+        if (Color.alpha(bmp.getPixel(w - 1, h - 1)) < 40) transparentCount++;
+        return transparentCount >= 2;
+    }
+
+    public static boolean hasUniformSolidCorners(@Nullable Bitmap bmp) {
+        if (bmp == null || bmp.getWidth() < 8 || bmp.getHeight() < 8) return false;
+        int w = bmp.getWidth();
+        int h = bmp.getHeight();
+        int[] corners = new int[]{
+                bmp.getPixel(2, 2),
+                bmp.getPixel(w - 3, 2),
+                bmp.getPixel(2, h - 3),
+                bmp.getPixel(w - 3, h - 3)
+        };
+        int ref = corners[0];
+        if (Color.alpha(ref) < 220) return false;
+        int r = Color.red(ref), g = Color.green(ref), b = Color.blue(ref);
+        int matchCount = 0;
+        for (int c : corners) {
+            if (Color.alpha(c) >= 220 && colorDist(c, r, g, b) <= 16) matchCount++;
+        }
+        return matchCount >= 4;
+    }
+
+    /**
+     * Checks whether the bitmap has a genuine flat studio background box around its entire perimeter
+     * (all 4 corners + >= 85% of border perimeter pixels share the same flat color within tight tolerance).
+     * Real-world photos and meme scenes return false so their subject/background colors are never blended.
+     */
+    public static boolean hasUniformSolidBorderBox(@Nullable Bitmap bmp) {
+        if (bmp == null || bmp.getWidth() < 16 || bmp.getHeight() < 16) return false;
+        if (!hasUniformSolidCorners(bmp)) return false;
+        int w = bmp.getWidth();
+        int h = bmp.getHeight();
+        int ref = bmp.getPixel(2, 2);
+        int r = Color.red(ref), g = Color.green(ref), b = Color.blue(ref);
+        int samples = 0;
+        int matches = 0;
+        int stepX = Math.max(1, w / 24);
+        int stepY = Math.max(1, h / 24);
+        for (int x = 2; x < w - 2; x += stepX) {
+            samples += 2;
+            if (colorDist(bmp.getPixel(x, 2), r, g, b) <= 16) matches++;
+            if (colorDist(bmp.getPixel(x, h - 3), r, g, b) <= 16) matches++;
+        }
+        for (int y = 2; y < h - 2; y += stepY) {
+            samples += 2;
+            if (colorDist(bmp.getPixel(2, y), r, g, b) <= 16) matches++;
+            if (colorDist(bmp.getPixel(w - 3, y), r, g, b) <= 16) matches++;
+        }
+        if (samples == 0 || ((float) matches / samples) < 0.85f) {
+            return false;
+        }
+        // Ensure center region is not the exact same flat color
+        int centerDiffs = 0;
+        int[] cxOffsets = new int[]{w / 2, w / 3, (w * 2) / 3};
+        int[] cyOffsets = new int[]{h / 2, h / 3, (h * 2) / 3};
+        for (int cx : cxOffsets) {
+            for (int cy : cyOffsets) {
+                if (colorDist(bmp.getPixel(cx, cy), r, g, b) > 22) {
+                    centerDiffs++;
+                }
+            }
+        }
+        return centerDiffs >= 2;
+    }
+
+    @NonNull
+    public static String detectStickerFileExtension(@Nullable File file) {
+        if (file != null && file.exists() && file.length() >= 12) {
+            try (InputStream is = new FileInputStream(file)) {
+                byte[] h = new byte[12];
+                if (is.read(h) >= 12) {
+                    if (h[0] == 'G' && h[1] == 'I' && h[2] == 'F' && h[3] == '8') {
+                        return ".gif";
+                    }
+                    if (h[0] == 'R' && h[1] == 'I' && h[2] == 'F' && h[3] == 'F'
+                            && h[8] == 'W' && h[9] == 'E' && h[10] == 'B' && h[11] == 'P') {
+                        return ".webp";
+                    }
+                    if ((h[0] & 0xFF) == 0x89 && h[1] == 'P' && h[2] == 'N' && h[3] == 'G') {
+                        return ".png";
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+        return ".png";
+    }
+
+    public static boolean isAnimatedWebpFile(@Nullable File file) {
+        if (file == null || !file.exists() || file.length() < 30) return false;
+        try (InputStream is = new FileInputStream(file)) {
+            byte[] h = new byte[32];
+            int read = is.read(h);
+            if (read >= 21
+                    && h[0] == 'R' && h[1] == 'I' && h[2] == 'F' && h[3] == 'F'
+                    && h[8] == 'W' && h[9] == 'E' && h[10] == 'B' && h[11] == 'P') {
+                // VP8X extended WebP header stores animation bit (0x02) at byte offset 20
+                if (h[12] == 'V' && h[13] == 'P' && h[14] == '8' && h[15] == 'X') {
+                    return (h[20] & 0x02) != 0;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    public static boolean isAnimatedStickerFile(@Nullable File file) {
+        return isGifFile(file) || isAnimatedWebpFile(file);
+    }
+
     public static boolean isGifMessage(@Nullable Message message, @Nullable File localFile) {
         if (message == null) return false;
+        if (isStickerMessage(message)) return false;
         if ("gif".equalsIgnoreCase(message.getType())) return true;
         String text = message.getText();
         if (text != null) {
@@ -321,17 +529,58 @@ public class VeilStickerGifEngine {
         return false;
     }
 
+    public static boolean shouldAutoPlayOnce(@Nullable Message message) {
+        if (message == null || message.getId() == null || message.getId().isEmpty()) {
+            return true;
+        }
+        long now = SystemClock.uptimeMillis();
+        Long firstStart = FIRST_AUTO_PLAY_START_MS.get(message.getId());
+        if (firstStart == null) {
+            FIRST_AUTO_PLAY_START_MS.put(message.getId(), now);
+            return true;
+        }
+        return (now - firstStart) <= AUTO_PLAY_WINDOW_MS;
+    }
+
+    public static void replayAnimatedDrawable(@Nullable ImageView imageView) {
+        if (imageView == null) return;
+        Drawable d = imageView.getDrawable();
+        if (d instanceof Animatable) {
+            Animatable anim = (Animatable) d;
+            try {
+                if (anim.isRunning()) {
+                    anim.stop();
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && d instanceof AnimatedImageDrawable) {
+                    ((AnimatedImageDrawable) d).setRepeatCount(MAX_AUTO_PLAY_LOOPS - 1);
+                }
+                anim.start();
+                imageView.invalidate();
+            } catch (Throwable ignored) {}
+        }
+    }
+
     // =========================================================================
-    // 3. NATIVE GIF FILE DECODER + ANIMATED DRAWABLE LOADER
+    // 3. NATIVE GIF / STICKER FILE DECODER + 3-LOOP ANIMATED DRAWABLE LOADER (WHATSAPP/TELEGRAM APPROACH)
     // =========================================================================
 
     /**
-     * Loads a looping animated Drawable from a local .gif file (or animated .webp on API 28+).
+     * Loads a 3-loop (WhatsApp/Telegram style) animated Drawable from a local .gif or animated .webp file.
      */
     @Nullable
     public static Drawable loadAnimatedGifFromFile(@Nullable File file) {
+        return loadSingleCycleAnimatedDrawable(file, true, false, false);
+    }
+
+    @Nullable
+    public static Drawable loadSingleCycleAnimatedDrawable(
+            @Nullable File file,
+            boolean autoStart,
+            boolean stripSolidBg,
+            boolean fitCenter) {
         if (file == null || !file.exists() || file.length() < 16) return null;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && !stripSolidBg) {
             try {
                 android.graphics.ImageDecoder.Source source = android.graphics.ImageDecoder.createSource(file);
                 Drawable decoded = android.graphics.ImageDecoder.decodeDrawable(source, (decoder, info, src) -> {
@@ -339,17 +588,25 @@ public class VeilStickerGifEngine {
                 });
                 if (decoded instanceof AnimatedImageDrawable) {
                     AnimatedImageDrawable anim = (AnimatedImageDrawable) decoded;
-                    anim.setRepeatCount(AnimatedImageDrawable.REPEAT_INFINITE);
-                    anim.start();
+                    // Play 3 times (1 initial pass + 2 repeats = 3 plays total) then stop cleanly (WhatsApp/Telegram approach)
+                    anim.setRepeatCount(MAX_AUTO_PLAY_LOOPS - 1);
+                    if (autoStart) {
+                        anim.start();
+                    } else {
+                        anim.stop();
+                    }
                     return anim;
                 }
             } catch (Throwable ignored) {}
         }
+
         try {
             Movie movie = Movie.decodeFile(file.getAbsolutePath());
             if (movie != null && movie.width() > 0 && movie.height() > 0) {
-                MovieGifDrawable drawable = new MovieGifDrawable(movie);
-                drawable.start();
+                MovieGifDrawable drawable = new MovieGifDrawable(movie, stripSolidBg, fitCenter);
+                if (autoStart) {
+                    drawable.start();
+                }
                 return drawable;
             }
         } catch (Throwable ignored) {}
@@ -358,6 +615,7 @@ public class VeilStickerGifEngine {
 
     /**
      * Binds either a built-in animated GIF preset (`[GIF:...]`) or a local `.gif` file into an ImageView.
+     * Plays 3 loops on display (WhatsApp/Telegram approach) and replays 3 loops on tap.
      */
     public static boolean bindGifToImageView(
             @NonNull Context context,
@@ -367,37 +625,76 @@ public class VeilStickerGifEngine {
             @Nullable View progressBar) {
         if (progressBar != null) progressBar.setVisibility(View.GONE);
         String text = message.getText() != null ? message.getText().trim() : "";
+        File gifFile = localFile;
+        if (!text.startsWith("[GIF:") && (gifFile == null || !gifFile.exists())) {
+            gifFile = FileMediaManager.getDecryptedFile(context, message, ".gif");
+        }
+        String bindKey = "veil_gif_" + (message.getId() != null ? message.getId() : "")
+                + "_" + (gifFile != null ? gifFile.getAbsolutePath() : text);
+        Object existingTag = targetView.getTag();
+        if (bindKey.equals(existingTag) && targetView.getDrawable() instanceof Animatable) {
+            // Preserve existing Drawable across RecyclerView re-binds so 3-loop playback is never interrupted
+            return true;
+        }
+
+        boolean autoStart = shouldAutoPlayOnce(message);
         if (text.startsWith("[GIF:")) {
             GifPreset preset = findGifPresetByCode(text);
             if (preset != null) {
                 AnimatedGifSceneDrawable scene = new AnimatedGifSceneDrawable(context, preset);
                 targetView.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 targetView.setImageDrawable(scene);
-                scene.start();
+                targetView.setTag(bindKey);
+                if (autoStart) {
+                    scene.start();
+                } else {
+                    scene.stop();
+                }
                 return true;
             }
         }
 
-        File gifFile = localFile;
-        if (gifFile == null || !gifFile.exists()) {
-            gifFile = FileMediaManager.getDecryptedFile(context, message, ".gif");
-        }
         if (gifFile != null && gifFile.exists()) {
-            Drawable gifDrawable = loadAnimatedGifFromFile(gifFile);
+            Drawable gifDrawable = loadSingleCycleAnimatedDrawable(gifFile, autoStart, false, false);
             if (gifDrawable != null) {
                 targetView.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 targetView.setImageDrawable(gifDrawable);
-                if (gifDrawable instanceof Animatable) {
-                    ((Animatable) gifDrawable).start();
-                }
+                targetView.setTag(bindKey);
                 return true;
             }
         }
         return false;
     }
 
+    @Nullable
+    public static File resolveStickerFile(@NonNull Context context, @Nullable Message message) {
+        if (message == null) return null;
+        String[] exts = new String[]{".webp", ".png", ".gif", ".jpg"};
+        for (String ext : exts) {
+            File dec = FileMediaManager.getDecryptedFile(context, message, ext);
+            if (dec != null && dec.exists() && dec.length() > 16) {
+                return dec;
+            }
+        }
+        if (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
+            File f = new File(message.getLocalFilePath());
+            if (f.exists() && f.length() > 16) {
+                return f;
+            }
+        }
+        try {
+            File inlineFile = com.m3.veil.manager.VeilMessagesController.decodeInlineMediaToFile(
+                    context, message.getChatId(), message);
+            if (inlineFile != null && inlineFile.exists() && inlineFile.length() > 16) {
+                return inlineFile;
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
     /**
      * Binds a WhatsApp/Telegram-style chromeless, borderless, transparent sticker into an ImageView.
+     * Plays 3 cycles on display (WhatsApp/Telegram approach) and replays on tap.
      */
     public static void bindStickerToImageView(
             @NonNull Context context,
@@ -407,62 +704,155 @@ public class VeilStickerGifEngine {
         targetView.setBackground(null);
         targetView.setPadding(0, 0, 0, 0);
         String raw = message.getText() != null ? message.getText().trim() : "✨";
-        // 1. Check if backed by a local .gif / .webp / .png / .jpg custom sticker file
-        File candidateFile = null;
-        if (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
-            File f = new File(message.getLocalFilePath());
-            if (f.exists() && f.length() > 16) {
-                candidateFile = f;
+        File candidateFile = resolveStickerFile(context, message);
+
+        String bindKey = "veil_sticker_" + (message.getId() != null ? message.getId() : "")
+                + "_" + (candidateFile != null ? candidateFile.getAbsolutePath() : raw);
+        Object existingTag = targetView.getTag();
+        if (bindKey.equals(existingTag) && targetView.getDrawable() instanceof Animatable) {
+            Drawable active = targetView.getDrawable();
+            if (active.getIntrinsicWidth() > 0 && active.getIntrinsicHeight() > 0) {
+                syncStickerCardDimensions(context, targetView, message, active.getIntrinsicWidth(), active.getIntrinsicHeight());
             }
+            // Preserve active animated sticker drawable across RecyclerView re-binds
+            return;
         }
-        if (candidateFile == null) {
-            File decPng = com.m3.veil.utils.FileMediaManager.getDecryptedFile(context, message, ".png");
-            if (decPng != null && decPng.exists() && decPng.length() > 16) {
-                candidateFile = decPng;
-            }
-        }
+
+        boolean autoPlayOnce = shouldAutoPlayOnce(message);
+
+        // 1. Check if backed by a local .webp / .png / .gif / .jpg sticker file
         if (candidateFile != null && candidateFile.exists()) {
-            if (isGifFile(candidateFile)) {
-                Drawable d = loadAnimatedGifFromFile(candidateFile);
+            String pathKey = candidateFile.getAbsolutePath();
+            if (isAnimatedStickerFile(candidateFile)) {
+                Bitmap firstFrame = null;
+                boolean needsSolidBorderStrip = false;
+                int frameW = 0;
+                int frameH = 0;
+                try {
+                    BitmapFactory.Options opts = new BitmapFactory.Options();
+                    opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+                    firstFrame = BitmapFactory.decodeFile(pathKey, opts);
+                    if (firstFrame != null) {
+                        frameW = firstFrame.getWidth();
+                        frameH = firstFrame.getHeight();
+                        if (!hasTransparentCorners(firstFrame)) {
+                            needsSolidBorderStrip = hasUniformSolidBorderBox(firstFrame);
+                        }
+                    }
+                } catch (Throwable ignored) {}
+
+                Drawable d = loadSingleCycleAnimatedDrawable(candidateFile, autoPlayOnce, needsSolidBorderStrip, true);
                 if (d != null) {
+                    int dw = d.getIntrinsicWidth() > 0 ? d.getIntrinsicWidth() : frameW;
+                    int dh = d.getIntrinsicHeight() > 0 ? d.getIntrinsicHeight() : frameH;
+                    if (dw > 0 && dh > 0) {
+                        DIMENSION_CACHE.put(pathKey, new int[]{dw, dh});
+                        syncStickerCardDimensions(context, targetView, message, dw, dh);
+                    }
+                    if (firstFrame != null) firstFrame.recycle();
                     targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     targetView.setImageDrawable(d);
+                    targetView.setTag(bindKey);
+                    return;
+                }
+                if (firstFrame != null) {
+                    Bitmap dieCut = stripSolidBorderBackgroundIfPresent(firstFrame);
+                    DIE_CUT_STICKER_CACHE.put(pathKey, dieCut);
+                    DIMENSION_CACHE.put(pathKey, new int[]{dieCut.getWidth(), dieCut.getHeight()});
+                    syncStickerCardDimensions(context, targetView, message, dieCut.getWidth(), dieCut.getHeight());
+                    targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    targetView.setImageBitmap(dieCut);
+                    targetView.setTag(bindKey);
                     return;
                 }
             } else {
-                Bitmap bmp = BitmapFactory.decodeFile(candidateFile.getAbsolutePath());
-                if (bmp != null) {
-                    Bitmap dieCut = stripSolidBorderBackgroundIfPresent(bmp);
+                Bitmap cached = DIE_CUT_STICKER_CACHE.get(pathKey);
+                if (cached != null && !cached.isRecycled()) {
+                    DIMENSION_CACHE.put(pathKey, new int[]{cached.getWidth(), cached.getHeight()});
+                    syncStickerCardDimensions(context, targetView, message, cached.getWidth(), cached.getHeight());
+                    targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    targetView.setImageBitmap(cached);
+                    targetView.setTag(bindKey);
+                    return;
+                }
+                Bitmap cachedDecoded = decodePhotoPreservingAspectRatio(candidateFile, 512);
+                if (cachedDecoded != null) {
+                    Bitmap dieCut = stripSolidBorderBackgroundIfPresent(cachedDecoded);
+                    DIE_CUT_STICKER_CACHE.put(pathKey, dieCut);
+                    DIMENSION_CACHE.put(pathKey, new int[]{dieCut.getWidth(), dieCut.getHeight()});
+                    syncStickerCardDimensions(context, targetView, message, dieCut.getWidth(), dieCut.getHeight());
                     targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     targetView.setImageBitmap(dieCut);
+                    targetView.setTag(bindKey);
                     return;
                 }
             }
         }
-        // 2. Check if message has a base64 thumbnail for custom sticker
+
+        // 2. Check if message has a base64 thumbnail for custom/keyboard sticker
         if (message.getThumbnail() != null && !message.getThumbnail().isEmpty()
                 && ("[sticker]".equalsIgnoreCase(raw) || raw.isEmpty())) {
+            String thumbKey = "thumb_" + (message.getId() != null ? message.getId() : raw.hashCode());
+            Bitmap cachedThumb = DIE_CUT_STICKER_CACHE.get(thumbKey);
+            if (cachedThumb != null && !cachedThumb.isRecycled()) {
+                syncStickerCardDimensions(context, targetView, message, cachedThumb.getWidth(), cachedThumb.getHeight());
+                targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                targetView.setImageBitmap(cachedThumb);
+                targetView.setTag(bindKey);
+                return;
+            }
             try {
                 byte[] bytes = android.util.Base64.decode(message.getThumbnail(), android.util.Base64.DEFAULT);
-                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                BitmapFactory.Options opts = new BitmapFactory.Options();
+                opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
                 if (bmp != null) {
                     Bitmap dieCut = stripSolidBorderBackgroundIfPresent(bmp);
+                    DIE_CUT_STICKER_CACHE.put(thumbKey, dieCut);
+                    syncStickerCardDimensions(context, targetView, message, dieCut.getWidth(), dieCut.getHeight());
                     targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     targetView.setImageBitmap(dieCut);
+                    targetView.setTag(bindKey);
                     return;
                 }
             } catch (Exception ignored) {}
         }
+
+        if (raw.startsWith("[GIF:")) {
+            GifPreset gifPreset = findGifPresetByCode(raw);
+            if (gifPreset != null) {
+                AnimatedGifSceneDrawable scene = new AnimatedGifSceneDrawable(context, gifPreset);
+                targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                targetView.setImageDrawable(scene);
+                targetView.setTag(bindKey);
+                if (autoPlayOnce) {
+                    scene.start();
+                } else {
+                    scene.stop();
+                }
+                return;
+            }
+        }
+
         StickerPreset preset = resolveStickerPreset(raw);
         AnimatedStickerDrawable stickerDrawable = new AnimatedStickerDrawable(context, preset);
         targetView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         targetView.setImageDrawable(stickerDrawable);
-        stickerDrawable.start();
+        targetView.setTag(bindKey);
+        if (autoPlayOnce) {
+            stickerDrawable.start();
+        } else {
+            stickerDrawable.stop();
+        }
     }
 
     /**
-     * Automatically strips solid rectangular background/border from custom screenshot/photo stickers
-     * via edge flood-fill chroma key so stickers always float cleanly on the chat wallpaper.
+     * Accurately prepares a custom/keyboard sticker bitmap without blurry color blending:
+     * - If the image already has transparent corners, returns it untouched at 100% sharpness.
+     * - If the image has a genuine uniform flat studio border box (e.g. white/black box around a character),
+     *   flood-fills ONLY that flat border color with tight tolerance (18) and crisp 1px edge anti-aliasing.
+     * - If the image is a real-world photo, video frame, or meme scene, preserves 100% of original subject
+     *   and scene colors with clean rounded sticker corners (zero muddy chroma-key bleeding!).
      */
     @NonNull
     public static Bitmap stripSolidBorderBackgroundIfPresent(@NonNull Bitmap src) {
@@ -470,37 +860,36 @@ public class VeilStickerGifEngine {
             int w = src.getWidth();
             int h = src.getHeight();
             if (w < 8 || h < 8) return src;
-            // Check if corners are already transparent
-            int c00 = src.getPixel(0, 0);
-            int c10 = src.getPixel(w - 1, 0);
-            int c01 = src.getPixel(0, h - 1);
-            int c11 = src.getPixel(w - 1, h - 1);
-            if (Color.alpha(c00) < 20 && Color.alpha(c10) < 20 && Color.alpha(c01) < 20 && Color.alpha(c11) < 20) {
+            // 1. Already transparent sticker -> return untouched (zero pixel alteration)
+            if (hasTransparentCorners(src)) {
                 return src;
             }
+            // 2. Real photo / meme scene without a flat uniform studio border box ->
+            //    keep 100% crisp original colors and apply clean rounded sticker corners!
+            if (!hasUniformSolidBorderBox(src)) {
+                return applyCrispRoundedStickerCorners(src);
+            }
+
             Bitmap out = src.copy(Bitmap.Config.ARGB_8888, true);
             int[] pixels = new int[w * h];
             out.getPixels(pixels, 0, w, 0, 0, w, h);
 
-            int seedColor = c00;
-            int sr = Color.red(seedColor);
-            int sg = Color.green(seedColor);
-            int sb = Color.blue(seedColor);
+            int cRef = pixels[2 * w + 2];
+            int sr = Color.red(cRef), sg = Color.green(cRef), sb = Color.blue(cRef);
 
             boolean[] visited = new boolean[w * h];
             int[] queue = new int[w * h];
             int head = 0, tail = 0;
 
-            // Enqueue border pixels that match corner background color within tolerance
-            int tolerance = 42;
+            int tolerance = 18;
             for (int x = 0; x < w; x++) {
                 int topIdx = x;
                 int botIdx = (h - 1) * w + x;
-                if (colorDist(pixels[topIdx], sr, sg, sb) <= tolerance) {
+                if (matchesSingleBgSeed(pixels[topIdx], sr, sg, sb, tolerance)) {
                     visited[topIdx] = true;
                     queue[tail++] = topIdx;
                 }
-                if (!visited[botIdx] && colorDist(pixels[botIdx], sr, sg, sb) <= tolerance) {
+                if (!visited[botIdx] && matchesSingleBgSeed(pixels[botIdx], sr, sg, sb, tolerance)) {
                     visited[botIdx] = true;
                     queue[tail++] = botIdx;
                 }
@@ -508,11 +897,11 @@ public class VeilStickerGifEngine {
             for (int y = 0; y < h; y++) {
                 int leftIdx = y * w;
                 int rightIdx = y * w + (w - 1);
-                if (!visited[leftIdx] && colorDist(pixels[leftIdx], sr, sg, sb) <= tolerance) {
+                if (!visited[leftIdx] && matchesSingleBgSeed(pixels[leftIdx], sr, sg, sb, tolerance)) {
                     visited[leftIdx] = true;
                     queue[tail++] = leftIdx;
                 }
-                if (!visited[rightIdx] && colorDist(pixels[rightIdx], sr, sg, sb) <= tolerance) {
+                if (!visited[rightIdx] && matchesSingleBgSeed(pixels[rightIdx], sr, sg, sb, tolerance)) {
                     visited[rightIdx] = true;
                     queue[tail++] = rightIdx;
                 }
@@ -525,38 +914,90 @@ public class VeilStickerGifEngine {
                 int y = idx / w;
                 if (x > 0) {
                     int n = idx - 1;
-                    if (!visited[n] && colorDist(pixels[n], sr, sg, sb) <= tolerance) {
+                    if (!visited[n] && matchesSingleBgSeed(pixels[n], sr, sg, sb, tolerance)) {
                         visited[n] = true;
                         queue[tail++] = n;
                     }
                 }
                 if (x + 1 < w) {
                     int n = idx + 1;
-                    if (!visited[n] && colorDist(pixels[n], sr, sg, sb) <= tolerance) {
+                    if (!visited[n] && matchesSingleBgSeed(pixels[n], sr, sg, sb, tolerance)) {
                         visited[n] = true;
                         queue[tail++] = n;
                     }
                 }
                 if (y > 0) {
                     int n = idx - w;
-                    if (!visited[n] && colorDist(pixels[n], sr, sg, sb) <= tolerance) {
+                    if (!visited[n] && matchesSingleBgSeed(pixels[n], sr, sg, sb, tolerance)) {
                         visited[n] = true;
                         queue[tail++] = n;
                     }
                 }
                 if (y + 1 < h) {
                     int n = idx + w;
-                    if (!visited[n] && colorDist(pixels[n], sr, sg, sb) <= tolerance) {
+                    if (!visited[n] && matchesSingleBgSeed(pixels[n], sr, sg, sb, tolerance)) {
                         visited[n] = true;
                         queue[tail++] = n;
                     }
                 }
             }
+
+            // Safety guard: if flood-fill removed > 72% of total pixels, the subject itself shared the border color;
+            // keep crisp rounded sticker instead of a damaged cutout.
+            if (tail > (w * h * 72) / 100) {
+                out.recycle();
+                return applyCrispRoundedStickerCorners(src);
+            }
+
+            // Crisp 1px contour anti-aliasing without color bleeding
+            for (int y = 1; y < h - 1; y++) {
+                int rowOffset = y * w;
+                for (int x = 1; x < w - 1; x++) {
+                    int idx = rowOffset + x;
+                    if (!visited[idx]) {
+                        if (visited[idx - 1] || visited[idx + 1] || visited[idx - w] || visited[idx + w]) {
+                            int px = pixels[idx];
+                            int dist = colorDist(px, sr, sg, sb);
+                            if (dist < tolerance + 6) {
+                                int origA = Color.alpha(px);
+                                int softA = Math.min(origA, Math.max(96, (dist - tolerance / 2) * 255 / 12));
+                                pixels[idx] = Color.argb(softA, Color.red(px), Color.green(px), Color.blue(px));
+                            }
+                        }
+                    }
+                }
+            }
+
             out.setPixels(pixels, 0, w, 0, 0, w, h);
             return out;
         } catch (Exception e) {
             return src;
         }
+    }
+
+    @NonNull
+    public static Bitmap applyCrispRoundedStickerCorners(@NonNull Bitmap src) {
+        try {
+            int w = src.getWidth();
+            int h = src.getHeight();
+            if (w < 8 || h < 8) return src;
+            Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(out);
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+            float radius = Math.min(w, h) * 0.085f;
+            Path clipPath = new Path();
+            clipPath.addRoundRect(new RectF(0f, 0f, w, h), radius, radius, Path.Direction.CW);
+            canvas.clipPath(clipPath);
+            canvas.drawBitmap(src, 0f, 0f, paint);
+            return out;
+        } catch (Throwable t) {
+            return src;
+        }
+    }
+
+    private static boolean matchesSingleBgSeed(int pixel, int r, int g, int b, int tol) {
+        if (Color.alpha(pixel) < 35) return true;
+        return colorDist(pixel, r, g, b) <= tol;
     }
 
     private static int colorDist(int pixel, int r, int g, int b) {
@@ -567,43 +1008,49 @@ public class VeilStickerGifEngine {
     }
 
     /**
-     * Computes Telegram/WhatsApp-style per-sticker display [widthPx, heightPx] based on each sticker's
-     * natural aspect ratio (preset dimensions or local sticker file dimensions) so every sticker
-     * renders at its own unique width and height without any border.
+     * Computes WhatsApp/Telegram-standard 1:1 Square sticker display [widthPx, heightPx] (174dp x 174dp).
+     * Stickers always render in a 1:1 square box in chat regardless of source media orientation.
      */
     @NonNull
     public static int[] computeStickerSizePx(@NonNull Context context, @Nullable Message message) {
         float dp = context.getResources().getDisplayMetrics().density;
-        if (message != null && message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
-            File f = new File(message.getLocalFilePath());
-            if (f.exists() && f.length() > 16) {
-                BitmapFactory.Options opts = new BitmapFactory.Options();
-                opts.inJustDecodeBounds = true;
-                BitmapFactory.decodeFile(f.getAbsolutePath(), opts);
-                if (opts.outWidth > 0 && opts.outHeight > 0) {
-                    float ratio = (float) opts.outWidth / (float) opts.outHeight;
-                    float wDp;
-                    float hDp;
-                    if (ratio >= 1.15f) {
-                        wDp = Math.min(212f, Math.max(164f, 180f * Math.min(1.25f, ratio)));
-                        hDp = Math.max(122f, wDp / ratio);
-                    } else if (ratio <= 0.88f) {
-                        hDp = Math.min(212f, Math.max(164f, 180f / Math.max(0.75f, ratio)));
-                        wDp = Math.max(124f, hDp * ratio);
-                    } else {
-                        wDp = 168f;
-                        hDp = 168f / ratio;
-                    }
-                    return new int[]{Math.round(wDp * dp), Math.round(hDp * dp)};
-                }
+        int sq = Math.round(174f * dp);
+        return new int[]{sq, sq};
+    }
+
+    @NonNull
+    public static int[] computeStickerSizeFromIntrinsic(float dp, int intrinsicW, int intrinsicH) {
+        int sq = Math.round(174f * dp);
+        return new int[]{sq, sq};
+    }
+
+    /**
+     * Dynamically synchronizes the sticker card container's LayoutParams to match the loaded
+     * sticker's true Portrait, Landscape, or Square dimensions immediately on bind.
+     */
+    private static void syncStickerCardDimensions(
+            @NonNull Context context,
+            @NonNull ImageView targetView,
+            @Nullable Message message,
+            int intrinsicW,
+            int intrinsicH) {
+        if (intrinsicW <= 0 || intrinsicH <= 0) return;
+        if (message != null && message.getId() != null) {
+            DIMENSION_CACHE.put("msg_" + message.getId(), new int[]{intrinsicW, intrinsicH});
+        }
+        float dp = context.getResources().getDisplayMetrics().density;
+        int[] dims = computeStickerSizeFromIntrinsic(dp, intrinsicW, intrinsicH);
+        android.view.ViewParent p1 = targetView.getParent();
+        if (p1 instanceof View) {
+            android.view.ViewParent p2 = p1.getParent();
+            if (p2 instanceof View && ((View) p2).getId() == com.m3.veil.R.id.imageCardView) {
+                updateViewDimensions((View) p2, dims[0], dims[1]);
+                return;
+            }
+            if (((View) p1).getId() == com.m3.veil.R.id.imageCardView) {
+                updateViewDimensions((View) p1, dims[0], dims[1]);
             }
         }
-        String raw = message != null && message.getText() != null ? message.getText().trim() : "✨";
-        StickerPreset preset = resolveStickerPreset(raw);
-        return new int[]{
-                Math.round(preset.intrinsicWidth * dp),
-                Math.round(preset.intrinsicHeight * dp)
-        };
     }
 
     /**
@@ -830,11 +1277,44 @@ public class VeilStickerGifEngine {
         return new StickerPreset("[STICKER:" + inner + "]", dispEmoji, label, colors1[cIdx], colors2[cIdx], hash % 5, sz[0], sz[1]);
     }
 
+    @Nullable
+    public static File materializePresetGifToFile(@NonNull Context context, @NonNull String gifCode) {
+        try {
+            GifPreset preset = findGifPresetByCode(gifCode);
+            int w = preset != null ? Math.max(420, preset.intrinsicWidth) : 512;
+            int h = preset != null ? Math.max(420, preset.intrinsicHeight) : 512;
+            Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bmp);
+            if (preset != null) {
+                AnimatedGifSceneDrawable d = new AnimatedGifSceneDrawable(context, preset);
+                d.setBounds(0, 0, w, h);
+                d.draw(canvas);
+            } else {
+                StickerPreset sp = resolveStickerPreset(gifCode);
+                AnimatedStickerDrawable sd = new AnimatedStickerDrawable(context, sp);
+                sd.setBounds(0, 0, w, h);
+                sd.draw(canvas);
+            }
+            File cacheDir = context.getExternalCacheDir() != null ? context.getExternalCacheDir() : context.getCacheDir();
+            File out = new File(cacheDir, "preset_gif_" + System.currentTimeMillis() + ".png");
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(out)) {
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, fos);
+                fos.flush();
+            }
+            bmp.recycle();
+            return out;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     // =========================================================================
-    // 5. TELEGRAM-STYLE ANIMATED STICKER DRAWABLE (60FPS LOOPING CANVAS)
+    // 5. TELEGRAM/WHATSAPP-STYLE ANIMATED STICKER DRAWABLE (PLAYS 3 CYCLES THEN STOPS)
     // =========================================================================
 
     public static class AnimatedStickerDrawable extends Drawable implements Animatable {
+        private static final long SINGLE_CYCLE_MS = 1800L;
+        private static final long TOTAL_PLAY_MS = SINGLE_CYCLE_MS * MAX_AUTO_PLAY_LOOPS;
         private final StickerPreset preset;
         private final float dp;
         private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -844,13 +1324,12 @@ public class VeilStickerGifEngine {
         private final TextPaint emojiPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         private final TextPaint labelPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         private final RectF badgeRect = new RectF();
-        private boolean running = true;
-        private final long startTimeOffset;
+        private boolean running = false;
+        private long cycleStartMs = 0L;
 
         public AnimatedStickerDrawable(@NonNull Context context, @NonNull StickerPreset preset) {
             this.preset = preset;
             this.dp = context.getResources().getDisplayMetrics().density;
-            this.startTimeOffset = Math.abs(preset.code.hashCode() % 4000);
 
             ringPaint.setStyle(Paint.Style.STROKE);
             ringPaint.setStrokeWidth(2.5f * dp);
@@ -887,25 +1366,32 @@ public class VeilStickerGifEngine {
             float cy = b.top + h * 0.44f;
             float minDim = Math.min(w, h);
 
-            long elapsed = (SystemClock.uptimeMillis() + startTimeOffset) % 2400L;
-            float phase = (float) elapsed / 2400f; // 0..1 loop
+            float phase = 0f;
+            if (running) {
+                long elapsed = SystemClock.uptimeMillis() - cycleStartMs;
+                if (elapsed >= TOTAL_PLAY_MS) {
+                    running = false;
+                    phase = 0f;
+                } else {
+                    phase = (float) (elapsed % SINGLE_CYCLE_MS) / (float) SINGLE_CYCLE_MS;
+                }
+            }
             float angleRad = (float) (phase * Math.PI * 2.0);
 
             // 1. WhatsApp Die-Cut Sticker Style: ZERO background circle, ZERO border box!
-            //    Subtle floating musical notes / expressive comic accents around the character
             emojiPaint.setTextSize(minDim * 0.14f);
-            float noteBounce = (float) Math.sin(angleRad * 2f) * (3.5f * dp);
+            float noteBounce = running ? (float) Math.sin(angleRad * 2f) * (3.5f * dp) : 0f;
             labelPaint.setStyle(Paint.Style.FILL);
             labelPaint.setColor(0xFF1F1F1F);
             labelPaint.setTextSize(minDim * 0.15f);
             canvas.drawText("♪", cx - minDim * 0.30f, cy - minDim * 0.08f + noteBounce, labelPaint);
             canvas.drawText("♫", cx + minDim * 0.30f, cy - minDim * 0.12f - noteBounce, labelPaint);
 
-            // 2. Animated central sticker character with expressive spring bounce & tilt
+            // 2. Central sticker character (animates 3 cycles then settles cleanly at upright resting pose)
             canvas.save();
-            float bounceY = (float) Math.sin(angleRad) * (minDim * 0.035f);
-            float scale = 0.96f + 0.07f * (float) Math.sin(angleRad * 2f);
-            float tiltDeg = (float) Math.cos(angleRad) * 4.5f;
+            float bounceY = running ? (float) Math.sin(angleRad) * (minDim * 0.035f) : 0f;
+            float scale = running ? (0.96f + 0.07f * (float) Math.sin(angleRad * 2f)) : 1.0f;
+            float tiltDeg = running ? ((float) Math.sin(angleRad) * 4.5f) : 0f;
             canvas.translate(cx, cy + bounceY);
             canvas.rotate(tiltDeg);
             canvas.scale(scale, scale);
@@ -916,14 +1402,13 @@ public class VeilStickerGifEngine {
             canvas.drawText(preset.emoji, 0, textCenterOffset, emojiPaint);
             canvas.restore();
 
-            // 3. Borderless hand-lettered WhatsApp sticker typography (white die-cut halo + dark ink text, NO pill box/border!)
+            // 3. Borderless hand-lettered WhatsApp sticker typography (white die-cut halo + dark ink text)
             if (preset.label != null && !preset.label.isEmpty()) {
                 float textSize = Math.max(12f * dp, minDim * 0.115f);
                 labelPaint.setTextSize(textSize);
                 Paint.FontMetrics lfm = labelPaint.getFontMetrics();
                 float lBaseline = b.top + h * 0.85f - (lfm.ascent + lfm.descent) * 0.5f;
 
-                // White sticker die-cut outline behind text for readability on any chat wallpaper
                 labelPaint.setStyle(Paint.Style.STROKE);
                 labelPaint.setStrokeJoin(Paint.Join.ROUND);
                 labelPaint.setStrokeCap(Paint.Cap.ROUND);
@@ -931,7 +1416,6 @@ public class VeilStickerGifEngine {
                 labelPaint.setColor(0xF2FFFFFF);
                 canvas.drawText(preset.label, cx, lBaseline, labelPaint);
 
-                // Crisp dark hand-lettered ink fill (like "LEAVE ME ALONE" / "PLEASE, GO ON..." in WhatsApp)
                 labelPaint.setStyle(Paint.Style.FILL);
                 labelPaint.setColor(0xFF1F1D1B);
                 canvas.drawText(preset.label, cx, lBaseline, labelPaint);
@@ -944,15 +1428,15 @@ public class VeilStickerGifEngine {
 
         @Override
         public void start() {
-            if (!running) {
-                running = true;
-                invalidateSelf();
-            }
+            cycleStartMs = SystemClock.uptimeMillis();
+            running = true;
+            invalidateSelf();
         }
 
         @Override
         public void stop() {
             running = false;
+            invalidateSelf();
         }
 
         @Override
@@ -973,10 +1457,12 @@ public class VeilStickerGifEngine {
     }
 
     // =========================================================================
-    // 6. LOOPING ANIMATED GIF SCENE DRAWABLE (PORTRAIT / LANDSCAPE / SQUARE)
+    // 6. 3-CYCLE ANIMATED GIF SCENE DRAWABLE (PORTRAIT / LANDSCAPE / SQUARE)
     // =========================================================================
 
     public static class AnimatedGifSceneDrawable extends Drawable implements Animatable {
+        private static final long SINGLE_CYCLE_MS = 2000L;
+        private static final long TOTAL_PLAY_MS = SINGLE_CYCLE_MS * MAX_AUTO_PLAY_LOOPS;
         private final GifPreset preset;
         private final float dp;
         private final Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -988,13 +1474,12 @@ public class VeilStickerGifEngine {
         private final RectF bannerRect = new RectF();
         private LinearGradient cachedGradient;
         private int lastW = -1, lastH = -1;
-        private boolean running = true;
-        private final long seedOffset;
+        private boolean running = false;
+        private long cycleStartMs = 0L;
 
         public AnimatedGifSceneDrawable(@NonNull Context context, @NonNull GifPreset preset) {
             this.preset = preset;
             this.dp = context.getResources().getDisplayMetrics().density;
-            this.seedOffset = Math.abs(preset.code.hashCode() % 5000);
 
             emojiPaint.setTextAlign(Paint.Align.CENTER);
             captionPaint.setTextAlign(Paint.Align.CENTER);
@@ -1032,28 +1517,32 @@ public class VeilStickerGifEngine {
                 bgPaint.setShader(cachedGradient);
             }
 
-            // 1. Rich gradient backdrop
             canvas.drawRect(b, bgPaint);
 
-            long now = (SystemClock.uptimeMillis() + seedOffset) % 2600L;
-            float t = (float) now / 2600f;
+            float t = 0.25f;
+            if (running) {
+                long elapsed = SystemClock.uptimeMillis() - cycleStartMs;
+                if (elapsed >= TOTAL_PLAY_MS) {
+                    running = false;
+                    t = 0.25f;
+                } else {
+                    t = (float) (elapsed % SINGLE_CYCLE_MS) / (float) SINGLE_CYCLE_MS;
+                }
+            }
             float rad = (float) (t * Math.PI * 2.0);
             float cx = b.left + w * 0.5f;
             float cy = b.top + h * 0.44f;
             float minDim = Math.min(w, h);
 
-            // 2. Animated synthwave / pulse rings / starfield
             particlePaint.setColor(preset.accentColor);
             for (int i = 0; i < 8; i++) {
                 float pPhase = (t + i * 0.125f) % 1.0f;
                 if (preset.animMode == 2) {
-                    // Rising vertical streaks (Rocket / Fire portrait)
                     float x = b.left + w * (0.15f + 0.7f * ((i * 37 % 100) / 100f));
                     float y = b.bottom - pPhase * h;
                     particlePaint.setAlpha((int) (180 * (1f - Math.abs(pPhase - 0.5f) * 1.6f)));
                     canvas.drawCircle(x, y, (3f + (i % 3) * 1.5f) * dp, particlePaint);
                 } else {
-                    // Expanding radial rings & burst stars
                     float angle = (float) (i * Math.PI * 0.25 + rad * 0.5);
                     float dist = minDim * (0.12f + pPhase * 0.38f);
                     float px = cx + (float) Math.cos(angle) * dist;
@@ -1063,7 +1552,6 @@ public class VeilStickerGifEngine {
                 }
             }
 
-            // Subtle animated wave at bottom
             wavePath.reset();
             float waveBaseY = b.top + h * 0.76f;
             wavePath.moveTo(b.left, b.bottom);
@@ -1079,10 +1567,9 @@ public class VeilStickerGifEngine {
             particlePaint.setAlpha(42);
             canvas.drawPath(wavePath, particlePaint);
 
-            // 3. Animated hero emoji
             canvas.save();
-            float scale = 0.92f + 0.14f * (float) Math.sin(rad * 2f);
-            float dy = (float) Math.cos(rad) * (5f * dp);
+            float scale = running ? (0.92f + 0.14f * (float) Math.sin(rad * 2f)) : 1.0f;
+            float dy = running ? ((float) Math.cos(rad) * (5f * dp)) : 0f;
             canvas.translate(cx, cy + dy);
             canvas.scale(scale, scale);
             emojiPaint.setTextSize(minDim * 0.36f);
@@ -1090,7 +1577,6 @@ public class VeilStickerGifEngine {
             canvas.drawText(preset.centerEmoji, 0, -(fm.ascent + fm.descent) * 0.5f, emojiPaint);
             canvas.restore();
 
-            // 4. Bold Impact / Meme GIF caption overlay
             if (preset.captionOverlay != null && !preset.captionOverlay.isEmpty()) {
                 captionPaint.setTextSize(Math.max(12f * dp, minDim * 0.095f));
                 float tw = captionPaint.measureText(preset.captionOverlay);
@@ -1111,15 +1597,15 @@ public class VeilStickerGifEngine {
 
         @Override
         public void start() {
-            if (!running) {
-                running = true;
-                invalidateSelf();
-            }
+            cycleStartMs = SystemClock.uptimeMillis();
+            running = true;
+            invalidateSelf();
         }
 
         @Override
         public void stop() {
             running = false;
+            invalidateSelf();
         }
 
         @Override
@@ -1140,16 +1626,28 @@ public class VeilStickerGifEngine {
     }
 
     // =========================================================================
-    // 7. LEGACY / STREAM MOVIE GIF DRAWABLE FALLBACK
+    // 7. 3-CYCLE TRANSPARENT / CHROMA-KEY MOVIE GIF DRAWABLE (WHATSAPP/TELEGRAM APPROACH)
     // =========================================================================
 
     public static class MovieGifDrawable extends Drawable implements Animatable {
         private final Movie movie;
+        private final boolean stripSolidBg;
+        private final boolean fitCenter;
+        private final Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private Bitmap offscreenBuffer;
+        private Canvas offscreenCanvas;
+        private Bitmap cachedRestingTransparentFrame;
         private long movieStart = 0;
-        private boolean running = true;
+        private boolean running = false;
 
         public MovieGifDrawable(@NonNull Movie movie) {
+            this(movie, false, false);
+        }
+
+        public MovieGifDrawable(@NonNull Movie movie, boolean stripSolidBg, boolean fitCenter) {
             this.movie = movie;
+            this.stripSolidBg = stripSolidBg;
+            this.fitCenter = fitCenter;
         }
 
         @Override
@@ -1165,27 +1663,68 @@ public class VeilStickerGifEngine {
         @Override
         public void draw(@NonNull Canvas canvas) {
             Rect b = getBounds();
-            if (b.isEmpty() || movie.width() <= 0 || movie.height() <= 0) return;
+            int mw = movie.width();
+            int mh = movie.height();
+            if (b.isEmpty() || mw <= 0 || mh <= 0) return;
 
-            long now = SystemClock.uptimeMillis();
-            if (movieStart == 0) {
-                movieStart = now;
+            int rawDur = movie.duration();
+            int singleLoopDur = rawDur > 200 ? rawDur : 1500;
+            long totalPlayMs = (long) singleLoopDur * MAX_AUTO_PLAY_LOOPS;
+            int relTime = 0;
+            if (running) {
+                long now = SystemClock.uptimeMillis();
+                if (movieStart == 0) {
+                    movieStart = now;
+                }
+                long elapsed = now - movieStart;
+                if (elapsed >= totalPlayMs) {
+                    // Play 3 cycles (WhatsApp/Telegram approach) then stop cleanly
+                    running = false;
+                    relTime = 0;
+                } else {
+                    relTime = (int) (elapsed % singleLoopDur);
+                }
             }
-            int dur = movie.duration();
-            if (dur <= 0) dur = 1000;
-            int relTime = (int) ((now - movieStart) % dur);
-            movie.setTime(relTime);
 
-            canvas.save();
-            float scaleX = (float) b.width() / (float) movie.width();
-            float scaleY = (float) b.height() / (float) movie.height();
-            float scale = Math.max(scaleX, scaleY);
-            float dx = b.left + (b.width() - movie.width() * scale) * 0.5f;
-            float dy = b.top + (b.height() - movie.height() * scale) * 0.5f;
-            canvas.translate(dx, dy);
-            canvas.scale(scale, scale);
-            movie.draw(canvas, 0, 0);
-            canvas.restore();
+            float scaleX = (float) b.width() / (float) mw;
+            float scaleY = (float) b.height() / (float) mh;
+            float scale = fitCenter ? Math.min(scaleX, scaleY) : Math.max(scaleX, scaleY);
+            float dx = b.left + (b.width() - mw * scale) * 0.5f;
+            float dy = b.top + (b.height() - mh * scale) * 0.5f;
+
+            if (stripSolidBg) {
+                if (!running && cachedRestingTransparentFrame != null && !cachedRestingTransparentFrame.isRecycled()) {
+                    canvas.save();
+                    canvas.translate(dx, dy);
+                    canvas.scale(scale, scale);
+                    canvas.drawBitmap(cachedRestingTransparentFrame, 0f, 0f, bitmapPaint);
+                    canvas.restore();
+                    return;
+                }
+                if (offscreenBuffer == null || offscreenBuffer.getWidth() != mw || offscreenBuffer.getHeight() != mh) {
+                    offscreenBuffer = Bitmap.createBitmap(mw, mh, Bitmap.Config.ARGB_8888);
+                    offscreenCanvas = new Canvas(offscreenBuffer);
+                }
+                offscreenBuffer.eraseColor(Color.TRANSPARENT);
+                movie.setTime(relTime);
+                movie.draw(offscreenCanvas, 0f, 0f);
+                Bitmap transparentFrame = stripSolidBorderBackgroundIfPresent(offscreenBuffer);
+                if (!running && relTime == 0) {
+                    cachedRestingTransparentFrame = transparentFrame;
+                }
+                canvas.save();
+                canvas.translate(dx, dy);
+                canvas.scale(scale, scale);
+                canvas.drawBitmap(transparentFrame, 0f, 0f, bitmapPaint);
+                canvas.restore();
+            } else {
+                movie.setTime(relTime);
+                canvas.save();
+                canvas.translate(dx, dy);
+                canvas.scale(scale, scale);
+                movie.draw(canvas, 0f, 0f);
+                canvas.restore();
+            }
 
             if (running) {
                 invalidateSelf();
@@ -1194,6 +1733,7 @@ public class VeilStickerGifEngine {
 
         @Override
         public void start() {
+            movieStart = SystemClock.uptimeMillis();
             running = true;
             invalidateSelf();
         }
@@ -1201,6 +1741,7 @@ public class VeilStickerGifEngine {
         @Override
         public void stop() {
             running = false;
+            invalidateSelf();
         }
 
         @Override
@@ -1209,14 +1750,846 @@ public class VeilStickerGifEngine {
         }
 
         @Override
-        public void setAlpha(int alpha) {}
+        public void setAlpha(int alpha) {
+            bitmapPaint.setAlpha(alpha);
+        }
 
         @Override
-        public void setColorFilter(@Nullable android.graphics.ColorFilter colorFilter) {}
+        public void setColorFilter(@Nullable android.graphics.ColorFilter colorFilter) {
+            bitmapPaint.setColorFilter(colorFilter);
+        }
 
         @Override
         public int getOpacity() {
             return PixelFormat.TRANSLUCENT;
         }
+    }
+
+    // =========================================================================
+    // 8. COMPLETE PHOTO STICKER CREATOR STUDIO & ANIMATED VIDEO-TO-GIF89A STICKER ENCODER
+    // =========================================================================
+
+    public static final int STICKER_MODE_AUTO_CUTOUT = 0;
+    public static final int STICKER_MODE_FULL_PORTRAIT = 1;
+    public static final int STICKER_MODE_FREEHAND_CUT = 2;
+    public static final int STICKER_MODE_SHAPE_CIRCLE = 3;
+    public static final long MAX_VIDEO_STICKER_DURATION_MS = 5000L;
+
+    /**
+     * Decodes a photo file with EXIF rotation applied and scales its longest side to {@code maxSidePx},
+     * strictly preserving the photo's natural Portrait (e.g. 9:16 / 3:4), Landscape, or Square aspect ratio.
+     */
+    @Nullable
+    public static Bitmap decodePhotoPreservingAspectRatio(@NonNull File photoFile, int maxSidePx) {
+        if (!photoFile.exists()) return null;
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(photoFile.getAbsolutePath(), bounds);
+            int rawW = bounds.outWidth;
+            int rawH = bounds.outHeight;
+            if (rawW <= 0 || rawH <= 0) return null;
+
+            int inSample = 1;
+            while ((rawW / inSample) > maxSidePx * 2 || (rawH / inSample) > maxSidePx * 2) {
+                inSample *= 2;
+            }
+            BitmapFactory.Options decodeOpts = new BitmapFactory.Options();
+            decodeOpts.inSampleSize = inSample;
+            decodeOpts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            Bitmap decoded = BitmapFactory.decodeFile(photoFile.getAbsolutePath(), decodeOpts);
+            if (decoded == null) return null;
+
+            int rotationDeg = 0;
+            try {
+                android.media.ExifInterface exif = new android.media.ExifInterface(photoFile.getAbsolutePath());
+                int ori = exif.getAttributeInt(
+                        android.media.ExifInterface.TAG_ORIENTATION,
+                        android.media.ExifInterface.ORIENTATION_NORMAL);
+                if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_90) rotationDeg = 90;
+                else if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_180) rotationDeg = 180;
+                else if (ori == android.media.ExifInterface.ORIENTATION_ROTATE_270) rotationDeg = 270;
+            } catch (Throwable ignored) {}
+
+            if (rotationDeg != 0) {
+                android.graphics.Matrix m = new android.graphics.Matrix();
+                m.postRotate(rotationDeg);
+                Bitmap rotated = Bitmap.createBitmap(decoded, 0, 0, decoded.getWidth(), decoded.getHeight(), m, true);
+                if (rotated != decoded) decoded.recycle();
+                decoded = rotated;
+            }
+
+            int w = decoded.getWidth();
+            int h = decoded.getHeight();
+            float scale = Math.min(1f, (float) maxSidePx / (float) Math.max(w, h));
+            if (scale < 0.99f) {
+                int nw = Math.max(1, Math.round(w * scale));
+                int nh = Math.max(1, Math.round(h * scale));
+                Bitmap scaled = Bitmap.createScaledBitmap(decoded, nw, nh, true);
+                if (scaled != decoded) decoded.recycle();
+                decoded = scaled;
+            }
+            return decoded;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Normalizes any source bitmap into a 1:1 Square (sidePx x sidePx) ARGB_8888 bitmap:
+     * - When {@code centerCrop} is true: center-crops the bitmap so the 1:1 square is completely filled.
+     * - When {@code centerCrop} is false: scales and centers the bitmap inside the 1:1 square canvas with transparent padding.
+     */
+    @NonNull
+    public static Bitmap fitOrCenterCropToSquare(@NonNull Bitmap src, int sidePx, boolean centerCrop) {
+        int sw = Math.max(1, src.getWidth());
+        int sh = Math.max(1, src.getHeight());
+        int side = Math.max(64, sidePx);
+        Bitmap out = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(out);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+
+        float scale = centerCrop
+                ? Math.max((float) side / sw, (float) side / sh)
+                : (Math.min((float) side / sw, (float) side / sh) * 0.92f);
+        float dw = sw * scale;
+        float dh = sh * scale;
+        float dx = (side - dw) * 0.5f;
+        float dy = (side - dh) * 0.5f;
+        RectF dst = new RectF(dx, dy, dx + dw, dy + dh);
+        canvas.drawBitmap(src, null, dst, paint);
+        return out;
+    }
+
+    /**
+     * Generates a Telegram/WhatsApp-standard 512x512 (1:1 Square) custom Photo Sticker bitmap, supporting:
+     * - {@link #STICKER_MODE_AUTO_CUTOUT}: Smart foreground subject extraction centered in a 512x512 square
+     * - {@link #STICKER_MODE_FULL_PORTRAIT}: 1:1 Square center-cropped photo with die-cut rounded sticker corners
+     * - {@link #STICKER_MODE_FREEHAND_CUT}: User finger-traced lasso cutout centered in a 512x512 square
+     * - {@link #STICKER_MODE_SHAPE_CIRCLE}: Clean 1:1 Circle badge cutout in a 512x512 square
+     * Plus optional crisp white die-cut contour outline, bold outlined sticker caption text, and corner emoji stamp.
+     */
+    @NonNull
+    public static Bitmap createCustomPhotoStickerBitmap(
+            @NonNull Bitmap src,
+            int mode,
+            boolean addWhiteOutline,
+            @Nullable Path freehandViewPath,
+            int viewW,
+            int viewH,
+            @Nullable String captionText,
+            int captionColor,
+            @Nullable String stampEmoji) {
+        final int squareSide = 512;
+        int sw = Math.max(1, src.getWidth());
+        int sh = Math.max(1, src.getHeight());
+        Bitmap working;
+
+        if (mode == STICKER_MODE_FREEHAND_CUT && freehandViewPath != null && !freehandViewPath.isEmpty() && viewW > 0 && viewH > 0) {
+            // Map user's finger-traced path from preview ImageView coordinates (FIT_CENTER) into bitmap coordinates
+            float scale = Math.min((float) viewW / sw, (float) viewH / sh);
+            float dx = (viewW - sw * scale) * 0.5f;
+            float dy = (viewH - sh * scale) * 0.5f;
+            android.graphics.Matrix inv = new android.graphics.Matrix();
+            inv.postTranslate(-dx, -dy);
+            inv.postScale(1f / Math.max(0.001f, scale), 1f / Math.max(0.001f, scale));
+
+            Path bmpPath = new Path();
+            freehandViewPath.transform(inv, bmpPath);
+            bmpPath.close();
+
+            Bitmap masked = Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(masked);
+            Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+            c.drawPath(bmpPath, maskPaint);
+            maskPaint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+            c.drawBitmap(src, 0f, 0f, maskPaint);
+
+            RectF bounds = new RectF();
+            bmpPath.computeBounds(bounds, true);
+            int pad = Math.max(12, Math.round(Math.max(sw, sh) * 0.04f));
+            int cropL = Math.max(0, Math.round(bounds.left) - pad);
+            int cropT = Math.max(0, Math.round(bounds.top) - pad);
+            int cropR = Math.min(sw, Math.round(bounds.right) + pad);
+            int cropB = Math.min(sh, Math.round(bounds.bottom) + pad);
+            Bitmap croppedCutout;
+            if (cropR - cropL >= 32 && cropB - cropT >= 32) {
+                croppedCutout = Bitmap.createBitmap(masked, cropL, cropT, cropR - cropL, cropB - cropT);
+            } else {
+                croppedCutout = masked;
+            }
+            working = fitOrCenterCropToSquare(croppedCutout, squareSide, false);
+        } else if (mode == STICKER_MODE_SHAPE_CIRCLE) {
+            Bitmap sqSrc = fitOrCenterCropToSquare(src, squareSide, true);
+            working = Bitmap.createBitmap(squareSide, squareSide, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(working);
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+            float inset = Math.max(12f, squareSide * 0.035f);
+            RectF oval = new RectF(inset, inset, squareSide - inset, squareSide - inset);
+            c.drawOval(oval, p);
+            p.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+            c.drawBitmap(sqSrc, 0f, 0f, p);
+        } else if (mode == STICKER_MODE_AUTO_CUTOUT) {
+            Bitmap cutout = extractSmartSubjectCutout(src);
+            working = fitOrCenterCropToSquare(cutout, squareSide, false);
+        } else {
+            // STICKER_MODE_FULL_PORTRAIT (1:1 Square Sticker): Center-crop into 512x512 square with crisp rounded corners
+            Bitmap sqSrc = fitOrCenterCropToSquare(src, squareSide, true);
+            working = Bitmap.createBitmap(squareSide, squareSide, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(working);
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+            float inset = addWhiteOutline ? Math.max(10f, squareSide * 0.028f) : 0f;
+            float radius = Math.max(24f, squareSide * 0.08f);
+            RectF rect = new RectF(inset, inset, squareSide - inset, squareSide - inset);
+            c.drawRoundRect(rect, radius, radius, p);
+            p.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+            c.drawBitmap(sqSrc, 0f, 0f, p);
+        }
+
+        if (addWhiteOutline) {
+            working = applyDieCutWhiteContourOutline(working, Math.max(5, Math.round(squareSide * 0.022f)));
+        }
+
+        // Draw optional corner emoji stamp and/or die-cut sticker caption text
+        boolean hasCaption = captionText != null && !captionText.trim().isEmpty();
+        boolean hasStamp = stampEmoji != null && !stampEmoji.trim().isEmpty();
+        if (hasCaption || hasStamp) {
+            Bitmap mutable = working.isMutable() ? working : working.copy(Bitmap.Config.ARGB_8888, true);
+            Canvas canvas = new Canvas(mutable);
+            int mw = mutable.getWidth();
+            int mh = mutable.getHeight();
+            float minDim = Math.min(mw, mh);
+
+            if (hasStamp) {
+                TextPaint emojiPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+                emojiPaint.setTextSize(minDim * 0.20f);
+                emojiPaint.setTextAlign(Paint.Align.CENTER);
+                float ex = mw - minDim * 0.16f;
+                float ey = minDim * 0.22f;
+                canvas.save();
+                canvas.rotate(12f, ex, ey);
+                canvas.drawText(stampEmoji.trim(), ex, ey, emojiPaint);
+                canvas.restore();
+            }
+
+            if (hasCaption) {
+                drawStickerCaptionOnCanvas(canvas, captionText.trim(), captionColor != 0 ? captionColor : Color.WHITE, mw, mh);
+            }
+            working = mutable;
+        }
+
+        return working;
+    }
+
+    /**
+     * Smart foreground subject segmentation for {@link #STICKER_MODE_AUTO_CUTOUT}:
+     * Samples the outer perimeter color distribution and flood-fills connected background regions from all
+     * 4 edges toward the center while protecting the central portrait subject, with smooth 2px feathering.
+     */
+    @NonNull
+    private static Bitmap extractSmartSubjectCutout(@NonNull Bitmap src) {
+        int w = src.getWidth();
+        int h = src.getHeight();
+        if (w < 16 || h < 16) return src.copy(Bitmap.Config.ARGB_8888, true);
+
+        int[] pixels = new int[w * h];
+        src.getPixels(pixels, 0, w, 0, 0, w, h);
+
+        // If already transparent, return copy
+        if (((pixels[0] >>> 24) < 32) && ((pixels[w - 1] >>> 24) < 32)) {
+            return src.copy(Bitmap.Config.ARGB_8888, true);
+        }
+
+        // Compute average border palette across top, left, right edges
+        long sumR = 0, sumG = 0, sumB = 0, count = 0;
+        int step = Math.max(1, Math.min(w, h) / 32);
+        for (int x = 0; x < w; x += step) {
+            int pTop = pixels[x];
+            sumR += (pTop >> 16) & 0xFF;
+            sumG += (pTop >> 8) & 0xFF;
+            sumB += pTop & 0xFF;
+            count++;
+        }
+        for (int y = 0; y < h; y += step) {
+            int pLeft = pixels[y * w];
+            int pRight = pixels[y * w + (w - 1)];
+            sumR += ((pLeft >> 16) & 0xFF) + ((pRight >> 16) & 0xFF);
+            sumG += ((pLeft >> 8) & 0xFF) + ((pRight >> 8) & 0xFF);
+            sumB += (pLeft & 0xFF) + (pRight & 0xFF);
+            count += 2;
+        }
+        int bgR = (int) (sumR / Math.max(1, count));
+        int bgG = (int) (sumG / Math.max(1, count));
+        int bgB = (int) (sumB / Math.max(1, count));
+
+        boolean[] visited = new boolean[w * h];
+        int[] queue = new int[w * h];
+        int head = 0, tail = 0;
+
+        for (int x = 0; x < w; x++) {
+            int topIdx = x;
+            visited[topIdx] = true;
+            queue[tail++] = topIdx;
+            int botIdx = (h - 1) * w + x;
+            if (!visited[botIdx]) {
+                visited[botIdx] = true;
+                queue[tail++] = botIdx;
+            }
+        }
+        for (int y = 1; y < h - 1; y++) {
+            int leftIdx = y * w;
+            if (!visited[leftIdx]) {
+                visited[leftIdx] = true;
+                queue[tail++] = leftIdx;
+            }
+            int rightIdx = y * w + (w - 1);
+            if (!visited[rightIdx]) {
+                visited[rightIdx] = true;
+                queue[tail++] = rightIdx;
+            }
+        }
+
+        float cx = w * 0.5f;
+        float cy = h * 0.52f;
+        float rx = w * 0.28f;
+        float ry = h * 0.34f;
+        int removedCount = 0;
+
+        while (head < tail) {
+            int idx = queue[head++];
+            int px = idx % w;
+            int py = idx / w;
+
+            // Protect core subject center oval unless color is nearly identical to border
+            float normDx = (px - cx) / rx;
+            float normDy = (py - cy) / ry;
+            boolean insideSubjectCore = (normDx * normDx + normDy * normDy) < 0.85f;
+
+            int c = pixels[idx];
+            int r = (c >> 16) & 0xFF;
+            int g = (c >> 8) & 0xFF;
+            int b = c & 0xFF;
+            int distGlobal = Math.max(Math.abs(r - bgR), Math.max(Math.abs(g - bgG), Math.abs(b - bgB)));
+            int maxGlobalTol = insideSubjectCore ? 18 : 42;
+            if (distGlobal > maxGlobalTol) {
+                continue;
+            }
+
+            pixels[idx] = 0x00000000;
+            removedCount++;
+
+            // 4-connected neighbors with local gradient check
+            int[] neighbors = new int[]{
+                    px > 0 ? idx - 1 : -1,
+                    px + 1 < w ? idx + 1 : -1,
+                    py > 0 ? idx - w : -1,
+                    py + 1 < h ? idx + w : -1
+            };
+            for (int nIdx : neighbors) {
+                if (nIdx >= 0 && !visited[nIdx]) {
+                    int nc = pixels[nIdx];
+                    int nr = (nc >> 16) & 0xFF;
+                    int ng = (nc >> 8) & 0xFF;
+                    int nb = nc & 0xFF;
+                    int localStep = Math.max(Math.abs(nr - r), Math.max(Math.abs(ng - g), Math.abs(nb - b)));
+                    if (localStep <= 22) {
+                        visited[nIdx] = true;
+                        queue[tail++] = nIdx;
+                    }
+                }
+            }
+        }
+
+        // If background is a complex multi-color real-world scene where < 8% of border pixels matched,
+        // apply a clean portrait/subject rounded silhouette mask so the subject is never jagged
+        if (removedCount < (w * h) / 14) {
+            Bitmap fallback = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(fallback);
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+            float insetX = w * 0.04f;
+            float insetY = h * 0.03f;
+            RectF rect = new RectF(insetX, insetY, w - insetX, h - insetY);
+            float rad = Math.min(w, h) * 0.14f;
+            c.drawRoundRect(rect, rad, rad, p);
+            p.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+            c.drawBitmap(src, 0f, 0f, p);
+            return fallback;
+        }
+
+        // Feather 1px boundary for smooth anti-aliased cutout edges
+        for (int y = 1; y < h - 1; y++) {
+            int row = y * w;
+            for (int x = 1; x < w - 1; x++) {
+                int i = row + x;
+                if ((pixels[i] >>> 24) != 0) {
+                    int transNeighbors = 0;
+                    if ((pixels[i - 1] >>> 24) == 0) transNeighbors++;
+                    if ((pixels[i + 1] >>> 24) == 0) transNeighbors++;
+                    if ((pixels[i - w] >>> 24) == 0) transNeighbors++;
+                    if ((pixels[i + w] >>> 24) == 0) transNeighbors++;
+                    if (transNeighbors >= 2) {
+                        pixels[i] = (0x99 << 24) | (pixels[i] & 0x00FFFFFF);
+                    }
+                }
+            }
+        }
+
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        out.setPixels(pixels, 0, w, 0, 0, w, h);
+        return out;
+    }
+
+    /**
+     * Draws a crisp Telegram/WhatsApp-style white die-cut sticker outline around any non-transparent silhouette.
+     */
+    @NonNull
+    public static Bitmap applyDieCutWhiteContourOutline(@NonNull Bitmap src, int strokeRadiusPx) {
+        int w = src.getWidth();
+        int h = src.getHeight();
+        int r = Math.max(2, Math.min(14, strokeRadiusPx));
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(out);
+
+        Bitmap alphaMask = src.extractAlpha();
+        Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        outlinePaint.setColor(Color.WHITE);
+
+        // Draw radial 12-direction dilated silhouette to create a smooth continuous die-cut sticker border
+        for (int i = 0; i < 12; i++) {
+            double angle = (Math.PI * 2.0 * i) / 12.0;
+            float dx = (float) (Math.cos(angle) * r);
+            float dy = (float) (Math.sin(angle) * r);
+            canvas.drawBitmap(alphaMask, dx, dy, outlinePaint);
+        }
+        int innerR = Math.max(1, r / 2);
+        for (int i = 0; i < 8; i++) {
+            double angle = (Math.PI * 2.0 * i) / 8.0;
+            float dx = (float) (Math.cos(angle) * innerR);
+            float dy = (float) (Math.sin(angle) * innerR);
+            canvas.drawBitmap(alphaMask, dx, dy, outlinePaint);
+        }
+        alphaMask.recycle();
+
+        Paint fgPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        canvas.drawBitmap(src, 0f, 0f, fgPaint);
+        return out;
+    }
+
+    private static void drawStickerCaptionOnCanvas(@NonNull Canvas canvas, @NonNull String text, int fillColor, int w, int h) {
+        float minDim = Math.min(w, h);
+        TextPaint tp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        tp.setTextAlign(Paint.Align.CENTER);
+        tp.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+
+        float textSize = Math.max(18f, minDim * 0.105f);
+        tp.setTextSize(textSize);
+        float maxAllowedW = w * 0.88f;
+        float measured = tp.measureText(text);
+        if (measured > maxAllowedW && measured > 0f) {
+            textSize = Math.max(14f, textSize * (maxAllowedW / measured));
+            tp.setTextSize(textSize);
+        }
+
+        float cx = w * 0.5f;
+        float cy = h - Math.max(20f, minDim * 0.085f);
+
+        // Outer black contrast halo + white die-cut stroke + vibrant fill color
+        tp.setStyle(Paint.Style.STROKE);
+        tp.setStrokeJoin(Paint.Join.ROUND);
+        tp.setStrokeCap(Paint.Cap.ROUND);
+        tp.setStrokeWidth(Math.max(6f, textSize * 0.24f));
+        tp.setColor(0xDD000000);
+        canvas.drawText(text, cx, cy, tp);
+
+        if (fillColor != Color.WHITE) {
+            tp.setStrokeWidth(Math.max(3f, textSize * 0.12f));
+            tp.setColor(Color.WHITE);
+            canvas.drawText(text, cx, cy, tp);
+        }
+
+        tp.setStyle(Paint.Style.FILL);
+        tp.setColor(fillColor);
+        canvas.drawText(text, cx, cy, tp);
+    }
+
+    /**
+     * Creates a real multi-frame looping Animated GIF89a Sticker file (`.gif`) from a trimmed video range
+     * `[startMs, endMs]` (strictly capped at {@link #MAX_VIDEO_STICKER_DURATION_MS} = 5.0 seconds),
+     * preserving the video's true Portrait (e.g. 9:16), Landscape (16:9), or Square (1:1) aspect ratio!
+     */
+    @Nullable
+    public static File createAnimatedVideoStickerFile(
+            @NonNull Context context,
+            @NonNull File videoFile,
+            long startMs,
+            long endMs,
+            boolean addWhiteOutline,
+            @Nullable String captionText,
+            int captionColor) {
+        if (!videoFile.exists()) return null;
+        android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
+        try {
+            mmr.setDataSource(videoFile.getAbsolutePath());
+            String durStr = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);
+            long totalMs = 5000L;
+            if (durStr != null) {
+                try {
+                    totalMs = Math.max(500L, Long.parseLong(durStr));
+                } catch (NumberFormatException ignored) {}
+            }
+
+            int metaW = 0;
+            int metaH = 0;
+            int metaRot = 0;
+            try {
+                String wStr = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH);
+                String hStr = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT);
+                String rStr = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
+                if (wStr != null) metaW = Integer.parseInt(wStr);
+                if (hStr != null) metaH = Integer.parseInt(hStr);
+                if (rStr != null) metaRot = Integer.parseInt(rStr);
+            } catch (Throwable ignored) {}
+            int expectedDisplayW = (metaRot == 90 || metaRot == 270) ? metaH : metaW;
+            int expectedDisplayH = (metaRot == 90 || metaRot == 270) ? metaW : metaH;
+
+            long safeStart = Math.max(0L, Math.min(startMs, totalMs - 200L));
+            long safeEnd = Math.max(safeStart + 300L, Math.min(endMs, totalMs));
+            if (safeEnd - safeStart > MAX_VIDEO_STICKER_DURATION_MS) {
+                safeEnd = safeStart + MAX_VIDEO_STICKER_DURATION_MS;
+            }
+            long clipDurationMs = Math.max(400L, safeEnd - safeStart);
+
+            // Sample at ~8 FPS across [safeStart, safeEnd] (between 6 and 36 frames for smooth animated playback)
+            int frameDelayMs = 120;
+            int frameCount = (int) Math.max(6, Math.min(36, clipDurationMs / frameDelayMs));
+            long stepUs = (clipDurationMs * 1000L) / Math.max(1, frameCount);
+
+            List<Bitmap> frames = new ArrayList<>(frameCount);
+            int targetW = 0;
+            int targetH = 0;
+
+            for (int i = 0; i < frameCount; i++) {
+                long timeUs = (safeStart * 1000L) + (i * stepUs);
+                Bitmap raw = mmr.getFrameAtTime(timeUs, android.media.MediaMetadataRetriever.OPTION_CLOSEST);
+                if (raw == null) {
+                    raw = mmr.getFrameAtTime(timeUs, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                }
+                if (raw == null && !frames.isEmpty()) {
+                    frames.add(frames.get(frames.size() - 1));
+                    continue;
+                }
+                if (raw == null) continue;
+
+                // Ensure frame orientation matches true Portrait or Landscape display orientation
+                if ((metaRot == 90 || metaRot == 270) && expectedDisplayW > 0 && expectedDisplayH > 0) {
+                    boolean shouldBePortrait = expectedDisplayH > expectedDisplayW;
+                    boolean rawIsLandscape = raw.getWidth() > raw.getHeight();
+                    if (shouldBePortrait && rawIsLandscape) {
+                        android.graphics.Matrix m = new android.graphics.Matrix();
+                        m.postRotate(metaRot);
+                        Bitmap rotated = Bitmap.createBitmap(raw, 0, 0, raw.getWidth(), raw.getHeight(), m, true);
+                        if (rotated != raw) raw.recycle();
+                        raw = rotated;
+                    }
+                }
+
+                if (targetW <= 0 || targetH <= 0) {
+                    // Always render animated video stickers in a 320x320 (1:1 Square) canvas
+                    targetW = 320;
+                    targetH = 320;
+                }
+
+                Bitmap scaled = fitOrCenterCropToSquare(raw, targetW, true);
+                if (scaled != raw) raw.recycle();
+
+                // Apply rounded sticker corners + optional white die-cut border + optional caption
+                Bitmap styled = styleVideoStickerFrame(scaled, addWhiteOutline, captionText, captionColor);
+                if (styled != scaled) scaled.recycle();
+                frames.add(styled);
+            }
+
+            if (frames.isEmpty()) return null;
+
+            File stickerDir = new File(context.getFilesDir(), "custom_stickers");
+            if (!stickerDir.exists()) stickerDir.mkdirs();
+            File outGif = new File(stickerDir, "sticker_" + System.currentTimeMillis() + ".gif");
+            try (java.io.BufferedOutputStream bos = new java.io.BufferedOutputStream(new java.io.FileOutputStream(outGif), 32768)) {
+                writeAnimatedGif89a(bos, frames, targetW, targetH, frameDelayMs / 10);
+                bos.flush();
+            }
+
+            DIMENSION_CACHE.put(outGif.getAbsolutePath(), new int[]{targetW, targetH});
+            for (Bitmap b : frames) {
+                if (b != null && !b.isRecycled()) b.recycle();
+            }
+            return (outGif.exists() && outGif.length() > 64) ? outGif : null;
+        } catch (Throwable ignored) {
+            return null;
+        } finally {
+            try { mmr.release(); } catch (Throwable ignored) {}
+        }
+    }
+
+    @NonNull
+    private static Bitmap styleVideoStickerFrame(
+            @NonNull Bitmap frame,
+            boolean addWhiteOutline,
+            @Nullable String captionText,
+            int captionColor) {
+        int w = frame.getWidth();
+        int h = frame.getHeight();
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+
+        float inset = addWhiteOutline ? Math.max(4f, Math.min(w, h) * 0.022f) : 0f;
+        float radius = Math.max(14f, Math.min(w, h) * 0.08f);
+        RectF rect = new RectF(inset, inset, w - inset, h - inset);
+
+        Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        c.drawRoundRect(rect, radius, radius, maskPaint);
+        maskPaint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+        c.drawBitmap(frame, 0f, 0f, maskPaint);
+
+        if (addWhiteOutline) {
+            Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            borderPaint.setStyle(Paint.Style.STROKE);
+            borderPaint.setStrokeWidth(Math.max(3f, inset * 0.9f));
+            borderPaint.setColor(Color.WHITE);
+            c.drawRoundRect(rect, radius, radius, borderPaint);
+        }
+
+        if (captionText != null && !captionText.trim().isEmpty()) {
+            drawStickerCaptionOnCanvas(c, captionText.trim(), captionColor != 0 ? captionColor : Color.WHITE, w, h);
+        }
+        return out;
+    }
+
+    /**
+     * Compact, dependency-free GIF89a multi-frame encoder with 3-3-2 RGB quantization + transparent index 255
+     * and Netscape 2.0 looping extension so custom video stickers animate natively via {@link AnimatedImageDrawable}
+     * and {@link MovieGifDrawable}.
+     */
+    private static void writeAnimatedGif89a(
+            @NonNull java.io.OutputStream os,
+            @NonNull List<Bitmap> frames,
+            int width,
+            int height,
+            int delayCentiseconds) throws java.io.IOException {
+        // 1. Header: GIF89a
+        os.write(new byte[]{'G', 'I', 'F', '8', '9', 'a'});
+
+        // 2. Logical Screen Descriptor (Global Color Table Flag = 1, 256 colors -> 0xF7)
+        writeShortLE(os, width);
+        writeShortLE(os, height);
+        os.write(0xF7); // GCT present, 8-bit color resolution, 256 entries
+        os.write(255);  // Background color index (transparent index 255)
+        os.write(0);    // Pixel aspect ratio
+
+        // 3. Global Color Table (256 entries: 0..254 = 3-3-2 RGB cube, 255 = transparent key)
+        for (int i = 0; i < 256; i++) {
+            if (i == 255) {
+                os.write(0);
+                os.write(0);
+                os.write(0);
+            } else {
+                int r3 = (i >> 5) & 0x07;
+                int g3 = (i >> 2) & 0x07;
+                int b2 = i & 0x03;
+                os.write((r3 * 255) / 7);
+                os.write((g3 * 255) / 7);
+                os.write((b2 * 255) / 3);
+            }
+        }
+
+        // 4. Netscape 2.0 Application Extension for looping
+        os.write(new byte[]{
+                0x21, (byte) 0xFF, 0x0B,
+                'N', 'E', 'T', 'S', 'C', 'A', 'P', 'E', '2', '.', '0',
+                0x03, 0x01, 0x00, 0x00, 0x00
+        });
+
+        int[] argb = new int[width * height];
+        byte[] indexed = new byte[width * height];
+
+        for (Bitmap bmp : frames) {
+            if (bmp == null || bmp.isRecycled()) continue;
+            bmp.getPixels(argb, 0, width, 0, 0, width, height);
+            for (int i = 0; i < argb.length; i++) {
+                int c = argb[i];
+                int a = (c >>> 24) & 0xFF;
+                if (a < 96) {
+                    indexed[i] = (byte) 255;
+                } else {
+                    int r = (c >> 16) & 0xFF;
+                    int g = (c >> 8) & 0xFF;
+                    int b = c & 0xFF;
+                    int idx = ((r >> 5) << 5) | ((g >> 5) << 2) | (b >> 6);
+                    if (idx == 255) idx = 254;
+                    indexed[i] = (byte) idx;
+                }
+            }
+
+            // Graphic Control Extension (Disposal = 2: restore to background/transparent, transparent flag = 1)
+            os.write(0x21);
+            os.write(0xF9);
+            os.write(0x04);
+            os.write(0x09); // Disposal method 2 (bits 2-4 = 010) + transparent color flag (bit 0 = 1)
+            writeShortLE(os, Math.max(4, delayCentiseconds));
+            os.write(255);  // Transparent color index
+            os.write(0x00);
+
+            // Image Descriptor
+            os.write(0x2C);
+            writeShortLE(os, 0);
+            writeShortLE(os, 0);
+            writeShortLE(os, width);
+            writeShortLE(os, height);
+            os.write(0x00); // No local color table, non-interlaced
+
+            // LZW Image Data
+            writeLzwImageData(os, indexed);
+        }
+
+        // 5. GIF Trailer
+        os.write(0x3B);
+    }
+
+    private static void writeShortLE(@NonNull java.io.OutputStream os, int val) throws java.io.IOException {
+        os.write(val & 0xFF);
+        os.write((val >> 8) & 0xFF);
+    }
+
+    /**
+     * Fast LZW encoder for 8-bit indexed GIF frames using 12-bit hash table and periodic clear codes.
+     */
+    private static void writeLzwImageData(@NonNull java.io.OutputStream os, @NonNull byte[] pixels) throws java.io.IOException {
+        final int minCodeSize = 8;
+        os.write(minCodeSize);
+
+        final int clearCode = 1 << minCodeSize; // 256
+        final int endCode = clearCode + 1;      // 257
+        int nextCode = endCode + 1;             // 258
+        int codeSize = minCodeSize + 1;         // 9
+
+        final int tableSize = 5003;
+        int[] hashKeys = new int[tableSize];
+        int[] hashValues = new int[tableSize];
+        java.util.Arrays.fill(hashKeys, -1);
+
+        byte[] subBlock = new byte[255];
+        int subBlockLen = 0;
+        int bitBuffer = 0;
+        int bitCount = 0;
+
+        // Emit initial Clear Code
+        bitBuffer |= (clearCode << bitCount);
+        bitCount += codeSize;
+        while (bitCount >= 8) {
+            subBlock[subBlockLen++] = (byte) (bitBuffer & 0xFF);
+            if (subBlockLen == 255) {
+                os.write(255);
+                os.write(subBlock, 0, 255);
+                subBlockLen = 0;
+            }
+            bitBuffer >>>= 8;
+            bitCount -= 8;
+        }
+
+        if (pixels.length > 0) {
+            int prefix = pixels[0] & 0xFF;
+            for (int i = 1; i < pixels.length; i++) {
+                int k = pixels[i] & 0xFF;
+                int key = (prefix << 8) | k;
+                int h = ((prefix << 4) ^ k) % tableSize;
+                if (h < 0) h += tableSize;
+
+                boolean found = false;
+                while (hashKeys[h] != -1) {
+                    if (hashKeys[h] == key) {
+                        prefix = hashValues[h];
+                        found = true;
+                        break;
+                    }
+                    h = (h + 1) % tableSize;
+                }
+
+                if (!found) {
+                    // Output prefix code
+                    bitBuffer |= (prefix << bitCount);
+                    bitCount += codeSize;
+                    while (bitCount >= 8) {
+                        subBlock[subBlockLen++] = (byte) (bitBuffer & 0xFF);
+                        if (subBlockLen == 255) {
+                            os.write(255);
+                            os.write(subBlock, 0, 255);
+                            subBlockLen = 0;
+                        }
+                        bitBuffer >>>= 8;
+                        bitCount -= 8;
+                    }
+
+                    if (nextCode < 4096) {
+                        hashKeys[h] = key;
+                        hashValues[h] = nextCode;
+                        if (nextCode == (1 << codeSize) && codeSize < 12) {
+                            codeSize++;
+                        }
+                        nextCode++;
+                    } else {
+                        // Table full: emit Clear Code and reset dictionary
+                        bitBuffer |= (clearCode << bitCount);
+                        bitCount += codeSize;
+                        while (bitCount >= 8) {
+                            subBlock[subBlockLen++] = (byte) (bitBuffer & 0xFF);
+                            if (subBlockLen == 255) {
+                                os.write(255);
+                                os.write(subBlock, 0, 255);
+                                subBlockLen = 0;
+                            }
+                            bitBuffer >>>= 8;
+                            bitCount -= 8;
+                        }
+                        java.util.Arrays.fill(hashKeys, -1);
+                        nextCode = endCode + 1;
+                        codeSize = minCodeSize + 1;
+                    }
+                    prefix = k;
+                }
+            }
+
+            // Emit final prefix
+            bitBuffer |= (prefix << bitCount);
+            bitCount += codeSize;
+            while (bitCount >= 8) {
+                subBlock[subBlockLen++] = (byte) (bitBuffer & 0xFF);
+                if (subBlockLen == 255) {
+                    os.write(255);
+                    os.write(subBlock, 0, 255);
+                    subBlockLen = 0;
+                }
+                bitBuffer >>>= 8;
+                bitCount -= 8;
+            }
+        }
+
+        // Emit End of Information Code
+        bitBuffer |= (endCode << bitCount);
+        bitCount += codeSize;
+        while (bitCount > 0) {
+            subBlock[subBlockLen++] = (byte) (bitBuffer & 0xFF);
+            if (subBlockLen == 255) {
+                os.write(255);
+                os.write(subBlock, 0, 255);
+                subBlockLen = 0;
+            }
+            bitBuffer >>>= 8;
+            bitCount -= 8;
+        }
+
+        if (subBlockLen > 0) {
+            os.write(subBlockLen);
+            os.write(subBlock, 0, subBlockLen);
+        }
+        os.write(0x00); // Block terminator
     }
 }

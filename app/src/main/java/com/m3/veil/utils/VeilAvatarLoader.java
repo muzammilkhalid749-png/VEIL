@@ -80,6 +80,10 @@ public final class VeilAvatarLoader {
      * Loads an avatar into an ImageView asynchronously.
      * Displays a Telegram-style initials gradient placeholder immediately, then loads the image.
      */
+    public static void loadAvatar(@NonNull Context context, @Nullable String avatarSource, @NonNull ImageView imageView) {
+        loadAvatar(imageView, avatarSource, "User", false);
+    }
+
     public static void loadAvatar(@NonNull ImageView imageView,
                                   @Nullable String avatarSource,
                                   @Nullable String displayName,

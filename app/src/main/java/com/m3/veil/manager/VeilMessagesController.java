@@ -992,20 +992,138 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         mStageQueue.post(() -> {
             String messageId = UUID.randomUUID().toString();
             Chat chat = getDialog(dialogId);
+            if (chat == null && mDatabase != null) {
+                chat = mDatabase.getChat(dialogId);
+            }
             long vanishTimer = chat != null ? chat.getVanishTimer() : 0L;
             String vanishMode = (chat != null && chat.getVanishMode() != null) ? chat.getVanishMode() : "after_send";
 
-            Message msg = new Message(messageId, getCurrentUserId(), recipientId != null ? recipientId : dialogId,
+            String effectiveRecipientId = recipientId;
+            if (!isGroupOrChannel && (effectiveRecipientId == null || effectiveRecipientId.isEmpty() || effectiveRecipientId.equals(dialogId))) {
+                String myId = getCurrentUserId();
+                if (chat != null && chat.getParticipants() != null) {
+                    for (String p : chat.getParticipants()) {
+                        if (p != null && !p.isEmpty() && !p.equals(myId)) {
+                            effectiveRecipientId = p;
+                            break;
+                        }
+                    }
+                }
+                if ((effectiveRecipientId == null || effectiveRecipientId.equals(dialogId)) && dialogId.contains("_")) {
+                    String[] parts = dialogId.split("_");
+                    if (parts.length == 2) {
+                        effectiveRecipientId = parts[0].equals(myId) ? parts[1] : parts[0];
+                    }
+                }
+            }
+
+            File stagedFile = file;
+            try {
+                File cacheDir = mContext.getExternalCacheDir() != null ? mContext.getExternalCacheDir() : mContext.getCacheDir();
+                String ext = ".jpg";
+                if ("video".equalsIgnoreCase(mediaType)) ext = ".mp4";
+                else if ("gif".equalsIgnoreCase(mediaType)) ext = ".gif";
+                else if ("sticker".equalsIgnoreCase(mediaType)) ext = com.m3.veil.utils.VeilStickerGifEngine.detectStickerFileExtension(file);
+                else if ("voice".equalsIgnoreCase(mediaType) || "audio".equalsIgnoreCase(mediaType)) ext = ".m4a";
+                File decCopy = new File(cacheDir, "dec_" + messageId + ext);
+                if (!file.getAbsolutePath().equals(decCopy.getAbsolutePath())) {
+                    try (java.io.FileInputStream fis = new java.io.FileInputStream(file);
+                         java.io.FileOutputStream fos = new java.io.FileOutputStream(decCopy)) {
+                        byte[] buf = new byte[16384];
+                        int n;
+                        while ((n = fis.read(buf)) > 0) {
+                            fos.write(buf, 0, n);
+                        }
+                    }
+                    if (decCopy.exists() && decCopy.length() > 0) {
+                        stagedFile = decCopy;
+                    }
+                }
+            } catch (Throwable ignored) {}
+
+            Message msg = new Message(messageId, getCurrentUserId(),
+                    effectiveRecipientId != null ? effectiveRecipientId : dialogId,
                     caption != null ? caption : "", Timestamp.now(), mediaType);
             msg.setChatId(dialogId);
             msg.setSenderName(getCurrentUserName());
-            msg.setLocalFilePath(file.getAbsolutePath());
-            msg.setMediaSize(file.length());
+            msg.setLocalFilePath(stagedFile.getAbsolutePath());
+            msg.setMediaSize(stagedFile.length());
             msg.setBlink(isBlink);
             msg.setVanishTimer(vanishTimer);
             msg.setVanishMode(vanishMode);
 
-            if (replyToId != null) {
+            // Generate and attach thumbnail for video, sticker & image so forwarded/edited media always renders thumbnails
+            if ("video".equalsIgnoreCase(mediaType)) {
+                android.media.MediaMetadataRetriever retriever = new android.media.MediaMetadataRetriever();
+                try {
+                    retriever.setDataSource(stagedFile.getAbsolutePath());
+                    android.graphics.Bitmap frame = retriever.getFrameAtTime(0, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                    if (frame == null) {
+                        frame = retriever.getFrameAtTime();
+                    }
+                    if (frame != null) {
+                        int fw = Math.max(1, frame.getWidth());
+                        int fh = Math.max(1, frame.getHeight());
+                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions("msg_" + messageId, fw, fh);
+                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions(stagedFile.getAbsolutePath(), fw, fh);
+                        float thumbRatio = Math.min(320f / fw, 320f / fh);
+                        int thumbW = Math.max(48, Math.round(fw * thumbRatio));
+                        int thumbH = Math.max(48, Math.round(fh * thumbRatio));
+                        android.graphics.Bitmap thumb = android.graphics.Bitmap.createScaledBitmap(frame, thumbW, thumbH, true);
+                        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                        thumb.compress(android.graphics.Bitmap.CompressFormat.JPEG, 78, baos);
+                        msg.setThumbnail(android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.NO_WRAP));
+                        if (thumb != frame) thumb.recycle();
+                        frame.recycle();
+                    }
+                } catch (Throwable ignored) {
+                } finally {
+                    try { retriever.release(); } catch (Throwable ignored) {}
+                }
+            } else if ("sticker".equalsIgnoreCase(mediaType)) {
+                try {
+                    android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+                    opts.inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888;
+                    android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeFile(stagedFile.getAbsolutePath(), opts);
+                    if (bmp != null) {
+                        android.graphics.Bitmap dieCut = com.m3.veil.utils.VeilStickerGifEngine.stripSolidBorderBackgroundIfPresent(bmp);
+                        int bw = Math.max(1, dieCut.getWidth());
+                        int bh = Math.max(1, dieCut.getHeight());
+                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions("msg_" + messageId, bw, bh);
+                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions(stagedFile.getAbsolutePath(), bw, bh);
+                        float thumbRatio = Math.min(384f / bw, 384f / bh);
+                        int thumbW = Math.max(64, Math.round(bw * thumbRatio));
+                        int thumbH = Math.max(64, Math.round(bh * thumbRatio));
+                        android.graphics.Bitmap thumb = android.graphics.Bitmap.createScaledBitmap(dieCut, thumbW, thumbH, true);
+                        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                        thumb.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, baos);
+                        msg.setThumbnail(android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.NO_WRAP));
+                    }
+                } catch (Throwable ignored) {}
+            } else if ("image".equalsIgnoreCase(mediaType) || "gif".equalsIgnoreCase(mediaType)) {
+                try {
+                    android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+                    opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
+                    android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeFile(stagedFile.getAbsolutePath(), opts);
+                    if (bmp != null) {
+                        int bw = Math.max(1, bmp.getWidth());
+                        int bh = Math.max(1, bmp.getHeight());
+                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions("msg_" + messageId, bw, bh);
+                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions(stagedFile.getAbsolutePath(), bw, bh);
+                        float thumbRatio = Math.min(240f / bw, 240f / bh);
+                        int thumbW = Math.max(36, Math.round(bw * thumbRatio));
+                        int thumbH = Math.max(36, Math.round(bh * thumbRatio));
+                        android.graphics.Bitmap thumb = android.graphics.Bitmap.createScaledBitmap(bmp, thumbW, thumbH, true);
+                        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                        thumb.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, baos);
+                        msg.setThumbnail(android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.NO_WRAP));
+                        if (thumb != bmp) thumb.recycle();
+                        bmp.recycle();
+                    }
+                } catch (Throwable ignored) {}
+            }
+
+            if (replyToId != null && !replyToId.trim().isEmpty()) {
                 Message replyMsg = getMessage(replyToId);
                 msg.setReplyToMessageId(replyToId);
                 if (replyMsg != null) {
@@ -1019,7 +1137,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 msg.setExpiresAt(new Timestamp(new Date(expiresAt)));
             }
 
-            dispatchMessageInternal(dialogId, recipientId, msg, file);
+            dispatchMessageInternal(dialogId, effectiveRecipientId, msg, stagedFile);
         });
     }
 
@@ -1865,6 +1983,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             return ".m4a";
         } else if ("gif".equals(mType)) {
             return ".gif";
+        } else if ("sticker".equals(mType)) {
+            if (msg.getLocalFilePath() != null) {
+                String lower = msg.getLocalFilePath().toLowerCase(java.util.Locale.ROOT);
+                if (lower.endsWith(".gif")) return ".gif";
+                if (lower.endsWith(".webp")) return ".webp";
+            }
+            return ".png";
         } else if ("image".equals(mType)) {
             return ".jpg";
         } else if ("video".equals(mType)) {
@@ -1944,6 +2069,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             }
             byte[] decoded = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
             if (decoded != null && decoded.length >= 64) {
+                if ("sticker".equalsIgnoreCase(msg.getType()) && decoded.length > 6
+                        && decoded[0] == 'G' && decoded[1] == 'I' && decoded[2] == 'F') {
+                    targetFile = new File(context.getExternalCacheDir(), "dec_" + msg.getId() + ".gif");
+                }
                 File tempFile = new File(context.getExternalCacheDir(), "tmp_dec_" + msg.getId() + "_" + System.nanoTime() + ".tmp");
                 try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
                     fos.write(decoded);
@@ -2255,15 +2384,31 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             Message msg = getMessage(messageId);
             String localPath = msg != null ? msg.getLocalFilePath() : null;
 
-            // Remove from memory cache
-            removeMessageFromCache(dialogId, messageId);
+            if (deleteForEveryone) {
+                if (msg != null) {
+                    msg.setType("deleted");
+                    msg.setText("🚫 This message was deleted");
+                    msg.setLocalFilePath(null);
+                    msg.setMediaUrl(null);
+                    msg.setThumbnail(null);
+                    msg.setPollJson(null);
+                    msg.setReactions(null);
+                }
+            } else {
+                // Remove from memory cache
+                removeMessageFromCache(dialogId, messageId);
+            }
 
-            // Shred local media & delete from SQLCipher
+            // Shred local media & update SQLCipher
             mStorageQueue.execute(() -> {
                 if (localPath != null) {
                     cryptographicZeroWipe(new File(localPath));
                 }
-                mDatabase.deleteMessage(messageId);
+                if (deleteForEveryone) {
+                    mDatabase.markMessageDeletedForEveryone(dialogId, messageId);
+                } else {
+                    mDatabase.deleteMessage(messageId);
+                }
                 mDatabase.updateChatLastMessageSummary(dialogId);
                 refreshDialogInCache(dialogId);
             });
@@ -2282,18 +2427,18 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         for (String peerId : resolveTargetPeers(dialogId, null, msg)) {
                             WebRtcManager.getInstance(mContext).sendDeleteMessageForEveryone(peerId, dialogId, messageId);
                         }
+                        Map<String, Object> upd = new HashMap<>();
+                        upd.put("type", "deleted");
+                        upd.put("text", "🚫 This message was deleted");
+                        if (msg.getSenderId() != null) upd.put("senderId", msg.getSenderId());
+                        if (msg.getReceiverId() != null) upd.put("receiverId", msg.getReceiverId());
+
                         if (dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_")) {
-                            Map<String, Object> upd = new HashMap<>();
-                            upd.put("type", "deleted");
-                            upd.put("text", "🚫 This message was deleted");
                             com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                     .collection("groups").document(dialogId)
                                     .collection("messages").document(messageId)
                                     .set(upd, com.google.firebase.firestore.SetOptions.merge());
                         } else {
-                            Map<String, Object> upd = new HashMap<>();
-                            upd.put("type", "deleted");
-                            upd.put("text", "🚫 This message was deleted");
                             com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                     .collection("chats").document(dialogId)
                                     .collection("messages").document(messageId)
@@ -2331,12 +2476,29 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             Map<String, String> reactions = msg.getReactions();
             if (reactions == null) reactions = new HashMap<>();
 
-            if (emoji.equals(reactions.get(reactorKey)) || emoji.isEmpty()) {
+            if (emoji == null || emoji.trim().isEmpty() || emoji.equals(reactions.get(reactorKey))) {
                 reactions.remove(reactorKey);
+                if (!reactorKey.startsWith("anon_") && reactorKey.length() >= 4) {
+                    reactions.remove("anon_" + reactorKey.substring(0, Math.min(4, reactorKey.length())));
+                }
             } else {
-                reactions.put(reactorKey, emoji);
+                reactions.put(reactorKey, emoji.trim());
             }
-            msg.setReactions(reactions);
+
+            // Purge any empty / null / whitespace values
+            Iterator<Map.Entry<String, String>> it = reactions.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<String, String> entry = it.next();
+                if (entry.getValue() == null || entry.getValue().trim().isEmpty()) {
+                    it.remove();
+                }
+            }
+
+            if (reactions.isEmpty()) {
+                msg.setReactions(null);
+            } else {
+                msg.setReactions(reactions);
+            }
 
             // Update DB
             mStorageQueue.execute(() -> mDatabase.updateMessageReaction(dialogId, messageId, reactorKey, emoji));
@@ -2349,28 +2511,38 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             });
 
             // Broadcast to all target peers
-            final Map<String, String> finalReactions = new HashMap<>(reactions);
+            final Map<String, String> finalReactions = reactions != null ? new HashMap<>(reactions) : new HashMap<>();
             mCryptoQueue.execute(() -> {
                 for (String peerId : resolveTargetPeers(dialogId, null, msg)) {
                     WebRtcManager.getInstance(mContext).sendReaction(peerId, dialogId, messageId, reactorKey, emoji);
                 }
                 if (dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_")) {
                     try {
-                        Map<String, Object> upd = new HashMap<>();
-                        upd.put("reactions", finalReactions);
-                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                .collection("groups").document(dialogId)
-                                .collection("messages").document(messageId)
-                                .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                        if (finalReactions.isEmpty()) {
+                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    .collection("groups").document(dialogId)
+                                    .collection("messages").document(messageId)
+                                    .update("reactions", com.google.firebase.firestore.FieldValue.delete());
+                        } else {
+                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    .collection("groups").document(dialogId)
+                                    .collection("messages").document(messageId)
+                                    .update("reactions", finalReactions);
+                        }
                     } catch (Exception ignored) {}
                 } else {
                     try {
-                        Map<String, Object> upd = new HashMap<>();
-                        upd.put("reactions", finalReactions);
-                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                .collection("chats").document(dialogId)
-                                .collection("messages").document(messageId)
-                                .set(upd, com.google.firebase.firestore.SetOptions.merge());
+                        if (finalReactions.isEmpty()) {
+                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    .collection("chats").document(dialogId)
+                                    .collection("messages").document(messageId)
+                                    .update("reactions", com.google.firebase.firestore.FieldValue.delete());
+                        } else {
+                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    .collection("chats").document(dialogId)
+                                    .collection("messages").document(messageId)
+                                    .update("reactions", finalReactions);
+                        }
                     } catch (Exception ignored) {}
                 }
             });

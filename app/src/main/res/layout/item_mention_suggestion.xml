@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="9dp"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- Member Avatar -->
+    <ImageView
+        android:id="@+id/ivMentionAvatar"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:src="@drawable/ic_person"
+        android:background="@drawable/bg_circle_icon"
+        android:backgroundTint="@color/colorSurfaceVariant"
+        android:padding="6dp"
+        app:tint="@color/colorPrimary" />
+
+    <!-- Name & @Username Container -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvMentionDisplayName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14.5sp"
+            android:textStyle="bold"
+            android:textColor="@color/colorTextPrimary"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="Alex Mercer" />
+
+        <TextView
+            android:id="@+id/tvMentionUsername"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12.5sp"
+            android:textColor="@color/colorPrimary"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="@alex_m" />
+    </LinearLayout>
+
+    <!-- Optional Role / Badge (e.g. Owner / Admin) -->
+    <TextView
+        android:id="@+id/tvMentionBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:textColor="@color/veil_accent"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="3dp"
+        android:background="@drawable/bg_filter_chip"
+        android:visibility="gone"
+        tools:text="Admin" />
+
+</LinearLayout>

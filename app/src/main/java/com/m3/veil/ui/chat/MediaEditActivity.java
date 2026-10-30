@@ -22,10 +22,14 @@ import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.content.res.ColorStateList;
+import android.content.res.Configuration;
 import android.widget.Toast;
 import android.widget.VideoView;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
@@ -33,8 +37,8 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-import com.google.android.material.slider.RangeSlider;
 import com.m3.veil.R;
+import com.m3.veil.ui.views.VeilVideoTrimmerFilmstripView;
 import com.m3.veil.utils.UiAnimator;
 import com.m3.veil.utils.VideoTrimUtil;
 import com.yalantis.ucrop.UCrop;
@@ -57,6 +61,8 @@ public class MediaEditActivity extends AppCompatActivity {
     public static final String EXTRA_BATCH_TYPES = "extra_batch_types";
     public static final String EXTRA_IS_STATUS_MODE = "extra_is_status_mode";
     public static final String EXTRA_RECIPIENT_NAME = "extra_recipient_name";
+    public static final String EXTRA_IS_STICKER_MODE = "extra_is_sticker_mode";
+    public static final String EXTRA_IS_GIF_MODE = "extra_is_gif_mode";
 
     public static final String RESULT_EDITED_FILE_PATH = "result_edited_file_path";
     public static final String RESULT_MEDIA_TYPE = "result_media_type";
@@ -101,7 +107,9 @@ public class MediaEditActivity extends AppCompatActivity {
     private TextView tvEditBatchCounter;
     private boolean isViewOnce = false;
 
-    private TextView btnCensorChip;
+    private FrameLayout videoContainer;
+    private View drawingHeaderBar;
+    private ImageView btnDrawUndo;
     private TextView btnMuteAudioChip;
     private TextView btnVideoSpeedChip;
     private TextView btnHdQualityChip;
@@ -127,10 +135,11 @@ public class MediaEditActivity extends AppCompatActivity {
 
     // Video Trimmer & Filmstrip members
     private View videoTrimmerContainer;
-    private LinearLayout videoFilmstripRow;
+    private VeilVideoTrimmerFilmstripView videoFilmstripTrimmer;
     private TextView btnVideoPlayPauseToggle;
     private TextView btnVideoGifModeToggle;
-    private RangeSlider videoRangeSlider;
+    private ImageView btnMidPlayPause;
+    private ImageView btnToolbarGifMode;
     private TextView tvTrimStart, tvTrimEnd, tvTrimDuration;
     private long trimStartMs = 0;
     private long trimEndMs = 0;
@@ -154,6 +163,8 @@ public class MediaEditActivity extends AppCompatActivity {
     private GestureDetector horizontalSwipeDetector;
 
     private boolean isStatusMode = false;
+    private boolean isStickerMode = false;
+    private boolean isGifMode = false;
     private String recipientLabel = "Status (Contacts)";
 
     @Override
@@ -163,11 +174,46 @@ public class MediaEditActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_media_edit);
 
-        View mainView = findViewById(android.R.id.content);
-        ViewCompat.setOnApplyWindowInsetsListener(mainView, (v, insets) -> {
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            float dp = getResources().getDisplayMetrics().density;
+            View topBar = findViewById(R.id.topHeaderBar);
+            if (topBar != null) {
+                topBar.setPadding(
+                        Math.round(12 * dp) + systemBars.left,
+                        systemBars.top + Math.round(8 * dp),
+                        Math.round(12 * dp) + systemBars.right,
+                        Math.round(8 * dp));
+            }
+            View drawBar = findViewById(R.id.drawingHeaderBar);
+            if (drawBar != null) {
+                drawBar.setPadding(
+                        Math.round(12 * dp) + systemBars.left,
+                        systemBars.top + Math.round(8 * dp),
+                        Math.round(12 * dp) + systemBars.right,
+                        Math.round(8 * dp));
+            }
+            View bottomBar = findViewById(R.id.bottomBar);
+            if (bottomBar != null) {
+                bottomBar.setPadding(
+                        Math.round(12 * dp) + systemBars.left,
+                        Math.round(10 * dp),
+                        Math.round(12 * dp) + systemBars.right,
+                        systemBars.bottom + Math.round(14 * dp));
+            }
             return insets;
+        });
+
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (currentState != UIState.BASE) {
+                    updateState(UIState.BASE);
+                } else {
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                }
+            }
         });
 
         extractMediaBatchFromIntent();
@@ -178,52 +224,93 @@ public class MediaEditActivity extends AppCompatActivity {
             return;
         }
 
-        configureDarkMediaSystemBars();
+        configureAdaptiveMediaSystemBarsAndTheme();
 
+        View mainView = findViewById(android.R.id.content);
         if (mainView != null) {
-            mainView.setScaleX(0.92f);
-            mainView.setScaleY(0.92f);
+            mainView.setScaleX(0.96f);
+            mainView.setScaleY(0.96f);
             mainView.setAlpha(0f);
             mainView.animate()
                     .scaleX(1f)
                     .scaleY(1f)
                     .alpha(1f)
-                    .setDuration(240)
+                    .setDuration(210)
                     .setInterpolator(new android.view.animation.DecelerateInterpolator())
                     .start();
         }
     }
 
-    private void configureDarkMediaSystemBars() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            android.view.Window window = getWindow();
-            window.setStatusBarColor(Color.TRANSPARENT);
-            window.setNavigationBarColor(Color.TRANSPARENT);
-            android.view.WindowInsetsController controller = window.getInsetsController();
-            if (controller != null) {
-                controller.setSystemBarsAppearance(
-                        0,
-                        android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
-                                | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
-                );
-            }
-        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            android.view.Window window = getWindow();
-            window.setStatusBarColor(Color.TRANSPARENT);
-            window.setNavigationBarColor(Color.TRANSPARENT);
-            int flags = window.getDecorView().getSystemUiVisibility();
-            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-            }
-            flags |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
-            window.getDecorView().setSystemUiVisibility(flags);
+    @Override
+    public void onBackPressed() {
+        if (currentState != UIState.BASE) {
+            updateState(UIState.BASE);
+        } else {
+            super.onBackPressed();
         }
+    }
+
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        boolean isNight = (newConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        try {
+            android.view.Window window = getWindow();
+            int surfaceColor = isNight ? Color.parseColor("#0B1017") : Color.parseColor("#F8FAFC");
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(surfaceColor));
+            window.setStatusBarColor(surfaceColor);
+            window.setNavigationBarColor(surfaceColor);
+            androidx.core.view.WindowInsetsControllerCompat insetsController =
+                    androidx.core.view.WindowCompat.getInsetsController(window, window.getDecorView());
+            if (insetsController != null) {
+                insetsController.setAppearanceLightStatusBars(!isNight);
+                insetsController.setAppearanceLightNavigationBars(!isNight);
+            }
+        } catch (Throwable ignored) {}
+        applyAdaptiveThemeElements(isNight);
+    }
+
+    private void configureAdaptiveMediaSystemBarsAndTheme() {
+        boolean isNight = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        try {
+            android.view.Window window = getWindow();
+            int surfaceColor = isNight ? Color.parseColor("#0B1017") : Color.parseColor("#F8FAFC");
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(surfaceColor));
+            window.setStatusBarColor(surfaceColor);
+            window.setNavigationBarColor(surfaceColor);
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false);
+            androidx.core.view.WindowInsetsControllerCompat insetsController =
+                    androidx.core.view.WindowCompat.getInsetsController(window, window.getDecorView());
+            if (insetsController != null) {
+                insetsController.setAppearanceLightStatusBars(!isNight);
+                insetsController.setAppearanceLightNavigationBars(!isNight);
+            }
+        } catch (Throwable ignored) {}
 
         photoEditorView = findViewById(R.id.photoEditorView);
+        videoContainer = findViewById(R.id.videoContainer);
         videoView = findViewById(R.id.videoView);
+        btnMidPlayPause = findViewById(R.id.btnMidPlayPause);
+        btnToolbarGifMode = findViewById(R.id.btnToolbarGifMode);
+        if (btnMidPlayPause != null) {
+            UiAnimator.attachSpringPress(btnMidPlayPause);
+            btnMidPlayPause.setOnClickListener(v -> toggleVideoPlayback());
+        }
+        if (videoContainer != null) {
+            videoContainer.setOnClickListener(v -> toggleVideoPlayback());
+        }
+        if (btnToolbarGifMode != null) {
+            UiAnimator.attachSpringPress(btnToolbarGifMode);
+            btnToolbarGifMode.setOnClickListener(v -> {
+                sendVideoAsGif = !sendVideoAsGif;
+                if (sendVideoAsGif) {
+                    isVideoMuted = true;
+                    applyLiveVideoMuteState();
+                }
+                updateToolbarGifModeUi();
+                Toast.makeText(this, sendVideoAsGif ? "🎬 Looping GIF mode active" : "🎥 Standard Video mode active", Toast.LENGTH_SHORT).show();
+            });
+        }
         captionEditText = findViewById(R.id.captionEditText);
         editBatchThumbnailScroll = findViewById(R.id.editBatchThumbnailScroll);
         editBatchThumbnailStrip = findViewById(R.id.editBatchThumbnailStrip);
@@ -246,6 +333,7 @@ public class MediaEditActivity extends AppCompatActivity {
         UiAnimator.attachSpringPress(btnUndoView);
 
         btnCloseView.setOnClickListener(v -> finish());
+        applyAdaptiveThemeElements(isNight);
 
         setupViewsForState();
         initToolbarDynamicChips();
@@ -407,6 +495,9 @@ public class MediaEditActivity extends AppCompatActivity {
         if (intent == null) return;
 
         isStatusMode = intent.getBooleanExtra(EXTRA_IS_STATUS_MODE, false);
+        isStickerMode = intent.getBooleanExtra(EXTRA_IS_STICKER_MODE, false);
+        isGifMode = intent.getBooleanExtra(EXTRA_IS_GIF_MODE, false)
+                || "gif".equalsIgnoreCase(intent.getStringExtra(EXTRA_MEDIA_TYPE));
         String customRecipient = intent.getStringExtra(EXTRA_RECIPIENT_NAME);
         if (customRecipient != null && !customRecipient.trim().isEmpty()) {
             recipientLabel = customRecipient;
@@ -456,17 +547,142 @@ public class MediaEditActivity extends AppCompatActivity {
         }
     }
 
-    private boolean isCensorBrushActive = false;
     private boolean isVideoMuted = false;
+
+    private void applyAdaptiveThemeElements(boolean isNight) {
+        float dp = getResources().getDisplayMetrics().density;
+
+        View root = findViewById(R.id.mediaEditRoot);
+        if (root != null) {
+            root.setBackgroundColor(isNight ? Color.parseColor("#0B1017") : Color.parseColor("#F1F5F9"));
+        }
+
+        View topBar = findViewById(R.id.topHeaderBar);
+        if (topBar != null) {
+            topBar.setBackgroundColor(isNight ? Color.parseColor("#CC0B1017") : Color.parseColor("#F2F8FAFC"));
+        }
+
+        int iconTint = isNight ? Color.WHITE : Color.parseColor("#0F172A");
+        int circleBgColor = isNight ? 0x33FFFFFF : 0x1F0F172A;
+
+        ImageView btnCloseView = findViewById(R.id.btnClose);
+        ImageView btnUndoView = findViewById(R.id.btnUndo);
+        ImageView btnCropView = findViewById(R.id.btnCrop);
+        ImageView btnEmojiView = findViewById(R.id.btnEmoji);
+        ImageView btnTextView = findViewById(R.id.btnText);
+        ImageView btnDrawView = findViewById(R.id.btnDraw);
+
+        ImageView[] toolButtons = new ImageView[]{btnCloseView, btnUndoView, btnCropView, btnEmojiView, btnTextView, btnDrawView};
+        for (ImageView iv : toolButtons) {
+            if (iv != null) {
+                iv.setColorFilter(iconTint);
+                GradientDrawable cBg = new GradientDrawable();
+                cBg.setShape(GradientDrawable.OVAL);
+                cBg.setColor(circleBgColor);
+                iv.setBackground(cBg);
+            }
+        }
+
+        View bottomBar = findViewById(R.id.bottomBar);
+        if (bottomBar != null) {
+            bottomBar.setBackgroundColor(isNight ? Color.parseColor("#D90B1017") : Color.parseColor("#F2F8FAFC"));
+        }
+
+        View captionWrap = findViewById(R.id.captionPillWrap);
+        if (captionWrap != null) {
+            GradientDrawable cBg = new GradientDrawable();
+            cBg.setCornerRadius(24 * dp);
+            if (isNight) {
+                cBg.setColor(Color.parseColor("#1E293B"));
+                cBg.setStroke(Math.max(1, Math.round(dp)), Color.parseColor("#334155"));
+            } else {
+                cBg.setColor(Color.parseColor("#FFFFFF"));
+                cBg.setStroke(Math.max(1, Math.round(dp)), Color.parseColor("#CBD5E1"));
+            }
+            captionWrap.setBackground(cBg);
+        }
+
+        EditText captionInput = findViewById(R.id.captionEditText);
+        if (captionInput != null) {
+            captionInput.setTextColor(isNight ? Color.WHITE : Color.parseColor("#0F172A"));
+            captionInput.setHintTextColor(isNight ? 0x99FFFFFF : Color.parseColor("#94A3B8"));
+        }
+
+        View recipientPill = findViewById(R.id.recipientStatusPill);
+        if (recipientPill != null) {
+            GradientDrawable rBg = new GradientDrawable();
+            rBg.setCornerRadius(18 * dp);
+            if (isNight) {
+                rBg.setColor(Color.parseColor("#1E293B"));
+                rBg.setStroke(Math.max(1, Math.round(dp)), Color.parseColor("#334155"));
+            } else {
+                rBg.setColor(Color.parseColor("#E2E8F0"));
+                rBg.setStroke(Math.max(1, Math.round(dp)), Color.parseColor("#CBD5E1"));
+            }
+            recipientPill.setBackground(rBg);
+        }
+
+        TextView tvRecipLabel = findViewById(R.id.tvRecipientStatusLabel);
+        if (tvRecipLabel != null) {
+            tvRecipLabel.setTextColor(isNight ? Color.WHITE : Color.parseColor("#0F172A"));
+        }
+
+        ImageView ivRecipIcon = findViewById(R.id.ivRecipientStatusIcon);
+        if (ivRecipIcon != null) {
+            ivRecipIcon.setColorFilter(isNight ? Color.parseColor("#CFD8DC") : Color.parseColor("#64748B"));
+        }
+
+        ImageView ivAddMore = findViewById(R.id.btnAddMoreMedia);
+        if (ivAddMore != null) {
+            ivAddMore.setColorFilter(isNight ? Color.parseColor("#CFD8DC") : Color.parseColor("#64748B"));
+        }
+
+        TextView tvMention = findViewById(R.id.btnMentionTag);
+        if (tvMention != null) {
+            tvMention.setTextColor(isNight ? Color.parseColor("#CFD8DC") : Color.parseColor("#64748B"));
+        }
+
+        if (btnHdQualityChip != null) updateChipTheme(btnHdQualityChip, isHdQuality);
+        if (btnColorFilterChip != null) updateChipTheme(btnColorFilterChip, currentFilterIndex != 0);
+        if (btnVideoSpeedChip != null) updateChipTheme(btnVideoSpeedChip, currentVideoSpeed != 1.0f);
+        if (btnMuteAudioChip != null) updateChipTheme(btnMuteAudioChip, isVideoMuted);
+        if (tvEditBatchCounter != null) updateChipTheme(tvEditBatchCounter, false);
+    }
+
+    private void updateChipTheme(TextView chip, boolean isSelected) {
+        if (chip == null) return;
+        boolean isNight = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        float dp = getResources().getDisplayMetrics().density;
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(18 * dp);
+        if (isSelected) {
+            // Selected active state: vibrant royal indigo pill with crisp white text
+            bg.setColor(Color.parseColor("#4F46E5"));
+            bg.setStroke(Math.max(1, Math.round(1f * dp)), Color.parseColor("#818CF8"));
+            chip.setTextColor(Color.WHITE);
+        } else {
+            if (isNight) {
+                // Dark mode: dark slate pill with light text
+                bg.setColor(Color.parseColor("#1E293B"));
+                bg.setStroke(Math.max(1, Math.round(1f * dp)), Color.parseColor("#334155"));
+                chip.setTextColor(Color.parseColor("#F8FAFC"));
+            } else {
+                // Light mode: clean light slate pill with dark high-contrast text
+                bg.setColor(Color.parseColor("#E2E8F0"));
+                bg.setStroke(Math.max(1, Math.round(1f * dp)), Color.parseColor("#CBD5E1"));
+                chip.setTextColor(Color.parseColor("#0F172A"));
+            }
+        }
+        chip.setBackground(bg);
+    }
 
     private TextView buildToolbarChip(String label, float dp) {
         TextView chip = new TextView(this);
         chip.setText(label);
-        chip.setTextColor(Color.WHITE);
         chip.setTextSize(12f);
         chip.setTypeface(null, Typeface.BOLD);
-        chip.setBackgroundResource(R.drawable.bg_filter_chip);
-        chip.setPadding((int) (10 * dp), (int) (6 * dp), (int) (10 * dp), (int) (6 * dp));
+        updateChipTheme(chip, false);
+        chip.setPadding((int) (11 * dp), (int) (6 * dp), (int) (11 * dp), (int) (6 * dp));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -482,71 +698,67 @@ public class MediaEditActivity extends AppCompatActivity {
 
         // 1. HD / Standard Quality Chip
         btnHdQualityChip = buildToolbarChip("HD", dp);
-        btnHdQualityChip.setBackgroundResource(R.drawable.bg_filter_chip_selected);
+        updateChipTheme(btnHdQualityChip, isHdQuality);
         btnHdQualityChip.setOnClickListener(v -> {
             isHdQuality = !isHdQuality;
             btnHdQualityChip.setText(isHdQuality ? "HD" : "SD");
-            btnHdQualityChip.setBackgroundResource(isHdQuality ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+            updateChipTheme(btnHdQualityChip, isHdQuality);
             updateTrimDurationAndSizeLabel();
             Toast.makeText(this, isHdQuality ? "HD High-Definition Quality enabled" : "Standard Data-Saver Quality enabled", Toast.LENGTH_SHORT).show();
         });
         tb.addView(btnHdQualityChip, 0);
 
+        // Move GIF button directly next to HD/SD quality button
+        if (btnToolbarGifMode != null) {
+            tb.removeView(btnToolbarGifMode);
+            LinearLayout.LayoutParams gifLp = new LinearLayout.LayoutParams((int) (38 * dp), (int) (38 * dp));
+            gifLp.setMarginEnd((int) (8 * dp));
+            gifLp.gravity = Gravity.CENTER_VERTICAL;
+            btnToolbarGifMode.setLayoutParams(gifLp);
+            tb.addView(btnToolbarGifMode, 1);
+        }
+
         // 2. Color Filter Cycling Chip
         btnColorFilterChip = buildToolbarChip("✨ Filter", dp);
+        updateChipTheme(btnColorFilterChip, currentFilterIndex != 0);
         btnColorFilterChip.setOnClickListener(v -> {
             currentFilterIndex = (currentFilterIndex + 1) % FILTER_NAMES.length;
             applyActiveColorFilter();
+            updateToolbarGifModeUi();
             Toast.makeText(this, "Filter: " + FILTER_NAMES[currentFilterIndex], Toast.LENGTH_SHORT).show();
         });
-        tb.addView(btnColorFilterChip, 1);
+        int filterIdx = btnToolbarGifMode != null ? (tb.indexOfChild(btnToolbarGifMode) + 1) : 1;
+        tb.addView(btnColorFilterChip, filterIdx);
 
-        // 3. Video Playback Speed Chip (0.5x / 1.0x / 1.5x / 2.0x)
+        // 3. Real-Time Audio Mute Chip (placed directly next to Filter button!)
+        btnMuteAudioChip = buildToolbarChip("🔊 Audio", dp);
+        updateChipTheme(btnMuteAudioChip, isVideoMuted);
+        btnMuteAudioChip.setOnClickListener(v -> {
+            isVideoMuted = !isVideoMuted;
+            applyLiveVideoMuteState();
+            Toast.makeText(this, isVideoMuted ? "🔇 Video audio muted (will send silent video)" : "🔊 Video audio enabled", Toast.LENGTH_SHORT).show();
+        });
+        tb.addView(btnMuteAudioChip, tb.indexOfChild(btnColorFilterChip) + 1);
+
+        // 4. Video Playback Speed Chip (0.5x / 1.0x / 1.5x / 2.0x)
         btnVideoSpeedChip = buildToolbarChip("1.0x", dp);
+        updateChipTheme(btnVideoSpeedChip, currentVideoSpeed != 1.0f);
         btnVideoSpeedChip.setOnClickListener(v -> {
             if (currentVideoSpeed == 1.0f) currentVideoSpeed = 1.5f;
             else if (currentVideoSpeed == 1.5f) currentVideoSpeed = 2.0f;
             else if (currentVideoSpeed == 2.0f) currentVideoSpeed = 0.5f;
             else currentVideoSpeed = 1.0f;
             btnVideoSpeedChip.setText(String.format(java.util.Locale.US, "%.1fx", currentVideoSpeed));
-            btnVideoSpeedChip.setBackgroundResource(currentVideoSpeed != 1.0f ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+            updateChipTheme(btnVideoSpeedChip, currentVideoSpeed != 1.0f);
             applyLiveVideoPlaybackSpeed();
         });
-        tb.addView(btnVideoSpeedChip, 2);
-
-        // 4. Privacy Censor Brush Chip (works on both Photos and Videos!)
-        btnCensorChip = buildToolbarChip("🕵️ Censor", dp);
-        btnCensorChip.setOnClickListener(v -> {
-            if (photoEditor == null) return;
-            isCensorBrushActive = !isCensorBrushActive;
-            if (isCensorBrushActive) {
-                updateState(UIState.DRAWING);
-                photoEditor.setBrushSize(64f);
-                photoEditor.setBrushColor(Color.parseColor("#E6111827"));
-                btnCensorChip.setBackgroundResource(R.drawable.bg_filter_chip_selected);
-                Toast.makeText(this, "🕵️ Censor Brush active: swipe over faces or sensitive text", Toast.LENGTH_SHORT).show();
-            } else {
-                photoEditor.setBrushSize(16f);
-                photoEditor.setBrushColor(currentSelectedColor);
-                btnCensorChip.setBackgroundResource(R.drawable.bg_filter_chip);
-            }
-        });
-        tb.addView(btnCensorChip);
-
-        // 5. Real-Time Audio Mute Chip (mutes live MediaPlayer AND strips audio track on save!)
-        btnMuteAudioChip = buildToolbarChip("🔊 Audio", dp);
-        btnMuteAudioChip.setOnClickListener(v -> {
-            isVideoMuted = !isVideoMuted;
-            applyLiveVideoMuteState();
-            Toast.makeText(this, isVideoMuted ? "🔇 Video audio muted (will send silent video)" : "🔊 Video audio enabled", Toast.LENGTH_SHORT).show();
-        });
-        tb.addView(btnMuteAudioChip);
+        tb.addView(btnVideoSpeedChip, tb.indexOfChild(btnMuteAudioChip) + 1);
     }
 
     private void applyLiveVideoMuteState() {
         if (btnMuteAudioChip != null) {
             btnMuteAudioChip.setText(isVideoMuted ? "🔇 Muted" : "🔊 Audio");
-            btnMuteAudioChip.setBackgroundResource(isVideoMuted ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+            updateChipTheme(btnMuteAudioChip, isVideoMuted);
         }
         if (activeVideoMediaPlayer != null) {
             try {
@@ -578,7 +790,7 @@ public class MediaEditActivity extends AppCompatActivity {
     private void applyActiveColorFilter() {
         if (btnColorFilterChip != null) {
             btnColorFilterChip.setText(currentFilterIndex == 0 ? "✨ Filter" : ("✨ " + FILTER_NAMES[currentFilterIndex]));
-            btnColorFilterChip.setBackgroundResource(currentFilterIndex != 0 ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+            updateChipTheme(btnColorFilterChip, currentFilterIndex != 0);
         }
         int tint = FILTER_TINT_COLORS[currentFilterIndex % FILTER_TINT_COLORS.length];
         if (photoEditorView != null && photoEditorView.getSource() != null) {
@@ -656,7 +868,12 @@ public class MediaEditActivity extends AppCompatActivity {
             btn.setOnClickListener(v -> {
                 if (idx == 0) {
                     currentVideoRotation = (currentVideoRotation + 90) % 360;
-                    if (videoView != null) videoView.setRotation(currentVideoRotation);
+                    if (videoView != null) {
+                        videoView.setRotation(currentVideoRotation);
+                        if (activeVideoMediaPlayer != null) {
+                            fitVideoViewToContainer(activeVideoMediaPlayer.getVideoWidth(), activeVideoMediaPlayer.getVideoHeight());
+                        }
+                    }
                     Toast.makeText(this, "Video rotated to " + currentVideoRotation + "°", Toast.LENGTH_SHORT).show();
                 } else if (idx == 1) {
                     currentVideoFlipH = !currentVideoFlipH;
@@ -669,6 +886,9 @@ public class MediaEditActivity extends AppCompatActivity {
                         videoView.setRotation(0f);
                         videoView.setScaleX(1f);
                         videoView.setScaleY(1f);
+                        if (activeVideoMediaPlayer != null) {
+                            fitVideoViewToContainer(activeVideoMediaPlayer.getVideoWidth(), activeVideoMediaPlayer.getVideoHeight());
+                        }
                     }
                 }
                 if (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size()) {
@@ -722,7 +942,7 @@ public class MediaEditActivity extends AppCompatActivity {
         btnExtractCropFrame.setTextColor(Color.WHITE);
         btnExtractCropFrame.setTextSize(13.5f);
         btnExtractCropFrame.setTypeface(null, Typeface.BOLD);
-        btnExtractCropFrame.setBackgroundResource(R.drawable.bg_filter_chip_selected);
+        updateChipTheme(btnExtractCropFrame, true);
         btnExtractCropFrame.setOnClickListener(v -> {
             sheet.dismiss();
             captureCurrentVideoFrameAndCrop();
@@ -840,6 +1060,7 @@ public class MediaEditActivity extends AppCompatActivity {
         if (tvEditBatchCounter != null) {
             tvEditBatchCounter.setVisibility(View.VISIBLE);
             tvEditBatchCounter.setText((currentBatchIndex + 1) + " / " + batchItems.size());
+            updateChipTheme(tvEditBatchCounter, false);
         }
 
         float dp = getResources().getDisplayMetrics().density;
@@ -1006,6 +1227,7 @@ public class MediaEditActivity extends AppCompatActivity {
             currentFilterIndex = item.filterIndex;
         }
         applyActiveColorFilter();
+        updateToolbarGifModeUi();
         if (mediaType != null && (mediaType.startsWith("video") || "gif".equals(mediaType))) {
             setupVideoEditor();
         } else {
@@ -1018,6 +1240,9 @@ public class MediaEditActivity extends AppCompatActivity {
         if (videoView != null && videoView.isPlaying()) {
             videoView.stopPlayback();
         }
+        if (videoContainer != null) {
+            videoContainer.setVisibility(View.GONE);
+        }
         photoEditorView.setVisibility(View.VISIBLE);
         videoView.setVisibility(View.GONE);
         if (videoTrimmerContainer != null) {
@@ -1029,7 +1254,6 @@ public class MediaEditActivity extends AppCompatActivity {
         findViewById(R.id.btnText).setVisibility(View.VISIBLE);
         findViewById(R.id.btnDraw).setVisibility(View.VISIBLE);
         findViewById(R.id.btnUndo).setVisibility(View.VISIBLE);
-        if (btnCensorChip != null) btnCensorChip.setVisibility(View.VISIBLE);
         if (btnMuteAudioChip != null) btnMuteAudioChip.setVisibility(View.GONE);
         if (btnVideoSpeedChip != null) btnVideoSpeedChip.setVisibility(View.GONE);
 
@@ -1065,7 +1289,60 @@ public class MediaEditActivity extends AppCompatActivity {
                 .start(this);
     }
 
+    private int getEmbeddedVideoRotation(Uri uri) {
+        if (uri == null) return 0;
+        MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+        try {
+            mmr.setDataSource(this, uri);
+            String rot = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
+            if (rot != null && !rot.isEmpty()) {
+                return Integer.parseInt(rot);
+            }
+        } catch (Throwable ignored) {
+        } finally {
+            try { mmr.release(); } catch (Throwable ignored) {}
+        }
+        return 0;
+    }
+
+    private void fitVideoViewToContainer(int videoWidth, int videoHeight) {
+        if (videoView == null || videoContainer == null || videoWidth <= 0 || videoHeight <= 0) return;
+        videoContainer.post(() -> {
+            int containerW = videoContainer.getWidth();
+            int containerH = videoContainer.getHeight();
+            if (containerW <= 0) {
+                containerW = getResources().getDisplayMetrics().widthPixels;
+            }
+            if (containerH <= 0) {
+                containerH = getResources().getDisplayMetrics().heightPixels;
+            }
+            if (containerW <= 0 || containerH <= 0) return;
+
+            int embeddedRot = getEmbeddedVideoRotation(mediaUri);
+            int totalRotation = (embeddedRot + currentVideoRotation) % 360;
+            boolean isRotated = (totalRotation == 90 || totalRotation == 270);
+            int realW = isRotated ? videoHeight : videoWidth;
+            int realH = isRotated ? videoWidth : videoHeight;
+
+            float scale = Math.min((float) containerW / realW, (float) containerH / realH);
+            int targetW = Math.max(1, Math.round(realW * scale));
+            int targetH = Math.max(1, Math.round(realH * scale));
+
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) videoView.getLayoutParams();
+            if (lp == null) {
+                lp = new FrameLayout.LayoutParams(targetW, targetH, Gravity.CENTER);
+            } else {
+                lp.width = targetW;
+                lp.height = targetH;
+                lp.gravity = Gravity.CENTER;
+            }
+            videoView.setLayoutParams(lp);
+            videoView.requestLayout();
+        });
+    }
+
     private void setupVideoEditor() {
+        if (videoContainer != null) videoContainer.setVisibility(View.VISIBLE);
         videoView.setVisibility(View.VISIBLE);
         videoView.setRotation(currentVideoRotation);
         videoView.setScaleX(currentVideoFlipH ? -1f : 1f);
@@ -1082,13 +1359,12 @@ public class MediaEditActivity extends AppCompatActivity {
             photoEditor.clearAllViews();
         }
 
-        // Enable ALL tools on video editor (including Crop/Rotate, Censor Brush, Emoji, Text, Draw, Mute, Speed!)
+        // Enable tools on video editor
         findViewById(R.id.btnCrop).setVisibility(View.VISIBLE);
         findViewById(R.id.btnEmoji).setVisibility(View.VISIBLE);
         findViewById(R.id.btnText).setVisibility(View.VISIBLE);
         findViewById(R.id.btnDraw).setVisibility(View.VISIBLE);
         findViewById(R.id.btnUndo).setVisibility(View.VISIBLE);
-        if (btnCensorChip != null) btnCensorChip.setVisibility(View.VISIBLE);
         if (btnMuteAudioChip != null) btnMuteAudioChip.setVisibility(View.VISIBLE);
         if (btnVideoSpeedChip != null) {
             btnVideoSpeedChip.setVisibility(View.VISIBLE);
@@ -1096,88 +1372,18 @@ public class MediaEditActivity extends AppCompatActivity {
         }
 
         videoTrimmerContainer = findViewById(R.id.videoTrimmerContainer);
-        videoRangeSlider = findViewById(R.id.videoRangeSlider);
+        videoFilmstripTrimmer = findViewById(R.id.videoFilmstripTrimmer);
+        btnVideoPlayPauseToggle = findViewById(R.id.btnVideoPlayPauseToggle);
+        btnVideoGifModeToggle = findViewById(R.id.btnVideoGifModeToggle);
         tvTrimStart = findViewById(R.id.tvTrimStart);
         tvTrimEnd = findViewById(R.id.tvTrimEnd);
         tvTrimDuration = findViewById(R.id.tvTrimDuration);
 
         if (videoTrimmerContainer != null) {
             videoTrimmerContainer.setVisibility(View.VISIBLE);
-            ensureVideoFilmstripAndControlsCreated();
         }
 
-        videoView.setVideoURI(mediaUri);
-        videoView.setOnPreparedListener(mp -> {
-            activeVideoMediaPlayer = mp;
-            totalDurationMs = Math.max(100L, mp.getDuration());
-            BatchEditItem item = (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size())
-                    ? batchItems.get(currentBatchIndex) : null;
-            if (item != null && item.trimEndMs > 0 && item.totalDurationMs == totalDurationMs) {
-                trimStartMs = item.trimStartMs;
-                trimEndMs = item.trimEndMs;
-            } else {
-                trimStartMs = 0;
-                trimEndMs = totalDurationMs;
-            }
-
-            applyLiveVideoMuteState();
-            applyLiveVideoPlaybackSpeed();
-            populateVideoFilmstripTimeline(mediaUri, totalDurationMs);
-
-            if (videoRangeSlider != null && totalDurationMs > 0) {
-                videoRangeSlider.clearOnChangeListeners();
-                videoRangeSlider.setValueFrom(0f);
-                videoRangeSlider.setValueTo((float) totalDurationMs);
-                videoRangeSlider.setValues((float) trimStartMs, (float) trimEndMs);
-
-                if (tvTrimStart != null) tvTrimStart.setText(formatTime(trimStartMs));
-                if (tvTrimEnd != null) tvTrimEnd.setText(formatTime(trimEndMs));
-                updateTrimDurationAndSizeLabel();
-
-                videoRangeSlider.addOnChangeListener((slider, value, fromUser) -> {
-                    if (fromUser) {
-                        List<Float> values = slider.getValues();
-                        trimStartMs = values.get(0).longValue();
-                        trimEndMs = values.get(1).longValue();
-                        if (tvTrimStart != null) tvTrimStart.setText(formatTime(trimStartMs));
-                        if (tvTrimEnd != null) tvTrimEnd.setText(formatTime(trimEndMs));
-                        updateTrimDurationAndSizeLabel();
-                        videoView.seekTo((int) value);
-                    }
-                });
-            }
-
-            mp.setLooping(false);
-            videoView.seekTo((int) trimStartMs);
-            videoView.start();
-            updatePlayPauseButtonUi(true);
-            videoLoopHandler.removeCallbacks(videoLoopRunnable);
-            videoLoopHandler.post(videoLoopRunnable);
-        });
-    }
-
-    private void ensureVideoFilmstripAndControlsCreated() {
-        if (!(videoTrimmerContainer instanceof LinearLayout)) return;
-        LinearLayout container = (LinearLayout) videoTrimmerContainer;
-        float dp = getResources().getDisplayMetrics().density;
-
-        if (videoFilmstripRow == null) {
-            // Controls row above filmstrip: [⏸ Pause / ▶ Play] + [🎬 Video | 👾 GIF Loop]
-            LinearLayout modeRow = new LinearLayout(this);
-            modeRow.setOrientation(LinearLayout.HORIZONTAL);
-            modeRow.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams mLp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            mLp.bottomMargin = Math.round(6 * dp);
-            modeRow.setLayoutParams(mLp);
-
-            btnVideoPlayPauseToggle = new TextView(this);
-            btnVideoPlayPauseToggle.setText("⏸ Pause");
-            btnVideoPlayPauseToggle.setTextColor(Color.WHITE);
-            btnVideoPlayPauseToggle.setTextSize(11.5f);
-            btnVideoPlayPauseToggle.setTypeface(null, Typeface.BOLD);
-            btnVideoPlayPauseToggle.setBackgroundResource(R.drawable.bg_filter_chip);
-            btnVideoPlayPauseToggle.setPadding(Math.round(10 * dp), Math.round(4 * dp), Math.round(10 * dp), Math.round(4 * dp));
+        if (btnVideoPlayPauseToggle != null) {
             btnVideoPlayPauseToggle.setOnClickListener(v -> {
                 if (videoView == null) return;
                 if (videoView.isPlaying()) {
@@ -1188,30 +1394,22 @@ public class MediaEditActivity extends AppCompatActivity {
                     updatePlayPauseButtonUi(true);
                 }
             });
-            modeRow.addView(btnVideoPlayPauseToggle);
+        }
 
-            View spacer = new View(this);
-            spacer.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
-            modeRow.addView(spacer);
-
-            btnVideoGifModeToggle = new TextView(this);
+        if (btnVideoGifModeToggle != null) {
             btnVideoGifModeToggle.setText(sendVideoAsGif ? "👾 GIF Loop" : "🎬 Video Mode");
-            btnVideoGifModeToggle.setTextColor(Color.WHITE);
-            btnVideoGifModeToggle.setTextSize(11.5f);
-            btnVideoGifModeToggle.setTypeface(null, Typeface.BOLD);
-            btnVideoGifModeToggle.setBackgroundResource(sendVideoAsGif ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
-            btnVideoGifModeToggle.setPadding(Math.round(10 * dp), Math.round(4 * dp), Math.round(10 * dp), Math.round(4 * dp));
+            updateChipTheme(btnVideoGifModeToggle, sendVideoAsGif);
             btnVideoGifModeToggle.setOnClickListener(v -> {
                 sendVideoAsGif = !sendVideoAsGif;
                 btnVideoGifModeToggle.setText(sendVideoAsGif ? "👾 GIF Loop" : "🎬 Video Mode");
-                btnVideoGifModeToggle.setBackgroundResource(sendVideoAsGif ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+                updateChipTheme(btnVideoGifModeToggle, sendVideoAsGif);
                 if (sendVideoAsGif) {
                     isVideoMuted = true;
                     applyLiveVideoMuteState();
                     if (trimEndMs - trimStartMs > 6500L) {
                         trimEndMs = Math.min(totalDurationMs, trimStartMs + 6000L);
-                        if (videoRangeSlider != null) {
-                            videoRangeSlider.setValues((float) trimStartMs, (float) trimEndMs);
+                        if (videoFilmstripTrimmer != null) {
+                            videoFilmstripTrimmer.setTrimRange(trimStartMs, trimEndMs);
                         }
                         if (tvTrimEnd != null) tvTrimEnd.setText(formatTime(trimEndMs));
                     }
@@ -1225,71 +1423,102 @@ public class MediaEditActivity extends AppCompatActivity {
                 }
                 updateTrimDurationAndSizeLabel();
             });
-            modeRow.addView(btnVideoGifModeToggle);
-            container.addView(modeRow, 0);
-
-            // Filmstrip frame thumbnail timeline
-            videoFilmstripRow = new LinearLayout(this);
-            videoFilmstripRow.setOrientation(LinearLayout.HORIZONTAL);
-            LinearLayout.LayoutParams fsLp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, Math.round(38 * dp));
-            fsLp.topMargin = Math.round(4 * dp);
-            videoFilmstripRow.setLayoutParams(fsLp);
-            GradientDrawable fsBg = new GradientDrawable();
-            fsBg.setColor(Color.parseColor("#33FFFFFF"));
-            fsBg.setCornerRadius(6 * dp);
-            fsBg.setStroke(Math.max(1, Math.round(1 * dp)), Color.parseColor("#6600A884"));
-            videoFilmstripRow.setBackground(fsBg);
-            videoFilmstripRow.setClipToOutline(true);
-            container.addView(videoFilmstripRow, 2);
-        } else {
-            if (btnVideoGifModeToggle != null) {
-                btnVideoGifModeToggle.setText(sendVideoAsGif ? "👾 GIF Loop" : "🎬 Video Mode");
-                btnVideoGifModeToggle.setBackgroundResource(sendVideoAsGif ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
-            }
         }
+
+        videoView.setVideoURI(mediaUri);
+        videoView.setOnPreparedListener(mp -> {
+            activeVideoMediaPlayer = mp;
+            totalDurationMs = Math.max(100L, mp.getDuration());
+            fitVideoViewToContainer(mp.getVideoWidth(), mp.getVideoHeight());
+
+            BatchEditItem item = (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size())
+                    ? batchItems.get(currentBatchIndex) : null;
+            if (item != null && item.trimEndMs > 0 && item.totalDurationMs == totalDurationMs) {
+                trimStartMs = item.trimStartMs;
+                trimEndMs = item.trimEndMs;
+            } else {
+                trimStartMs = 0;
+                trimEndMs = totalDurationMs;
+            }
+
+            applyLiveVideoMuteState();
+            applyLiveVideoPlaybackSpeed();
+
+            if (videoFilmstripTrimmer != null && totalDurationMs > 0) {
+                videoFilmstripTrimmer.setVideoUri(this, mediaUri, totalDurationMs);
+                videoFilmstripTrimmer.setTrimRange(trimStartMs, trimEndMs);
+                videoFilmstripTrimmer.setOnTrimChangeListener((startMs, endMs, fromUser, isDragging) -> {
+                    trimStartMs = startMs;
+                    trimEndMs = endMs;
+                    if (tvTrimStart != null) tvTrimStart.setText(formatTime(trimStartMs));
+                    if (tvTrimEnd != null) tvTrimEnd.setText(formatTime(trimEndMs));
+                    updateTrimDurationAndSizeLabel();
+                    if (fromUser && videoView != null) {
+                        videoView.seekTo((int) startMs);
+                        if (isDragging) {
+                            if (videoView.isPlaying()) videoView.pause();
+                            updatePlayPauseButtonUi(false);
+                        }
+                    }
+                });
+            }
+
+            if (tvTrimStart != null) tvTrimStart.setText(formatTime(trimStartMs));
+            if (tvTrimEnd != null) tvTrimEnd.setText(formatTime(trimEndMs));
+            updateTrimDurationAndSizeLabel();
+
+            mp.setLooping(false);
+            videoView.seekTo((int) trimStartMs);
+            videoView.start();
+            updatePlayPauseButtonUi(true);
+            videoLoopHandler.removeCallbacks(videoLoopRunnable);
+            videoLoopHandler.post(videoLoopRunnable);
+        });
+    }
+
+    private void toggleVideoPlayback() {
+        if (videoView == null) return;
+        if (videoView.isPlaying()) {
+            videoView.pause();
+            updatePlayPauseButtonUi(false);
+        } else {
+            videoView.start();
+            updatePlayPauseButtonUi(true);
+        }
+    }
+
+    private void updateToolbarGifModeUi() {
+        if (btnToolbarGifMode == null) return;
+        boolean isVideo = mediaType != null && mediaType.startsWith("video");
+        btnToolbarGifMode.setVisibility(isVideo ? View.VISIBLE : View.GONE);
+        if (sendVideoAsGif) {
+            btnToolbarGifMode.setBackgroundResource(R.drawable.bg_view_once_ring_active);
+            btnToolbarGifMode.setColorFilter(Color.WHITE);
+        } else {
+            btnToolbarGifMode.setBackgroundResource(R.drawable.bg_circle_translucent);
+            btnToolbarGifMode.setColorFilter(Color.WHITE);
+        }
+        updateTrimDurationAndSizeLabel();
     }
 
     private void updatePlayPauseButtonUi(boolean playing) {
         if (btnVideoPlayPauseToggle != null) {
             btnVideoPlayPauseToggle.setText(playing ? "⏸ Pause" : "▶ Play");
         }
-    }
-
-    private void populateVideoFilmstripTimeline(final Uri uri, final long durationMs) {
-        if (videoFilmstripRow == null || uri == null || durationMs <= 0) return;
-        videoFilmstripRow.removeAllViews();
-        final int frameCount = 8;
-        final List<ImageView> slots = new ArrayList<>(frameCount);
-        for (int i = 0; i < frameCount; i++) {
-            ImageView iv = new ImageView(this);
-            iv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
-            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            videoFilmstripRow.addView(iv);
-            slots.add(iv);
-        }
-        new Thread(() -> {
-            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-            try {
-                mmr.setDataSource(MediaEditActivity.this, uri);
-                for (int i = 0; i < frameCount; i++) {
-                    final int idx = i;
-                    long timeUs = ((durationMs * i) / frameCount) * 1000L;
-                    Bitmap frame = mmr.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
-                    if (frame != null) {
-                        final Bitmap scaled = Bitmap.createScaledBitmap(frame, 96, 96, true);
-                        runOnUiThread(() -> {
-                            if (idx < slots.size()) {
-                                slots.get(idx).setImageBitmap(scaled);
-                            }
-                        });
+        if (btnMidPlayPause != null) {
+            btnMidPlayPause.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play_arrow);
+            if (playing) {
+                btnMidPlayPause.animate().alpha(0f).setDuration(600).withEndAction(() -> {
+                    if (videoView != null && videoView.isPlaying()) {
+                        btnMidPlayPause.setVisibility(View.GONE);
                     }
-                }
-            } catch (Throwable ignored) {
-            } finally {
-                try { mmr.release(); } catch (Throwable ignored) {}
+                }).start();
+            } else {
+                btnMidPlayPause.animate().cancel();
+                btnMidPlayPause.setAlpha(1f);
+                btnMidPlayPause.setVisibility(View.VISIBLE);
             }
-        }).start();
+        }
     }
 
     private void updateTrimDurationAndSizeLabel() {
@@ -1365,76 +1594,253 @@ public class MediaEditActivity extends AppCompatActivity {
         return item.uri.getPath() != null ? item.uri.getPath() : "";
     }
 
-    private void saveAndSend() {
-        if (batchItems.size() > 1) {
-            persistCurrentItemStateSynchronously();
-            ArrayList<String> allPaths = new ArrayList<>();
-            ArrayList<String> allTypes = new ArrayList<>();
-            for (int i = 0; i < batchItems.size(); i++) {
-                BatchEditItem item = batchItems.get(i);
-                String p = resolveBatchItemFilePath(item, i);
-                if (p != null && !p.isEmpty()) {
-                    allPaths.add(p);
-                    allTypes.add(item.sendAsGif ? "gif" : item.type);
+    private boolean isSavingMedia = false;
+    private View sendProgressSpinner;
+    private View mediaProcessingOverlay;
+    private TextView tvMediaProcessingStatus;
+    private View topHeaderBar;
+
+    private void setMediaSavingState(boolean saving, String statusMessage) {
+        isSavingMedia = saving;
+        View btnSendView = findViewById(R.id.btnSend);
+        if (btnSendView instanceof com.google.android.material.floatingactionbutton.FloatingActionButton) {
+            com.google.android.material.floatingactionbutton.FloatingActionButton fab =
+                    (com.google.android.material.floatingactionbutton.FloatingActionButton) btnSendView;
+            fab.setEnabled(!saving);
+            if (saving) {
+                fab.setImageDrawable(null);
+            } else {
+                fab.setImageResource(R.drawable.ic_send);
+            }
+        } else if (btnSendView != null) {
+            btnSendView.setEnabled(!saving);
+        }
+
+        if (sendProgressSpinner == null) {
+            sendProgressSpinner = findViewById(R.id.sendProgressSpinner);
+        }
+        if (sendProgressSpinner != null) {
+            sendProgressSpinner.setVisibility(saving ? View.VISIBLE : View.GONE);
+        }
+
+        if (mediaProcessingOverlay == null) {
+            mediaProcessingOverlay = findViewById(R.id.mediaProcessingOverlay);
+        }
+        if (tvMediaProcessingStatus == null) {
+            tvMediaProcessingStatus = findViewById(R.id.tvMediaProcessingStatus);
+        }
+        if (tvMediaProcessingStatus != null && statusMessage != null && !statusMessage.isEmpty()) {
+            tvMediaProcessingStatus.setText(statusMessage);
+        }
+        if (mediaProcessingOverlay != null) {
+            mediaProcessingOverlay.setVisibility(saving ? View.VISIBLE : View.GONE);
+        }
+
+        float disabledAlpha = saving ? 0.45f : 1.0f;
+        int[] controlIds = new int[]{
+                R.id.btnClose, R.id.btnUndo, R.id.btnCrop, R.id.btnEmoji, R.id.btnText, R.id.btnDraw,
+                R.id.btnAddMoreMedia, R.id.captionEditText, R.id.btnMentionTag, R.id.btnViewOnce,
+                R.id.recipientStatusPill, R.id.videoFilmstripTrimmer, R.id.editBatchThumbnailScroll
+        };
+        for (int id : controlIds) {
+            View v = findViewById(id);
+            if (v != null) {
+                v.setEnabled(!saving);
+                v.setAlpha(disabledAlpha);
+            }
+        }
+        if (topToolbar instanceof ViewGroup) {
+            ViewGroup tb = (ViewGroup) topToolbar;
+            for (int i = 0; i < tb.getChildCount(); i++) {
+                View child = tb.getChildAt(i);
+                if (child != null) {
+                    child.setEnabled(!saving);
+                    child.setAlpha(disabledAlpha);
                 }
             }
-            String primaryPath = !allPaths.isEmpty() ? allPaths.get(0) : "";
-            String primaryType = !allTypes.isEmpty() ? allTypes.get(0) : "image";
-            finishWithBatchResult(primaryPath, primaryType, allPaths, allTypes);
+        }
+    }
+
+    private void saveAndSend() {
+        if (isSavingMedia) return;
+
+        if (batchItems.size() > 1) {
+            persistCurrentItemStateSynchronously();
+            setMediaSavingState(true, "Processing " + batchItems.size() + " media items...");
+            new Thread(() -> {
+                final ArrayList<String> allPaths = new ArrayList<>();
+                final ArrayList<String> allTypes = new ArrayList<>();
+                for (int i = 0; i < batchItems.size(); i++) {
+                    BatchEditItem item = batchItems.get(i);
+                    String p = resolveBatchItemFilePath(item, i);
+                    if (p != null && !p.isEmpty()) {
+                        allPaths.add(p);
+                        allTypes.add(item.sendAsGif ? "gif" : item.type);
+                    }
+                }
+                final String primaryPath = !allPaths.isEmpty() ? allPaths.get(0) : "";
+                final String primaryType = !allTypes.isEmpty() ? allTypes.get(0) : "image";
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    finishWithBatchResult(primaryPath, primaryType, allPaths, allTypes);
+                });
+            }, "VeilBatchMediaSave").start();
             return;
         }
 
         if (mediaType != null && mediaType.startsWith("image") && photoEditor != null) {
+            setMediaSavingState(true, isStickerMode ? "Saving custom sticker..." : (isGifMode ? "Saving GIF..." : "Saving edited photo..."));
+            final boolean noOverlayEdits = photoEditor.isCacheEmpty();
             File outputFile = new File(getExternalCacheDir(), "edited_" + System.currentTimeMillis() + ".jpg");
             try {
                 photoEditor.saveAsFile(outputFile.getAbsolutePath(), new PhotoEditor.OnSaveListener() {
                     @Override
-                    public void onSuccess(String imagePath) {
-                        finishWithResult(imagePath, "image");
+                    public void onSuccess(final String imagePath) {
+                        new Thread(() -> {
+                            String finalOutPath = imagePath;
+                            String finalOutType = "image";
+                            try {
+                                if (isStickerMode) {
+                                    finalOutType = "sticker";
+                                    if (noOverlayEdits && mediaUri != null && "file".equalsIgnoreCase(mediaUri.getScheme()) && mediaUri.getPath() != null) {
+                                        File srcFile = new File(mediaUri.getPath());
+                                        if (com.m3.veil.utils.VeilStickerGifEngine.isAnimatedStickerFile(srcFile)) {
+                                            finalOutPath = srcFile.getAbsolutePath();
+                                            final String outP = finalOutPath;
+                                            final String outT = finalOutType;
+                                            runOnUiThread(() -> finishWithResult(outP, outT));
+                                            return;
+                                        }
+                                    }
+                                    android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+                                    opts.inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888;
+                                    Bitmap rawBmp = null;
+                                    if (noOverlayEdits && mediaUri != null) {
+                                        try (InputStream in = getContentResolver().openInputStream(mediaUri)) {
+                                            if (in != null) rawBmp = android.graphics.BitmapFactory.decodeStream(in, null, opts);
+                                        } catch (Throwable ignored) {}
+                                    }
+                                    if (rawBmp == null) {
+                                        rawBmp = android.graphics.BitmapFactory.decodeFile(imagePath, opts);
+                                    }
+                                    if (rawBmp != null) {
+                                        int maxSide = 512;
+                                        int bw = Math.max(1, rawBmp.getWidth());
+                                        int bh = Math.max(1, rawBmp.getHeight());
+                                        float sc = Math.min(1f, Math.min((float) maxSide / bw, (float) maxSide / bh));
+                                        Bitmap scaled = (sc < 0.99f)
+                                                ? Bitmap.createScaledBitmap(rawBmp, Math.max(1, Math.round(bw * sc)), Math.max(1, Math.round(bh * sc)), true)
+                                                : rawBmp;
+                                        Bitmap crispCutout = com.m3.veil.utils.VeilStickerGifEngine.stripSolidBorderBackgroundIfPresent(scaled);
+                                        // Enforce WhatsApp/Telegram-standard 512x512 (1:1 Square) transparent sticker canvas
+                                        Bitmap crispSticker = com.m3.veil.utils.VeilStickerGifEngine.fitOrCenterCropToSquare(crispCutout, 512, false);
+                                        File stickerOut = new File(getExternalCacheDir(), "edited_sticker_" + System.currentTimeMillis() + ".png");
+                                        try (FileOutputStream fos = new FileOutputStream(stickerOut)) {
+                                            crispSticker.compress(Bitmap.CompressFormat.PNG, 100, fos);
+                                            fos.flush();
+                                        }
+                                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions(
+                                                stickerOut.getAbsolutePath(), crispSticker.getWidth(), crispSticker.getHeight());
+                                        finalOutPath = stickerOut.getAbsolutePath();
+                                    }
+                                } else if (isGifMode) {
+                                    finalOutType = "gif";
+                                    if (noOverlayEdits && mediaUri != null && "file".equalsIgnoreCase(mediaUri.getScheme()) && mediaUri.getPath() != null) {
+                                        File srcFile = new File(mediaUri.getPath());
+                                        if (com.m3.veil.utils.VeilStickerGifEngine.isGifFile(srcFile)) {
+                                            finalOutPath = srcFile.getAbsolutePath();
+                                        }
+                                    }
+                                } else {
+                                    // Standard photo edit: ensure true JPEG bytes and always return "image" (never sticker!)
+                                    finalOutType = "image";
+                                    Bitmap savedBmp = android.graphics.BitmapFactory.decodeFile(imagePath);
+                                    if (savedBmp != null) {
+                                        try (FileOutputStream fos = new FileOutputStream(imagePath)) {
+                                            savedBmp.compress(Bitmap.CompressFormat.JPEG, 95, fos);
+                                            fos.flush();
+                                        }
+                                        savedBmp.recycle();
+                                    }
+                                }
+                            } catch (Throwable ignored) {}
+                            final String resPath = finalOutPath;
+                            final String resType = finalOutType;
+                            runOnUiThread(() -> {
+                                if (isFinishing() || isDestroyed()) return;
+                                finishWithResult(resPath, resType);
+                            });
+                        }, "VeilPhotoSaveThread").start();
                     }
 
                     @Override
                     public void onFailure(Exception exception) {
+                        setMediaSavingState(false, null);
                         Toast.makeText(MediaEditActivity.this, "Failed to save image", Toast.LENGTH_SHORT).show();
                     }
                 });
             } catch (Exception e) {
+                setMediaSavingState(false, null);
                 e.printStackTrace();
             }
         } else {
-            File tempVideo = new File(getExternalCacheDir(), "processed_vid_" + System.currentTimeMillis() + ".mp4");
-            boolean isTrimmed = (trimStartMs > 250) || (totalDurationMs > 0 && (totalDurationMs - trimEndMs > 250));
-            boolean needsMuxProcess = isTrimmed || isVideoMuted || sendVideoAsGif || (currentVideoRotation % 360 != 0);
-            boolean muxSuccess = false;
-
-            if (needsMuxProcess) {
-                muxSuccess = VideoTrimUtil.processVideo(
-                        this, mediaUri, tempVideo,
-                        trimStartMs, trimEndMs > 0 ? trimEndMs : totalDurationMs,
-                        isVideoMuted || sendVideoAsGif, currentVideoRotation);
-            }
-
-            String path;
-            if (muxSuccess && tempVideo.exists() && tempVideo.length() > 0) {
-                path = tempVideo.getAbsolutePath();
-            } else if (mediaUri != null && "file".equalsIgnoreCase(mediaUri.getScheme())) {
-                path = mediaUri.getPath();
-            } else if (mediaUri != null) {
-                try (InputStream in = getContentResolver().openInputStream(mediaUri);
-                     OutputStream out = new FileOutputStream(tempVideo)) {
-                    byte[] buf = new byte[8192];
-                    int len;
-                    while ((len = in.read(buf)) != -1) {
-                        out.write(buf, 0, len);
-                    }
-                    path = tempVideo.getAbsolutePath();
-                } catch (Exception e) {
-                    path = mediaUri.getPath();
+            try {
+                if (videoView != null && videoView.isPlaying()) {
+                    videoView.pause();
                 }
-            } else {
-                path = "";
-            }
-            finishWithResult(path, sendVideoAsGif ? "gif" : "video");
+            } catch (Exception ignored) {}
+            setMediaSavingState(true, sendVideoAsGif ? "Encoding GIF clip..." : "Processing video...");
+            final long startSnapshot = trimStartMs;
+            final long endSnapshot = trimEndMs > 0 ? trimEndMs : totalDurationMs;
+            final long totalSnapshot = totalDurationMs;
+            final boolean mutedSnapshot = isVideoMuted;
+            final boolean gifSnapshot = sendVideoAsGif;
+            final int rotSnapshot = currentVideoRotation;
+
+            new Thread(() -> {
+                File tempVideo = new File(getExternalCacheDir(), "processed_vid_" + System.currentTimeMillis() + ".mp4");
+                boolean isTrimmed = (startSnapshot > 250) || (totalSnapshot > 0 && (totalSnapshot - endSnapshot > 250));
+                boolean needsMuxProcess = isTrimmed || mutedSnapshot || gifSnapshot || (rotSnapshot % 360 != 0);
+                boolean muxSuccess = false;
+
+                if (needsMuxProcess) {
+                    muxSuccess = VideoTrimUtil.processVideo(
+                            MediaEditActivity.this, mediaUri, tempVideo,
+                            startSnapshot, endSnapshot,
+                            mutedSnapshot || gifSnapshot, rotSnapshot);
+                }
+
+                final String path;
+                if (muxSuccess && tempVideo.exists() && tempVideo.length() > 0) {
+                    path = tempVideo.getAbsolutePath();
+                } else if (mediaUri != null && "file".equalsIgnoreCase(mediaUri.getScheme())) {
+                    path = mediaUri.getPath();
+                } else if (mediaUri != null) {
+                    String copiedPath = "";
+                    try (InputStream in = getContentResolver().openInputStream(mediaUri);
+                         OutputStream out = new FileOutputStream(tempVideo)) {
+                        if (in != null) {
+                            byte[] buf = new byte[8192];
+                            int len;
+                            while ((len = in.read(buf)) != -1) {
+                                out.write(buf, 0, len);
+                            }
+                            out.flush();
+                            copiedPath = tempVideo.getAbsolutePath();
+                        }
+                    } catch (Exception e) {
+                        copiedPath = mediaUri.getPath() != null ? mediaUri.getPath() : "";
+                    }
+                    path = copiedPath;
+                } else {
+                    path = "";
+                }
+                final String resultType = gifSnapshot ? "gif" : "video";
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    finishWithResult(path, resultType);
+                });
+            }, "VeilVideoSaveThread").start();
         }
     }
 
@@ -1521,23 +1927,49 @@ public class MediaEditActivity extends AppCompatActivity {
     private View topToolbar, bottomBar, btnClose, btnDone, drawingOptionsBar, textOptionsBar;
     private ColorPickerView colorPickerView;
     private int currentSelectedColor = Color.WHITE;
+    private int selectedBrushIndex = 0;
+    private final List<ImageView> brushViews = new ArrayList<>();
 
     private void setupViewsForState() {
+        topHeaderBar = findViewById(R.id.topHeaderBar);
         topToolbar = findViewById(R.id.topToolbar);
         bottomBar = findViewById(R.id.bottomBar);
         btnClose = findViewById(R.id.btnClose);
+        drawingHeaderBar = findViewById(R.id.drawingHeaderBar);
         btnDone = findViewById(R.id.btnDone);
+        btnDrawUndo = findViewById(R.id.btnDrawUndo);
         drawingOptionsBar = findViewById(R.id.drawingOptionsBar);
         textOptionsBar = findViewById(R.id.textOptionsBar);
         colorPickerView = findViewById(R.id.colorPickerView);
+        sendProgressSpinner = findViewById(R.id.sendProgressSpinner);
+        mediaProcessingOverlay = findViewById(R.id.mediaProcessingOverlay);
+        tvMediaProcessingStatus = findViewById(R.id.tvMediaProcessingStatus);
 
-        btnDone.setOnClickListener(v -> updateState(UIState.BASE));
+        if (btnDone != null) {
+            btnDone.setOnClickListener(v -> updateState(UIState.BASE));
+        }
+        if (btnDrawUndo != null) {
+            btnDrawUndo.setOnClickListener(v -> {
+                if (photoEditor != null) photoEditor.undo();
+            });
+        }
 
         colorPickerView.setOnColorChangeListener(color -> {
             currentSelectedColor = color;
             if (currentState == UIState.DRAWING && photoEditor != null) {
-                photoEditor.setBrushDrawingMode(true);
-                photoEditor.setBrushColor(color);
+                if (selectedBrushIndex == 4) {
+                    photoEditor.brushEraser();
+                } else if (selectedBrushIndex == 2) {
+                    int alphaColor = Color.argb(128, Color.red(color), Color.green(color), Color.blue(color));
+                    photoEditor.setBrushDrawingMode(true);
+                    photoEditor.setBrushSize(32f);
+                    photoEditor.setBrushColor(alphaColor);
+                } else {
+                    float[] sizes = new float[]{6f, 16f, 32f, 22f, 36f};
+                    photoEditor.setBrushDrawingMode(true);
+                    photoEditor.setBrushSize(sizes[selectedBrushIndex]);
+                    photoEditor.setBrushColor(color);
+                }
             }
         });
 
@@ -1549,29 +1981,74 @@ public class MediaEditActivity extends AppCompatActivity {
         if (drawingOptionsBar instanceof LinearLayout) {
             LinearLayout drawBar = (LinearLayout) drawingOptionsBar;
             drawBar.removeAllViews();
-            String[] labels = new String[]{"Fine", "Medium", "Bold", "Neon", "Eraser"};
-            float[] sizes = new float[]{8f, 18f, 34f, 24f, 36f};
-            for (int i = 0; i < labels.length; i++) {
+            brushViews.clear();
+
+            int[] iconRes = new int[]{
+                    R.drawable.ic_brush_pen,
+                    R.drawable.ic_brush_marker,
+                    R.drawable.ic_brush_highlighter,
+                    R.drawable.ic_brush_neon,
+                    R.drawable.ic_brush_eraser
+            };
+            float[] sizes = new float[]{6f, 16f, 32f, 22f, 36f};
+
+            for (int i = 0; i < iconRes.length; i++) {
                 final int idx = i;
                 final float bSize = sizes[i];
-                TextView pill = new TextView(this);
-                pill.setText(labels[i]);
-                pill.setTextColor(Color.WHITE);
-                pill.setTextSize(12.5f);
-                pill.setTypeface(null, Typeface.BOLD);
-                pill.setPadding(Math.round(12 * dp), Math.round(6 * dp), Math.round(12 * dp), Math.round(6 * dp));
-                pill.setOnClickListener(v -> {
+
+                ImageView iv = new ImageView(this);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Math.round(38 * dp), Math.round(38 * dp));
+                lp.setMargins(Math.round(4 * dp), 0, Math.round(4 * dp), 0);
+                iv.setLayoutParams(lp);
+                iv.setImageResource(iconRes[i]);
+                iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                iv.setPadding(Math.round(7 * dp), Math.round(7 * dp), Math.round(7 * dp), Math.round(7 * dp));
+                UiAnimator.attachSpringPress(iv);
+
+                iv.setOnClickListener(v -> {
+                    selectedBrushIndex = idx;
+                    updateBrushSelectionUi();
                     if (photoEditor == null) return;
                     if (idx == 4) {
                         photoEditor.brushEraser();
                         Toast.makeText(this, "Eraser active", Toast.LENGTH_SHORT).show();
+                    } else if (idx == 2) {
+                        photoEditor.setBrushDrawingMode(true);
+                        photoEditor.setBrushSize(bSize);
+                        int alphaColor = Color.argb(128, Color.red(currentSelectedColor), Color.green(currentSelectedColor), Color.blue(currentSelectedColor));
+                        photoEditor.setBrushColor(alphaColor);
                     } else {
                         photoEditor.setBrushDrawingMode(true);
                         photoEditor.setBrushSize(bSize);
                         photoEditor.setBrushColor(currentSelectedColor);
                     }
                 });
-                drawBar.addView(pill);
+
+                brushViews.add(iv);
+                drawBar.addView(iv);
+            }
+            updateBrushSelectionUi();
+        }
+    }
+
+    private void updateBrushSelectionUi() {
+        for (int i = 0; i < brushViews.size(); i++) {
+            ImageView iv = brushViews.get(i);
+            boolean isSelected = (i == selectedBrushIndex);
+            if (isSelected) {
+                GradientDrawable selBg = new GradientDrawable();
+                selBg.setShape(GradientDrawable.OVAL);
+                selBg.setColor(Color.parseColor("#00A884"));
+                iv.setBackground(selBg);
+                iv.setImageTintList(ColorStateList.valueOf(Color.WHITE));
+                iv.animate().scaleX(1.12f).scaleY(1.12f).setDuration(160).start();
+            } else {
+                GradientDrawable normalBg = new GradientDrawable();
+                normalBg.setShape(GradientDrawable.OVAL);
+                normalBg.setColor(Color.parseColor("#26FFFFFF"));
+                iv.setBackground(normalBg);
+                iv.setImageTintList(ColorStateList.valueOf(Color.parseColor("#B3FFFFFF")));
+                iv.animate().scaleX(1.0f).scaleY(1.0f).setDuration(160).start();
             }
         }
     }
@@ -1579,9 +2056,18 @@ public class MediaEditActivity extends AppCompatActivity {
     private void updateState(UIState newState) {
         currentState = newState;
 
-        topToolbar.setVisibility(newState == UIState.BASE ? View.VISIBLE : View.GONE);
-        bottomBar.setVisibility(newState == UIState.BASE ? View.VISIBLE : View.GONE);
-        btnClose.setVisibility(newState == UIState.BASE ? View.VISIBLE : View.GONE);
+        if (topHeaderBar != null) {
+            topHeaderBar.setVisibility(newState == UIState.BASE ? View.VISIBLE : View.GONE);
+        }
+        if (drawingHeaderBar != null) {
+            drawingHeaderBar.setVisibility(newState == UIState.DRAWING ? View.VISIBLE : View.GONE);
+        }
+        if (videoTrimmerContainer != null) {
+            videoTrimmerContainer.setVisibility(newState == UIState.BASE && mediaType != null && mediaType.startsWith("video") ? View.VISIBLE : View.GONE);
+        }
+        if (topToolbar != null) topToolbar.setVisibility(newState == UIState.BASE ? View.VISIBLE : View.GONE);
+        if (bottomBar != null) bottomBar.setVisibility(newState == UIState.BASE ? View.VISIBLE : View.GONE);
+        if (btnClose != null) btnClose.setVisibility(newState == UIState.BASE ? View.VISIBLE : View.GONE);
         if (editBatchThumbnailScroll != null) {
             editBatchThumbnailScroll.setVisibility(newState == UIState.BASE && batchItems.size() > 1 ? View.VISIBLE : View.GONE);
         }
@@ -1589,16 +2075,22 @@ public class MediaEditActivity extends AppCompatActivity {
             tvEditBatchCounter.setVisibility(newState == UIState.BASE && batchItems.size() > 1 ? View.VISIBLE : View.GONE);
         }
 
-        btnDone.setVisibility(newState != UIState.BASE ? View.VISIBLE : View.GONE);
-        colorPickerView.setVisibility(newState != UIState.BASE ? View.VISIBLE : View.GONE);
-
-        drawingOptionsBar.setVisibility(newState == UIState.DRAWING ? View.VISIBLE : View.GONE);
-        textOptionsBar.setVisibility(newState == UIState.TEXT ? View.VISIBLE : View.GONE);
+        if (colorPickerView != null) colorPickerView.setVisibility(newState != UIState.BASE ? View.VISIBLE : View.GONE);
+        if (textOptionsBar != null) textOptionsBar.setVisibility(newState == UIState.TEXT ? View.VISIBLE : View.GONE);
 
         if (photoEditor != null) {
             photoEditor.setBrushDrawingMode(newState == UIState.DRAWING);
-            if (newState == UIState.DRAWING && !isCensorBrushActive) {
-                photoEditor.setBrushColor(currentSelectedColor);
+            if (newState == UIState.DRAWING) {
+                if (selectedBrushIndex == 4) {
+                    photoEditor.brushEraser();
+                } else if (selectedBrushIndex == 2) {
+                    int alphaColor = Color.argb(128, Color.red(currentSelectedColor), Color.green(currentSelectedColor), Color.blue(currentSelectedColor));
+                    photoEditor.setBrushColor(alphaColor);
+                } else {
+                    float[] sizes = new float[]{6f, 16f, 32f, 22f, 36f};
+                    photoEditor.setBrushSize(sizes[selectedBrushIndex]);
+                    photoEditor.setBrushColor(currentSelectedColor);
+                }
             }
         }
     }

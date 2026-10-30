@@ -529,7 +529,6 @@ public class EmojiStickerBottomSheet extends BottomSheetDialogFragment {
                 VeilStickerGifEngine.AnimatedStickerDrawable drawable =
                         new VeilStickerGifEngine.AnimatedStickerDrawable(context, preset);
                 iv.setImageDrawable(drawable);
-                drawable.start();
                 return iv;
             } else {
                 // MODE_GIFS: Rounded animated GIF preview card with "GIF" badge
@@ -551,7 +550,6 @@ public class EmojiStickerBottomSheet extends BottomSheetDialogFragment {
                 VeilStickerGifEngine.AnimatedGifSceneDrawable scene =
                         new VeilStickerGifEngine.AnimatedGifSceneDrawable(context, gif);
                 iv.setImageDrawable(scene);
-                scene.start();
                 card.addView(iv);
 
                 TextView badge = new TextView(context);

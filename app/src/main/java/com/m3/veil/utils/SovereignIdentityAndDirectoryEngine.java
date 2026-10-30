@@ -651,6 +651,9 @@ public class SovereignIdentityAndDirectoryEngine {
         public String publicKeyBase64;
         public long updatedAtTimestamp;
         public String signature;
+        public boolean showUsernameInGroup;
+        public String allowMentions = "everyone";
+        public String whoCanMessageMe = "everyone";
 
         public SovereignProfileManifest() {
             this.uid = "";
@@ -2834,5 +2837,15 @@ public class SovereignIdentityAndDirectoryEngine {
         }
         return u;
     }
-}
 
+    public static SovereignProfileManifest getLocalProfile(Context context) {
+        if (context == null) return null;
+        return getInstance(context).getLocalManifest();
+    }
+
+    public static void saveLocalProfile(Context context, SovereignProfileManifest manifest) {
+        if (context == null || manifest == null) return;
+        getInstance(context).persistManifestLocally(manifest);
+    }
+
+}

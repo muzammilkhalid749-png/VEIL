@@ -273,6 +273,13 @@ public class ChatActivity extends AppCompatActivity {
     private View layoutSmartReplies;
     private LinearLayout containerSmartReplies;
 
+    // Mention Suggestions & Message Request Banner
+    private View mentionSuggestionsContainer;
+    private RecyclerView mentionSuggestionsRecyclerView;
+    private com.m3.veil.ui.chat.adapters.MentionSuggestionsAdapter mentionSuggestionsAdapter;
+    private final List<com.m3.veil.model.GroupMentionCandidate> groupMentionCandidates = new ArrayList<>();
+    private View layoutMessageRequestBanner;
+
     private long currentVanishTimer = 0;
     private String currentVanishMode = "after_send";
 
@@ -435,8 +442,27 @@ public class ChatActivity extends AppCompatActivity {
                                 if (m.getId() != null && m.getId().equals(messageId)) {
                                     java.util.Map<String, String> rx = m.getReactions();
                                     if (rx == null) rx = new java.util.HashMap<>();
-                                    rx.put(userId, emoji);
-                                    m.setReactions(rx);
+                                    if (emoji == null || emoji.trim().isEmpty()) {
+                                        rx.remove(userId);
+                                        if (userId != null && !userId.startsWith("anon_") && userId.length() >= 4) {
+                                            rx.remove("anon_" + userId.substring(0, Math.min(4, userId.length())));
+                                        }
+                                    } else {
+                                        rx.put(userId, emoji.trim());
+                                    }
+                                    // Purge empty / whitespace reaction values
+                                    java.util.Iterator<java.util.Map.Entry<String, String>> it = rx.entrySet().iterator();
+                                    while (it.hasNext()) {
+                                        java.util.Map.Entry<String, String> entry = it.next();
+                                        if (entry.getValue() == null || entry.getValue().trim().isEmpty()) {
+                                            it.remove();
+                                        }
+                                    }
+                                    if (rx.isEmpty()) {
+                                        m.setReactions(null);
+                                    } else {
+                                        m.setReactions(rx);
+                                    }
                                     messagesAdapter.notifyItemChanged(i + 1);
                                     break;
                                 }
@@ -564,6 +590,7 @@ public class ChatActivity extends AppCompatActivity {
                     }
                     if (updated && messagesAdapter != null) {
                         messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                     }
                 });
             }
@@ -742,6 +769,10 @@ public class ChatActivity extends AppCompatActivity {
         // Apply cached chat appearance & header immediately on Frame 1
         if (currentLocalChat != null) {
             updateBlockedState(isChatBlocked, currentLocalChat.getBlockedBy());
+            initMessageRequestBanner();
+            if (isGroupChatContext()) {
+                loadGroupMentionCandidates();
+            }
         }
         applyChatWallpaper();
         updateChannelRoleComposerState();
@@ -904,6 +935,11 @@ public class ChatActivity extends AppCompatActivity {
                     messagesRecyclerView.smoothScrollToPosition(messagesAdapter.getItemCount() - 1);
                 }
             });
+        }
+
+        View btnJumpToMention = findViewById(R.id.btnJumpToMention);
+        if (btnJumpToMention != null) {
+            btnJumpToMention.setOnClickListener(v -> jumpToNextUnreadMention());
         }
 
         runOnUiThread(this::updateRecipientHeader);
@@ -1106,6 +1142,7 @@ public class ChatActivity extends AppCompatActivity {
                     }
                     refreshPinnedMessagesBanner();
                     if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                 } else {
                     if (currentLocalChat != null) {
                         currentLocalChat.setPinnedMessageId(null);
@@ -1115,6 +1152,7 @@ public class ChatActivity extends AppCompatActivity {
                     Toast.makeText(this, "Message unpinned", Toast.LENGTH_SHORT).show();
                     refreshPinnedMessagesBanner();
                     if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                 }
             });
             btnUnpinBanner.setOnLongClickListener(v -> {
@@ -1294,16 +1332,13 @@ public class ChatActivity extends AppCompatActivity {
         if (messageEditText != null) {
             androidx.core.view.ViewCompat.setOnReceiveContentListener(
                     messageEditText,
-                    new String[]{"image/gif", "image/webp", "image/*"},
+                    new String[]{"image/webp", "image/png", "image/gif", "image/*"},
                     (view, payload) -> {
                         android.content.ClipData clip = payload.getClip();
                         if (clip != null && clip.getItemCount() > 0) {
                             Uri uri = clip.getItemAt(0).getUri();
                             if (uri != null) {
-                                String mime = getContentResolver().getType(uri);
-                                boolean isGifUri = (mime != null && mime.toLowerCase(Locale.ROOT).contains("gif"))
-                                        || uri.toString().toLowerCase(Locale.ROOT).endsWith(".gif");
-                                handleDirectMediaSend(uri, isGifUri ? "gif" : "image", "");
+                                handleDirectMediaSend(uri, "sticker", "");
                                 return null;
                             }
                         }
@@ -1322,6 +1357,19 @@ public class ChatActivity extends AppCompatActivity {
         replyPreviewText = findViewById(R.id.replyPreviewText);
         closeReplyButton = findViewById(R.id.closeReplyButton);
         closeReplyButton.setOnClickListener(v -> cancelReply());
+
+        mentionSuggestionsContainer = findViewById(R.id.mentionSuggestionsContainer);
+        mentionSuggestionsRecyclerView = findViewById(R.id.mentionSuggestionsRecyclerView);
+        if (mentionSuggestionsRecyclerView != null) {
+            mentionSuggestionsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+            mentionSuggestionsAdapter = new com.m3.veil.ui.chat.adapters.MentionSuggestionsAdapter(this, candidate -> {
+                insertMentionIntoInput(candidate);
+            });
+            mentionSuggestionsRecyclerView.setAdapter(mentionSuggestionsAdapter);
+        }
+
+        layoutMessageRequestBanner = findViewById(R.id.layoutMessageRequestBanner);
+        initMessageRequestBanner();
 
         // Attachment Button: Opens modern Material 3 Bottom Sheet Dialog
         ImageView attachmentButton = findViewById(R.id.attachmentButton);
@@ -1431,10 +1479,13 @@ public class ChatActivity extends AppCompatActivity {
 
                 if (chatId != null) {
                     android.content.SharedPreferences.Editor draftEd = getSharedPreferences("VeilChatDrafts", Context.MODE_PRIVATE).edit();
+                    android.content.SharedPreferences.Editor draftEd2 = getSharedPreferences("veil_drafts", Context.MODE_PRIVATE).edit();
                     if (hasText) {
                         draftEd.putString("draft_" + chatId, rawText).apply();
+                        draftEd2.putString("draft_" + chatId, rawText).apply();
                     } else {
                         draftEd.remove("draft_" + chatId).apply();
+                        draftEd2.remove("draft_" + chatId).apply();
                     }
                 }
 
@@ -1457,6 +1508,13 @@ public class ChatActivity extends AppCompatActivity {
                     typingHandler.postDelayed(stopTypingRunnable, 2000);
                 } else if (isTyping) {
                     stopTypingRunnable.run();
+                }
+
+                // Group @Mention Autocomplete (only active in group chats; typing @ in 1-on-1 chat never triggers mentions)
+                if (isGroupChatContext()) {
+                    checkAndFilterMentionSuggestions(s, messageEditText != null ? messageEditText.getSelectionStart() : 0);
+                } else if (mentionSuggestionsContainer != null) {
+                    mentionSuggestionsContainer.setVisibility(View.GONE);
                 }
             }
 
@@ -1704,21 +1762,51 @@ public class ChatActivity extends AppCompatActivity {
         new Thread(() -> {
             try {
                 String mime = getContentResolver().getType(mediaUri);
-                boolean isGif = "gif".equalsIgnoreCase(mediaType)
-                        || (mime != null && mime.toLowerCase(Locale.ROOT).contains("gif"))
-                        || mediaUri.toString().toLowerCase(Locale.ROOT).endsWith(".gif");
-                String effectiveType = isGif ? "gif" : mediaType;
-                String ext = "video".equals(effectiveType) ? ".mp4" : (isGif ? ".gif" : ".jpg");
-                File dest = new File(getExternalCacheDir(), "pick_" + System.currentTimeMillis() + ext);
+                String uriLower = mediaUri.toString().toLowerCase(Locale.ROOT);
+                String mimeLower = mime != null ? mime.toLowerCase(Locale.ROOT) : "";
+                File tempRaw = new File(getExternalCacheDir(), "pick_raw_" + System.currentTimeMillis() + ".tmp");
                 try (InputStream in = getContentResolver().openInputStream(mediaUri);
-                     OutputStream out = new FileOutputStream(dest)) {
+                     OutputStream out = new FileOutputStream(tempRaw)) {
                     byte[] buffer = new byte[16384];
                     int read;
                     while ((read = in.read(buffer)) != -1) {
                         out.write(buffer, 0, read);
                     }
                 }
-                runOnUiThread(() -> uploadAndSendMedia(dest, effectiveType, caption));
+                boolean isGifBinary = com.m3.veil.utils.VeilStickerGifEngine.isGifFile(tempRaw)
+                        || mimeLower.contains("gif")
+                        || uriLower.endsWith(".gif")
+                        || "gif".equalsIgnoreCase(mediaType);
+                boolean isExplicitStickerPath = mimeLower.contains("webp")
+                        || uriLower.endsWith(".webp")
+                        || uriLower.contains("sticker")
+                        || uriLower.contains("emoji_kitchen")
+                        || uriLower.contains("bitmoji");
+                boolean isGifChoice = isGifBinary && !isExplicitStickerPath;
+                boolean isSticker = !isGifChoice && ("sticker".equalsIgnoreCase(mediaType) || isExplicitStickerPath);
+                String effectiveType = isGifChoice ? "gif" : (isSticker ? "sticker" : mediaType);
+
+                String ext;
+                if (isGifChoice) {
+                    ext = ".gif";
+                } else if ("sticker".equals(effectiveType)) {
+                    ext = com.m3.veil.utils.VeilStickerGifEngine.detectStickerFileExtension(tempRaw);
+                } else if ("video".equals(effectiveType)) {
+                    ext = ".mp4";
+                } else {
+                    ext = ".jpg";
+                }
+                File dest = new File(getExternalCacheDir(), "pick_" + System.currentTimeMillis() + ext);
+                if (!tempRaw.renameTo(dest)) {
+                    copyFile(tempRaw, dest);
+                    tempRaw.delete();
+                }
+                if (isGifChoice) {
+                    runOnUiThread(() -> showGifStickerChoiceBottomSheet(dest, null));
+                } else {
+                    final String finalType = effectiveType;
+                    runOnUiThread(() -> uploadAndSendMedia(dest, finalType, caption));
+                }
             } catch (Exception e) {
                 runOnUiThread(() -> Toast.makeText(this, "Failed to load media: " + e.getMessage(), Toast.LENGTH_SHORT).show());
             }
@@ -1877,6 +1965,7 @@ public class ChatActivity extends AppCompatActivity {
         message.setDelivered(false);
         message.setRead(false);
         message.setSenderName(com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName());
+        attachSenderIdentityPreferences(message);
 
         // Anonymous Channel Admin System (#82) - Blind rotating alias
         if (currentLocalChat != null && ("channel".equalsIgnoreCase(currentLocalChat.getType()) || (chatId != null && chatId.startsWith("channel_")))) {
@@ -2232,6 +2321,8 @@ public class ChatActivity extends AppCompatActivity {
         if ("document".equals(mediaType)) {
             String cleanName = com.m3.veil.manager.VeilMessagesController.cleanDocumentFileName(rawFile.getName());
             initialText = cleanName + "|" + formatFileSize(rawFile.length());
+        } else if ("sticker".equals(mediaType) && initialText.isEmpty()) {
+            initialText = "[sticker]";
         }
 
         String effectiveReceiver = isGroupChatContext() ? chatId : recipientId;
@@ -2245,6 +2336,7 @@ public class ChatActivity extends AppCompatActivity {
         );
         message.setChatId(chatId);
         message.setSenderName(com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName());
+        attachSenderIdentityPreferences(message);
         message.setPending(true);
         message.setDelivered(false);
         message.setRead(false);
@@ -2291,7 +2383,59 @@ public class ChatActivity extends AppCompatActivity {
             File decryptedFile = null;
             try {
                 File cacheDir = appContext.getExternalCacheDir() != null ? appContext.getExternalCacheDir() : appContext.getCacheDir();
-                if ("image".equals(mediaType) || "gif".equals(mediaType)) {
+                if ("sticker".equals(mediaType)) {
+                    boolean isAnimSticker = com.m3.veil.utils.VeilStickerGifEngine.isAnimatedStickerFile(rawFile);
+                    String stickerExt = com.m3.veil.utils.VeilStickerGifEngine.detectStickerFileExtension(rawFile);
+                    BitmapFactory.Options opts = new BitmapFactory.Options();
+                    opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+                    Bitmap bitmap = BitmapFactory.decodeFile(rawFile.getAbsolutePath(), opts);
+                    if (isAnimSticker) {
+                        decryptedFile = new File(cacheDir, "dec_" + messageId + stickerExt);
+                        if (!rawFile.getAbsolutePath().equals(decryptedFile.getAbsolutePath())) {
+                            copyFile(rawFile, decryptedFile);
+                        }
+                        if (bitmap != null) {
+                            Bitmap dieCut = com.m3.veil.utils.VeilStickerGifEngine.stripSolidBorderBackgroundIfPresent(bitmap);
+                            int bw = Math.max(1, dieCut.getWidth());
+                            int bh = Math.max(1, dieCut.getHeight());
+                            com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions("msg_" + messageId, bw, bh);
+                            com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions(decryptedFile.getAbsolutePath(), bw, bh);
+                            float thumbRatio = Math.min(384f / bw, 384f / bh);
+                            int thumbW = Math.max(48, Math.round(bw * thumbRatio));
+                            int thumbH = Math.max(48, Math.round(bh * thumbRatio));
+                            Bitmap thumbBitmap = Bitmap.createScaledBitmap(dieCut, thumbW, thumbH, true);
+                            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                            thumbBitmap.compress(Bitmap.CompressFormat.PNG, 100, baos);
+                            message.setThumbnail(Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT));
+                        }
+                    } else if (bitmap != null) {
+                        Bitmap dieCut = com.m3.veil.utils.VeilStickerGifEngine.stripSolidBorderBackgroundIfPresent(bitmap);
+                        int bw = Math.max(1, dieCut.getWidth());
+                        int bh = Math.max(1, dieCut.getHeight());
+                        decryptedFile = new File(cacheDir, "dec_" + messageId + ".png");
+                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions("msg_" + messageId, bw, bh);
+                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions(decryptedFile.getAbsolutePath(), bw, bh);
+                        int maxStickerDim = 512;
+                        // Enforce WhatsApp/Telegram-standard 512x512 (1:1 Square) transparent sticker canvas
+                        Bitmap toSave = com.m3.veil.utils.VeilStickerGifEngine.fitOrCenterCropToSquare(dieCut, maxStickerDim, false);
+                        try (FileOutputStream fos = new FileOutputStream(decryptedFile)) {
+                            toSave.compress(Bitmap.CompressFormat.PNG, 100, fos);
+                            fos.flush();
+                        }
+                        float thumbRatio = Math.min(384f / bw, 384f / bh);
+                        int thumbW = Math.max(48, Math.round(bw * thumbRatio));
+                        int thumbH = Math.max(48, Math.round(bh * thumbRatio));
+                        Bitmap thumbBitmap = Bitmap.createScaledBitmap(dieCut, thumbW, thumbH, true);
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        thumbBitmap.compress(Bitmap.CompressFormat.PNG, 100, baos);
+                        message.setThumbnail(Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT));
+                    } else {
+                        decryptedFile = new File(cacheDir, "dec_" + messageId + stickerExt);
+                        if (!rawFile.getAbsolutePath().equals(decryptedFile.getAbsolutePath())) {
+                            copyFile(rawFile, decryptedFile);
+                        }
+                    }
+                } else if ("image".equals(mediaType) || "gif".equals(mediaType)) {
                     boolean isGifMedia = "gif".equals(mediaType) || com.m3.veil.utils.VeilStickerGifEngine.isGifFile(rawFile);
                     BitmapFactory.Options opts = new BitmapFactory.Options();
                     opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
@@ -2574,6 +2718,7 @@ public class ChatActivity extends AppCompatActivity {
                         if (isFinishing() || isDestroyed()) return;
                         if (messageList != null) messageList.clear();
                         if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                         Toast.makeText(this, "Conversation was deleted", Toast.LENGTH_SHORT).show();
                         finish();
                     });
@@ -3000,6 +3145,177 @@ public class ChatActivity extends AppCompatActivity {
                 || "channel".equalsIgnoreCase(currentLocalChat.getType()));
     }
 
+    private void initMessageRequestBanner() {
+        if (layoutMessageRequestBanner == null) return;
+        boolean isRequestChat = currentLocalChat != null && currentLocalChat.isRequest() && !isGroupChatContext();
+        if (!isRequestChat) {
+            layoutMessageRequestBanner.setVisibility(View.GONE);
+            return;
+        }
+
+        layoutMessageRequestBanner.setVisibility(View.VISIBLE);
+        TextView tvPrompt = findViewById(R.id.tvMessageRequestPrompt);
+        if (tvPrompt != null) {
+            String name = (recipientName != null && !recipientName.trim().isEmpty()) ? recipientName : "This user";
+            tvPrompt.setText("📥 Message Request: " + name + " wants to send you a message. They won't know you've viewed it until you accept.");
+        }
+
+        View btnAccept = findViewById(R.id.btnAcceptMessageRequest);
+        if (btnAccept != null) {
+            btnAccept.setOnClickListener(v -> acceptMessageRequest());
+        }
+
+        View btnDecline = findViewById(R.id.btnDeclineMessageRequest);
+        if (btnDecline != null) {
+            btnDecline.setOnClickListener(v -> declineMessageRequest());
+        }
+    }
+
+    private void acceptMessageRequest() {
+        if (chatId == null) return;
+        if (currentLocalChat != null) currentLocalChat.setRequest(false);
+        new Thread(() -> {
+            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).updateChatRequestStatus(chatId, false);
+        }).start();
+        if (recipientId != null && !recipientId.isEmpty()) {
+            com.m3.veil.webrtc.WebRtcManager.getInstance(this).sendRequestAcceptedAck(recipientId, chatId);
+        }
+        if (layoutMessageRequestBanner != null) layoutMessageRequestBanner.setVisibility(View.GONE);
+        Toast.makeText(this, "Message request accepted", Toast.LENGTH_SHORT).show();
+    }
+
+    private void declineMessageRequest() {
+        if (chatId == null) return;
+        new Thread(() -> {
+            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).deleteChat(chatId);
+        }).start();
+        Toast.makeText(this, "Message request declined", Toast.LENGTH_SHORT).show();
+        finish();
+    }
+
+    private void loadGroupMentionCandidates() {
+        if (!isGroupChatContext()) return;
+        new Thread(() -> {
+            List<String> participants = null;
+            if (currentLocalChat != null && currentLocalChat.getParticipants() != null) {
+                participants = currentLocalChat.getParticipants();
+            } else if (chatId != null) {
+                com.m3.veil.model.Chat c = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).getChat(chatId);
+                if (c != null && c.getParticipants() != null) participants = c.getParticipants();
+            }
+
+            if (participants == null || participants.isEmpty()) return;
+
+            List<com.m3.veil.model.GroupMentionCandidate> candidates = new ArrayList<>();
+            com.m3.veil.database.EncryptedChatDatabase db = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this);
+            String ownerId = currentLocalChat != null ? currentLocalChat.getAdminId() : null;
+
+            for (String pid : participants) {
+                if (pid == null || pid.isEmpty() || pid.equals(currentUserId)) continue;
+
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                        db.getSovereignProfileManifest(pid);
+
+                String handle = (manifest != null && manifest.username != null && !manifest.username.isEmpty())
+                        ? manifest.username : ("user_" + (pid.length() >= 6 ? pid.substring(0, 6) : pid));
+                String displayName = (manifest != null && manifest.displayName != null && !manifest.displayName.isEmpty())
+                        ? manifest.displayName : "Peer #" + (pid.length() >= 4 ? pid.substring(0, 4) : pid);
+                String avatar = manifest != null ? manifest.avatarBase64 : null;
+                String allowMentions = manifest != null && manifest.allowMentions != null ? manifest.allowMentions : "everyone";
+
+                boolean isOwner = pid.equals(ownerId);
+                boolean isAdmin = currentLocalChat != null && currentLocalChat.isAdmin(pid);
+                boolean isContact = db.getChat(com.m3.veil.database.EncryptedChatDatabase.generateDirectChatId(currentUserId, pid)) != null
+                        || db.getChat(pid) != null;
+
+                com.m3.veil.model.GroupMentionCandidate cand = new com.m3.veil.model.GroupMentionCandidate(
+                        pid, handle, displayName, avatar, allowMentions, isOwner, isAdmin
+                );
+
+                // Enforce privacy setting: if candidate does not allow mentions from this user, omit from list
+                if (cand.canBeMentionedBy(currentUserId, isContact)) {
+                    candidates.add(cand);
+                }
+            }
+
+            runOnUiThread(() -> {
+                groupMentionCandidates.clear();
+                groupMentionCandidates.addAll(candidates);
+            });
+        }).start();
+    }
+
+    private void checkAndFilterMentionSuggestions(CharSequence s, int cursorPos) {
+        if (!isGroupChatContext() || s == null || cursorPos <= 0 || groupMentionCandidates.isEmpty()) {
+            if (mentionSuggestionsContainer != null) mentionSuggestionsContainer.setVisibility(View.GONE);
+            return;
+        }
+
+        String text = s.toString();
+        int tokenStart = cursorPos - 1;
+        while (tokenStart >= 0 && !Character.isWhitespace(text.charAt(tokenStart))) {
+            tokenStart--;
+        }
+        tokenStart++;
+
+        if (tokenStart < cursorPos && text.charAt(tokenStart) == '@') {
+            String query = text.substring(tokenStart + 1, cursorPos).toLowerCase(java.util.Locale.ROOT);
+            List<com.m3.veil.model.GroupMentionCandidate> exactPrefix = new ArrayList<>();
+            List<com.m3.veil.model.GroupMentionCandidate> substringMatches = new ArrayList<>();
+
+            for (com.m3.veil.model.GroupMentionCandidate c : groupMentionCandidates) {
+                if (c == null) continue;
+                String u = c.getUsername().toLowerCase(java.util.Locale.ROOT);
+                String d = c.getDisplayName().toLowerCase(java.util.Locale.ROOT);
+                if (query.isEmpty() || u.startsWith(query)) {
+                    exactPrefix.add(c);
+                } else if (u.contains(query) || d.startsWith(query) || d.contains(query)) {
+                    substringMatches.add(c);
+                }
+            }
+            List<com.m3.veil.model.GroupMentionCandidate> matches = new ArrayList<>(exactPrefix.size() + substringMatches.size());
+            matches.addAll(exactPrefix);
+            matches.addAll(substringMatches);
+
+            if (!matches.isEmpty()) {
+                if (mentionSuggestionsAdapter != null) {
+                    mentionSuggestionsAdapter.submitList(matches);
+                }
+                if (mentionSuggestionsContainer != null) {
+                    mentionSuggestionsContainer.setVisibility(View.VISIBLE);
+                }
+            } else if (mentionSuggestionsContainer != null) {
+                mentionSuggestionsContainer.setVisibility(View.GONE);
+            }
+        } else if (mentionSuggestionsContainer != null) {
+            mentionSuggestionsContainer.setVisibility(View.GONE);
+        }
+    }
+
+    private void insertMentionIntoInput(com.m3.veil.model.GroupMentionCandidate candidate) {
+        if (messageEditText == null || candidate == null) return;
+        Editable editable = messageEditText.getText();
+        if (editable == null) return;
+
+        int cursorPos = messageEditText.getSelectionStart();
+        String text = editable.toString();
+        int tokenStart = cursorPos - 1;
+        while (tokenStart >= 0 && !Character.isWhitespace(text.charAt(tokenStart))) {
+            tokenStart--;
+        }
+        tokenStart++;
+
+        if (tokenStart < cursorPos && text.charAt(tokenStart) == '@') {
+            String insert = "@" + candidate.getUsername() + " ";
+            editable.replace(tokenStart, cursorPos, insert);
+            messageEditText.setSelection(tokenStart + insert.length());
+        }
+
+        if (mentionSuggestionsContainer != null) {
+            mentionSuggestionsContainer.setVisibility(View.GONE);
+        }
+    }
+
     private void setMenuItemVisible(android.view.Menu menu, int itemId, boolean visible) {
         if (menu == null) return;
         android.view.MenuItem item = menu.findItem(itemId);
@@ -3159,6 +3475,7 @@ public class ChatActivity extends AppCompatActivity {
             sheet.dismiss();
             messageList.clear();
             messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
             com.m3.veil.manager.VeilMessagesController.getInstance(this)
                     .clearConversationHistory(chatId, recipientId, forBoth);
             Toast.makeText(this, forBoth
@@ -3201,6 +3518,7 @@ public class ChatActivity extends AppCompatActivity {
             currentLocalChat = null;
             messageList.clear();
             messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
             com.m3.veil.manager.VeilMessagesController.getInstance(this)
                     .deleteConversation(chatId, recipientId, forBoth);
             Toast.makeText(this, forBoth
@@ -3433,12 +3751,57 @@ public class ChatActivity extends AppCompatActivity {
         messagesAdapter.setOnQuickForwardClickListener(this::showForwardMessageSheet);
         messagesAdapter.setOnDoubleTapReactListener(message -> {
             if (message == null || message.getId() == null || "deleted".equals(message.getType())) return;
+            String anonKey = "anon_" + currentUserId.substring(0, Math.min(4, currentUserId.length()));
             String reactorKey = com.m3.veil.manager.VeilFeatureManager.getInstance(this).isAnonymousReactionEnabled()
-                    ? "anon_" + currentUserId.substring(0, Math.min(4, currentUserId.length()))
+                    ? anonKey
                     : currentUserId;
-            String existing = message.getReactions() != null ? message.getReactions().get(reactorKey) : null;
-            String newEmoji = "❤️".equals(existing) ? "" : "❤️";
+
+            java.util.Map<String, String> currentRx = message.getReactions();
+            String existing = null;
+            if (currentRx != null) {
+                existing = currentRx.get(reactorKey);
+                if (existing == null || existing.trim().isEmpty()) {
+                    existing = currentRx.get(currentUserId);
+                }
+                if (existing == null || existing.trim().isEmpty()) {
+                    existing = currentRx.get(anonKey);
+                }
+            }
+
+            boolean isRemoving = (existing != null && !existing.trim().isEmpty());
+            String newEmoji = isRemoving ? "" : "❤️";
             messagesRecyclerView.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+
+            // Immediate local UI update on click for instant response
+            if (currentRx == null) currentRx = new java.util.HashMap<>();
+            if (isRemoving) {
+                currentRx.remove(reactorKey);
+                currentRx.remove(currentUserId);
+                currentRx.remove(anonKey);
+            } else {
+                currentRx.put(reactorKey, "❤️");
+            }
+
+            // Clean any empty reaction entries
+            java.util.Iterator<java.util.Map.Entry<String, String>> it = currentRx.entrySet().iterator();
+            while (it.hasNext()) {
+                java.util.Map.Entry<String, String> entry = it.next();
+                if (entry.getValue() == null || entry.getValue().trim().isEmpty()) {
+                    it.remove();
+                }
+            }
+
+            if (currentRx.isEmpty()) {
+                message.setReactions(null);
+            } else {
+                message.setReactions(currentRx);
+            }
+
+            int idx = messageList.indexOf(message);
+            if (idx >= 0) {
+                messagesAdapter.notifyItemChanged(idx + 1);
+            }
+
             com.m3.veil.manager.VeilMessagesController.getInstance(this)
                     .sendReaction(chatId, message.getId(), reactorKey, newEmoji);
         });
@@ -3466,7 +3829,7 @@ public class ChatActivity extends AppCompatActivity {
         LinearLayoutManager lm = new LinearLayoutManager(this);
         lm.setInitialPrefetchItemCount(15);
         messagesRecyclerView.setLayoutManager(lm);
-        messagesRecyclerView.setHasFixedSize(true);
+        messagesRecyclerView.setHasFixedSize(false);
         messagesRecyclerView.setItemViewCacheSize(24);
         if (messagesRecyclerView.getItemAnimator() instanceof androidx.recyclerview.widget.SimpleItemAnimator) {
             ((androidx.recyclerview.widget.SimpleItemAnimator) messagesRecyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
@@ -3938,7 +4301,7 @@ public class ChatActivity extends AppCompatActivity {
 
             @Override
             public void onGifSelected(String gifCode) {
-                sendMessageWithType("gif", gifCode);
+                showGifStickerChoiceBottomSheet(null, gifCode);
             }
 
             @Override
@@ -3950,6 +4313,269 @@ public class ChatActivity extends AppCompatActivity {
             }
         });
         sheet.show(getSupportFragmentManager(), "EmojiStickerBottomSheet");
+    }
+
+    /**
+     * WhatsApp-style "Custom sticker" GIF action bottom sheet (matching media_1793334732939_93389845.jpg):
+     * - Top drag handle + top-left close (X) button
+     * - Centered animated preview of the chosen GIF + "Custom sticker" subtitle
+     * - Divider + 4 action rows:
+     *   1. Send as sticker
+     *   2. Send as GIF
+     *   3. Edit as GIF
+     *   4. Edit as sticker
+     */
+    private void showGifStickerChoiceBottomSheet(@Nullable File gifFile, @Nullable String presetGifCode) {
+        if ((gifFile == null || !gifFile.exists()) && (presetGifCode == null || presetGifCode.isEmpty())) {
+            return;
+        }
+        float dp = getResources().getDisplayMetrics().density;
+        boolean isNight = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(this);
+        int sheetBgColor = isNight ? 0xFF111B21 : 0xFFFFFFFF;
+        int primaryTextColor = isNight ? 0xFFF8FAFC : 0xFF1E293B;
+        int secondaryTextColor = isNight ? 0xFF94A3B8 : 0xFF64748B;
+        int iconTint = isNight ? 0xFFCBD5E1 : 0xFF475569;
+        int dividerColor = isNight ? 0x1FFFFFFF : 0x14000000;
+
+        BottomSheetDialog dialog = new BottomSheetDialog(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(0, Math.round(10 * dp), 0, Math.round(18 * dp));
+        android.graphics.drawable.GradientDrawable sheetBg = new android.graphics.drawable.GradientDrawable();
+        sheetBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        sheetBg.setColor(sheetBgColor);
+        float topRad = 24f * dp;
+        sheetBg.setCornerRadii(new float[]{topRad, topRad, topRad, topRad, 0f, 0f, 0f, 0f});
+        root.setBackground(sheetBg);
+
+        // 1. Top drag handle pill
+        View dragHandle = new View(this);
+        LinearLayout.LayoutParams handleLp = new LinearLayout.LayoutParams(
+                Math.round(36 * dp), Math.round(4 * dp));
+        handleLp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        dragHandle.setLayoutParams(handleLp);
+        android.graphics.drawable.GradientDrawable handleBg = new android.graphics.drawable.GradientDrawable();
+        handleBg.setCornerRadius(2 * dp);
+        handleBg.setColor(isNight ? 0xFF475569 : 0xFF94A3B8);
+        dragHandle.setBackground(handleBg);
+        root.addView(dragHandle);
+
+        // 2. Top-left Close (X) button row
+        android.widget.FrameLayout headerRow = new android.widget.FrameLayout(this);
+        headerRow.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        headerRow.setPadding(Math.round(12 * dp), Math.round(2 * dp), Math.round(12 * dp), 0);
+
+        ImageView btnClose = new ImageView(this);
+        android.widget.FrameLayout.LayoutParams closeLp = new android.widget.FrameLayout.LayoutParams(
+                Math.round(38 * dp), Math.round(38 * dp), android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+        btnClose.setLayoutParams(closeLp);
+        int closePad = Math.round(7 * dp);
+        btnClose.setPadding(closePad, closePad, closePad, closePad);
+        btnClose.setImageResource(R.drawable.ic_close);
+        btnClose.setColorFilter(primaryTextColor);
+        android.util.TypedValue outVal = new android.util.TypedValue();
+        if (getTheme().resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outVal, true)) {
+            btnClose.setBackgroundResource(outVal.resourceId);
+        }
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+        headerRow.addView(btnClose);
+        root.addView(headerRow);
+
+        // 3. Centered animated preview preserving natural Portrait / Landscape / Square aspect ratio
+        ImageView previewImage = new ImageView(this);
+        int previewW = Math.round(156 * dp);
+        int previewH = Math.round(156 * dp);
+        if (gifFile != null && gifFile.exists()) {
+            BitmapFactory.Options bOpts = new BitmapFactory.Options();
+            bOpts.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(gifFile.getAbsolutePath(), bOpts);
+            if (bOpts.outWidth > 0 && bOpts.outHeight > 0) {
+                float ratio = (float) bOpts.outWidth / (float) bOpts.outHeight;
+                if (ratio < 0.90f) {
+                    previewH = Math.round(188 * dp);
+                    previewW = Math.max(Math.round(108 * dp), Math.round(previewH * ratio));
+                } else if (ratio > 1.12f) {
+                    previewW = Math.round(196 * dp);
+                    previewH = Math.max(Math.round(112 * dp), Math.round(previewW / ratio));
+                }
+            }
+        } else if (presetGifCode != null) {
+            com.m3.veil.utils.VeilStickerGifEngine.GifPreset preset =
+                    com.m3.veil.utils.VeilStickerGifEngine.findGifPresetByCode(presetGifCode);
+            if (preset != null && preset.intrinsicWidth > 0 && preset.intrinsicHeight > 0) {
+                float ratio = (float) preset.intrinsicWidth / (float) preset.intrinsicHeight;
+                if (ratio < 0.90f) {
+                    previewH = Math.round(188 * dp);
+                    previewW = Math.max(Math.round(108 * dp), Math.round(previewH * ratio));
+                } else if (ratio > 1.12f) {
+                    previewW = Math.round(196 * dp);
+                    previewH = Math.max(Math.round(112 * dp), Math.round(previewW / ratio));
+                }
+            }
+        }
+        LinearLayout.LayoutParams prevLp = new LinearLayout.LayoutParams(previewW, previewH);
+        prevLp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        prevLp.topMargin = Math.round(2 * dp);
+        previewImage.setLayoutParams(prevLp);
+        previewImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        previewImage.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, android.graphics.Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), 10f * dp);
+            }
+        });
+        previewImage.setClipToOutline(true);
+
+        if (gifFile != null && gifFile.exists()) {
+            android.graphics.drawable.Drawable animDrawable =
+                    com.m3.veil.utils.VeilStickerGifEngine.loadSingleCycleAnimatedDrawable(gifFile, true, false, true);
+            if (animDrawable != null) {
+                previewImage.setImageDrawable(animDrawable);
+            } else {
+                Bitmap bmp = com.m3.veil.utils.VeilStickerGifEngine.decodePhotoPreservingAspectRatio(gifFile, 512);
+                if (bmp != null) previewImage.setImageBitmap(bmp);
+            }
+        } else if (presetGifCode != null) {
+            com.m3.veil.utils.VeilStickerGifEngine.GifPreset preset =
+                    com.m3.veil.utils.VeilStickerGifEngine.findGifPresetByCode(presetGifCode);
+            if (preset != null) {
+                com.m3.veil.utils.VeilStickerGifEngine.AnimatedGifSceneDrawable scene =
+                        new com.m3.veil.utils.VeilStickerGifEngine.AnimatedGifSceneDrawable(this, preset);
+                previewImage.setImageDrawable(scene);
+                scene.start();
+            }
+        }
+        previewImage.setOnClickListener(v -> com.m3.veil.utils.VeilStickerGifEngine.replayAnimatedDrawable(previewImage));
+        root.addView(previewImage);
+
+        // 4. "Custom sticker" subtitle
+        TextView tvSubtitle = new TextView(this);
+        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subLp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        subLp.topMargin = Math.round(12 * dp);
+        subLp.bottomMargin = Math.round(16 * dp);
+        tvSubtitle.setLayoutParams(subLp);
+        tvSubtitle.setText("Custom sticker");
+        tvSubtitle.setTextColor(secondaryTextColor);
+        tvSubtitle.setTextSize(13.5f);
+        root.addView(tvSubtitle);
+
+        // 5. Divider line
+        View divider = new View(this);
+        divider.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Math.round(1 * dp))));
+        divider.setBackgroundColor(dividerColor);
+        root.addView(divider);
+
+        // Helper to build each action row matching screenshot
+        String[] titles = new String[]{
+                "Send as sticker",
+                "Send as GIF",
+                "Edit as GIF",
+                "Edit as sticker"
+        };
+        for (int i = 0; i < titles.length; i++) {
+            final int actionIdx = i;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, Math.round(54 * dp)));
+            row.setPadding(Math.round(24 * dp), 0, Math.round(24 * dp), 0);
+            android.util.TypedValue rippleVal = new android.util.TypedValue();
+            if (getTheme().resolveAttribute(android.R.attr.selectableItemBackground, rippleVal, true)) {
+                row.setBackgroundResource(rippleVal.resourceId);
+            }
+
+            android.widget.FrameLayout iconBox = new android.widget.FrameLayout(this);
+            iconBox.setLayoutParams(new LinearLayout.LayoutParams(
+                    Math.round(32 * dp), Math.round(32 * dp)));
+
+            if (actionIdx == 0 || actionIdx == 3) {
+                ImageView iv = new ImageView(this);
+                android.widget.FrameLayout.LayoutParams ivLp = new android.widget.FrameLayout.LayoutParams(
+                        Math.round(22 * dp), Math.round(22 * dp), android.view.Gravity.CENTER);
+                iv.setLayoutParams(ivLp);
+                iv.setImageResource(actionIdx == 0 ? R.drawable.ic_send : R.drawable.ic_edit);
+                iv.setColorFilter(iconTint);
+                iconBox.addView(iv);
+            } else {
+                TextView tvBadge = new TextView(this);
+                android.widget.FrameLayout.LayoutParams bLp = new android.widget.FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, android.view.Gravity.CENTER);
+                tvBadge.setLayoutParams(bLp);
+                tvBadge.setText(actionIdx == 1 ? "GIF" : "✎GIF");
+                tvBadge.setTextColor(iconTint);
+                tvBadge.setTextSize(actionIdx == 1 ? 11.5f : 10.5f);
+                tvBadge.setTypeface(null, Typeface.BOLD);
+                iconBox.addView(tvBadge);
+            }
+            row.addView(iconBox);
+
+            TextView tvTitle = new TextView(this);
+            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            titleLp.leftMargin = Math.round(22 * dp);
+            tvTitle.setLayoutParams(titleLp);
+            tvTitle.setText(titles[i]);
+            tvTitle.setTextColor(primaryTextColor);
+            tvTitle.setTextSize(16f);
+            row.addView(tvTitle);
+
+            row.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (actionIdx == 0) {
+                    // Send as sticker
+                    if (gifFile != null && gifFile.exists()) {
+                        uploadAndSendMedia(gifFile, "sticker", "[sticker]");
+                    } else if (presetGifCode != null) {
+                        sendMessageWithType("sticker", presetGifCode);
+                    }
+                } else if (actionIdx == 1) {
+                    // Send as GIF
+                    if (gifFile != null && gifFile.exists()) {
+                        uploadAndSendMedia(gifFile, "gif", "");
+                    } else if (presetGifCode != null) {
+                        sendMessageWithType("gif", presetGifCode);
+                    }
+                } else if (actionIdx == 2) {
+                    // Edit as GIF
+                    File target = (gifFile != null && gifFile.exists())
+                            ? gifFile
+                            : com.m3.veil.utils.VeilStickerGifEngine.materializePresetGifToFile(ChatActivity.this, presetGifCode != null ? presetGifCode : "");
+                    if (target != null && target.exists()) {
+                        Intent editIntent = new Intent(ChatActivity.this, MediaEditActivity.class);
+                        editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, Uri.fromFile(target));
+                        editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, "image");
+                        editIntent.putExtra(MediaEditActivity.EXTRA_IS_GIF_MODE, true);
+                        editIntent.putExtra(MediaEditActivity.EXTRA_IS_STICKER_MODE, false);
+                        startActivityForResult(editIntent, REQ_MEDIA_EDIT);
+                    }
+                } else if (actionIdx == 3) {
+                    // Edit as sticker
+                    File target = (gifFile != null && gifFile.exists())
+                            ? gifFile
+                            : com.m3.veil.utils.VeilStickerGifEngine.materializePresetGifToFile(ChatActivity.this, presetGifCode != null ? presetGifCode : "");
+                    if (target != null && target.exists()) {
+                        Intent editIntent = new Intent(ChatActivity.this, MediaEditActivity.class);
+                        editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, Uri.fromFile(target));
+                        editIntent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, "image");
+                        editIntent.putExtra(MediaEditActivity.EXTRA_IS_STICKER_MODE, true);
+                        editIntent.putExtra(MediaEditActivity.EXTRA_IS_GIF_MODE, false);
+                        startActivityForResult(editIntent, REQ_MEDIA_EDIT);
+                    }
+                }
+            });
+            root.addView(row);
+        }
+
+        dialog.setContentView(root);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+        dialog.show();
     }
 
     private void showReactionDialog(Message message, View anchorView) {
@@ -4105,6 +4731,7 @@ public class ChatActivity extends AppCompatActivity {
                     }
                     refreshPinnedMessagesBanner();
                     if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                     Toast.makeText(this, "Message unpinned", Toast.LENGTH_SHORT).show();
                 } else {
                     message.setPinned(true);
@@ -4121,6 +4748,7 @@ public class ChatActivity extends AppCompatActivity {
                     currentPinnedBannerIndex = Math.max(0, allPinned.size() - 1);
                     refreshPinnedMessagesBanner();
                     if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                     Toast.makeText(this, allPinned.size() > 1
                             ? "📌 Message pinned (" + allPinned.size() + " pinned messages)"
                             : "📌 Message pinned to chat header", Toast.LENGTH_SHORT).show();
@@ -4350,6 +4978,7 @@ public class ChatActivity extends AppCompatActivity {
                 }
                 refreshPinnedMessagesBanner();
                 if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                 sheet.dismiss();
             });
             card.addView(btnUnpinOne);
@@ -4385,6 +5014,7 @@ public class ChatActivity extends AppCompatActivity {
                 com.m3.veil.manager.VeilMessagesController.getInstance(this).unpinMessage(chatId, recipientId);
                 refreshPinnedMessagesBanner();
                 if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                 Toast.makeText(this, "All messages unpinned", Toast.LENGTH_SHORT).show();
                 sheet.dismiss();
             });
@@ -4519,8 +5149,137 @@ public class ChatActivity extends AppCompatActivity {
         sheet.show();
     }
 
+    private boolean isValidMediaCaptionForForward(@Nullable String text) {
+        if (text == null) return false;
+        String t = text.trim();
+        if (t.isEmpty()) return false;
+        String lower = t.toLowerCase(Locale.ROOT);
+        return !lower.startsWith("[image") && !lower.startsWith("[video")
+                && !lower.equals("[image message]") && !lower.equals("[video message]")
+                && !lower.equals("[sticker]");
+    }
+
     private void showForwardMessageSheet(Message message) {
         if (message == null || isFinishing()) return;
+        boolean isPhotoOrVideo = "image".equalsIgnoreCase(message.getType()) || "video".equalsIgnoreCase(message.getType());
+        if (isPhotoOrVideo && isValidMediaCaptionForForward(message.getText())) {
+            final String capToPreFill = message.getText().trim();
+            final boolean isNight = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(this);
+            final float dp = getResources().getDisplayMetrics().density;
+
+            android.app.Dialog askDialog = new android.app.Dialog(this);
+            askDialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+            if (askDialog.getWindow() != null) {
+                askDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+            }
+
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            int pad = Math.round(22 * dp);
+            card.setPadding(pad, pad, pad, Math.round(18 * dp));
+            GradientDrawable cardBg = new GradientDrawable();
+            cardBg.setColor(isNight ? Color.parseColor("#131B2E") : Color.WHITE);
+            cardBg.setCornerRadius(22 * dp);
+            cardBg.setStroke(Math.max(1, Math.round(1 * dp)), isNight ? Color.parseColor("#26334D") : Color.parseColor("#E2E8F0"));
+            card.setBackground(cardBg);
+
+            TextView tvTitle = new TextView(this);
+            tvTitle.setText("Forward with Caption?");
+            tvTitle.setTextColor(isNight ? Color.parseColor("#F8FAFC") : Color.parseColor("#0F172A"));
+            tvTitle.setTextSize(18f);
+            tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+            card.addView(tvTitle);
+
+            TextView tvBody = new TextView(this);
+            tvBody.setText("Do you want to include the caption with this media? If you select Yes, it will appear in the message box on the forward screen.");
+            tvBody.setTextColor(isNight ? Color.parseColor("#94A3B8") : Color.parseColor("#475569"));
+            tvBody.setTextSize(14f);
+            LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            bodyLp.topMargin = Math.round(8 * dp);
+            card.addView(tvBody, bodyLp);
+
+            TextView tvPreview = new TextView(this);
+            tvPreview.setText("\"" + capToPreFill + "\"");
+            tvPreview.setTextColor(isNight ? Color.parseColor("#E2E8F0") : Color.parseColor("#1E293B"));
+            tvPreview.setTextSize(13.5f);
+            tvPreview.setMaxLines(3);
+            tvPreview.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            int qPad = Math.round(12 * dp);
+            tvPreview.setPadding(qPad, Math.round(8 * dp), qPad, Math.round(8 * dp));
+            GradientDrawable qBg = new GradientDrawable();
+            qBg.setColor(isNight ? Color.parseColor("#1E293B") : Color.parseColor("#F1F5F9"));
+            qBg.setCornerRadius(12 * dp);
+            tvPreview.setBackground(qBg);
+            LinearLayout.LayoutParams prevLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            prevLp.topMargin = Math.round(12 * dp);
+            prevLp.bottomMargin = Math.round(18 * dp);
+            card.addView(tvPreview, prevLp);
+
+            LinearLayout btnRow = new LinearLayout(this);
+            btnRow.setOrientation(LinearLayout.HORIZONTAL);
+            btnRow.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+
+            TextView btnNo = new TextView(this);
+            btnNo.setText("No, Without Caption");
+            btnNo.setTextColor(isNight ? Color.parseColor("#CBD5E1") : Color.parseColor("#475569"));
+            btnNo.setTextSize(14f);
+            btnNo.setTypeface(null, android.graphics.Typeface.BOLD);
+            btnNo.setPadding(Math.round(14 * dp), Math.round(10 * dp), Math.round(14 * dp), Math.round(10 * dp));
+            GradientDrawable noBg = new GradientDrawable();
+            noBg.setColor(isNight ? Color.parseColor("#1E293B") : Color.parseColor("#F1F5F9"));
+            noBg.setCornerRadius(12 * dp);
+            btnNo.setBackground(noBg);
+            btnNo.setOnClickListener(v -> {
+                askDialog.dismiss();
+                openForwardMessageSheetInternal(message, "");
+            });
+            btnRow.addView(btnNo);
+
+            TextView btnYes = new TextView(this);
+            btnYes.setText("Yes, Include");
+            btnYes.setTextColor(Color.WHITE);
+            btnYes.setTextSize(14f);
+            btnYes.setTypeface(null, android.graphics.Typeface.BOLD);
+            btnYes.setPadding(Math.round(16 * dp), Math.round(10 * dp), Math.round(16 * dp), Math.round(10 * dp));
+            GradientDrawable yesBg = new GradientDrawable();
+            yesBg.setColor(Color.parseColor("#4F46E5"));
+            yesBg.setCornerRadius(12 * dp);
+            btnYes.setBackground(yesBg);
+            LinearLayout.LayoutParams yesLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            yesLp.leftMargin = Math.round(10 * dp);
+            btnYes.setOnClickListener(v -> {
+                askDialog.dismiss();
+                openForwardMessageSheetInternal(message, capToPreFill);
+            });
+            btnRow.addView(btnYes, yesLp);
+
+            card.addView(btnRow);
+            askDialog.setContentView(card);
+            if (askDialog.getWindow() != null) {
+                int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.88f);
+                askDialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+            }
+            askDialog.show();
+        } else {
+            String initialText = isPhotoOrVideo ? "" : (message.getText() != null ? message.getText() : "");
+            openForwardMessageSheetInternal(message, initialText);
+        }
+    }
+
+    private void openForwardMessageSheetInternal(Message message, @NonNull String initialCaption) {
+        if (message == null || isFinishing()) return;
+        final float dp = getResources().getDisplayMetrics().density;
+        final boolean isNight = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(this);
+        final int bgSurface = isNight ? Color.parseColor("#131B2E") : Color.WHITE;
+        final int bgInput = isNight ? Color.parseColor("#1E293B") : Color.parseColor("#F1F5F9");
+        final int textPrimary = isNight ? Color.parseColor("#F8FAFC") : Color.parseColor("#0F172A");
+        final int textSecondary = isNight ? Color.parseColor("#94A3B8") : Color.parseColor("#64748B");
+        final int dividerColor = isNight ? Color.parseColor("#26334D") : Color.parseColor("#E2E8F0");
+        final int veilAccent = Color.parseColor(isNight ? "#6366F1" : "#4F46E5");
+
         BottomSheetDialog sheet = new BottomSheetDialog(this, R.style.ModernBottomSheetDialogTheme);
         View view = getLayoutInflater().inflate(R.layout.dialog_forward_message_sheet, null);
         sheet.setContentView(view);
@@ -4528,6 +5287,7 @@ public class ChatActivity extends AppCompatActivity {
         View cardShareExternal = view.findViewById(R.id.cardShareExternal);
         LinearLayout forwardChatsContainer = view.findViewById(R.id.forwardChatsContainer);
         TextView forwardEmptyState = view.findViewById(R.id.forwardEmptyState);
+        final TextView tvTitle = view.findViewById(R.id.tvForwardSheetTitle);
 
         if (cardShareExternal != null) {
             cardShareExternal.setOnClickListener(v -> {
@@ -4562,16 +5322,38 @@ public class ChatActivity extends AppCompatActivity {
                 }
             }
         }
+        if (validChats.isEmpty() && currentLocalChat != null) {
+            validChats.add(currentLocalChat);
+        }
+
+        final java.util.Map<String, Chat> selectedChats = new java.util.LinkedHashMap<>();
+        final boolean[] hideSenderTag = {true};
+        final android.widget.FrameLayout btnConfirmForward = new android.widget.FrameLayout(this);
+        final GradientDrawable sendBg = new GradientDrawable();
+        sendBg.setShape(GradientDrawable.OVAL);
+        final ImageView ivSendArrow = new ImageView(this);
+
+        final Runnable updateSelectionState = () -> {
+            int count = selectedChats.size();
+            boolean hasSelection = count > 0;
+            if (tvTitle != null) {
+                tvTitle.setText(hasSelection ? ("Forward (" + count + " selected)") : "Forward Message");
+            }
+            btnConfirmForward.setEnabled(hasSelection);
+            btnConfirmForward.setAlpha(hasSelection ? 1.0f : 0.42f);
+            sendBg.setColor(hasSelection ? veilAccent : (isNight ? Color.parseColor("#334155") : Color.parseColor("#CBD5E1")));
+            btnConfirmForward.setBackground(sendBg);
+            ivSendArrow.setColorFilter(hasSelection ? Color.WHITE : textSecondary);
+        };
 
         if (forwardChatsContainer != null && forwardEmptyState != null) {
             forwardChatsContainer.removeAllViews();
 
             // Telegram-style Anonymous Forward Toggle ("Hide Sender Name")
-            final boolean[] hideSenderTag = {true};
             android.widget.CheckBox cbAnonForward = new android.widget.CheckBox(this);
             cbAnonForward.setText("🕵️ Forward Anonymously (Hide Original Sender Tag)");
             cbAnonForward.setChecked(true);
-            cbAnonForward.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+            cbAnonForward.setTextColor(textPrimary);
             cbAnonForward.setTextSize(13.5f);
             cbAnonForward.setOnCheckedChangeListener((btn, checked) -> hideSenderTag[0] = checked);
             forwardChatsContainer.addView(cbAnonForward);
@@ -4580,30 +5362,89 @@ public class ChatActivity extends AppCompatActivity {
                 forwardEmptyState.setVisibility(View.VISIBLE);
             } else {
                 forwardEmptyState.setVisibility(View.GONE);
-                LayoutInflater inflater = LayoutInflater.from(this);
 
-                for (Chat targetChat : validChats) {
-                    View row = inflater.inflate(R.layout.item_chat, forwardChatsContainer, false);
-                    ImageView avatar = row.findViewById(R.id.avatar);
-                    TextView name = row.findViewById(R.id.name);
-                    TextView lastMessage = row.findViewById(R.id.lastMessage);
-                    TextView time = row.findViewById(R.id.time);
-                    View onlineIndicator = row.findViewById(R.id.onlineIndicator);
-                    View unreadCount = row.findViewById(R.id.unreadCount);
+                for (final Chat targetChat : validChats) {
+                    final String cid = targetChat.getId();
+                    LinearLayout row = new LinearLayout(this);
+                    row.setOrientation(LinearLayout.HORIZONTAL);
+                    row.setGravity(Gravity.CENTER_VERTICAL);
+                    int pH = Math.round(10 * dp);
+                    int pV = Math.round(10 * dp);
+                    row.setPadding(pH, pV, pH, pV);
+                    GradientDrawable rowBg = new GradientDrawable();
+                    rowBg.setCornerRadius(14 * dp);
+                    row.setBackground(rowBg);
 
-                    if (name != null) name.setText(targetChat.getName() != null ? targetChat.getName() : "@Anonymous");
-                    if (lastMessage != null) lastMessage.setText(targetChat.getLastMessage() != null ? targetChat.getLastMessage() : "Tap to forward here");
-                    if (time != null) time.setText("");
-                    if (onlineIndicator != null) onlineIndicator.setVisibility(View.GONE);
-                    if (unreadCount != null) unreadCount.setVisibility(View.GONE);
+                    android.widget.FrameLayout avWrap = new android.widget.FrameLayout(this);
+                    int avSz = Math.round(44 * dp);
+                    LinearLayout.LayoutParams avLp = new LinearLayout.LayoutParams(avSz, avSz);
+                    avLp.rightMargin = Math.round(12 * dp);
+                    avWrap.setLayoutParams(avLp);
+                    GradientDrawable avCircle = new GradientDrawable();
+                    avCircle.setShape(GradientDrawable.OVAL);
+                    avCircle.setColor(veilAccent);
+                    avWrap.setBackground(avCircle);
 
-                    if (avatar != null) {
-                        avatar.setImageResource(targetChat.isGroup() ? R.drawable.ic_group : R.drawable.ic_person);
-                    }
+                    ImageView ivAv = new ImageView(this);
+                    int icSz = Math.round(22 * dp);
+                    ivAv.setLayoutParams(new android.widget.FrameLayout.LayoutParams(icSz, icSz, Gravity.CENTER));
+                    ivAv.setImageResource(targetChat.isGroup() ? R.drawable.ic_group : R.drawable.ic_person);
+                    ivAv.setColorFilter(Color.WHITE);
+                    avWrap.addView(ivAv);
+                    row.addView(avWrap);
+
+                    LinearLayout textCol = new LinearLayout(this);
+                    textCol.setOrientation(LinearLayout.VERTICAL);
+                    textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                    TextView tvName = new TextView(this);
+                    tvName.setText(targetChat.getName() != null ? targetChat.getName() : "@Anonymous");
+                    tvName.setTextColor(textPrimary);
+                    tvName.setTextSize(15.5f);
+                    tvName.setTypeface(null, android.graphics.Typeface.BOLD);
+                    textCol.addView(tvName);
+
+                    TextView tvSub = new TextView(this);
+                    tvSub.setText(targetChat.isGroup() ? "🔒 Encrypted Veil Group" : "🔒 End-to-end encrypted • Veil Peer");
+                    tvSub.setTextColor(textSecondary);
+                    tvSub.setTextSize(12.5f);
+                    textCol.addView(tvSub);
+                    row.addView(textCol);
+
+                    final TextView checkCircle = new TextView(this);
+                    int chkSz = Math.round(24 * dp);
+                    checkCircle.setLayoutParams(new LinearLayout.LayoutParams(chkSz, chkSz));
+                    checkCircle.setGravity(Gravity.CENTER);
+                    checkCircle.setTextColor(Color.WHITE);
+                    checkCircle.setTextSize(13f);
+                    checkCircle.setTypeface(null, android.graphics.Typeface.BOLD);
+
+                    final Runnable renderRowCheck = () -> {
+                        boolean checked = selectedChats.containsKey(cid);
+                        GradientDrawable cBg = new GradientDrawable();
+                        cBg.setShape(GradientDrawable.OVAL);
+                        if (checked) {
+                            cBg.setColor(veilAccent);
+                            checkCircle.setText("✓");
+                            rowBg.setColor(isNight ? 0x226366F1 : 0x144F46E5);
+                        } else {
+                            cBg.setColor(Color.TRANSPARENT);
+                            cBg.setStroke(Math.round(1.8f * dp), textSecondary);
+                            checkCircle.setText("");
+                            rowBg.setColor(Color.TRANSPARENT);
+                        }
+                        checkCircle.setBackground(cBg);
+                    };
+                    renderRowCheck.run();
+                    row.addView(checkCircle);
 
                     row.setOnClickListener(vRow -> {
-                        sheet.dismiss();
-                        forwardMessageToChat(message, targetChat, hideSenderTag[0]);
+                        if (selectedChats.containsKey(cid)) {
+                            selectedChats.remove(cid);
+                        } else {
+                            selectedChats.put(cid, targetChat);
+                        }
+                        renderRowCheck.run();
+                        updateSelectionState.run();
                     });
 
                     forwardChatsContainer.addView(row);
@@ -4611,14 +5452,163 @@ public class ChatActivity extends AppCompatActivity {
             }
         }
 
+        // Bottom Composer Row on Forward Sheet (Media Thumbnail + Caption/Message EditText + VEIL Send Button)
+        if (view instanceof ViewGroup) {
+            ViewGroup rootGroup = (ViewGroup) view;
+            View divider = new View(this);
+            LinearLayout.LayoutParams divLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Math.round(1 * dp)));
+            divLp.topMargin = Math.round(10 * dp);
+            divLp.bottomMargin = Math.round(10 * dp);
+            divider.setLayoutParams(divLp);
+            divider.setBackgroundColor(dividerColor);
+            rootGroup.addView(divider);
+
+            LinearLayout composerBar = new LinearLayout(this);
+            composerBar.setOrientation(LinearLayout.HORIZONTAL);
+            composerBar.setGravity(Gravity.CENTER_VERTICAL);
+            composerBar.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            boolean isMedia = "image".equalsIgnoreCase(message.getType()) || "video".equalsIgnoreCase(message.getType());
+            int thumbSz = Math.round(44 * dp);
+            if (isMedia) {
+                android.widget.FrameLayout thumbWrap = new android.widget.FrameLayout(this);
+                LinearLayout.LayoutParams thLp = new LinearLayout.LayoutParams(thumbSz, thumbSz);
+                thLp.rightMargin = Math.round(10 * dp);
+                thumbWrap.setLayoutParams(thLp);
+                GradientDrawable thBg = new GradientDrawable();
+                thBg.setColor(bgInput);
+                thBg.setCornerRadius(12 * dp);
+                thBg.setStroke(Math.max(1, Math.round(1 * dp)), dividerColor);
+                thumbWrap.setBackground(thBg);
+                thumbWrap.setClipToOutline(true);
+
+                ImageView ivThumb = new ImageView(this);
+                ivThumb.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                ivThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                Bitmap previewBmp = resolveMessageThumbnailBitmap(message);
+                if (previewBmp != null) {
+                    ivThumb.setImageBitmap(previewBmp);
+                }
+                thumbWrap.addView(ivThumb);
+
+                if ("video".equalsIgnoreCase(message.getType())) {
+                    TextView tvPlay = new TextView(this);
+                    tvPlay.setText("▶");
+                    tvPlay.setTextColor(Color.WHITE);
+                    tvPlay.setTextSize(10f);
+                    tvPlay.setGravity(Gravity.CENTER);
+                    int bSz = Math.round(20 * dp);
+                    android.widget.FrameLayout.LayoutParams bLp = new android.widget.FrameLayout.LayoutParams(bSz, bSz, Gravity.CENTER);
+                    GradientDrawable bBg = new GradientDrawable();
+                    bBg.setShape(GradientDrawable.OVAL);
+                    bBg.setColor(0x99000000);
+                    tvPlay.setBackground(bBg);
+                    thumbWrap.addView(tvPlay, bLp);
+                }
+                composerBar.addView(thumbWrap);
+            }
+
+            final EditText etForwardCaption = new EditText(this);
+            LinearLayout.LayoutParams etLp = new LinearLayout.LayoutParams(0, thumbSz, 1f);
+            etForwardCaption.setLayoutParams(etLp);
+            etForwardCaption.setHint(isMedia ? "Add a caption or message..." : "Edit forwarded message...");
+            etForwardCaption.setHintTextColor(textSecondary);
+            etForwardCaption.setTextColor(textPrimary);
+            etForwardCaption.setTextSize(14.5f);
+            etForwardCaption.setSingleLine(true);
+            etForwardCaption.setPadding(Math.round(14 * dp), 0, Math.round(14 * dp), 0);
+            GradientDrawable pillBg = new GradientDrawable();
+            pillBg.setColor(bgInput);
+            pillBg.setCornerRadius(22 * dp);
+            pillBg.setStroke(Math.max(1, Math.round(1 * dp)), dividerColor);
+            etForwardCaption.setBackground(pillBg);
+            if (!initialCaption.isEmpty()) {
+                etForwardCaption.setText(initialCaption);
+                etForwardCaption.setSelection(initialCaption.length());
+            }
+            composerBar.addView(etForwardCaption);
+
+            LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(thumbSz, thumbSz);
+            sendLp.leftMargin = Math.round(8 * dp);
+            btnConfirmForward.setLayoutParams(sendLp);
+            int sIc = Math.round(20 * dp);
+            ivSendArrow.setLayoutParams(new android.widget.FrameLayout.LayoutParams(sIc, sIc, Gravity.CENTER));
+            ivSendArrow.setImageResource(R.drawable.ic_send);
+            btnConfirmForward.addView(ivSendArrow);
+
+            updateSelectionState.run();
+
+            btnConfirmForward.setOnClickListener(v -> {
+                if (selectedChats.isEmpty()) {
+                    Toast.makeText(this, "Select at least one contact to forward", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                String customCaption = etForwardCaption.getText() != null
+                        ? etForwardCaption.getText().toString().trim()
+                        : "";
+                List<String> names = new ArrayList<>();
+                for (Chat target : selectedChats.values()) {
+                    names.add(target.getName() != null ? target.getName() : target.getId());
+                    forwardMessageToChat(message, target, hideSenderTag[0], customCaption);
+                }
+                sheet.dismiss();
+            });
+            composerBar.addView(btnConfirmForward);
+            rootGroup.addView(composerBar);
+        }
+
         sheet.show();
     }
 
+    @Nullable
+    private Bitmap resolveMessageThumbnailBitmap(Message message) {
+        if (message == null) return null;
+        if (message.getThumbnail() != null && !message.getThumbnail().isEmpty()) {
+            try {
+                byte[] decoded = Base64.decode(message.getThumbnail(), Base64.DEFAULT);
+                Bitmap bmp = BitmapFactory.decodeByteArray(decoded, 0, decoded.length);
+                if (bmp != null) return bmp;
+            } catch (Throwable ignored) {}
+        }
+        String ext = "video".equalsIgnoreCase(message.getType()) ? ".mp4" : ".jpg";
+        File local = com.m3.veil.utils.FileMediaManager.getDecryptedFile(this, message, ext);
+        if ((local == null || !local.exists()) && message.getLocalFilePath() != null) {
+            File f = new File(message.getLocalFilePath());
+            if (f.exists()) local = f;
+        }
+        if (local != null && local.exists()) {
+            if ("video".equalsIgnoreCase(message.getType()) || local.getName().toLowerCase(Locale.ROOT).endsWith(".mp4")) {
+                MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+                try {
+                    mmr.setDataSource(local.getAbsolutePath());
+                    Bitmap b = mmr.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                    if (b == null) b = mmr.getFrameAtTime();
+                    if (b != null) return b;
+                } catch (Throwable ignored) {
+                } finally {
+                    try { mmr.release(); } catch (Throwable ignored) {}
+                }
+            } else {
+                try {
+                    return BitmapFactory.decodeFile(local.getAbsolutePath());
+                } catch (Throwable ignored) {}
+            }
+        }
+        return null;
+    }
+
     private void forwardMessageToChat(Message originalMessage, Chat targetChat) {
-        forwardMessageToChat(originalMessage, targetChat, true);
+        forwardMessageToChat(originalMessage, targetChat, true, null);
     }
 
     private void forwardMessageToChat(Message originalMessage, Chat targetChat, boolean anonymousForward) {
+        forwardMessageToChat(originalMessage, targetChat, anonymousForward, null);
+    }
+
+    private void forwardMessageToChat(Message originalMessage, Chat targetChat, boolean anonymousForward, @Nullable String overrideCaption) {
         if (originalMessage == null || targetChat == null) return;
         String newMsgId = UUID.randomUUID().toString();
         String targetRecipientId = "";
@@ -4634,26 +5624,87 @@ public class ChatActivity extends AppCompatActivity {
             targetRecipientId = targetChat.getId();
         }
 
-        String fwdText = originalMessage.getText() != null ? originalMessage.getText() : "";
-        if (!anonymousForward && !"image".equals(originalMessage.getType()) && !"video".equals(originalMessage.getType())) {
+        boolean isMedia = "image".equalsIgnoreCase(originalMessage.getType()) || "video".equalsIgnoreCase(originalMessage.getType());
+        String fwdText;
+        if (overrideCaption != null) {
+            fwdText = overrideCaption;
+        } else {
+            fwdText = isMedia ? "" : (originalMessage.getText() != null ? originalMessage.getText() : "");
+        }
+        if (!anonymousForward && !isMedia) {
             String origSender = originalMessage.getSenderName() != null ? originalMessage.getSenderName() : "Peer";
             fwdText = "↪️ Forwarded from " + origSender + ":\n" + fwdText;
         }
+
+        String msgType = originalMessage.getType() != null ? originalMessage.getType() : "text";
         Message fwdMessage = new Message(
                 newMsgId,
                 currentUserId,
                 targetRecipientId,
                 fwdText,
                 Timestamp.now(),
-                originalMessage.getType() != null ? originalMessage.getType() : "text"
+                msgType
         );
-        fwdMessage.setLocalFilePath(originalMessage.getLocalFilePath());
-        fwdMessage.setThumbnail(originalMessage.getThumbnail());
+
+        String ext = "video".equalsIgnoreCase(msgType) ? ".mp4" : ".jpg";
+        File srcFile = com.m3.veil.utils.FileMediaManager.getDecryptedFile(this, originalMessage, ext);
+        if ((srcFile == null || !srcFile.exists()) && originalMessage.getLocalFilePath() != null) {
+            File f = new File(originalMessage.getLocalFilePath());
+            if (f.exists()) srcFile = f;
+        }
+        if (srcFile != null && srcFile.exists()) {
+            try {
+                File cacheDir = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
+                File decCopy = new File(cacheDir, "dec_" + newMsgId + ext);
+                if (!srcFile.getAbsolutePath().equals(decCopy.getAbsolutePath())) {
+                    copyFile(srcFile, decCopy);
+                }
+                fwdMessage.setLocalFilePath(decCopy.exists() ? decCopy.getAbsolutePath() : srcFile.getAbsolutePath());
+                fwdMessage.setMediaSize(srcFile.length());
+            } catch (Throwable ignored) {
+                fwdMessage.setLocalFilePath(srcFile.getAbsolutePath());
+            }
+        } else {
+            fwdMessage.setLocalFilePath(originalMessage.getLocalFilePath());
+        }
+
+        String thumbB64 = originalMessage.getThumbnail();
+        if ((thumbB64 == null || thumbB64.isEmpty()) && srcFile != null && srcFile.exists()) {
+            if ("video".equalsIgnoreCase(msgType)) {
+                MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+                try {
+                    mmr.setDataSource(srcFile.getAbsolutePath());
+                    Bitmap frame = mmr.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                    if (frame == null) frame = mmr.getFrameAtTime();
+                    if (frame != null) {
+                        int fw = Math.max(1, frame.getWidth());
+                        int fh = Math.max(1, frame.getHeight());
+                        com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions("msg_" + newMsgId, fw, fh);
+                        float ratio = Math.min(320f / fw, 320f / fh);
+                        Bitmap scaled = Bitmap.createScaledBitmap(
+                                frame, Math.max(48, Math.round(fw * ratio)), Math.max(48, Math.round(fh * ratio)), true);
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        scaled.compress(Bitmap.CompressFormat.JPEG, 78, baos);
+                        thumbB64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
+                        if (scaled != frame) scaled.recycle();
+                        frame.recycle();
+                    }
+                } catch (Throwable ignored) {
+                } finally {
+                    try { mmr.release(); } catch (Throwable ignored) {}
+                }
+            }
+        }
+        fwdMessage.setThumbnail(thumbB64);
         fwdMessage.setMediaUrl(originalMessage.getMediaUrl());
         fwdMessage.setPollJson(originalMessage.getPollJson());
 
-        // Route through VeilMessagesController (optimistic UI + warm cache + outbox + direct P2P delivery)
-        com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(targetChat, targetRecipientId, fwdMessage);
+        if (srcFile != null && srcFile.exists() && isMedia) {
+            com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMediaMessage(
+                    targetChat.getId(), targetRecipientId, msgType, srcFile, fwdText, null, false);
+        } else {
+            com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(targetChat, targetRecipientId, fwdMessage);
+        }
 
         Toast.makeText(this, (anonymousForward ? "🕵️ Anonymously forwarded to " : "Forwarded to ") + targetChat.getName(), Toast.LENGTH_SHORT).show();
     }
@@ -4693,10 +5744,15 @@ public class ChatActivity extends AppCompatActivity {
         com.m3.veil.manager.VeilMessagesController.getInstance(this).deleteMessage(chatId, message.getId(), false);
         messageList.remove(message);
         messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
         Toast.makeText(this, "Message deleted for you", Toast.LENGTH_SHORT).show();
     }
 
     private void deleteMessageForEveryone(Message message) {
+        if (message != null && chatId != null) {
+            com.m3.veil.database.EncryptedChatDatabase.getInstance(this)
+                    .markMessageDeletedForEveryone(chatId, message.getId());
+        }
         com.m3.veil.manager.VeilMessagesController.getInstance(this).deleteMessage(chatId, message.getId(), true);
         reloadMessagesFromLocalVault();
         Toast.makeText(this, "Message deleted for everyone via P2P", Toast.LENGTH_SHORT).show();
@@ -4757,6 +5813,18 @@ public class ChatActivity extends AppCompatActivity {
             showScheduleMessageDialog();
         });
         root.addView(btnSchedule);
+
+        MaterialButton btnWhenOnline = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnWhenOnline.setText("🌐 Send When Peer Comes Online");
+        btnWhenOnline.setCornerRadius((int) (12 * dp));
+        btnWhenOnline.setLayoutParams(lp);
+        btnWhenOnline.setOnClickListener(v -> {
+            sheet.dismiss();
+            messageEditText.setText(textToSend);
+            Toast.makeText(this, "Queued to auto-dispatch when peer connects via WebRTC", Toast.LENGTH_SHORT).show();
+            sendMessage();
+        });
+        root.addView(btnWhenOnline);
 
         MaterialButton btnBlinkOnce = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
         btnBlinkOnce.setText("⚡ Send as 1x View-Once Blink");
@@ -5017,6 +6085,7 @@ public class ChatActivity extends AppCompatActivity {
         message.setDelivered(false);
         message.setRead(false);
         message.setSenderName(com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName());
+        attachSenderIdentityPreferences(message);
 
         // Anonymous Channel Admin System (#82) - Blind rotating alias
         if (currentLocalChat != null && ("channel".equalsIgnoreCase(currentLocalChat.getType()) || (chatId != null && chatId.startsWith("channel_")))) {
@@ -5509,10 +6578,11 @@ public class ChatActivity extends AppCompatActivity {
                         boolean isMediaAction = Message.isMediaRequiringActionToRead(mType);
                         boolean shouldMarkReadNow = isChatActiveInFg && hasFocusNow && !isMediaAction;
                         if (existing == null) {
+                            boolean fromMe = isSenderMe(sId, null);
                             Message m = new Message(
                                     mId,
-                                    sId != null ? sId : (recipientId != null ? recipientId : ""),
-                                    currentUserId,
+                                    fromMe ? currentUserId : (sId != null ? sId : (recipientId != null ? recipientId : "")),
+                                    fromMe ? (recipientId != null ? recipientId : "") : currentUserId,
                                     mText != null ? mText : "",
                                     mTs,
                                     mType != null ? mType : "text"
@@ -5732,8 +6802,42 @@ public class ChatActivity extends AppCompatActivity {
                 sendReadReceiptsForUnreadMessages();
                 dbExecutor.execute(() -> com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId));
             }
+            // Returning from sticker studio / media creators: only jump to bottom if an outgoing message was dispatched
+            if (shouldScrollToBottomOnResume) {
+                shouldScrollToBottomOnResume = false;
+                scrollToBottomOnNextAppend = true;
+                chatDebounceHandler.postDelayed(() -> scrollToBottomOnNextAppend = false, 4000L);
+                if (messagesRecyclerView != null && messagesAdapter != null && messagesAdapter.getItemCount() > 0) {
+                    messagesRecyclerView.post(() -> {
+                        if (messagesAdapter != null && messagesAdapter.getItemCount() > 0) {
+                            messagesRecyclerView.scrollToPosition(messagesAdapter.getItemCount() - 1);
+                        }
+                    });
+                }
+            }
             reloadMessagesFromLocalVault();
         }
+    }
+
+    public static volatile boolean shouldScrollToBottomOnResume = false;
+    private volatile boolean scrollToBottomOnNextAppend = false;
+
+    public void searchForTextInChat(String query) {
+        if (query == null || query.isEmpty()) return;
+        runOnUiThread(() -> {
+            View chatSearchBar = findViewById(R.id.chatSearchBar);
+            EditText etChatSearch = findViewById(R.id.etChatSearch);
+            if (chatSearchBar != null && etChatSearch != null) {
+                chatSearchBar.setVisibility(View.VISIBLE);
+                etChatSearch.setText(query);
+                etChatSearch.setSelection(query.length());
+                etChatSearch.requestFocus();
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.showSoftInput(etChatSearch, InputMethodManager.SHOW_IMPLICIT);
+                }
+            }
+        });
     }
 
     @Override
@@ -5827,7 +6931,14 @@ public class ChatActivity extends AppCompatActivity {
 
                 boolean lastIsOutgoing = newCount > 0
                         && messageList.get(newCount - 1).getSenderId() != null
-                        && messageList.get(newCount - 1).getSenderId().equals(currentUserId);
+                        && (messageList.get(newCount - 1).getSenderId().equals(currentUserId)
+                            || isSenderMe(messageList.get(newCount - 1).getSenderId(), messageList.get(newCount - 1)));
+                if (scrollToBottomOnNextAppend && newCount > prevCount && prevCount > 0) {
+                    lastIsOutgoing = true;
+                }
+                if (newCount > prevCount || prevCount == 0) {
+                    scrollToBottomOnNextAppend = false;
+                }
 
                 boolean hasZeroVisualDiff = isSameCountDiff && changedIndices != null && changedIndices.isEmpty();
 
@@ -5835,6 +6946,7 @@ public class ChatActivity extends AppCompatActivity {
                     if (prevCount == 0) {
                         messagesAdapter.skipInitialAnimations();
                         messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                     } else if (isSimpleAppend) {
                         messagesAdapter.notifyItemChanged(prevCount);
                         messagesAdapter.notifyItemRangeInserted(prevCount + 1, newCount - prevCount);
@@ -5844,6 +6956,7 @@ public class ChatActivity extends AppCompatActivity {
                         }
                     } else {
                         messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                     }
                     String targetScrollMsgId = getIntent().getStringExtra("scrollToMessageId");
                     if (targetScrollMsgId != null && !targetScrollMsgId.isEmpty() && !messageList.isEmpty()) {
@@ -6002,6 +7115,7 @@ public class ChatActivity extends AppCompatActivity {
         }
         if (changed && messagesAdapter != null) {
             messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
         }
     }
 
@@ -7238,6 +8352,7 @@ public class ChatActivity extends AppCompatActivity {
                 message.setTranslatedText(null);
                 message.setTranslatedLang(null);
                 if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                 Toast.makeText(this, "Translation cleared", Toast.LENGTH_SHORT).show();
             });
         }
@@ -7341,6 +8456,7 @@ public class ChatActivity extends AppCompatActivity {
                 message.setTranslatedLang(code.toUpperCase(Locale.ROOT));
                 if (messagesAdapter != null) {
                     messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                 }
                 Toast.makeText(this, "Translated to " + name + " (On-Device)", Toast.LENGTH_SHORT).show();
             });
@@ -7441,6 +8557,7 @@ public class ChatActivity extends AppCompatActivity {
         messageList.clear();
         if (messagesAdapter != null) {
             messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
         }
 
         isReplayActive = true;
@@ -7523,6 +8640,7 @@ public class ChatActivity extends AppCompatActivity {
             messageList.addAll(fullChatHistorySnapshot);
             if (messagesAdapter != null) {
                 messagesAdapter.notifyDataSetChanged();
+        checkAndShowJumpToMentionPill();
                 if (!messageList.isEmpty()) {
                     messagesRecyclerView.scrollToPosition(messagesAdapter.getItemCount() - 1);
                 }
@@ -8363,4 +9481,84 @@ public class ChatActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
         }
     }
+    private void attachSenderIdentityPreferences(Message message) {
+        if (message == null) return;
+        boolean preferUsername = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                .getBoolean("group_show_username", false);
+        message.setPreferUsername(preferUsername);
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest myManifest =
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(this);
+        if (myManifest != null && myManifest.username != null) {
+            message.setSenderUsername(myManifest.username);
+        }
+    }
+
+
+    private void jumpToNextUnreadMention() {
+        if (messageList == null || messageList.isEmpty()) return;
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(this);
+        String myUname = manifest != null && manifest.username != null ? manifest.username.toLowerCase(java.util.Locale.ROOT).replace("@", "") : "";
+
+        int targetIndex = -1;
+        for (int i = messageList.size() - 1; i >= 0; i--) {
+            Message m = messageList.get(i);
+            if (m != null && m.getText() != null) {
+                String t = m.getText().toLowerCase(java.util.Locale.ROOT);
+                if ((!myUname.isEmpty() && t.contains("@" + myUname)) || (currentUserId != null && t.contains(currentUserId))) {
+                    targetIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (targetIndex >= 0 && messagesRecyclerView != null) {
+            messagesRecyclerView.smoothScrollToPosition(targetIndex);
+            View layoutJump = findViewById(R.id.layoutJumpToMention);
+            if (layoutJump != null) layoutJump.setVisibility(View.GONE);
+            if (currentLocalChat != null) {
+                currentLocalChat.setUnreadMentionsCount(0);
+                new Thread(() -> {
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).updateChatUnreadMentions(chatId, 0);
+                }).start();
+            }
+        }
+    }
+
+    private void checkAndShowJumpToMentionPill() {
+        if (!isGroupChatContext() || messageList == null || messageList.isEmpty()) return;
+        View layoutJump = findViewById(R.id.layoutJumpToMention);
+        TextView tvCount = findViewById(R.id.tvJumpMentionCount);
+        if (layoutJump == null) return;
+
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(this);
+        String myUname = manifest != null && manifest.username != null ? manifest.username.toLowerCase(java.util.Locale.ROOT).replace("@", "") : "";
+
+        int mentionCount = 0;
+        for (Message m : messageList) {
+            if (m != null && m.getText() != null && !m.isRead()) {
+                String t = m.getText().toLowerCase(java.util.Locale.ROOT);
+                if ((!myUname.isEmpty() && t.contains("@" + myUname)) || (currentUserId != null && t.contains(currentUserId))) {
+                    mentionCount++;
+                }
+            }
+        }
+
+        if (mentionCount > 0 || (currentLocalChat != null && currentLocalChat.getUnreadMentionsCount() > 0)) {
+            layoutJump.setVisibility(View.VISIBLE);
+            if (tvCount != null) {
+                int displayCount = Math.max(mentionCount, currentLocalChat != null ? currentLocalChat.getUnreadMentionsCount() : 0);
+                if (displayCount > 1) {
+                    tvCount.setText(String.valueOf(displayCount));
+                    tvCount.setVisibility(View.VISIBLE);
+                } else {
+                    tvCount.setVisibility(View.GONE);
+                }
+            }
+        } else {
+            layoutJump.setVisibility(View.GONE);
+        }
+    }
+
 }

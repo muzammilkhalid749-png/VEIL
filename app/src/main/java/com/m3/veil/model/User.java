@@ -39,6 +39,9 @@ public class User {
     private List<String> premiumFeatures;
     private String reservedUsername;
     private String publicKey;
+    private boolean showUsernameInGroup = false;
+    private String allowMentions = "everyone";
+    private String whoCanMessageMe = "everyone";
 
     public User() {
         // Default constructor for Firestore
@@ -240,4 +243,13 @@ public class User {
         java.text.SimpleDateFormat dateFmt = new java.text.SimpleDateFormat("MMM dd 'at' HH:mm", java.util.Locale.getDefault());
         return "last seen " + dateFmt.format(new java.util.Date(effectiveMs));
     }
+
+    public boolean isShowUsernameInGroup() { return showUsernameInGroup; }
+    public void setShowUsernameInGroup(boolean showUsernameInGroup) { this.showUsernameInGroup = showUsernameInGroup; }
+
+    public String getAllowMentions() { return allowMentions; }
+    public void setAllowMentions(String allowMentions) { this.allowMentions = allowMentions; }
+
+    public String getWhoCanMessageMe() { return whoCanMessageMe != null ? whoCanMessageMe : "everyone"; }
+    public void setWhoCanMessageMe(String whoCanMessageMe) { this.whoCanMessageMe = whoCanMessageMe; }
 }

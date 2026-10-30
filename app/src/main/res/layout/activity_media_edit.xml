@@ -2,140 +2,238 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mediaEditRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/black">
+    android:background="#0B1017">
 
     <ja.burhanrashid52.photoeditor.PhotoEditorView
         android:id="@+id/photoEditorView"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/videoTrimmerContainer"
         app:layout_constraintBottom_toTopOf="@id/bottomBar"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <VideoView
-        android:id="@+id/videoView"
+    <FrameLayout
+        android:id="@+id/videoContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/videoTrimmerContainer"
         app:layout_constraintBottom_toTopOf="@id/bottomBar"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent">
 
-    <!-- BASE STATE UI -->
+        <VideoView
+            android:id="@+id/videoView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center" />
+
+        <!-- Standard Mid Play/Pause Button on Video Player -->
+        <ImageView
+            android:id="@+id/btnMidPlayPause"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_circle_translucent"
+            android:padding="16dp"
+            android:src="@drawable/ic_play_arrow"
+            app:tint="@android:color/white"
+            android:elevation="8dp" />
+    </FrameLayout>
+
+    <!-- Unified Studio Top Header Bar (Close Button + Batch Pill + Scrollable Tool & Chip Bar) -->
     <LinearLayout
-        android:id="@+id/topToolbar"
+        android:id="@+id/topHeaderBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="32dp"
-        android:paddingBottom="16dp"
-        android:paddingHorizontal="16dp"
-        android:gravity="end|center_vertical"
-        android:clipToPadding="false"
-        app:layout_constraintTop_toTopOf="parent">
+        android:gravity="center_vertical"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:paddingHorizontal="12dp"
+        android:background="#B30B1017"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <ImageView
-            android:id="@+id/btnUndo"
+            android:id="@+id/btnClose"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_marginEnd="10dp"
-            android:padding="8dp"
-            android:src="@drawable/ic_undo"
+            android:padding="9dp"
+            android:src="@drawable/ic_close"
             android:background="@drawable/bg_circle_translucent"
             app:tint="@android:color/white" />
 
-        <ImageView
-            android:id="@+id/btnCrop"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="10dp"
-            android:padding="8dp"
-            android:src="@drawable/ic_crop"
-            android:background="@drawable/bg_circle_translucent"
-            app:tint="@android:color/white" />
+        <!-- Multi-media selection counter pill (1 / N) -->
+        <TextView
+            android:id="@+id/tvEditBatchCounter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_filter_chip"
+            android:paddingHorizontal="11dp"
+            android:paddingVertical="5dp"
+            android:text="1 / 1"
+            android:textColor="@android:color/white"
+            android:textSize="12.5sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
 
-        <ImageView
-            android:id="@+id/btnEmoji"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="10dp"
-            android:padding="8dp"
-            android:src="@drawable/ic_emoji"
-            android:background="@drawable/bg_circle_translucent"
-            app:tint="@android:color/white" />
+        <HorizontalScrollView
+            android:id="@+id/topToolbarScroll"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:scrollbars="none"
+            android:fillViewport="true"
+            android:clipToPadding="false">
 
-        <ImageView
-            android:id="@+id/btnText"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="10dp"
-            android:padding="8dp"
-            android:src="@drawable/ic_text"
-            android:background="@drawable/bg_circle_translucent"
-            app:tint="@android:color/white" />
+            <LinearLayout
+                android:id="@+id/topToolbar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end|center_vertical"
+                android:clipToPadding="false">
 
-        <ImageView
-            android:id="@+id/btnDraw"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:padding="8dp"
-            android:src="@drawable/ic_draw"
-            android:background="@drawable/bg_circle_translucent"
-            app:tint="@android:color/white" />
+                <ImageView
+                    android:id="@+id/btnUndo"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="8dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_undo"
+                    android:background="@drawable/bg_circle_translucent"
+                    app:tint="@android:color/white" />
+
+                <ImageView
+                    android:id="@+id/btnCrop"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="8dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_crop"
+                    android:background="@drawable/bg_circle_translucent"
+                    app:tint="@android:color/white" />
+
+                <ImageView
+                    android:id="@+id/btnEmoji"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="8dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_emoji"
+                    android:background="@drawable/bg_circle_translucent"
+                    app:tint="@android:color/white" />
+
+                <ImageView
+                    android:id="@+id/btnText"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="8dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_text"
+                    android:background="@drawable/bg_circle_translucent"
+                    app:tint="@android:color/white" />
+
+                <ImageView
+                    android:id="@+id/btnDraw"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="8dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_draw"
+                    android:background="@drawable/bg_circle_translucent"
+                    app:tint="@android:color/white" />
+
+                <!-- Toolbar GIF Mode Toggle Icon (Select/Unselect) -->
+                <ImageView
+                    android:id="@+id/btnToolbarGifMode"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:padding="7dp"
+                    android:src="@drawable/ic_gif_mode"
+                    android:background="@drawable/bg_circle_translucent"
+                    app:tint="@android:color/white"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </HorizontalScrollView>
     </LinearLayout>
 
-    <ImageView
-        android:id="@+id/btnClose"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="32dp"
-        android:padding="8dp"
-        android:src="@drawable/ic_close"
-        android:background="@drawable/bg_circle_translucent"
-        app:tint="@android:color/white"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <!-- Multi-media selection counter pill (1 / N) -->
-    <TextView
-        android:id="@+id/tvEditBatchCounter"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
-        android:background="@drawable/bg_filter_chip"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="6dp"
-        android:text="1 / 1"
-        android:textColor="@android:color/white"
-        android:textSize="13sp"
-        android:textStyle="bold"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="@id/btnClose"
-        app:layout_constraintBottom_toBottomOf="@id/btnClose"
-        app:layout_constraintStart_toEndOf="@id/btnClose" />
-
-    <!-- VIDEO TRIMMER BAR -->
+    <!-- TOP VIDEO FILMSTRIP TRIMMER BAR (Unified WhatsApp / Telegram Design) -->
     <LinearLayout
         android:id="@+id/videoTrimmerContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="20dp"
-        android:paddingVertical="10dp"
-        android:background="#80000000"
+        android:paddingHorizontal="14dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="8dp"
+        android:background="#D90B1017"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/editBatchThumbnailScroll">
+        app:layout_constraintTop_toBottomOf="@id/topHeaderBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
+        <!-- Controls Row: Play/Pause Toggle & GIF Loop Toggle (Deprecated in favor of Mid Button & Toolbar GIF) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/btnVideoPlayPauseToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⏸ Pause"
+                android:textColor="@android:color/white"
+                android:textSize="11.5sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:background="@drawable/bg_filter_chip" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/btnVideoGifModeToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎬 Video Mode"
+                android:textColor="@android:color/white"
+                android:textSize="11.5sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:background="@drawable/bg_filter_chip" />
+        </LinearLayout>
+
+        <!-- Unified Filmstrip Thumbnail Strip & Draggable Selection Handles -->
+        <com.m3.veil.ui.views.VeilVideoTrimmerFilmstripView
+            android:id="@+id/videoFilmstripTrimmer"
+            android:layout_width="match_parent"
+            android:layout_height="50dp" />
+
+        <!-- Info / Timestamps Row below Filmstrip -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="5dp">
 
             <TextView
                 android:id="@+id/tvTrimStart"
@@ -166,18 +264,6 @@
                 android:textSize="12sp"
                 android:fontFeatureSettings="tnum" />
         </LinearLayout>
-
-        <com.google.android.material.slider.RangeSlider
-            android:id="@+id/videoRangeSlider"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:valueFrom="0"
-            android:valueTo="100"
-            app:thumbColor="@color/colorPrimary"
-            app:trackColorActive="@color/colorPrimary"
-            app:trackColorInactive="#66FFFFFF"
-            app:thumbElevation="2dp"
-            app:trackHeight="4dp" />
     </LinearLayout>
 
     <!-- WhatsApp/Telegram Multi-Media Thumbnail Strip for Selected Photos & Videos -->
@@ -189,7 +275,7 @@
         android:clipToPadding="false"
         android:paddingHorizontal="16dp"
         android:paddingVertical="6dp"
-        android:background="#80000000"
+        android:background="#CC0B1017"
         android:visibility="gone"
         app:layout_constraintBottom_toTopOf="@id/bottomBar">
 
@@ -201,14 +287,15 @@
             android:orientation="horizontal" />
     </HorizontalScrollView>
 
-    <!-- WhatsApp Two-Row Bottom Composer (status_3cb0513d.jpg: Caption Pill Row + Status/Recipient & Green Send FAB Row) -->
+    <!-- WhatsApp Two-Row Bottom Composer (Caption Pill Row + Status/Recipient & Green Send FAB Row) -->
     <LinearLayout
         android:id="@+id/bottomBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
+        android:background="#D90B1017"
         android:paddingHorizontal="12dp"
-        android:paddingTop="8dp"
+        android:paddingTop="10dp"
         android:paddingBottom="14dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
@@ -275,7 +362,7 @@
             </FrameLayout>
         </LinearLayout>
 
-        <!-- Row 2: Left Status/Recipient Pill ([◎ Status (Contacts)]) + Right Green Circular Send FAB (➤) -->
+        <!-- Row 2: Left Status/Recipient Pill ([◎ Status (Contacts)]) + Right Green Circular Send FAB (➤ + Progress) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -316,36 +403,124 @@
                 android:layout_height="1dp"
                 android:layout_weight="1" />
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/btnSend"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:src="@drawable/ic_send"
-                app:backgroundTint="#25D366"
-                app:tint="#0B141A"
-                app:fabCustomSize="48dp"
-                app:maxImageSize="22dp"
-                app:elevation="4dp" />
+            <FrameLayout
+                android:id="@+id/sendButtonContainer"
+                android:layout_width="48dp"
+                android:layout_height="48dp">
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/btnSend"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_send"
+                    app:backgroundTint="#25D366"
+                    app:tint="#0B141A"
+                    app:fabCustomSize="48dp"
+                    app:maxImageSize="22dp"
+                    app:elevation="4dp" />
+
+                <ProgressBar
+                    android:id="@+id/sendProgressSpinner"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:indeterminateTint="#0B141A"
+                    android:elevation="8dp"
+                    android:visibility="gone" />
+            </FrameLayout>
         </LinearLayout>
     </LinearLayout>
 
-    <!-- DRAWING & TEXT STATE UI OVERLAYS -->
-    <TextView
-        android:id="@+id/btnDone"
+    <!-- Frosted-Glass Media Processing Overlay Card -->
+    <LinearLayout
+        android:id="@+id/mediaProcessingOverlay"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Done"
-        android:textColor="@android:color/white"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingHorizontal="26dp"
+        android:paddingVertical="20dp"
         android:background="@drawable/bg_done_button"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="32dp"
+        android:elevation="14dp"
         android:visibility="gone"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ProgressBar
+            android:id="@+id/mediaProcessingSpinner"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:indeterminateTint="#25D366"
+            android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:id="@+id/tvMediaProcessingStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Processing media..."
+            android:textColor="@android:color/white"
+            android:textSize="13.5sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- DEDICATED DRAWING HEADER BAR (Safely inset below Status Bar) -->
+    <LinearLayout
+        android:id="@+id/drawingHeaderBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:background="#D90B1017"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/btnDone"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="Done"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:paddingHorizontal="16dp"
+            android:background="@drawable/bg_done_button" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <LinearLayout
+            android:id="@+id/drawingOptionsBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <ImageView
+            android:id="@+id/btnDrawUndo"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_undo"
+            android:background="@drawable/bg_circle_translucent"
+            app:tint="@android:color/white" />
+    </LinearLayout>
 
     <com.m3.veil.ui.chat.ColorPickerView
         android:id="@+id/colorPickerView"
@@ -357,27 +532,6 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-
-    <LinearLayout
-        android:id="@+id/drawingOptionsBar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:padding="12dp"
-        android:background="@drawable/bg_done_button"
-        android:visibility="gone"
-        android:layout_marginBottom="32dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-        
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_draw"
-            app:tint="@android:color/white" />
-    </LinearLayout>
 
     <HorizontalScrollView
         android:id="@+id/textOptionsBar"

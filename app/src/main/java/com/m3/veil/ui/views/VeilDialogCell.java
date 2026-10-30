@@ -674,7 +674,7 @@ public class VeilDialogCell extends View {
 
         // Detect mention / reaction badges on unread chats
         String rawLastMsg = mChat.getLastMessage() != null ? mChat.getLastMessage() : "";
-        mHasMention = unreadCount > 0 && (rawLastMsg.contains("@") || rawLastMsg.startsWith("↩️"));
+        mHasMention = (mChat != null && mChat.getUnreadMentionsCount() > 0) || (unreadCount > 0 && (rawLastMsg.contains("@") || rawLastMsg.startsWith("↩️")));
         mHasReactionMention = unreadCount > 0 && (rawLastMsg.contains("reacted ") || rawLastMsg.contains("❤️"));
 
         if (mHasMention) {
@@ -705,6 +705,10 @@ public class VeilDialogCell extends View {
             if (mChat.getId() != null) {
                 SharedPreferences draftPrefs = getContext().getSharedPreferences("veil_drafts", Context.MODE_PRIVATE);
                 draftText = draftPrefs.getString("draft_" + mChat.getId(), null);
+                if (draftText == null || draftText.trim().isEmpty()) {
+                    SharedPreferences draftPrefs2 = getContext().getSharedPreferences("VeilChatDrafts", Context.MODE_PRIVATE);
+                    draftText = draftPrefs2.getString("draft_" + mChat.getId(), null);
+                }
             }
         } catch (Exception ignored) {
         }

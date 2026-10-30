@@ -26,6 +26,7 @@ public class Chat {
     private boolean isMuted;
     private boolean isArchived;
     private boolean isSecret; // Hidden in Secret Inbox Vault
+    private boolean isRequest;
     private String chatLockPin;
     private String wallpaperColor;
     private int slowModeSec;
@@ -179,6 +180,9 @@ public class Chat {
     public boolean isArchived() { return isArchived; }
     public void setArchived(boolean archived) { isArchived = archived; }
 
+    public boolean isRequest() { return isRequest; }
+    public void setRequest(boolean request) { isRequest = request; }
+
     public boolean isSecret() { return isSecret; }
     public void setSecret(boolean secret) { isSecret = secret; }
 
@@ -226,4 +230,9 @@ public class Chat {
 
     public boolean isTyping() { return isTyping; }
     public void setTyping(boolean typing) { isTyping = typing; }
+
+    private int unreadMentionsCount = 0;
+    public int getUnreadMentionsCount() { return unreadMentionsCount; }
+    public void setUnreadMentionsCount(int count) { this.unreadMentionsCount = Math.max(0, count); }
+    public boolean hasUnreadMentions() { return unreadMentionsCount > 0; }
 }

@@ -39,6 +39,8 @@ public class Message {
     private String voiceFilter; // "normal", "robot", "deep", "chipmunk"
     private String pollJson; // JSON object for inline polls
     private String senderName;
+    private String senderUsername;
+    private boolean preferUsername;
     private long vanishTimer; // Vanish duration in milliseconds
     private String vanishMode; // "after_send" or "after_read"
     private int viewCount;
@@ -187,6 +189,12 @@ public class Message {
 
     public String getSenderName() { return senderName; }
     public void setSenderName(String senderName) { this.senderName = senderName; }
+
+    public String getSenderUsername() { return senderUsername; }
+    public void setSenderUsername(String senderUsername) { this.senderUsername = senderUsername; }
+
+    public boolean isPreferUsername() { return preferUsername; }
+    public void setPreferUsername(boolean preferUsername) { this.preferUsername = preferUsername; }
 
     public long getVanishTimer() { return vanishTimer; }
     public void setVanishTimer(long vanishTimer) { this.vanishTimer = vanishTimer; }

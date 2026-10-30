@@ -417,6 +417,47 @@
             android:textColor="@android:color/white" />
     </LinearLayout>
 
+    <!-- Floating Jump-to-Mention Pill (Telegram Style) -->
+    <FrameLayout
+        android:id="@+id/layoutJumpToMention"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/layoutScrollToBottom"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/btnJumpToMention"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:background="@drawable/bg_mention_jump_pill"
+            android:paddingHorizontal="11dp"
+            android:elevation="6dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvJumpMentionCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </LinearLayout>
+    </FrameLayout>
+
     <!-- Floating Scroll-to-Bottom Container (WhatsApp Style) -->
     <FrameLayout
         android:id="@+id/layoutScrollToBottom"
@@ -603,6 +644,88 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal" />
         </HorizontalScrollView>
+
+        <!-- TikTok/Instagram-Style Message Request Banner -->
+        <LinearLayout
+            android:id="@+id/layoutMessageRequestBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_media_glass_chip"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="8dp"
+            android:padding="14dp"
+            android:visibility="gone"
+            android:elevation="6dp">
+
+            <TextView
+                android:id="@+id/tvMessageRequestPrompt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="📥 Message Request: This user wants to send you a message. They won't know you've viewed it until you accept."
+                android:textColor="@color/textPrimary"
+                android:textSize="13.5sp"
+                android:lineSpacingExtra="2dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end|center_vertical"
+                android:layout_marginTop="10dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDeclineMessageRequest"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="Decline"
+                    android:textColor="@color/colorError"
+                    android:textSize="12.5sp"
+                    android:layout_marginEnd="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAcceptMessageRequest"
+                    style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="Accept"
+                    android:textSize="12.5sp"
+                    app:cornerRadius="18dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Minimal, Modern Mention Suggestions List (@username) -->
+        <FrameLayout
+            android:id="@+id/mentionSuggestionsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone"
+            android:elevation="8dp">
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="6dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/colorOutline"
+                app:cardBackgroundColor="@color/colorSurfaceVariant">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/mentionSuggestionsRecyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxHeight="180dp"
+                    android:clipToPadding="false"
+                    android:paddingVertical="4dp"
+                    android:overScrollMode="never" />
+            </com.google.android.material.card.MaterialCardView>
+        </FrameLayout>
 
         <!-- Reply / Edit Preview Container -->
         <LinearLayout

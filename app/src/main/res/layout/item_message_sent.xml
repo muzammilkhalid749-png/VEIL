@@ -72,27 +72,25 @@
             android:id="@+id/replyQuoteContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:minWidth="160dp"
             android:orientation="horizontal"
             android:background="@drawable/bg_quote_sent"
-            android:paddingStart="8dp"
+            android:paddingStart="12dp"
             android:paddingEnd="10dp"
             android:paddingTop="6dp"
             android:paddingBottom="6dp"
             android:layout_marginBottom="4dp"
             android:visibility="gone">
 
-            <!-- Accent Left Vertical Stripe -->
+            <!-- Accent Left Vertical Stripe (drawn full-height by replyQuoteContainer background Drawable) -->
             <View
-                android:layout_width="4dp"
-                android:layout_height="match_parent"
-                android:background="@color/message_quote_strip"
-                android:layout_marginEnd="8dp" />
+                android:id="@+id/replyQuoteStripe"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="120dp"
                 android:orientation="vertical">
 
                 <TextView
@@ -123,7 +121,7 @@
         </LinearLayout>
 
         <!-- Plain Text Message -->
-        <TextView
+        <com.m3.veil.ui.views.VeilAdvancedTextView
             android:id="@+id/messageText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -399,7 +397,7 @@
             </com.google.android.material.card.MaterialCardView>
 
             <!-- Optional Image Caption -->
-            <TextView
+            <com.m3.veil.ui.views.VeilAdvancedTextView
                 android:id="@+id/imageCaptionText"
                 android:layout_width="254dp"
                 android:layout_height="wrap_content"
@@ -642,7 +640,7 @@
             </com.google.android.material.card.MaterialCardView>
 
             <!-- Optional Video Caption -->
-            <TextView
+            <com.m3.veil.ui.views.VeilAdvancedTextView
                 android:id="@+id/videoCaptionText"
                 android:layout_width="254dp"
                 android:layout_height="wrap_content"

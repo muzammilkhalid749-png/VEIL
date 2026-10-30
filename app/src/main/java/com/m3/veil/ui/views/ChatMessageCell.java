@@ -374,18 +374,19 @@ public class ChatMessageCell extends LinearLayout {
 
         // Show tail only on SINGLE or LAST message in a cluster
         this.mDrawTail = (clusterPosition == CLUSTER_SINGLE || clusterPosition == CLUSTER_LAST);
-        boolean isSticker = com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message);
-        this.mIsChromeless = isSticker
+        boolean isChromelessMedia = (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
+                || com.m3.veil.utils.VeilStickerGifEngine.isAnimatedEmojiMessage(message)
+                || "video_note".equalsIgnoreCase(message.getType()))
                 && (message.getReplyToMessageId() == null || message.getReplyToMessageId().isEmpty());
+        this.mIsChromeless = isChromelessMedia;
         applyChromelessElevationState();
 
         // Group / Persona Sender Header on first/single incoming bubble
         if (!outgoing && showSenderHeader
-                && (clusterPosition == CLUSTER_SINGLE || clusterPosition == CLUSTER_FIRST)
-                && message.getSenderName() != null && !message.getSenderName().trim().isEmpty()) {
-            mSenderHeaderName = message.getSenderName().trim();
+                && (clusterPosition == CLUSTER_SINGLE || clusterPosition == CLUSTER_FIRST)) {
+            mSenderHeaderName = com.m3.veil.ui.chat.adapters.MessagesAdapter.resolveSenderDisplayName(getContext(), message);
             int[] palette = mIsNightMode ? SENDER_COLORS_DARK : SENDER_COLORS_LIGHT;
-            String seed = message.getSenderId() != null ? message.getSenderId() : mSenderHeaderName;
+            String seed = message.getSenderId() != null ? message.getSenderId() : (mSenderHeaderName != null ? mSenderHeaderName : "");
             mSenderHeaderColor = palette[Math.abs(seed.hashCode()) % palette.length];
             mSenderHeaderPaint.setColor(mSenderHeaderColor);
         } else {
@@ -597,18 +598,45 @@ public class ChatMessageCell extends LinearLayout {
         mLastGradientHeight = -1;
     }
 
+    private int mLastPathWidth = -1;
+    private int mLastPathHeight = -1;
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int maxAllowedW = Math.round(screenW * 0.82f);
+        int specMode = MeasureSpec.getMode(widthMeasureSpec);
+        int specSize = MeasureSpec.getSize(widthMeasureSpec);
+        int effectiveWidthSpec = widthMeasureSpec;
+        if (specMode == MeasureSpec.UNSPECIFIED || specSize <= 0) {
+            effectiveWidthSpec = MeasureSpec.makeMeasureSpec(maxAllowedW, MeasureSpec.AT_MOST);
+        } else if (specMode == MeasureSpec.AT_MOST && specSize > maxAllowedW) {
+            effectiveWidthSpec = MeasureSpec.makeMeasureSpec(maxAllowedW, MeasureSpec.AT_MOST);
+        }
+
+        View replyQuote = findViewById(R.id.replyQuoteContainer);
+        if (replyQuote != null && replyQuote.getVisibility() == VISIBLE) {
+            replyQuote.setMinimumWidth(0);
+            if (replyQuote.getLayoutParams() != null && replyQuote.getLayoutParams().width != LayoutParams.WRAP_CONTENT) {
+                replyQuote.getLayoutParams().width = LayoutParams.WRAP_CONTENT;
+            }
+        }
+
+        super.onMeasure(effectiveWidthSpec, heightMeasureSpec);
 
         int measuredWidth = getMeasuredWidth();
         int measuredHeight = getMeasuredHeight();
+        int minBubbleW = dp(68);
+        if (!mIsChromeless && measuredWidth > 0 && measuredWidth < minBubbleW) {
+            measuredWidth = minBubbleW;
+            setMeasuredDimension(measuredWidth, measuredHeight);
+        }
+
         int innerWidth = measuredWidth - getPaddingLeft() - getPaddingRight();
         if (innerWidth <= 0) {
             return;
         }
 
-        View replyQuote = findViewById(R.id.replyQuoteContainer);
         if (replyQuote != null && replyQuote.getVisibility() == VISIBLE && replyQuote.getMeasuredWidth() < innerWidth) {
             int oldReplyHeight = replyQuote.getMeasuredHeight();
             int exactWidthSpec = MeasureSpec.makeMeasureSpec(innerWidth, MeasureSpec.EXACTLY);
@@ -620,8 +648,13 @@ public class ChatMessageCell extends LinearLayout {
             replyQuote.measure(exactWidthSpec, childHeightSpec);
             int newReplyHeight = replyQuote.getMeasuredHeight();
             if (newReplyHeight != oldReplyHeight) {
-                setMeasuredDimension(measuredWidth, measuredHeight + (newReplyHeight - oldReplyHeight));
+                measuredHeight = measuredHeight + (newReplyHeight - oldReplyHeight);
+                setMeasuredDimension(measuredWidth, measuredHeight);
             }
+        }
+
+        if (measuredWidth > 0 && measuredHeight > 0 && (measuredWidth != mLastPathWidth || measuredHeight != mLastPathHeight)) {
+            updateBubblePath(measuredWidth, measuredHeight);
         }
     }
 
@@ -633,6 +666,8 @@ public class ChatMessageCell extends LinearLayout {
 
     protected void updateBubblePath(int w, int h) {
         if (w <= 0 || h <= 0) return;
+        mLastPathWidth = w;
+        mLastPathHeight = h;
 
         float strokeInset = dpf2(0.6f);
         mBubbleRect.set(strokeInset, strokeInset, w - strokeInset, h - strokeInset);
@@ -676,7 +711,8 @@ public class ChatMessageCell extends LinearLayout {
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        if (mBubblePath.isEmpty() && getWidth() > 0 && getHeight() > 0) {
+        if ((mBubblePath.isEmpty() || mLastPathWidth != getWidth() || mLastPathHeight != getHeight())
+                && getWidth() > 0 && getHeight() > 0) {
             updateBubblePath(getWidth(), getHeight());
         }
 

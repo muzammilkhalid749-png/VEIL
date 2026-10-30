@@ -241,6 +241,41 @@ public class EncryptionManager {
         );
     }
 
+    private static final String[] SAS_EMOJI_TABLE = {
+            "🦊", "🛡️", "💎", "🚀", "🌟", "🔥", "⚡", "🍀",
+            "🌈", "🎯", "⚓", "👑", "🔮", "🪐", "🦄", "🕊️",
+            "🧩", "💡", "🎨", "🔑", "🌊", "🦁", "🌸", "🎸",
+            "⛵", "🧭", "🏹", "🎪", "🏆", "🌋", "🦋", "🌻"
+    };
+
+    /**
+     * Generates a Telegram/Signal-style 4-emoji SAS (Short Authentication String) fingerprint
+     * derived deterministically from the canonical identity keys of the two peers.
+     */
+    public static String generateSafetyEmojis(String myIdentityOrUid, String peerIdentityOrUid) {
+        try {
+            String myKey = getPublicKeyString();
+            String idA = (myKey != null ? myKey : "") + ":" + (myIdentityOrUid != null ? myIdentityOrUid : "local");
+            String idB = (peerIdentityOrUid != null ? peerIdentityOrUid : "peer");
+            String first = idA.compareTo(idB) <= 0 ? idA : idB;
+            String second = idA.compareTo(idB) <= 0 ? idB : idA;
+
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            md.update(first.getBytes(StandardCharsets.UTF_8));
+            md.update(second.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = md.digest();
+
+            int idx1 = (hash[0] & 0xFF) % SAS_EMOJI_TABLE.length;
+            int idx2 = (hash[1] & 0xFF) % SAS_EMOJI_TABLE.length;
+            int idx3 = (hash[2] & 0xFF) % SAS_EMOJI_TABLE.length;
+            int idx4 = (hash[3] & 0xFF) % SAS_EMOJI_TABLE.length;
+
+            return SAS_EMOJI_TABLE[idx1] + "  " + SAS_EMOJI_TABLE[idx2] + "  " + SAS_EMOJI_TABLE[idx3] + "  " + SAS_EMOJI_TABLE[idx4];
+        } catch (Exception e) {
+            return "🛡️  💎  🚀  🌟";
+        }
+    }
+
     /**
      * Generates a WhatsApp/Signal-style 60-digit numeric Safety Number (12 groups of 5 digits)
      * by iteratively hashing both peers' identity keys (5200 iterations of SHA-512) in canonical order.

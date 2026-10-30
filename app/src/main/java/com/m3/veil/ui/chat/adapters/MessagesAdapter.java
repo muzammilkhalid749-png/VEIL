@@ -18,13 +18,16 @@ import android.os.Handler;
 import android.os.Looper;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.m3.veil.R;
 import com.m3.veil.model.Message;
+import com.m3.veil.ui.chat.ChatActivity;
 import com.m3.veil.ui.chat.MediaViewerActivity;
+import com.m3.veil.ui.views.VeilAdvancedTextView;
 import com.m3.veil.ui.views.VoiceWaveformView;
 import com.m3.veil.utils.BlurUtils;
 import com.m3.veil.utils.FileMediaManager;
@@ -34,6 +37,8 @@ import com.m3.veil.utils.VoicePlayerManager;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.Intent;
+import android.net.Uri;
+import android.widget.Toast;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -130,6 +135,195 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             } catch (Throwable ignored) {}
         }
         return "Peer";
+    }
+
+    /**
+     * Resolves the group sender display name honoring the user's privacy policy:
+     * - If preferUsername or sovereign profile has showUsernameInGroup enabled, renders @username.
+     * - Otherwise renders the profile display name (or "Peer #XXXX").
+     */
+    public static String resolveSenderDisplayName(android.content.Context ctx, Message message) {
+        if (message == null) return "Peer";
+        String senderId = message.getSenderId();
+        String username = message.getSenderUsername();
+        boolean preferUsername = message.isPreferUsername();
+        String profileName = message.getSenderName();
+
+        if (senderId != null && ctx != null) {
+            try {
+                com.m3.veil.database.EncryptedChatDatabase db = com.m3.veil.database.EncryptedChatDatabase.getInstance(ctx);
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest = db.getSovereignProfileManifest(senderId);
+                if (manifest != null) {
+                    preferUsername = manifest.showUsernameInGroup;
+                    if (username == null || username.trim().isEmpty()) {
+                        username = manifest.username;
+                    }
+                    if (manifest.displayName != null && !manifest.displayName.trim().isEmpty() && !com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(manifest.displayName)) {
+                        profileName = manifest.displayName.trim();
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        // According to user privacy setting: if user configured to show username -> show @username, otherwise show profile name
+        if (preferUsername && username != null && !username.trim().isEmpty()) {
+            String clean = username.trim();
+            return clean.startsWith("@") ? clean : "@" + clean;
+        }
+
+        if (profileName != null && !profileName.trim().isEmpty() && !com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(profileName)) {
+            return profileName.trim();
+        }
+        if (senderId != null && senderId.length() >= 4) {
+            return "Peer #" + senderId.substring(0, 4);
+        }
+        return "Peer";
+    }
+
+    /**
+     * Styles the quoted reply container for both Sent and Received bubbles across Light and Dark modes:
+     * - Removes fixed minWidth constraints so short or long usernames/texts size dynamically
+     * - Renders a guaranteed full-height 4.5dp vertical accent bar on the left edge + high-contrast card well
+     *   so the sender/receiver reply bubble never looks faded or loses its vertical line.
+     */
+    private void styleReplyQuoteCard(
+            View replyQuoteContainer,
+            TextView replyQuoteName,
+            TextView replyQuoteText,
+            boolean isOutgoing,
+            boolean isDarkBubble) {
+        if (replyQuoteContainer == null) return;
+        Context ctx = replyQuoteContainer.getContext();
+        final float dp = ctx.getResources().getDisplayMetrics().density;
+        int screenW = ctx.getResources().getDisplayMetrics().widthPixels;
+        int maxQuoteTextW = Math.round(screenW * 0.65f);
+
+        replyQuoteContainer.setMinimumWidth(0);
+        if (replyQuoteContainer.getLayoutParams() != null
+                && replyQuoteContainer.getLayoutParams().width != ViewGroup.LayoutParams.WRAP_CONTENT) {
+            replyQuoteContainer.getLayoutParams().width = ViewGroup.LayoutParams.WRAP_CONTENT;
+        }
+        View oldStripe = replyQuoteContainer.findViewById(R.id.replyQuoteStripe);
+        if (oldStripe != null) {
+            oldStripe.setVisibility(View.GONE);
+        }
+        replyQuoteContainer.setPadding(
+                Math.round(13f * dp),
+                Math.round(6f * dp),
+                Math.round(10f * dp),
+                Math.round(6f * dp));
+
+        if (replyQuoteName != null) {
+            if (replyQuoteName.getParent() instanceof View) {
+                ((View) replyQuoteName.getParent()).setMinimumWidth(0);
+            }
+            replyQuoteName.setMinimumWidth(0);
+            replyQuoteName.setMaxWidth(maxQuoteTextW);
+        }
+        if (replyQuoteText != null) {
+            replyQuoteText.setMinimumWidth(0);
+            replyQuoteText.setMaxWidth(maxQuoteTextW);
+        }
+
+        final int cardFillColor;
+        final int cardStrokeColor;
+        final int stripeColor;
+        final int quoteTextColor;
+
+        if (isOutgoing) {
+            if (isDarkBubble) {
+                // Dark Sent Bubble (e.g. #2E2A72 or custom dark color): deep high-contrast well + electric cyan accent
+                cardFillColor = 0x52060913;
+                cardStrokeColor = 0x33FFFFFF;
+                stripeColor = 0xFF38BDF8;
+                quoteTextColor = 0xF2F8FAFC;
+            } else {
+                // Light Sent Bubble (e.g. #E0E7FE): crisp bright white inset card + royal indigo accent
+                cardFillColor = 0xE6FFFFFF;
+                cardStrokeColor = 0x384338CA;
+                stripeColor = 0xFF4338CA;
+                quoteTextColor = 0xFF1E293B;
+            }
+        } else {
+            if (isDarkBubble) {
+                // Dark Received Bubble (#1E293B): deep obsidian inset well + vibrant sky-indigo accent
+                cardFillColor = 0x54090D16;
+                cardStrokeColor = 0x33818CF8;
+                stripeColor = 0xFF818CF8;
+                quoteTextColor = 0xF0F1F5F9;
+            } else {
+                // Light Received Bubble (#FFFFFF): solid soft indigo-slate well + royal indigo accent
+                cardFillColor = 0xFFEEF2FF;
+                cardStrokeColor = 0x2E4F46E5;
+                stripeColor = 0xFF4F46E5;
+                quoteTextColor = 0xFF1E293B;
+            }
+        }
+
+        if (replyQuoteName != null) {
+            replyQuoteName.setTextColor(stripeColor);
+        }
+        if (replyQuoteText != null) {
+            replyQuoteText.setTextColor(quoteTextColor);
+        }
+
+        android.graphics.drawable.Drawable quoteCardDrawable = new android.graphics.drawable.Drawable() {
+            private final android.graphics.Paint fillPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            private final android.graphics.Paint stripePaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            private final android.graphics.Paint strokePaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            private final android.graphics.Path clipPath = new android.graphics.Path();
+            private final android.graphics.RectF rectF = new android.graphics.RectF();
+            {
+                fillPaint.setStyle(android.graphics.Paint.Style.FILL);
+                fillPaint.setColor(cardFillColor);
+                stripePaint.setStyle(android.graphics.Paint.Style.FILL);
+                stripePaint.setColor(stripeColor);
+                strokePaint.setStyle(android.graphics.Paint.Style.STROKE);
+                strokePaint.setStrokeWidth(Math.max(1f, 0.85f * dp));
+                strokePaint.setColor(cardStrokeColor);
+            }
+
+            @Override
+            public void draw(android.graphics.Canvas canvas) {
+                android.graphics.Rect b = getBounds();
+                if (b.width() <= 0 || b.height() <= 0) return;
+                float radius = 8f * dp;
+                float stripeW = 4.5f * dp;
+                rectF.set(b.left, b.top, b.right, b.bottom);
+                clipPath.reset();
+                clipPath.addRoundRect(rectF, radius, radius, android.graphics.Path.Direction.CW);
+
+                int save = canvas.save();
+                canvas.clipPath(clipPath);
+                canvas.drawRect(rectF, fillPaint);
+                canvas.drawRect(b.left, b.top, b.left + stripeW, b.bottom, stripePaint);
+                canvas.restoreToCount(save);
+
+                float halfStroke = strokePaint.getStrokeWidth() * 0.5f;
+                rectF.set(b.left + halfStroke, b.top + halfStroke, b.right - halfStroke, b.bottom - halfStroke);
+                canvas.drawRoundRect(rectF, radius, radius, strokePaint);
+            }
+
+            @Override
+            public void setAlpha(int alpha) {
+                fillPaint.setAlpha(alpha);
+                stripePaint.setAlpha(alpha);
+                strokePaint.setAlpha(alpha);
+            }
+
+            @Override
+            public void setColorFilter(android.graphics.ColorFilter colorFilter) {
+                fillPaint.setColorFilter(colorFilter);
+                stripePaint.setColorFilter(colorFilter);
+                strokePaint.setColorFilter(colorFilter);
+            }
+
+            @Override
+            public int getOpacity() {
+                return android.graphics.PixelFormat.TRANSLUCENT;
+            }
+        };
+        replyQuoteContainer.setBackground(quoteCardDrawable);
     }
 
     public boolean isSenderMe(String senderId, Message msg) {
@@ -304,6 +498,204 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         message.setTranslatedText(res.translatedText);
         message.setTranslatedLang(res.targetLanguage);
         notifyDataSetChanged();
+    }
+
+    private static VeilAdvancedTextView.OnEntityClickListener createEntityClickListener(final Context context) {
+        return new VeilAdvancedTextView.OnEntityClickListener() {
+            @Override
+            public void onUrlClick(String url) {
+                if (url == null || url.isEmpty() || context == null) return;
+                try {
+                    String fullUrl = url;
+                    if (!fullUrl.startsWith("http://") && !fullUrl.startsWith("https://") && !fullUrl.startsWith("ftp://")) {
+                        fullUrl = "https://" + fullUrl;
+                    }
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(intent);
+                } catch (Exception e) {
+                    Toast.makeText(context, "Could not open link: " + url, Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onMentionClick(String rawUsername) {
+                if (rawUsername == null || rawUsername.trim().isEmpty() || context == null) return;
+                String clean = rawUsername.trim();
+                while (clean.startsWith("@")) clean = clean.substring(1).trim();
+                if (clean.isEmpty()) return;
+
+                // 1. Validate username format (3-32 chars alphanumeric and underscores)
+                if (clean.length() < 3 || clean.length() > 32 || !clean.matches("^[a-zA-Z0-9_]{3,32}$")) {
+                    Toast.makeText(context, "Invalid username: @" + clean, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(context);
+                if (currentUserId == null || currentUserId.isEmpty()) {
+                    currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(context).getCurrentUserId();
+                }
+                if (currentUserId == null || currentUserId.isEmpty()) currentUserId = "veil_anonymous";
+
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest myProfile =
+                        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(context);
+                if (myProfile != null && myProfile.username != null && myProfile.username.equalsIgnoreCase(clean)) {
+                    Toast.makeText(context, "This is your own profile (@" + clean + ")", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                final String targetHandle = clean;
+                final String myUid = currentUserId;
+
+                // 2. Query local Sovereign manifest repository
+                com.m3.veil.database.EncryptedChatDatabase db = com.m3.veil.database.EncryptedChatDatabase.getInstance(context);
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
+                        db.getSovereignProfileManifestByUsername(targetHandle);
+
+                if (manifest != null && manifest.uid != null && !manifest.uid.isEmpty()) {
+                    openChatWithPeer(context, myUid, manifest.uid, manifest.displayName != null ? manifest.displayName : "@" + manifest.username, manifest.avatarBase64);
+                    return;
+                }
+
+                // 3. Search in local chats
+                List<com.m3.veil.model.Chat> allChats = db.getAllChats();
+                if (allChats != null) {
+                    for (com.m3.veil.model.Chat c : allChats) {
+                        if (c != null && !c.isGroup() && c.getName() != null) {
+                            String cName = c.getName().trim();
+                            if (cName.equalsIgnoreCase("@" + targetHandle) || cName.equalsIgnoreCase(targetHandle)) {
+                                String peerId = null;
+                                if (c.getParticipants() != null) {
+                                    for (String p : c.getParticipants()) {
+                                        if (p != null && !p.equals(myUid)) {
+                                            peerId = p;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (peerId == null && c.getId() != null) {
+                                    String[] parts = c.getId().split("_");
+                                    if (parts.length == 2) {
+                                        peerId = parts[0].equals(myUid) ? parts[1] : parts[0];
+                                    }
+                                }
+                                openChatWithPeer(context, myUid, peerId != null ? peerId : "veil_peer_" + targetHandle.toLowerCase(java.util.Locale.ROOT), c.getName(), c.getAvatar());
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // 4. Asynchronously search in Sovereign Directory Engine / Bloom Filter
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(context)
+                        .searchUsersByUsername(targetHandle, users -> {
+                            if (users != null && !users.isEmpty()) {
+                                com.m3.veil.model.User matchedUser = null;
+                                for (com.m3.veil.model.User u : users) {
+                                    if (u != null && u.getUsername() != null && u.getUsername().equalsIgnoreCase(targetHandle)) {
+                                        matchedUser = u;
+                                        break;
+                                    }
+                                }
+                                if (matchedUser == null) matchedUser = users.get(0);
+                                final com.m3.veil.model.User finalU = matchedUser;
+                                android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+                                mainHandler.post(() -> {
+                                    String targetUid = finalU.getUserId() != null ? finalU.getUserId() : ("veil_peer_" + targetHandle.toLowerCase(java.util.Locale.ROOT));
+                                    String title = finalU.getDisplayName() != null ? finalU.getDisplayName() : ("@" + targetHandle);
+                                    openChatWithPeer(context, myUid, targetUid, title, finalU.getPhotoUrl());
+                                });
+                            } else {
+                                android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+                                mainHandler.post(() -> {
+                                    Toast.makeText(context, "User @" + targetHandle + " not found", Toast.LENGTH_SHORT).show();
+                                });
+                            }
+                        });
+            }
+
+            @Override
+            public void onPhoneClick(String phoneNumber) {
+                if (phoneNumber == null || phoneNumber.isEmpty() || context == null) return;
+                try {
+                    String sanitized = phoneNumber.replaceAll("[^0-9+]", "");
+                    Intent intent = new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + sanitized));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(intent);
+                } catch (Exception e) {
+                    Toast.makeText(context, "Could not dial: " + phoneNumber, Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onHashtagClick(String hashtag) {
+                if (hashtag == null || hashtag.isEmpty() || context == null) return;
+                if (context instanceof ChatActivity) {
+                    ((ChatActivity) context).searchForTextInChat("#" + hashtag);
+                } else {
+                    Toast.makeText(context, "Hashtag: #" + hashtag, Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onEmailClick(String email) {
+                if (email == null || email.isEmpty() || context == null) return;
+                try {
+                    Intent intent = new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + email));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(intent);
+                } catch (Exception e) {
+                    Toast.makeText(context, "Could not email: " + email, Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onCashtagClick(String cashtag) {
+                if (cashtag == null || cashtag.isEmpty() || context == null) return;
+                try {
+                    String quoteUrl = "https://www.google.com/finance/quote/" + cashtag;
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(quoteUrl));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(intent);
+                } catch (Exception e) {
+                    Toast.makeText(context, "Stock / Crypto: $" + cashtag, Toast.LENGTH_SHORT).show();
+                }
+            }
+        };
+    }
+
+    private static void openChatWithPeer(Context context, String currentUserId, String peerId, String peerTitle, String avatar) {
+        if (context == null || peerId == null || peerId.isEmpty()) return;
+        List<String> ids = java.util.Arrays.asList(currentUserId, peerId);
+        java.util.Collections.sort(ids);
+        String chatId = ids.get(0) + "_" + ids.get(1);
+
+        com.m3.veil.database.EncryptedChatDatabase db = com.m3.veil.database.EncryptedChatDatabase.getInstance(context);
+        com.m3.veil.model.Chat existing = db.getChat(chatId);
+        if (existing == null) {
+            com.m3.veil.model.Chat newChat = new com.m3.veil.model.Chat(
+                    chatId,
+                    peerTitle != null ? peerTitle : "Peer",
+                    "",
+                    com.google.firebase.Timestamp.now(),
+                    avatar,
+                    0,
+                    false,
+                    false,
+                    "direct",
+                    ids
+            );
+            db.saveOrUpdateChat(newChat);
+        }
+
+        Intent intent = new Intent(context, com.m3.veil.ui.chat.ChatActivity.class);
+        intent.putExtra("chatId", chatId);
+        intent.putExtra("recipientId", peerId);
+        intent.putExtra("recipientName", peerTitle);
+        if (!(context instanceof android.app.Activity)) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
+        context.startActivity(intent);
     }
 
     private final java.util.Set<String> revealedSpoilers = new java.util.HashSet<>();
@@ -956,11 +1348,19 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     }
 
     /**
-     * Checks if a message is a standalone chromeless sticker eligible for WhatsApp 2-column side-by-side pairing.
+     * Checks if a message is a standalone square built-in sticker eligible for WhatsApp 2-column side-by-side pairing.
+     * Custom photo and video stickers (Portrait / Landscape / file-backed) always render singly at full aspect-ratio size.
      */
     private boolean isEligibleForStickerPairing(Message m) {
         if (m == null || "deleted".equals(m.getType()) || m.isBlink()) return false;
         if (!com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(m)) return false;
+        if (m.getLocalFilePath() != null && !m.getLocalFilePath().trim().isEmpty()) {
+            return false;
+        }
+        String text = m.getText() != null ? m.getText().trim() : "";
+        if ("[sticker]".equalsIgnoreCase(text)) {
+            return false;
+        }
         return m.getReplyToMessageId() == null || m.getReplyToMessageId().isEmpty();
     }
 
@@ -1030,34 +1430,44 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         float dp = ctx.getResources().getDisplayMetrics().density;
         boolean isNight = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(ctx);
-        int cellSize = Math.round(140f * dp);
-        int gapPx = Math.round(12f * dp);
+        int gapPx = Math.round(10f * dp);
         int pillHeightPx = Math.round(24f * dp);
 
         android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
         row.setTag(TAG_PAIR);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setGravity(android.view.Gravity.BOTTOM);
         row.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
 
         Message[] pair = new Message[]{firstSticker, secondSticker};
+        int sumW = 0;
+        int maxColH = 0;
         for (int i = 0; i < 2; i++) {
             final Message sMsg = pair[i];
+            int[] rawDims = com.m3.veil.utils.VeilStickerGifEngine.computeStickerSizePx(ctx, sMsg);
+            int cellW = Math.max(Math.round(96f * dp), Math.min(Math.round(148f * dp), Math.round(rawDims[0] * 0.78f)));
+            int cellH = Math.max(Math.round(96f * dp), Math.min(Math.round(186f * dp), Math.round(rawDims[1] * 0.78f)));
+            sumW += cellW;
+            if (cellH + pillHeightPx > maxColH) {
+                maxColH = cellH + pillHeightPx;
+            }
+
             android.widget.LinearLayout col = new android.widget.LinearLayout(ctx);
             col.setOrientation(android.widget.LinearLayout.VERTICAL);
             col.setGravity(android.view.Gravity.END);
             android.widget.LinearLayout.LayoutParams colLp =
-                    new android.widget.LinearLayout.LayoutParams(cellSize, cellSize + pillHeightPx);
+                    new android.widget.LinearLayout.LayoutParams(cellW, cellH + pillHeightPx);
             if (i == 1) colLp.leftMargin = gapPx;
             col.setLayoutParams(colLp);
 
             ImageView ivSticker = new ImageView(ctx);
-            ivSticker.setLayoutParams(new android.widget.LinearLayout.LayoutParams(cellSize, cellSize));
+            ivSticker.setLayoutParams(new android.widget.LinearLayout.LayoutParams(cellW, cellH));
             ivSticker.setBackgroundColor(android.graphics.Color.TRANSPARENT);
             com.m3.veil.utils.VeilStickerGifEngine.bindStickerToImageView(ctx, sMsg, ivSticker);
             ivSticker.setOnClickListener(v -> {
+                com.m3.veil.utils.VeilStickerGifEngine.replayAnimatedDrawable(ivSticker);
                 ivSticker.animate().scaleX(1.16f).scaleY(1.16f).setDuration(140)
                         .withEndAction(() -> ivSticker.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
                         .start();
@@ -1128,8 +1538,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
 
         host.addView(row);
-        int totalW = cellSize * 2 + gapPx;
-        int totalH = cellSize + pillHeightPx + Math.round(4f * dp);
+        int totalW = sumW + gapPx;
+        int totalH = maxColH + Math.round(4f * dp);
         com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, totalW, totalH);
     }
 
@@ -2422,9 +2832,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         ImageView btnQuickForwardMedia;
         private boolean hasVisibleMediaContainer = false;
+        final VeilAdvancedTextView.OnEntityClickListener entityClickListener;
 
         public SentMessageViewHolder(@NonNull View itemView) {
             super(itemView);
+            entityClickListener = createEntityClickListener(itemView.getContext());
             dateHeaderContainer = itemView.findViewById(R.id.dateHeaderContainer);
             dateHeaderText = itemView.findViewById(R.id.dateHeaderText);
             messageText = itemView.findViewById(R.id.messageText);
@@ -2618,8 +3030,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             if (callSubtitleText != null) callSubtitleText.setTextColor(textSecondary);
             if (tvLinkTitle != null) tvLinkTitle.setTextColor(textPrimary);
             if (tvLinkDesc != null) tvLinkDesc.setTextColor(textSecondary);
-            if (replyQuoteText != null) replyQuoteText.setTextColor(textSecondary);
-            if (replyQuoteName != null) replyQuoteName.setTextColor(isDark ? 0xFF818CF8 : ContextCompat.getColor(ctx, R.color.message_quote_strip));
+            styleReplyQuoteCard(replyQuoteContainer, replyQuoteName, replyQuoteText, true, isDark);
             if (imageCaptionText != null) imageCaptionText.setTextColor(textPrimary);
             if (videoCaptionText != null) videoCaptionText.setTextColor(textPrimary);
         }
@@ -2649,6 +3060,21 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             if (statusIcon != null) statusIcon.setVisibility(View.VISIBLE);
             timeText.setText(time);
             bindBubbleInfoBadges(message, ivPinnedBadge, tvStarredBadge, tvVanishBadge, tvEditedBadge);
+            if (messageBubble != null) {
+                float stdDp = itemView.getContext().getResources().getDisplayMetrics().density;
+                int stdPadH = Math.round(10f * stdDp);
+                int stdPadV = Math.round(7f * stdDp);
+                messageBubble.setPadding(stdPadH, stdPadV, stdPadH, stdPadV);
+                ViewGroup.LayoutParams bLp = messageBubble.getLayoutParams();
+                if (bLp != null && bLp.width != ViewGroup.LayoutParams.WRAP_CONTENT) {
+                    bLp.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+                    messageBubble.setLayoutParams(bLp);
+                }
+            }
+            if (messageText != null) {
+                int screenW = itemView.getContext().getResources().getDisplayMetrics().widthPixels;
+                messageText.setMaxWidth(Math.round(screenW * 0.72f));
+            }
             boolean isDarkBubble = false;
             if (messageBubble instanceof com.m3.veil.ui.views.ChatMessageCell) {
                 com.m3.veil.ui.views.ChatMessageCell cell = (com.m3.veil.ui.views.ChatMessageCell) messageBubble;
@@ -2677,7 +3103,14 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 hideAllMediaContainers();
                 messageText.setText("🚫 This message was deleted");
                 messageText.setTypeface(null, android.graphics.Typeface.ITALIC);
-                messageText.setTextColor(ContextCompat.getColor(itemView.getContext(), R.color.message_text_secondary));
+                messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, cachedTextSizeSp > 0 ? cachedTextSizeSp : 15.0f);
+                int deletedTextColor = isDarkBubble ? 0xD9F8FAFC : 0xDD0F172A;
+                messageText.setTextColor(deletedTextColor);
+                if (timeText != null) {
+                    timeText.setText(time);
+                    timeText.setTextColor(isDarkBubble ? 0x99F8FAFC : 0x8C0F172A);
+                }
+                if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                 statusIcon.setVisibility(View.GONE);
                 reactionsText.setVisibility(View.GONE);
                 if (replyQuoteContainer != null) replyQuoteContainer.setVisibility(View.GONE);
@@ -2807,11 +3240,119 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                         }
                     }
-                } else if (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)) {
+                } else if (com.m3.veil.utils.VeilStickerGifEngine.isAnimatedEmojiMessage(message)) {
                     ensureImageViews();
                     hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (messageBubble != null) {
+                        messageBubble.setPadding(0, 0, 0, 0);
+                        messageBubble.setBackground(null);
+                    }
+                    if (imageMessageContainer != null) {
+                        imageMessageContainer.setVisibility(View.VISIBLE);
+                        imageMessageContainer.setPadding(0, 0, 0, 0);
+                        imageMessageContainer.setBackground(null);
+                        if (imageCardView instanceof com.google.android.material.card.MaterialCardView) {
+                            com.google.android.material.card.MaterialCardView mcv = (com.google.android.material.card.MaterialCardView) imageCardView;
+                            mcv.setStrokeWidth(0);
+                            mcv.setCardElevation(0f);
+                            mcv.setCardBackgroundColor(android.graphics.Color.TRANSPARENT);
+                            mcv.setBackground(null);
+                            mcv.setRadius(0f);
+                        }
+                        if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
+                        if (imageGifBadge != null) imageGifBadge.setVisibility(View.GONE);
+                        if (imageProgressBar != null) imageProgressBar.setVisibility(View.GONE);
+                        if (imageDownloadOverlay != null) imageDownloadOverlay.setVisibility(View.GONE);
+                        if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
+                        if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
+
+                        int[] emojiDims = com.m3.veil.utils.VeilStickerGifEngine.computeAnimatedEmojiSizePx(itemView.getContext());
+                        com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, emojiDims[0], emojiDims[1]);
+
+                        if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
+                        if (statusIcon != null) statusIcon.setVisibility(View.VISIBLE);
+                        bindQuickForwardButton(btnQuickForwardMedia, message, true);
+
+                        if (messageImage != null) {
+                            messageImage.setVisibility(View.VISIBLE);
+                            messageImage.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                            com.m3.veil.utils.VeilStickerGifEngine.bindAnimatedEmojiToImageView(itemView.getContext(), message, messageImage);
+                        }
+
+                        View.OnClickListener emojiBurstClick = v -> {
+                            if (messageImage != null) {
+                                android.graphics.drawable.Drawable d = messageImage.getDrawable();
+                                if (d instanceof com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) {
+                                    ((com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) d).triggerTapBurst();
+                                }
+                                v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                                messageImage.animate().scaleX(1.22f).scaleY(1.22f).setDuration(120)
+                                        .withEndAction(() -> messageImage.animate().scaleX(1.0f).scaleY(1.0f).setDuration(160).start())
+                                        .start();
+                            }
+                        };
+                        imageMessageContainer.setOnClickListener(emojiBurstClick);
+                        if (imageCardView != null) imageCardView.setOnClickListener(emojiBurstClick);
+                    }
+                } else if ("video_note".equalsIgnoreCase(message.getType())) {
+                    ensureImageViews();
+                    hasVisibleMediaContainer = true;
+                    messageText.setVisibility(View.GONE);
+                    if (messageBubble != null) {
+                        messageBubble.setPadding(0, 0, 0, 0);
+                        messageBubble.setBackground(null);
+                    }
+                    if (imageMessageContainer != null) {
+                        imageMessageContainer.setVisibility(View.VISIBLE);
+                        imageMessageContainer.setPadding(0, 0, 0, 0);
+                        imageMessageContainer.setBackground(null);
+                        float dp = itemView.getContext().getResources().getDisplayMetrics().density;
+                        int sizePx = Math.round(180 * dp);
+                        com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, sizePx, sizePx);
+                        if (imageCardView instanceof com.google.android.material.card.MaterialCardView) {
+                            com.google.android.material.card.MaterialCardView mcv = (com.google.android.material.card.MaterialCardView) imageCardView;
+                            mcv.setRadius(sizePx / 2f);
+                            mcv.setStrokeWidth(Math.round(2.5f * dp));
+                            mcv.setStrokeColor(android.graphics.Color.parseColor("#38BDF8"));
+                            mcv.setCardBackgroundColor(android.graphics.Color.BLACK);
+                            mcv.setCardElevation(2 * dp);
+                        }
+                        if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
+                        if (imageGifBadge != null) imageGifBadge.setVisibility(View.GONE);
+                        if (imageProgressBar != null) imageProgressBar.setVisibility(View.GONE);
+                        if (imageDownloadOverlay != null) imageDownloadOverlay.setVisibility(View.GONE);
+                        if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
+                        if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
+
+                        if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
+                        if (statusIcon != null) statusIcon.setVisibility(View.VISIBLE);
+                        bindQuickForwardButton(btnQuickForwardMedia, message, true);
+
+                        if (messageImage != null) {
+                            messageImage.setVisibility(View.VISIBLE);
+                            messageImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                            bindVideoThumbnailBitmap(itemView.getContext(), messageImage, message,
+                                    message.getLocalFilePath() != null ? new File(message.getLocalFilePath()) : null);
+                        }
+
+                        View.OnClickListener videoNoteClick = v -> {
+                            String path = message.getLocalFilePath();
+                            if (path != null && !path.isEmpty()) {
+                                Intent intent = buildMediaViewerAlbumIntent(
+                                        itemView.getContext(), message, path, "video", "You", time, "", 0);
+                                itemView.getContext().startActivity(intent);
+                            }
+                        };
+                        imageMessageContainer.setOnClickListener(videoNoteClick);
+                        if (imageCardView != null) imageCardView.setOnClickListener(videoNoteClick);
+                    }
+                } else if (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)) {
+                    ensureImageViews();
+                    hasVisibleMediaContainer = true;
+                    messageText.setVisibility(View.GONE);
+                    boolean stickerHasReply = message.getReplyToMessageId() != null && !message.getReplyToMessageId().isEmpty();
+                    if (messageBubble != null && !stickerHasReply) {
                         messageBubble.setPadding(0, 0, 0, 0);
                     }
                     if (imageMessageContainer != null) {
@@ -2856,6 +3397,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                             View.OnClickListener stickerBounce = v -> {
                                 if (messageImage != null) {
+                                    com.m3.veil.utils.VeilStickerGifEngine.replayAnimatedDrawable(messageImage);
                                     messageImage.animate().scaleX(1.18f).scaleY(1.18f).setDuration(140)
                                             .withEndAction(() -> messageImage.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
                                             .start();
@@ -2942,7 +3484,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         if (hasCaption) {
                             if (imageCaptionText != null) {
                                 imageCaptionText.setVisibility(View.VISIBLE);
-                                imageCaptionText.setText(message.getText());
+                                if (imageCaptionText instanceof VeilAdvancedTextView) {
+                                    ((VeilAdvancedTextView) imageCaptionText).renderAdvancedText(
+                                            message.getText(), 14.5f, true, isDarkBubble, entityClickListener);
+                                } else {
+                                    imageCaptionText.setText(message.getText());
+                                }
                             }
                             if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
@@ -3000,6 +3547,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         }
 
                         View.OnClickListener openPhoto = v -> {
+                            if (isGif && messageImage != null && messageImage.getDrawable() instanceof android.graphics.drawable.Animatable) {
+                                android.graphics.drawable.Animatable anim = (android.graphics.drawable.Animatable) messageImage.getDrawable();
+                                if (!anim.isRunning()) {
+                                    com.m3.veil.utils.VeilStickerGifEngine.replayAnimatedDrawable(messageImage);
+                                    return;
+                                }
+                            }
                             File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, primaryExt);
                             String path = (local != null && local.exists()) ? local.getAbsolutePath() : message.getLocalFilePath();
                             org.json.JSONArray alb = extractAlbumItems(message);
@@ -3013,6 +3567,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                         isGif ? "gif" : ("video".equals(message.getType()) ? "video" : "image"),
                                         "You", time, hasCaption ? message.getText() : "", 0);
                                 itemView.getContext().startActivity(intent);
+                            } else if (isGif && messageImage != null) {
+                                com.m3.veil.utils.VeilStickerGifEngine.replayAnimatedDrawable(messageImage);
                             }
                         };
                         imageMessageContainer.setOnClickListener(openPhoto);
@@ -3073,7 +3629,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         if (hasCaption) {
                             if (videoCaptionText != null) {
                                 videoCaptionText.setVisibility(View.VISIBLE);
-                                videoCaptionText.setText(message.getText());
+                                if (videoCaptionText instanceof VeilAdvancedTextView) {
+                                    ((VeilAdvancedTextView) videoCaptionText).renderAdvancedText(
+                                            message.getText(), 14.5f, true, isDarkBubble, entityClickListener);
+                                } else {
+                                    videoCaptionText.setText(message.getText());
+                                }
                             }
                             if (videoOverlayPill != null) videoOverlayPill.setVisibility(View.GONE);
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
@@ -3101,26 +3662,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             });
                         }
 
-                        if (message.getThumbnail() != null && !message.getThumbnail().isEmpty()) {
-                            Bitmap thumb = BlurUtils.getBlurredThumbnail(itemView.getContext(), message.getThumbnail());
-                            if (thumb != null) {
-                                messageVideoThumbnail.setImageBitmap(thumb);
-                            } else {
-                                try {
-                                    byte[] decodedString = Base64.decode(message.getThumbnail(), Base64.DEFAULT);
-                                    BitmapFactory.Options opts = new BitmapFactory.Options();
-                                    opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
-                                    Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length, opts);
-                                    if (decodedByte != null) {
-                                        messageVideoThumbnail.setImageBitmap(decodedByte);
-                                    } else {
-                                        messageVideoThumbnail.setImageDrawable(null);
-                                    }
-                                } catch (Exception ignored) {}
-                            }
-                        } else {
-                            messageVideoThumbnail.setImageDrawable(null);
-                        }
+                        bindVideoThumbnailBitmap(itemView.getContext(), messageVideoThumbnail, message, localSentVid);
 
                         View.OnClickListener playClick = v -> {
                             File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".mp4");
@@ -3333,13 +3875,25 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 } else {
                     messageText.setVisibility(View.VISIBLE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
-                    messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
+                    CharSequence formatted = formatRichTextAndPoll(itemView.getContext(), message);
+                    if (messageText instanceof VeilAdvancedTextView) {
+                        ((VeilAdvancedTextView) messageText).renderAdvancedText(
+                                formatted,
+                                cachedTextSizeSp > 0 ? cachedTextSizeSp : 15.5f,
+                                true,
+                                isDarkBubble,
+                                entityClickListener
+                        );
+                    } else {
+                        messageText.setText(formatted);
+                    }
                     String rawMsgTxt = message.getText();
                     if (rawMsgTxt != null && (rawMsgTxt.contains("http://") || rawMsgTxt.contains("https://") || rawMsgTxt.contains("www."))) {
                         ensureLinkPreviewViews();
                         hasVisibleMediaContainer = true;
                         bindLinkPreview(rawMsgTxt, linkPreviewContainer, ivLinkThumb, tvLinkDomain, tvLinkTitle, tvLinkDesc);
                     }
+                    final boolean finalIsDarkBubble = isDarkBubble;
                     if (message.getText() != null && message.getText().contains("||") && message.getId() != null) {
                         messageText.setOnClickListener(v -> {
                             if (revealedSpoilers.contains(message.getId())) {
@@ -3347,7 +3901,18 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             } else {
                                 revealedSpoilers.add(message.getId());
                             }
-                            messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
+                            CharSequence refmt = formatRichTextAndPoll(itemView.getContext(), message);
+                            if (messageText instanceof VeilAdvancedTextView) {
+                                ((VeilAdvancedTextView) messageText).renderAdvancedText(
+                                        refmt,
+                                        cachedTextSizeSp > 0 ? cachedTextSizeSp : 15.5f,
+                                        true,
+                                        finalIsDarkBubble,
+                                        entityClickListener
+                                );
+                            } else {
+                                messageText.setText(refmt);
+                            }
                         });
                     } else {
                         messageText.setOnClickListener(null);
@@ -3356,7 +3921,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 
                 messageText.setTypeface(null, android.graphics.Typeface.NORMAL);
                 messageText.setTextColor(isDarkBubble ? 0xFFF8FAFC : ContextCompat.getColor(itemView.getContext(), R.color.message_text_primary));
-                if (cachedTextSizeSp > 0 && messageText != null) {
+                if (!(messageText instanceof VeilAdvancedTextView) && cachedTextSizeSp > 0 && messageText != null) {
                     messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, cachedTextSizeSp);
                 }
                 if ("call".equals(message.getType())) {
@@ -3417,28 +3982,40 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     updateStatusIcon(statusIcon, message, isDarkBubble);
                 }
                 
+                boolean hasValidReactions = false;
+                StringBuilder emojis = new StringBuilder();
                 if (message.getReactions() != null && !message.getReactions().isEmpty()) {
-                    StringBuilder emojis = new StringBuilder();
                     for (String emoji : message.getReactions().values()) {
-                        emojis.append(emoji);
+                        if (emoji != null && !emoji.trim().isEmpty()) {
+                            emojis.append(emoji.trim());
+                            hasValidReactions = true;
+                        }
                     }
+                }
+                if (hasValidReactions && emojis.length() > 0) {
                     reactionsText.setText(emojis.toString());
                     reactionsText.setVisibility(View.VISIBLE);
-                    
                     reactionsText.setOnClickListener(v -> {
                         if (reactionClickListener != null) {
                             reactionClickListener.onReactionClick(message);
                         }
                     });
                 } else {
+                    reactionsText.setText("");
                     reactionsText.setVisibility(View.GONE);
+                    reactionsText.setOnClickListener(null);
                 }
                 
                 applySentBubbleTheme(isDarkBubble);
-                boolean isChromelessSent = com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
+                boolean isChromelessSent = (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
+                        || com.m3.veil.utils.VeilStickerGifEngine.isAnimatedEmojiMessage(message))
                         && (message.getReplyToMessageId() == null || message.getReplyToMessageId().isEmpty());
                 applyChromelessBelowInfoStyle(bubbleInfoContainer, timeText, statusIcon, ivPinnedBadge,
                         message, isChromelessSent, true, isDarkBubble);
+                if (messageBubble != null) {
+                    messageBubble.requestLayout();
+                    messageBubble.invalidate();
+                }
                 itemView.setOnLongClickListener(v -> {
                     if (longClickListener != null) {
                         longClickListener.onMessageLongClick(message, itemView);
@@ -3563,9 +4140,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         ImageView btnQuickForwardMedia;
         private boolean hasVisibleMediaContainer = false;
+        final VeilAdvancedTextView.OnEntityClickListener entityClickListener;
 
         public ReceivedMessageViewHolder(@NonNull View itemView) {
             super(itemView);
+            entityClickListener = createEntityClickListener(itemView.getContext());
             dateHeaderContainer = itemView.findViewById(R.id.dateHeaderContainer);
             dateHeaderText = itemView.findViewById(R.id.dateHeaderText);
             senderNameText = itemView.findViewById(R.id.senderNameText);
@@ -3756,13 +4335,6 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 reactPill.setStroke(Math.max(1, (int) dp), isDark ? 0x33FFFFFF : 0x220F172A);
                 reactionsText.setBackground(reactPill);
             }
-            if (replyQuoteContainer != null) {
-                android.graphics.drawable.GradientDrawable quoteBg = new android.graphics.drawable.GradientDrawable();
-                quoteBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-                quoteBg.setCornerRadius(8f * dp);
-                quoteBg.setColor(isDark ? 0x24818CF8 : 0x124F46E5);
-                replyQuoteContainer.setBackground(quoteBg);
-            }
             if (linkPreviewContainer != null) {
                 android.graphics.drawable.GradientDrawable linkBg = new android.graphics.drawable.GradientDrawable();
                 linkBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
@@ -3808,8 +4380,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             if (tvLinkDomain != null) tvLinkDomain.setTextColor(textSecondary);
             if (tvLinkTitle != null) tvLinkTitle.setTextColor(textPrimary);
             if (tvLinkDesc != null) tvLinkDesc.setTextColor(textSecondary);
-            if (replyQuoteText != null) replyQuoteText.setTextColor(textSecondary);
-            if (replyQuoteName != null) replyQuoteName.setTextColor(quoteStripColor);
+            styleReplyQuoteCard(replyQuoteContainer, replyQuoteName, replyQuoteText, false, isDark);
             if (imageCaptionText != null) imageCaptionText.setTextColor(textPrimary);
             if (videoCaptionText != null) videoCaptionText.setTextColor(textPrimary);
         }
@@ -3838,6 +4409,21 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
             timeText.setText(time);
             bindBubbleInfoBadges(message, ivPinnedBadge, tvStarredBadge, tvVanishBadge, tvEditedBadge);
+            if (messageBubble != null) {
+                float stdDp = itemView.getContext().getResources().getDisplayMetrics().density;
+                int stdPadH = Math.round(10f * stdDp);
+                int stdPadV = Math.round(7f * stdDp);
+                messageBubble.setPadding(stdPadH, stdPadV, stdPadH, stdPadV);
+                ViewGroup.LayoutParams bLp = messageBubble.getLayoutParams();
+                if (bLp != null && bLp.width != ViewGroup.LayoutParams.WRAP_CONTENT) {
+                    bLp.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+                    messageBubble.setLayoutParams(bLp);
+                }
+            }
+            if (messageText != null) {
+                int screenW = itemView.getContext().getResources().getDisplayMetrics().widthPixels;
+                messageText.setMaxWidth(Math.round(screenW * 0.72f));
+            }
             int pos = msgIdx >= 0 ? msgIdx : (getAdapterPosition() - 1);
             int clusterPos = computeClusterPosition(pos);
             boolean isNight = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(itemView.getContext());
@@ -3848,11 +4434,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         || clusterPos == com.m3.veil.ui.views.ChatMessageCell.CLUSTER_FIRST
                         || showDate);
                 if (showSenderHeader) {
-                    String sName = message.getSenderName();
-                    if (com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(sName)) {
-                        String sid = message.getSenderId();
-                        sName = (sid != null && sid.length() >= 4) ? ("Peer #" + sid.substring(0, 4)) : "Peer";
-                    }
+                    String sName = resolveSenderDisplayName(itemView.getContext(), message);
                     senderNameText.setText(sName);
                     int[] palette = isNight 
                             ? new int[]{0xFF818CF8, 0xFFF472B6, 0xFF34D399, 0xFFFBBF24, 0xFF60A5FA, 0xFFA78BFA, 0xFF2DD4BF, 0xFFFB7185}
@@ -3887,7 +4469,14 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 hideAllMediaContainers();
                 messageText.setText("🚫 This message was deleted");
                 messageText.setTypeface(null, android.graphics.Typeface.ITALIC);
-                messageText.setTextColor(isDarkBubble ? 0xFF94A3B8 : 0xFF64748B);
+                messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, cachedTextSizeSp > 0 ? cachedTextSizeSp : 15.0f);
+                int deletedTextColor = isDarkBubble ? 0xD9F8FAFC : 0xDD0F172A;
+                messageText.setTextColor(deletedTextColor);
+                if (timeText != null) {
+                    timeText.setText(time);
+                    timeText.setTextColor(isDarkBubble ? 0x99F8FAFC : 0x8C0F172A);
+                }
+                if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
                 reactionsText.setVisibility(View.GONE);
                 if (replyQuoteContainer != null) replyQuoteContainer.setVisibility(View.GONE);
             } else if (message.isBlink()) {
@@ -4056,11 +4645,118 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                         }
                     }
-                } else if (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)) {
+                } else if (com.m3.veil.utils.VeilStickerGifEngine.isAnimatedEmojiMessage(message)) {
                     ensureImageViews();
                     hasVisibleMediaContainer = true;
                     messageText.setVisibility(View.GONE);
                     if (messageBubble != null) {
+                        messageBubble.setPadding(0, 0, 0, 0);
+                        messageBubble.setBackground(null);
+                    }
+                    if (imageMessageContainer != null) {
+                        imageMessageContainer.setVisibility(View.VISIBLE);
+                        imageMessageContainer.setPadding(0, 0, 0, 0);
+                        imageMessageContainer.setBackground(null);
+                        if (imageCardView instanceof com.google.android.material.card.MaterialCardView) {
+                            com.google.android.material.card.MaterialCardView mcv = (com.google.android.material.card.MaterialCardView) imageCardView;
+                            mcv.setStrokeWidth(0);
+                            mcv.setCardElevation(0f);
+                            mcv.setCardBackgroundColor(android.graphics.Color.TRANSPARENT);
+                            mcv.setBackground(null);
+                            mcv.setRadius(0f);
+                        }
+                        if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
+                        if (imageGifBadge != null) imageGifBadge.setVisibility(View.GONE);
+                        if (imageProgressBar != null) imageProgressBar.setVisibility(View.GONE);
+                        if (imageDownloadOverlay != null) imageDownloadOverlay.setVisibility(View.GONE);
+                        if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
+                        if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
+
+                        int[] emojiDims = com.m3.veil.utils.VeilStickerGifEngine.computeAnimatedEmojiSizePx(itemView.getContext());
+                        com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, emojiDims[0], emojiDims[1]);
+
+                        if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
+                        bindQuickForwardButton(btnQuickForwardMedia, message, true);
+
+                        if (messageImage != null) {
+                            messageImage.setVisibility(View.VISIBLE);
+                            messageImage.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                            com.m3.veil.utils.VeilStickerGifEngine.bindAnimatedEmojiToImageView(itemView.getContext(), message, messageImage);
+                        }
+
+                        View.OnClickListener emojiBurstClick = v -> {
+                            if (messageImage != null) {
+                                android.graphics.drawable.Drawable d = messageImage.getDrawable();
+                                if (d instanceof com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) {
+                                    ((com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) d).triggerTapBurst();
+                                }
+                                v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                                messageImage.animate().scaleX(1.22f).scaleY(1.22f).setDuration(120)
+                                        .withEndAction(() -> messageImage.animate().scaleX(1.0f).scaleY(1.0f).setDuration(160).start())
+                                        .start();
+                            }
+                        };
+                        imageMessageContainer.setOnClickListener(emojiBurstClick);
+                        if (imageCardView != null) imageCardView.setOnClickListener(emojiBurstClick);
+                    }
+                } else if ("video_note".equalsIgnoreCase(message.getType())) {
+                    ensureImageViews();
+                    hasVisibleMediaContainer = true;
+                    messageText.setVisibility(View.GONE);
+                    if (messageBubble != null) {
+                        messageBubble.setPadding(0, 0, 0, 0);
+                        messageBubble.setBackground(null);
+                    }
+                    if (imageMessageContainer != null) {
+                        imageMessageContainer.setVisibility(View.VISIBLE);
+                        imageMessageContainer.setPadding(0, 0, 0, 0);
+                        imageMessageContainer.setBackground(null);
+                        float dp = itemView.getContext().getResources().getDisplayMetrics().density;
+                        int sizePx = Math.round(180 * dp);
+                        com.m3.veil.utils.VeilStickerGifEngine.updateViewDimensions(imageCardView, sizePx, sizePx);
+                        if (imageCardView instanceof com.google.android.material.card.MaterialCardView) {
+                            com.google.android.material.card.MaterialCardView mcv = (com.google.android.material.card.MaterialCardView) imageCardView;
+                            mcv.setRadius(sizePx / 2f);
+                            mcv.setStrokeWidth(Math.round(2.5f * dp));
+                            mcv.setStrokeColor(android.graphics.Color.parseColor("#38BDF8"));
+                            mcv.setCardBackgroundColor(android.graphics.Color.BLACK);
+                            mcv.setCardElevation(2 * dp);
+                        }
+                        if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
+                        if (imageGifBadge != null) imageGifBadge.setVisibility(View.GONE);
+                        if (imageProgressBar != null) imageProgressBar.setVisibility(View.GONE);
+                        if (imageDownloadOverlay != null) imageDownloadOverlay.setVisibility(View.GONE);
+                        if (imageCaptionText != null) imageCaptionText.setVisibility(View.GONE);
+                        if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
+
+                        if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
+                        bindQuickForwardButton(btnQuickForwardMedia, message, true);
+
+                        if (messageImage != null) {
+                            messageImage.setVisibility(View.VISIBLE);
+                            messageImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                            bindVideoThumbnailBitmap(itemView.getContext(), messageImage, message,
+                                    message.getLocalFilePath() != null ? new File(message.getLocalFilePath()) : null);
+                        }
+
+                        View.OnClickListener videoNoteClick = v -> {
+                            String path = message.getLocalFilePath();
+                            if (path != null && !path.isEmpty()) {
+                                Intent intent = buildMediaViewerAlbumIntent(
+                                        itemView.getContext(), message, path, "video",
+                                        resolveSenderDisplayName(itemView.getContext(), message), time, "", 0);
+                                itemView.getContext().startActivity(intent);
+                            }
+                        };
+                        imageMessageContainer.setOnClickListener(videoNoteClick);
+                        if (imageCardView != null) imageCardView.setOnClickListener(videoNoteClick);
+                    }
+                } else if (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)) {
+                    ensureImageViews();
+                    hasVisibleMediaContainer = true;
+                    messageText.setVisibility(View.GONE);
+                    boolean stickerHasReply = message.getReplyToMessageId() != null && !message.getReplyToMessageId().isEmpty();
+                    if (messageBubble != null && !stickerHasReply) {
                         messageBubble.setPadding(0, 0, 0, 0);
                     }
                     if (imageMessageContainer != null) {
@@ -4104,6 +4800,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                             View.OnClickListener stickerBounce = v -> {
                                 if (messageImage != null) {
+                                    com.m3.veil.utils.VeilStickerGifEngine.replayAnimatedDrawable(messageImage);
                                     messageImage.animate().scaleX(1.18f).scaleY(1.18f).setDuration(140)
                                             .withEndAction(() -> messageImage.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
                                             .start();
@@ -4192,7 +4889,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         if (hasCaption) {
                             if (imageCaptionText != null) {
                                 imageCaptionText.setVisibility(View.VISIBLE);
-                                imageCaptionText.setText(message.getText());
+                                if (imageCaptionText instanceof VeilAdvancedTextView) {
+                                    ((VeilAdvancedTextView) imageCaptionText).renderAdvancedText(
+                                            message.getText(), 14.5f, false, isDarkBubble, entityClickListener);
+                                } else {
+                                    imageCaptionText.setText(message.getText());
+                                }
                             }
                             if (imageOverlayPill != null) imageOverlayPill.setVisibility(View.GONE);
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
@@ -4237,6 +4939,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
 
                             View.OnClickListener openPhoto = v -> {
+                                if (isGif && messageImage != null && messageImage.getDrawable() instanceof android.graphics.drawable.Animatable) {
+                                    android.graphics.drawable.Animatable anim = (android.graphics.drawable.Animatable) messageImage.getDrawable();
+                                    if (!anim.isRunning()) {
+                                        com.m3.veil.utils.VeilStickerGifEngine.replayAnimatedDrawable(messageImage);
+                                        return;
+                                    }
+                                }
                                 File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, recPrimaryExt);
                                 String path = (local != null && local.exists()) ? local.getAbsolutePath() : message.getLocalFilePath();
                                 if ((path == null || path.isEmpty()) && recAlbum != null && recAlbum.length() > 0) {
@@ -4252,6 +4961,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                     try {
                                         com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).markMessageAsReadExplicitly(message);
                                     } catch (Throwable ignored) {}
+                                } else if (isGif && messageImage != null) {
+                                    com.m3.veil.utils.VeilStickerGifEngine.replayAnimatedDrawable(messageImage);
                                 }
                             };
                             imageMessageContainer.setOnClickListener(openPhoto);
@@ -4337,7 +5048,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         if (hasCaption) {
                             if (videoCaptionText != null) {
                                 videoCaptionText.setVisibility(View.VISIBLE);
-                                videoCaptionText.setText(message.getText());
+                                if (videoCaptionText instanceof VeilAdvancedTextView) {
+                                    ((VeilAdvancedTextView) videoCaptionText).renderAdvancedText(
+                                            message.getText(), 14.5f, false, isDarkBubble, entityClickListener);
+                                } else {
+                                    videoCaptionText.setText(message.getText());
+                                }
                             }
                             if (videoOverlayPill != null) videoOverlayPill.setVisibility(View.GONE);
                             if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
@@ -4373,26 +5089,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             if (videoDownloadOverlay != null) videoDownloadOverlay.setVisibility(View.GONE);
                             if (videoPlayButtonContainer != null) videoPlayButtonContainer.setVisibility(View.VISIBLE);
 
-                            if (message.getThumbnail() != null && !message.getThumbnail().isEmpty()) {
-                                Bitmap thumb = BlurUtils.getBlurredThumbnail(itemView.getContext(), message.getThumbnail());
-                                if (thumb != null) {
-                                    messageVideoThumbnail.setImageBitmap(thumb);
-                                } else {
-                                    try {
-                                        byte[] decodedString = Base64.decode(message.getThumbnail(), Base64.DEFAULT);
-                                        BitmapFactory.Options opts = new BitmapFactory.Options();
-                                        opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
-                                        Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length, opts);
-                                        if (decodedByte != null) {
-                                            messageVideoThumbnail.setImageBitmap(decodedByte);
-                                        } else {
-                                            messageVideoThumbnail.setImageDrawable(null);
-                                        }
-                                    } catch (Exception ignored) {}
-                                }
-                            } else {
-                                messageVideoThumbnail.setImageDrawable(null);
-                            }
+                            bindVideoThumbnailBitmap(itemView.getContext(), messageVideoThumbnail, message, localVid);
 
                             View.OnClickListener playClick = v -> {
                                 File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, ".mp4");
@@ -4639,7 +5336,18 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 } else {
                     messageText.setVisibility(View.VISIBLE);
                     if (bubbleInfoContainer != null) bubbleInfoContainer.setVisibility(View.VISIBLE);
-                    messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
+                    CharSequence formatted = formatRichTextAndPoll(itemView.getContext(), message);
+                    if (messageText instanceof VeilAdvancedTextView) {
+                        ((VeilAdvancedTextView) messageText).renderAdvancedText(
+                                formatted,
+                                cachedTextSizeSp > 0 ? cachedTextSizeSp : 15.5f,
+                                false,
+                                isDarkBubble,
+                                entityClickListener
+                        );
+                    } else {
+                        messageText.setText(formatted);
+                    }
                     String rawMsgTxt = message.getText();
                     if (rawMsgTxt != null && (rawMsgTxt.contains("http://") || rawMsgTxt.contains("https://") || rawMsgTxt.contains("www."))) {
                         ensureLinkPreviewViews();
@@ -4653,7 +5361,18 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             } else {
                                 revealedSpoilers.add(message.getId());
                             }
-                            messageText.setText(formatRichTextAndPoll(itemView.getContext(), message));
+                            CharSequence refmt = formatRichTextAndPoll(itemView.getContext(), message);
+                            if (messageText instanceof VeilAdvancedTextView) {
+                                ((VeilAdvancedTextView) messageText).renderAdvancedText(
+                                        refmt,
+                                        cachedTextSizeSp > 0 ? cachedTextSizeSp : 15.5f,
+                                        false,
+                                        isDarkBubble,
+                                        entityClickListener
+                                );
+                            } else {
+                                messageText.setText(refmt);
+                            }
                         });
                     } else {
                         messageText.setOnClickListener(null);
@@ -4662,7 +5381,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 
                 messageText.setTypeface(null, android.graphics.Typeface.NORMAL);
                 messageText.setTextColor(isDarkBubble ? 0xFFF8FAFC : 0xFF0F172A);
-                if (cachedTextSizeSp > 0 && messageText != null) {
+                if (!(messageText instanceof VeilAdvancedTextView) && cachedTextSizeSp > 0 && messageText != null) {
                     messageText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, cachedTextSizeSp);
                 }
                 
@@ -4711,28 +5430,40 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     }
                 }
                 
+                boolean hasValidReactions = false;
+                StringBuilder emojis = new StringBuilder();
                 if (message.getReactions() != null && !message.getReactions().isEmpty()) {
-                    StringBuilder emojis = new StringBuilder();
                     for (String emoji : message.getReactions().values()) {
-                        emojis.append(emoji);
+                        if (emoji != null && !emoji.trim().isEmpty()) {
+                            emojis.append(emoji.trim());
+                            hasValidReactions = true;
+                        }
                     }
+                }
+                if (hasValidReactions && emojis.length() > 0) {
                     reactionsText.setText(emojis.toString());
                     reactionsText.setVisibility(View.VISIBLE);
-                    
                     reactionsText.setOnClickListener(v -> {
                         if (reactionClickListener != null) {
                             reactionClickListener.onReactionClick(message);
                         }
                     });
                 } else {
+                    reactionsText.setText("");
                     reactionsText.setVisibility(View.GONE);
+                    reactionsText.setOnClickListener(null);
                 }
                 
                 applyReceivedBubbleTheme(isDarkBubble);
-                boolean isChromelessRec = com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
+                boolean isChromelessRec = (com.m3.veil.utils.VeilStickerGifEngine.isStickerMessage(message)
+                        || com.m3.veil.utils.VeilStickerGifEngine.isAnimatedEmojiMessage(message))
                         && (message.getReplyToMessageId() == null || message.getReplyToMessageId().isEmpty());
                 applyChromelessBelowInfoStyle(bubbleInfoContainer, timeText, null, ivPinnedBadge,
                         message, isChromelessRec, false, isDarkBubble);
+                if (messageBubble != null) {
+                    messageBubble.requestLayout();
+                    messageBubble.invalidate();
+                }
                 itemView.setOnLongClickListener(v -> {
                     if (longClickListener != null) {
                         longClickListener.onMessageLongClick(message, itemView);
@@ -4836,5 +5567,64 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 thumb.setVisibility(View.GONE);
             }
         }
+    }
+
+    private static void bindVideoThumbnailBitmap(Context context, ImageView targetView, Message message, File localVideoFile) {
+        if (targetView == null || message == null) return;
+        // 1. Try decoding sharp Base64 thumbnail first
+        if (message.getThumbnail() != null && !message.getThumbnail().isEmpty()) {
+            try {
+                byte[] decodedBytes = Base64.decode(message.getThumbnail(), Base64.DEFAULT);
+                BitmapFactory.Options opts = new BitmapFactory.Options();
+                opts.inPreferredConfig = com.m3.veil.utils.VeilPerformanceController.getInstance().getPreferredBitmapConfig();
+                Bitmap sharpBmp = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length, opts);
+                if (sharpBmp != null) {
+                    targetView.setImageBitmap(sharpBmp);
+                    return;
+                }
+            } catch (Throwable ignored) {}
+            Bitmap blurred = BlurUtils.getBlurredThumbnail(context, message.getThumbnail());
+            if (blurred != null) {
+                targetView.setImageBitmap(blurred);
+                return;
+            }
+        }
+
+        // 2. Fallback: extract video frame from local file (e.g. forwarded or edited video) and cache on message
+        File vidFile = localVideoFile;
+        if ((vidFile == null || !vidFile.exists()) && message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty()) {
+            File candidate = new File(message.getLocalFilePath());
+            if (candidate.exists()) vidFile = candidate;
+        }
+        if (vidFile != null && vidFile.exists()) {
+            android.media.MediaMetadataRetriever retriever = new android.media.MediaMetadataRetriever();
+            try {
+                retriever.setDataSource(vidFile.getAbsolutePath());
+                Bitmap frame = retriever.getFrameAtTime(0, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                if (frame == null) {
+                    frame = retriever.getFrameAtTime();
+                }
+                if (frame != null) {
+                    int fw = Math.max(1, frame.getWidth());
+                    int fh = Math.max(1, frame.getHeight());
+                    float ratio = Math.min(320f / fw, 320f / fh);
+                    int tw = Math.max(48, Math.round(fw * ratio));
+                    int th = Math.max(48, Math.round(fh * ratio));
+                    Bitmap scaled = Bitmap.createScaledBitmap(frame, tw, th, true);
+                    targetView.setImageBitmap(scaled);
+                    try {
+                        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                        scaled.compress(Bitmap.CompressFormat.JPEG, 78, baos);
+                        message.setThumbnail(Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP));
+                    } catch (Throwable ignored) {}
+                    if (scaled != frame) frame.recycle();
+                    return;
+                }
+            } catch (Throwable ignored) {
+            } finally {
+                try { retriever.release(); } catch (Throwable ignored) {}
+            }
+        }
+        targetView.setImageDrawable(null);
     }
 }

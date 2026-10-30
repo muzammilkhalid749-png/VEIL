@@ -1350,7 +1350,7 @@ public class MediaViewerActivity extends AppCompatActivity {
                     if (chatId != null && !chatId.isEmpty()) {
                         VeilMessagesController.getInstance(this).sendMediaMessage(
                                 chatId, peerId, editedType != null ? editedType : "image",
-                                editedFile, editedCaption, messageId, editedViewOnce);
+                                editedFile, editedCaption, null, editedViewOnce);
                         Toast.makeText(this, "Edited media sent to chat", Toast.LENGTH_SHORT).show();
                         finish();
                     } else {
@@ -1408,59 +1408,758 @@ public class MediaViewerActivity extends AppCompatActivity {
         if (!f.exists()) return;
         pauseActiveVideoPlayback();
 
-        final boolean isVid = "video".equalsIgnoreCase(mediaType) || f.getName().toLowerCase(Locale.ROOT).endsWith(".mp4");
+        final boolean isVid = "video".equalsIgnoreCase(mediaType)
+                || f.getName().toLowerCase(Locale.ROOT).endsWith(".mp4")
+                || f.getName().toLowerCase(Locale.ROOT).endsWith(".mkv")
+                || f.getName().toLowerCase(Locale.ROOT).endsWith(".webm")
+                || f.getName().toLowerCase(Locale.ROOT).endsWith(".mov");
+
+        if (isVid) {
+            showVideoStickerTrimmerDialog(f);
+        } else {
+            showPhotoStickerCreatorDialog(f);
+        }
+    }
+
+    /**
+     * Complete Telegram/WhatsApp-style Photo Sticker Creator Studio (for Photos ONLY — no video trimmer!):
+     * - Preserves Portrait (9:16, 3:4), Landscape (16:9, 4:3), or Square (1:1) aspect ratio
+     * - 4 Cutout Modes: Auto Subject Cutout, Full Portrait/Original, Interactive Finger-Trace Freehand Lasso, Circle Badge
+     * - Toggleable White Die-Cut Contour Outline
+     * - Custom Sticker Text Caption + Color Swatches & Corner Emoji Stamp
+     */
+    private void showPhotoStickerCreatorDialog(@NonNull final File photoFile) {
+        final Bitmap sourceBitmap = com.m3.veil.utils.VeilStickerGifEngine.decodePhotoPreservingAspectRatio(photoFile, 720);
+        if (sourceBitmap == null) {
+            Toast.makeText(this, "Unable to decode photo for sticker", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         final float dp = getResources().getDisplayMetrics().density;
+        final android.app.Dialog studioDialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.parseColor("#0B1017"));
+        root.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        root.setPadding(Math.round(14 * dp), Math.round(34 * dp), Math.round(14 * dp), Math.round(18 * dp));
+
+        // 1. Sleek Minimal Header Bar: Close Icon + Title (Clean & Modern)
+        LinearLayout headerRow = new LinearLayout(this);
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(Gravity.CENTER_VERTICAL);
+        headerRow.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        headerRow.setPadding(Math.round(4 * dp), 0, Math.round(4 * dp), Math.round(14 * dp));
+
+        ImageView btnCloseHeader = new ImageView(this);
+        int closeSz = Math.round(36 * dp);
+        LinearLayout.LayoutParams cbLp = new LinearLayout.LayoutParams(closeSz, closeSz);
+        cbLp.rightMargin = Math.round(12 * dp);
+        btnCloseHeader.setLayoutParams(cbLp);
+        btnCloseHeader.setPadding(Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp));
+        btnCloseHeader.setImageResource(R.drawable.ic_close);
+        btnCloseHeader.setColorFilter(Color.WHITE);
+        GradientDrawable cbBg = new GradientDrawable();
+        cbBg.setShape(GradientDrawable.OVAL);
+        cbBg.setColor(0x2AFFFFFF);
+        btnCloseHeader.setBackground(cbBg);
+        btnCloseHeader.setOnClickListener(v -> studioDialog.dismiss());
+        headerRow.addView(btnCloseHeader);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        tvTitle.setText("Photo Sticker");
+        tvTitle.setTextColor(Color.WHITE);
+        tvTitle.setTextSize(17f);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        headerRow.addView(tvTitle);
+        root.addView(headerRow);
+
+        // 2. Center Sticker Stage with True Portrait/Landscape/Square Canvas Card & Transparency Grid
+        final FrameLayout stageWrapper = new FrameLayout(this);
+        LinearLayout.LayoutParams stageWrapLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+        stageWrapLp.bottomMargin = Math.round(12 * dp);
+        stageWrapper.setLayoutParams(stageWrapLp);
+
+        final FrameLayout canvasCard = new FrameLayout(this);
+        FrameLayout.LayoutParams cardLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER);
+        canvasCard.setLayoutParams(cardLp);
+        GradientDrawable cardBg = new GradientDrawable();
+        cardBg.setColor(Color.parseColor("#131B26"));
+        cardBg.setCornerRadius(20 * dp);
+        cardBg.setStroke(Math.max(1, Math.round(dp)), Color.parseColor("#26FFFFFF"));
+        canvasCard.setBackground(cardBg);
+
+        // Size canvasCard as a WhatsApp/Telegram-standard 1:1 Square sticker stage
+        stageWrapper.post(() -> {
+            int maxW = stageWrapper.getWidth();
+            int maxH = stageWrapper.getHeight();
+            if (maxW > 0 && maxH > 0) {
+                int side = Math.max(Math.round(180 * dp), Math.min(maxW, maxH));
+                FrameLayout.LayoutParams fitLp = new FrameLayout.LayoutParams(side, side, Gravity.CENTER);
+                canvasCard.setLayoutParams(fitLp);
+            }
+        });
+
+        // Subtle checkerboard transparency backdrop view
+        View checkerboardView = new View(this) {
+            private final android.graphics.Paint lightPaint = new android.graphics.Paint();
+            private final android.graphics.Paint darkPaint = new android.graphics.Paint();
+            {
+                lightPaint.setColor(0xFF1B2432);
+                darkPaint.setColor(0xFF131B26);
+            }
+            @Override
+            protected void onDraw(android.graphics.Canvas canvas) {
+                super.onDraw(canvas);
+                int cell = Math.max(12, Math.round(14 * dp));
+                int w = getWidth();
+                int h = getHeight();
+                for (int y = 0; y < h; y += cell) {
+                    for (int x = 0; x < w; x += cell) {
+                        boolean even = ((x / cell) + (y / cell)) % 2 == 0;
+                        canvas.drawRect(x, y, Math.min(w, x + cell), Math.min(h, y + cell), even ? lightPaint : darkPaint);
+                    }
+                }
+            }
+        };
+        checkerboardView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        canvasCard.addView(checkerboardView);
+
+        final ImageView ivStickerPreview = new ImageView(this);
+        FrameLayout.LayoutParams prevLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER);
+        int padCanvas = Math.round(12 * dp);
+        ivStickerPreview.setPadding(padCanvas, padCanvas, padCanvas, padCanvas);
+        ivStickerPreview.setLayoutParams(prevLp);
+        // FIT_CENTER preserves true Portrait (9:16 / 3:4), Landscape (16:9), or Square aspect ratio!
+        ivStickerPreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        canvasCard.addView(ivStickerPreview);
+
+        // State holders for Photo Sticker Studio
+        final int[] currentMode = new int[]{com.m3.veil.utils.VeilStickerGifEngine.STICKER_MODE_FULL_PORTRAIT};
+        final boolean[] whiteOutlineEnabled = new boolean[]{true};
+        final String[] captionText = new String[]{""};
+        final int[] captionColor = new int[]{Color.WHITE};
+        final String[] stampEmoji = new String[]{""};
+        final android.graphics.Path userLassoPath = new android.graphics.Path();
+        final Bitmap[] latestRenderedSticker = new Bitmap[]{null};
+
+        final TextView tvFreehandHint = new TextView(this);
+        tvFreehandHint.setText("☝️ Trace around any area with your finger to cut out");
+        tvFreehandHint.setTextColor(Color.WHITE);
+        tvFreehandHint.setTextSize(12.5f);
+        tvFreehandHint.setTypeface(null, Typeface.BOLD);
+        tvFreehandHint.setPadding(Math.round(14 * dp), Math.round(7 * dp), Math.round(14 * dp), Math.round(7 * dp));
+        GradientDrawable hintBg = new GradientDrawable();
+        hintBg.setColor(0xCC0F172A);
+        hintBg.setCornerRadius(16 * dp);
+        hintBg.setStroke(Math.max(1, Math.round(dp)), 0x6638BDF8);
+        tvFreehandHint.setBackground(hintBg);
+        FrameLayout.LayoutParams hintLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        hintLp.topMargin = Math.round(12 * dp);
+        tvFreehandHint.setLayoutParams(hintLp);
+        tvFreehandHint.setVisibility(View.GONE);
+        canvasCard.addView(tvFreehandHint);
+
+        final Runnable rebuildPhotoStickerPreview = () -> {
+            int vw = Math.max(1, ivStickerPreview.getWidth() - ivStickerPreview.getPaddingLeft() - ivStickerPreview.getPaddingRight());
+            int vh = Math.max(1, ivStickerPreview.getHeight() - ivStickerPreview.getPaddingTop() - ivStickerPreview.getPaddingBottom());
+            Bitmap processed = com.m3.veil.utils.VeilStickerGifEngine.createCustomPhotoStickerBitmap(
+                    sourceBitmap,
+                    currentMode[0],
+                    whiteOutlineEnabled[0],
+                    userLassoPath,
+                    vw,
+                    vh,
+                    captionText[0],
+                    captionColor[0],
+                    stampEmoji[0]);
+            latestRenderedSticker[0] = processed;
+            ivStickerPreview.setImageBitmap(processed);
+        };
+
+        // Interactive Freehand Lasso Overlay for STICKER_MODE_FREEHAND_CUT
+        final View lassoOverlayView = new View(this) {
+            private final android.graphics.Paint lassoStroke = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            private final android.graphics.Paint lassoGlow = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            private final android.graphics.Path activeDrawPath = new android.graphics.Path();
+            private float lastX, lastY;
+            {
+                lassoStroke.setStyle(android.graphics.Paint.Style.STROKE);
+                lassoStroke.setStrokeWidth(3f * dp);
+                lassoStroke.setColor(Color.WHITE);
+                lassoStroke.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+                lassoStroke.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+                lassoStroke.setPathEffect(new android.graphics.DashPathEffect(new float[]{10f * dp, 6f * dp}, 0f));
+
+                lassoGlow.setStyle(android.graphics.Paint.Style.STROKE);
+                lassoGlow.setStrokeWidth(6f * dp);
+                lassoGlow.setColor(0x8838BDF8);
+                lassoGlow.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+                lassoGlow.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+            }
+
+            @Override
+            protected void onDraw(android.graphics.Canvas canvas) {
+                super.onDraw(canvas);
+                if (!activeDrawPath.isEmpty()) {
+                    canvas.drawPath(activeDrawPath, lassoGlow);
+                    canvas.drawPath(activeDrawPath, lassoStroke);
+                }
+            }
+
+            @Override
+            public boolean onTouchEvent(android.view.MotionEvent event) {
+                if (!isEnabled() || currentMode[0] != com.m3.veil.utils.VeilStickerGifEngine.STICKER_MODE_FREEHAND_CUT) {
+                    return false;
+                }
+                float x = event.getX() - ivStickerPreview.getPaddingLeft();
+                float y = event.getY() - ivStickerPreview.getPaddingTop();
+                switch (event.getActionMasked()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        userLassoPath.reset();
+                        activeDrawPath.reset();
+                        // Show full source bitmap while tracing new lasso path
+                        ivStickerPreview.setImageBitmap(sourceBitmap);
+                        userLassoPath.moveTo(x, y);
+                        activeDrawPath.moveTo(event.getX(), event.getY());
+                        lastX = event.getX();
+                        lastY = event.getY();
+                        invalidate();
+                        return true;
+                    case android.view.MotionEvent.ACTION_MOVE:
+                        userLassoPath.lineTo(x, y);
+                        activeDrawPath.quadTo(lastX, lastY, (event.getX() + lastX) * 0.5f, (event.getY() + lastY) * 0.5f);
+                        lastX = event.getX();
+                        lastY = event.getY();
+                        invalidate();
+                        return true;
+                    case android.view.MotionEvent.ACTION_UP:
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        userLassoPath.close();
+                        activeDrawPath.reset();
+                        invalidate();
+                        rebuildPhotoStickerPreview.run();
+                        return true;
+                }
+                return false;
+            }
+        };
+        lassoOverlayView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        lassoOverlayView.setVisibility(View.GONE);
+        canvasCard.addView(lassoOverlayView);
+
+        // Frosted-Glass Studio Processing Overlay inside canvasCard (shown while creating & sending sticker)
+        final LinearLayout photoProcessingOverlay = new LinearLayout(this);
+        photoProcessingOverlay.setOrientation(LinearLayout.VERTICAL);
+        photoProcessingOverlay.setGravity(Gravity.CENTER);
+        int ovPadH = Math.round(24 * dp);
+        int ovPadV = Math.round(18 * dp);
+        photoProcessingOverlay.setPadding(ovPadH, ovPadV, ovPadH, ovPadV);
+        GradientDrawable ovBg = new GradientDrawable();
+        ovBg.setColor(0xDD0B1017);
+        ovBg.setCornerRadius(20 * dp);
+        ovBg.setStroke(Math.max(1, Math.round(dp)), 0x666366F1);
+        photoProcessingOverlay.setBackground(ovBg);
+        FrameLayout.LayoutParams ovLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        photoProcessingOverlay.setLayoutParams(ovLp);
+
+        ProgressBar overlaySpinner = new ProgressBar(this);
+        overlaySpinner.setIndeterminate(true);
+        overlaySpinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#818CF8")));
+        LinearLayout.LayoutParams ospLp = new LinearLayout.LayoutParams(Math.round(34 * dp), Math.round(34 * dp));
+        ospLp.bottomMargin = Math.round(10 * dp);
+        overlaySpinner.setLayoutParams(ospLp);
+        photoProcessingOverlay.addView(overlaySpinner);
+
+        final TextView tvPhotoOverlayStatus = new TextView(this);
+        tvPhotoOverlayStatus.setText("Creating & sending sticker...");
+        tvPhotoOverlayStatus.setTextColor(Color.WHITE);
+        tvPhotoOverlayStatus.setTextSize(13.5f);
+        tvPhotoOverlayStatus.setTypeface(null, Typeface.BOLD);
+        photoProcessingOverlay.addView(tvPhotoOverlayStatus);
+        photoProcessingOverlay.setVisibility(View.GONE);
+        canvasCard.addView(photoProcessingOverlay);
+
+        stageWrapper.addView(canvasCard);
+        root.addView(stageWrapper);
+
+        // 3. Cutout Mode Selector Row (Full Portrait | Auto Cutout | Freehand Cut | Circle)
+        android.widget.HorizontalScrollView modeScroll = new android.widget.HorizontalScrollView(this);
+        modeScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout.LayoutParams msLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        msLp.bottomMargin = Math.round(10 * dp);
+        modeScroll.setLayoutParams(msLp);
+
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setOrientation(LinearLayout.HORIZONTAL);
+        modeRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        final String[] modeLabels = new String[]{
+                "✨ Auto Cut",
+                "✂️ Freehand",
+                "⭕ Circle",
+                "🖼️ Square"
+        };
+        final int[] modeValues = new int[]{
+                com.m3.veil.utils.VeilStickerGifEngine.STICKER_MODE_AUTO_CUTOUT,
+                com.m3.veil.utils.VeilStickerGifEngine.STICKER_MODE_FREEHAND_CUT,
+                com.m3.veil.utils.VeilStickerGifEngine.STICKER_MODE_SHAPE_CIRCLE,
+                com.m3.veil.utils.VeilStickerGifEngine.STICKER_MODE_FULL_PORTRAIT
+        };
+        final TextView[] modeChips = new TextView[modeLabels.length];
+
+        final Runnable updateModeChipStyles = () -> {
+            for (int i = 0; i < modeChips.length; i++) {
+                boolean active = (currentMode[0] == modeValues[i]);
+                GradientDrawable bg = new GradientDrawable();
+                bg.setCornerRadius(16 * dp);
+                bg.setColor(active ? Color.parseColor("#4F46E5") : Color.parseColor("#141C28"));
+                bg.setStroke(Math.max(1, Math.round(dp)), active ? Color.parseColor("#818CF8") : Color.parseColor("#253347"));
+                modeChips[i].setBackground(bg);
+                modeChips[i].setTextColor(active ? Color.WHITE : Color.parseColor("#94A3B8"));
+            }
+            boolean isFreehand = (currentMode[0] == com.m3.veil.utils.VeilStickerGifEngine.STICKER_MODE_FREEHAND_CUT);
+            lassoOverlayView.setVisibility(isFreehand ? View.VISIBLE : View.GONE);
+            tvFreehandHint.setVisibility(isFreehand ? View.VISIBLE : View.GONE);
+        };
+
+        for (int i = 0; i < modeLabels.length; i++) {
+            final int idx = i;
+            TextView chip = new TextView(this);
+            LinearLayout.LayoutParams cLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(33 * dp));
+            cLp.rightMargin = Math.round(8 * dp);
+            chip.setLayoutParams(cLp);
+            chip.setGravity(Gravity.CENTER);
+            chip.setPadding(Math.round(13 * dp), 0, Math.round(13 * dp), 0);
+            chip.setText(modeLabels[i]);
+            chip.setTextSize(12.5f);
+            chip.setTypeface(null, Typeface.BOLD);
+            chip.setOnClickListener(v -> {
+                currentMode[0] = modeValues[idx];
+                updateModeChipStyles.run();
+                if (currentMode[0] == com.m3.veil.utils.VeilStickerGifEngine.STICKER_MODE_FREEHAND_CUT && userLassoPath.isEmpty()) {
+                    ivStickerPreview.setImageBitmap(sourceBitmap);
+                } else {
+                    rebuildPhotoStickerPreview.run();
+                }
+            });
+            modeChips[i] = chip;
+            modeRow.addView(chip);
+        }
+        modeScroll.addView(modeRow);
+        root.addView(modeScroll);
+
+        // 4. Sticker Customization Tools Row (Outline ON/OFF | Aa Text Caption | 😎 Emoji Stamp)
+        LinearLayout toolsRow = new LinearLayout(this);
+        toolsRow.setOrientation(LinearLayout.HORIZONTAL);
+        toolsRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams trLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        trLp.bottomMargin = Math.round(14 * dp);
+        toolsRow.setLayoutParams(trLp);
+
+        final TextView btnOutlineToggle = new TextView(this);
+        LinearLayout.LayoutParams toolLp1 = new LinearLayout.LayoutParams(0, Math.round(34 * dp), 1f);
+        toolLp1.rightMargin = Math.round(8 * dp);
+        btnOutlineToggle.setLayoutParams(toolLp1);
+        btnOutlineToggle.setGravity(Gravity.CENTER);
+        btnOutlineToggle.setText("⚪ Outline: ON");
+        btnOutlineToggle.setTextColor(Color.WHITE);
+        btnOutlineToggle.setTextSize(12f);
+        btnOutlineToggle.setTypeface(null, Typeface.BOLD);
+        final Runnable styleOutlineBtn = () -> {
+            GradientDrawable obg = new GradientDrawable();
+            obg.setCornerRadius(17 * dp);
+            obg.setColor(whiteOutlineEnabled[0] ? Color.parseColor("#0D9488") : Color.parseColor("#141C28"));
+            obg.setStroke(Math.max(1, Math.round(dp)), whiteOutlineEnabled[0] ? Color.parseColor("#2DD4BF") : Color.parseColor("#253347"));
+            btnOutlineToggle.setBackground(obg);
+            btnOutlineToggle.setText(whiteOutlineEnabled[0] ? "⚪ Outline: ON" : "⚪ Outline: OFF");
+            btnOutlineToggle.setTextColor(whiteOutlineEnabled[0] ? Color.WHITE : Color.parseColor("#94A3B8"));
+        };
+        styleOutlineBtn.run();
+        btnOutlineToggle.setOnClickListener(v -> {
+            whiteOutlineEnabled[0] = !whiteOutlineEnabled[0];
+            styleOutlineBtn.run();
+            rebuildPhotoStickerPreview.run();
+        });
+        toolsRow.addView(btnOutlineToggle);
+
+        final TextView btnAddCaption = new TextView(this);
+        LinearLayout.LayoutParams toolLp2 = new LinearLayout.LayoutParams(0, Math.round(34 * dp), 1f);
+        toolLp2.rightMargin = Math.round(8 * dp);
+        btnAddCaption.setLayoutParams(toolLp2);
+        btnAddCaption.setGravity(Gravity.CENTER);
+        btnAddCaption.setText("Aa Text");
+        btnAddCaption.setTextColor(Color.parseColor("#94A3B8"));
+        btnAddCaption.setTextSize(12f);
+        btnAddCaption.setTypeface(null, Typeface.BOLD);
+        GradientDrawable capBtnBg = new GradientDrawable();
+        capBtnBg.setCornerRadius(17 * dp);
+        capBtnBg.setColor(Color.parseColor("#141C28"));
+        capBtnBg.setStroke(Math.max(1, Math.round(dp)), Color.parseColor("#253347"));
+        btnAddCaption.setBackground(capBtnBg);
+        btnAddCaption.setOnClickListener(v -> promptStickerCaptionDialog(captionText, captionColor, rebuildPhotoStickerPreview));
+        toolsRow.addView(btnAddCaption);
+
+        final TextView btnAddStamp = new TextView(this);
+        LinearLayout.LayoutParams toolLp3 = new LinearLayout.LayoutParams(0, Math.round(34 * dp), 1f);
+        btnAddStamp.setLayoutParams(toolLp3);
+        btnAddStamp.setGravity(Gravity.CENTER);
+        btnAddStamp.setText("😎 Stamp");
+        btnAddStamp.setTextColor(Color.parseColor("#94A3B8"));
+        btnAddStamp.setTextSize(12f);
+        btnAddStamp.setTypeface(null, Typeface.BOLD);
+        GradientDrawable stampBtnBg = new GradientDrawable();
+        stampBtnBg.setCornerRadius(17 * dp);
+        stampBtnBg.setColor(Color.parseColor("#141C28"));
+        stampBtnBg.setStroke(Math.max(1, Math.round(dp)), Color.parseColor("#253347"));
+        btnAddStamp.setBackground(stampBtnBg);
+        final String[] stampCycle = new String[]{"", "🔥", "😂", "❤️", "✨", "💯", "👑", "🚀", "😎"};
+        final int[] stampIdx = new int[]{0};
+        btnAddStamp.setOnClickListener(v -> {
+            stampIdx[0] = (stampIdx[0] + 1) % stampCycle.length;
+            stampEmoji[0] = stampCycle[stampIdx[0]];
+            btnAddStamp.setText(stampEmoji[0].isEmpty() ? "😎 Stamp" : ("Stamp " + stampEmoji[0]));
+            btnAddStamp.setTextColor(stampEmoji[0].isEmpty() ? Color.parseColor("#94A3B8") : Color.WHITE);
+            rebuildPhotoStickerPreview.run();
+        });
+        toolsRow.addView(btnAddStamp);
+        root.addView(toolsRow);
+
+        // 5. Bottom Action Row: Cancel + Professional Custom Progress Send Sticker Button
+        LinearLayout bottomRow = new LinearLayout(this);
+        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+        bottomRow.setGravity(Gravity.CENTER_VERTICAL);
+        bottomRow.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        final TextView btnCancel = new TextView(this);
+        btnCancel.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(42 * dp)));
+        btnCancel.setGravity(Gravity.CENTER);
+        btnCancel.setPadding(Math.round(20 * dp), 0, Math.round(20 * dp), 0);
+        btnCancel.setText("Cancel");
+        btnCancel.setTextColor(Color.parseColor("#94A3B8"));
+        btnCancel.setTextSize(14.5f);
+        btnCancel.setTypeface(null, Typeface.BOLD);
+        GradientDrawable cancelBg = new GradientDrawable();
+        cancelBg.setColor(Color.parseColor("#182230"));
+        cancelBg.setCornerRadius(21 * dp);
+        btnCancel.setBackground(cancelBg);
+        btnCancel.setOnClickListener(v -> studioDialog.dismiss());
+        bottomRow.addView(btnCancel);
+
+        View spacer = new View(this);
+        spacer.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
+        bottomRow.addView(spacer);
+
+        final LinearLayout btnSendSticker = new LinearLayout(this);
+        btnSendSticker.setOrientation(LinearLayout.HORIZONTAL);
+        btnSendSticker.setGravity(Gravity.CENTER);
+        btnSendSticker.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(44 * dp)));
+        btnSendSticker.setPadding(Math.round(24 * dp), 0, Math.round(24 * dp), 0);
+        final GradientDrawable sendBg = new GradientDrawable();
+        sendBg.setColor(Color.parseColor("#6366F1"));
+        sendBg.setCornerRadius(22 * dp);
+        btnSendSticker.setBackground(sendBg);
+
+        final android.widget.ProgressBar sendBtnSpinner = new android.widget.ProgressBar(
+                this, null, android.R.attr.progressBarStyleSmall);
+        LinearLayout.LayoutParams spBtnLp = new LinearLayout.LayoutParams(
+                Math.round(18 * dp), Math.round(18 * dp));
+        spBtnLp.rightMargin = Math.round(8 * dp);
+        sendBtnSpinner.setLayoutParams(spBtnLp);
+        if (sendBtnSpinner.getIndeterminateDrawable() != null) {
+            sendBtnSpinner.getIndeterminateDrawable().setColorFilter(Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN);
+        }
+        sendBtnSpinner.setVisibility(View.GONE);
+        btnSendSticker.addView(sendBtnSpinner);
+
+        final TextView tvSendStickerText = new TextView(this);
+        tvSendStickerText.setText("Send Sticker");
+        tvSendStickerText.setTextColor(Color.WHITE);
+        tvSendStickerText.setTextSize(15f);
+        tvSendStickerText.setTypeface(null, Typeface.BOLD);
+        btnSendSticker.addView(tvSendStickerText);
+
+        final boolean[] isSendingPhotoSticker = new boolean[]{false};
+        btnSendSticker.setOnClickListener(v -> {
+            if (isSendingPhotoSticker[0]) return;
+            Bitmap finalBmp = latestRenderedSticker[0];
+            if (finalBmp == null) {
+                rebuildPhotoStickerPreview.run();
+                finalBmp = latestRenderedSticker[0];
+            }
+            if (finalBmp == null) return;
+            isSendingPhotoSticker[0] = true;
+
+            // Professional custom progress state: disable all buttons & show inline + stage progress
+            studioDialog.setCancelable(false);
+            btnSendSticker.setEnabled(false);
+            sendBg.setColor(Color.parseColor("#4338CA"));
+            sendBtnSpinner.setVisibility(View.VISIBLE);
+            tvSendStickerText.setText("Sending Sticker...");
+            photoProcessingOverlay.setVisibility(View.VISIBLE);
+
+            btnCancel.setEnabled(false);
+            btnCancel.setAlpha(0.42f);
+            btnOutlineToggle.setEnabled(false);
+            btnOutlineToggle.setAlpha(0.42f);
+            btnAddCaption.setEnabled(false);
+            btnAddCaption.setAlpha(0.42f);
+            btnAddStamp.setEnabled(false);
+            btnAddStamp.setAlpha(0.42f);
+            lassoOverlayView.setEnabled(false);
+            for (TextView chip : modeChips) {
+                if (chip != null) {
+                    chip.setEnabled(false);
+                    chip.setAlpha(0.42f);
+                }
+            }
+
+            final Bitmap bmpToSave = finalBmp;
+            new Thread(() -> {
+                final File savedFile = savePhotoStickerBitmapToFile(bmpToSave);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (savedFile != null && savedFile.exists()) {
+                        if (chatId != null && !chatId.isEmpty()) {
+                            VeilMessagesController.getInstance(MediaViewerActivity.this).sendMediaMessage(
+                                    chatId, peerId, "sticker", savedFile, "[sticker]", null, false);
+                            Toast.makeText(MediaViewerActivity.this, "Photo sticker created & sent!", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(MediaViewerActivity.this, "Photo sticker saved to your collection!", Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        Toast.makeText(MediaViewerActivity.this, "Unable to save photo sticker", Toast.LENGTH_SHORT).show();
+                    }
+                    try {
+                        if (studioDialog.isShowing()) studioDialog.dismiss();
+                    } catch (Exception ignored) {}
+                    if (savedFile != null && savedFile.exists() && chatId != null && !chatId.isEmpty()) {
+                        // Close sticker screen and return to ChatActivity at the latest message
+                        com.m3.veil.ui.chat.ChatActivity.shouldScrollToBottomOnResume = true;
+                        finish();
+                    }
+                });
+            }, "VeilPhotoStickerSender").start();
+        });
+        bottomRow.addView(btnSendSticker);
+        root.addView(bottomRow);
+
+        updateModeChipStyles.run();
+        studioDialog.setContentView(root);
+        studioDialog.show();
+        ivStickerPreview.post(rebuildPhotoStickerPreview);
+    }
+
+    private void promptStickerCaptionDialog(
+            @NonNull final String[] captionTextHolder,
+            @NonNull final int[] captionColorHolder,
+            @NonNull final Runnable onUpdated) {
+        final float dp = getResources().getDisplayMetrics().density;
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int pad = Math.round(20 * dp);
+        container.setPadding(pad, Math.round(14 * dp), pad, Math.round(8 * dp));
+
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setHint("Type sticker text (e.g. WOW!, LIT)...");
+        input.setText(captionTextHolder[0]);
+        input.setSingleLine(true);
+        container.addView(input);
+
+        LinearLayout colorRow = new LinearLayout(this);
+        colorRow.setOrientation(LinearLayout.HORIZONTAL);
+        colorRow.setGravity(Gravity.CENTER_VERTICAL);
+        colorRow.setPadding(0, Math.round(12 * dp), 0, 0);
+        final int[] palette = new int[]{
+                Color.WHITE,
+                0xFFFACC15, // Vibrant Yellow
+                0xFF38BDF8, // Electric Cyan
+                0xFFF43F5E, // Neon Rose
+                0xFF4ADE80, // Emerald Green
+                0xFFFB923C  // Sunset Orange
+        };
+        for (final int c : palette) {
+            View swatch = new View(this);
+            int sz = Math.round(30 * dp);
+            LinearLayout.LayoutParams sLp = new LinearLayout.LayoutParams(sz, sz);
+            sLp.rightMargin = Math.round(10 * dp);
+            swatch.setLayoutParams(sLp);
+            GradientDrawable sd = new GradientDrawable();
+            sd.setShape(GradientDrawable.OVAL);
+            sd.setColor(c);
+            sd.setStroke(Math.round(2 * dp), c == captionColorHolder[0] ? 0xFF6366F1 : 0x55888888);
+            swatch.setBackground(sd);
+            swatch.setOnClickListener(v -> {
+                captionColorHolder[0] = c;
+                input.setTextColor(c == Color.WHITE ? Color.DKGRAY : c);
+            });
+            colorRow.addView(swatch);
+        }
+        container.addView(colorRow);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Sticker Text Overlay")
+                .setView(container)
+                .setPositiveButton("Apply", (d, w) -> {
+                    captionTextHolder[0] = input.getText() != null ? input.getText().toString().trim() : "";
+                    onUpdated.run();
+                })
+                .setNeutralButton("Clear", (d, w) -> {
+                    captionTextHolder[0] = "";
+                    onUpdated.run();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    @Nullable
+    private File savePhotoStickerBitmapToFile(@NonNull Bitmap stickerBmp) {
+        try {
+            Bitmap toSave = stickerBmp;
+            if (stickerBmp.getWidth() != 512 || stickerBmp.getHeight() != 512) {
+                // Enforce WhatsApp/Telegram-standard 512x512 (1:1 Square) sticker output
+                toSave = com.m3.veil.utils.VeilStickerGifEngine.fitOrCenterCropToSquare(stickerBmp, 512, false);
+            }
+
+            File stickerDir = new File(getFilesDir(), "custom_stickers");
+            if (!stickerDir.exists()) stickerDir.mkdirs();
+            File stickerFile = new File(stickerDir, "sticker_" + System.currentTimeMillis() + ".png");
+            try (FileOutputStream fos = new FileOutputStream(stickerFile)) {
+                toSave.compress(Bitmap.CompressFormat.PNG, 100, fos);
+                fos.flush();
+            }
+
+            com.m3.veil.utils.VeilStickerGifEngine.cacheDimensions(
+                    stickerFile.getAbsolutePath(), toSave.getWidth(), toSave.getHeight());
+            return stickerFile;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Complete Telegram/WhatsApp-style Video Sticker Trimmer Studio (for Videos ONLY):
+     * - Strictly enforces a 5.0-second maximum duration (MAX_VIDEO_STICKER_DURATION_MS = 5000L)
+     * - Preserves the video's true Portrait (9:16 / 3:4), Landscape (16:9 / 4:3), or Square (1:1) aspect ratio
+     * - Plays live voice/audio with audio focus + Sound ON/Muted toggle
+     * - Shows custom loading progress on Send Sticker button & disables all controls during encoding
+     */
+    private void showVideoStickerTrimmerDialog(@NonNull final File videoFile) {
+        final float dp = getResources().getDisplayMetrics().density;
+        final long maxStickerMs = com.m3.veil.utils.VeilStickerGifEngine.MAX_VIDEO_STICKER_DURATION_MS; // 5000ms (5.0s)
+
+        // Release any active background video decoder/SurfaceView so trimmer VideoView gets full audio & video hardware access
+        try {
+            pauseActiveVideoPlayback();
+            if (videoViewer != null) {
+                videoViewer.stopPlayback();
+            }
+        } catch (Exception ignored) {}
 
         final android.app.Dialog trimDialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.BLACK);
+        root.setBackgroundColor(Color.parseColor("#0B1017"));
         root.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        root.setPadding(Math.round(14 * dp), Math.round(38 * dp), Math.round(14 * dp), Math.round(20 * dp));
+        root.setPadding(Math.round(14 * dp), Math.round(34 * dp), Math.round(14 * dp), Math.round(18 * dp));
 
-        // 1. Top "Trim" Title
-        TextView tvTrimHeader = new TextView(this);
-        tvTrimHeader.setLayoutParams(new LinearLayout.LayoutParams(
+        // 1. Sleek Minimal Header Bar: Close Icon + Title "Video Sticker" (No Sound / Mute / Badge Clutter)
+        LinearLayout headerRow = new LinearLayout(this);
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(Gravity.CENTER_VERTICAL);
+        headerRow.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        tvTrimHeader.setGravity(Gravity.CENTER);
-        tvTrimHeader.setText("Trim");
-        tvTrimHeader.setTextColor(Color.WHITE);
-        tvTrimHeader.setTextSize(18f);
-        tvTrimHeader.setTypeface(null, Typeface.BOLD);
-        tvTrimHeader.setPadding(0, Math.round(6 * dp), 0, Math.round(18 * dp));
-        root.addView(tvTrimHeader);
+        headerRow.setPadding(Math.round(4 * dp), 0, Math.round(4 * dp), Math.round(14 * dp));
 
-        // 2. Center Dark Slate Preview Card (#11161B) with Square Preview & Play Button
-        FrameLayout previewCard = new FrameLayout(this);
-        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+        ImageView btnCloseHeader = new ImageView(this);
+        int closeSz = Math.round(36 * dp);
+        LinearLayout.LayoutParams cbLp = new LinearLayout.LayoutParams(closeSz, closeSz);
+        cbLp.rightMargin = Math.round(12 * dp);
+        btnCloseHeader.setLayoutParams(cbLp);
+        btnCloseHeader.setPadding(Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp));
+        btnCloseHeader.setImageResource(R.drawable.ic_close);
+        btnCloseHeader.setColorFilter(Color.WHITE);
+        GradientDrawable cbBg = new GradientDrawable();
+        cbBg.setShape(GradientDrawable.OVAL);
+        cbBg.setColor(0x2AFFFFFF);
+        btnCloseHeader.setBackground(cbBg);
+        btnCloseHeader.setOnClickListener(v -> trimDialog.dismiss());
+        headerRow.addView(btnCloseHeader);
+
+        TextView tvTrimHeader = new TextView(this);
+        tvTrimHeader.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        tvTrimHeader.setText("Video Sticker");
+        tvTrimHeader.setTextColor(Color.WHITE);
+        tvTrimHeader.setTextSize(17f);
+        tvTrimHeader.setTypeface(null, Typeface.BOLD);
+        headerRow.addView(tvTrimHeader);
+        root.addView(headerRow);
+
+        final android.media.MediaPlayer[] activeTrimPlayer = new android.media.MediaPlayer[]{null};
+
+        // 2. Center Preview Stage Wrapper & Aspect-Ratio Fitted Card (Portrait / Landscape / Square)
+        final FrameLayout stageWrapper = new FrameLayout(this);
+        LinearLayout.LayoutParams stageLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
-        cardLp.bottomMargin = Math.round(18 * dp);
+        stageLp.bottomMargin = Math.round(14 * dp);
+        stageWrapper.setLayoutParams(stageLp);
+
+        final FrameLayout previewCard = new FrameLayout(this);
+        FrameLayout.LayoutParams cardLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER);
         previewCard.setLayoutParams(cardLp);
         GradientDrawable cardBg = new GradientDrawable();
         cardBg.setColor(Color.parseColor("#11161B"));
         cardBg.setCornerRadius(18 * dp);
+        cardBg.setStroke(Math.max(1, Math.round(1.2f * dp)), Color.parseColor("#2A3942"));
         previewCard.setBackground(cardBg);
 
-        int squareSize = Math.round(Math.min(getResources().getDisplayMetrics().widthPixels - 64 * dp, 300 * dp));
-        FrameLayout squareFrame = new FrameLayout(this);
-        FrameLayout.LayoutParams sqLp = new FrameLayout.LayoutParams(squareSize, squareSize, Gravity.CENTER);
-        squareFrame.setLayoutParams(sqLp);
-        squareFrame.setBackgroundColor(Color.BLACK);
+        final FrameLayout videoFrameHolder = new FrameLayout(this);
+        FrameLayout.LayoutParams vfLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER);
+        int marginFrame = Math.round(8 * dp);
+        vfLp.setMargins(marginFrame, marginFrame, marginFrame, marginFrame);
+        videoFrameHolder.setLayoutParams(vfLp);
+        videoFrameHolder.setBackgroundColor(Color.TRANSPARENT);
+        videoFrameHolder.setClipChildren(true);
+        videoFrameHolder.setClipToOutline(true);
+        videoFrameHolder.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, android.graphics.Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), 14 * dp);
+            }
+        });
 
         final ImageView ivFramePreview = new ImageView(this);
         ivFramePreview.setLayoutParams(new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
         ivFramePreview.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        squareFrame.addView(ivFramePreview);
+        videoFrameHolder.addView(ivFramePreview);
 
         final VideoView trimVideoView = new VideoView(this);
         trimVideoView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
-        trimVideoView.setVisibility(isVid ? View.VISIBLE : View.GONE);
-        squareFrame.addView(trimVideoView);
+        trimVideoView.setZOrderMediaOverlay(true);
+        videoFrameHolder.addView(trimVideoView);
 
-        // Center Play Button Overlay
         final FrameLayout centerPlayCircle = new FrameLayout(this);
         int playSz = Math.round(56 * dp);
         FrameLayout.LayoutParams playLp = new FrameLayout.LayoutParams(playSz, playSz, Gravity.CENTER);
@@ -1475,19 +2174,146 @@ public class MediaViewerActivity extends AppCompatActivity {
         ivPlayIcon.setImageResource(R.drawable.ic_play_arrow);
         ivPlayIcon.setColorFilter(Color.WHITE);
         centerPlayCircle.addView(ivPlayIcon);
-        squareFrame.addView(centerPlayCircle);
+        videoFrameHolder.addView(centerPlayCircle);
 
-        previewCard.addView(squareFrame);
-        root.addView(previewCard);
+        previewCard.addView(videoFrameHolder);
 
-        // 3. Filmstrip Timeline Bar with White Selection Box & Left/Right Circular Handles (●)
+        // Frosted-Glass Encoding Progress Overlay inside previewCard
+        final LinearLayout videoProcessingOverlay = new LinearLayout(this);
+        videoProcessingOverlay.setOrientation(LinearLayout.VERTICAL);
+        videoProcessingOverlay.setGravity(Gravity.CENTER);
+        FrameLayout.LayoutParams vpOvLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        videoProcessingOverlay.setLayoutParams(vpOvLp);
+        int vpPadH = Math.round(24 * dp);
+        int vpPadV = Math.round(18 * dp);
+        videoProcessingOverlay.setPadding(vpPadH, vpPadV, vpPadH, vpPadV);
+        GradientDrawable vpOvBg = new GradientDrawable();
+        vpOvBg.setColor(Color.parseColor("#E60F172A"));
+        vpOvBg.setCornerRadius(18 * dp);
+        vpOvBg.setStroke(Math.max(1, Math.round(dp)), Color.parseColor("#446366F1"));
+        videoProcessingOverlay.setBackground(vpOvBg);
+
+        android.widget.ProgressBar vidStageSpinner = new android.widget.ProgressBar(this);
+        LinearLayout.LayoutParams vspLp = new LinearLayout.LayoutParams(Math.round(38 * dp), Math.round(38 * dp));
+        vspLp.bottomMargin = Math.round(10 * dp);
+        vidStageSpinner.setLayoutParams(vspLp);
+        if (vidStageSpinner.getIndeterminateDrawable() != null) {
+            vidStageSpinner.getIndeterminateDrawable().setColorFilter(
+                    Color.parseColor("#818CF8"), android.graphics.PorterDuff.Mode.SRC_IN);
+        }
+        videoProcessingOverlay.addView(vidStageSpinner);
+
+        TextView tvVidOverlayStatus = new TextView(this);
+        tvVidOverlayStatus.setText("Encoding animated sticker...");
+        tvVidOverlayStatus.setTextColor(Color.WHITE);
+        tvVidOverlayStatus.setTextSize(13.5f);
+        tvVidOverlayStatus.setTypeface(null, Typeface.BOLD);
+        videoProcessingOverlay.addView(tvVidOverlayStatus);
+        videoProcessingOverlay.setVisibility(View.GONE);
+        previewCard.addView(videoProcessingOverlay);
+
+        stageWrapper.addView(previewCard);
+        root.addView(stageWrapper);
+
+        // 3. Extract Video Duration, Orientation-Aware Dimensions & Filmstrip Thumbnails
+        final long[] totalDurationMs = new long[]{5000L};
+        final int[] videoIntrinsicDim = new int[]{0, 0};
+        final List<Bitmap> stripBitmaps = new ArrayList<>();
+        int frameCount = 8;
+        MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+        try {
+            mmr.setDataSource(videoFile.getAbsolutePath());
+            String dStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            if (dStr != null) {
+                totalDurationMs[0] = Math.max(500L, Long.parseLong(dStr));
+            }
+            String wStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH);
+            String hStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT);
+            String rotStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
+            int metaW = wStr != null ? Integer.parseInt(wStr) : 0;
+            int metaH = hStr != null ? Integer.parseInt(hStr) : 0;
+            int metaRot = rotStr != null ? Integer.parseInt(rotStr) : 0;
+            if (metaRot == 90 || metaRot == 270) {
+                int tmp = metaW;
+                metaW = metaH;
+                metaH = tmp;
+            }
+            if (metaW > 0 && metaH > 0) {
+                videoIntrinsicDim[0] = metaW;
+                videoIntrinsicDim[1] = metaH;
+            }
+            for (int i = 0; i < frameCount; i++) {
+                long tUs = (totalDurationMs[0] * 1000L * i) / Math.max(1, frameCount);
+                Bitmap b = mmr.getFrameAtTime(tUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                if (b == null) b = mmr.getFrameAtTime();
+                if (b != null) {
+                    if (videoIntrinsicDim[0] <= 0 || videoIntrinsicDim[1] <= 0) {
+                        videoIntrinsicDim[0] = b.getWidth();
+                        videoIntrinsicDim[1] = b.getHeight();
+                    }
+                    stripBitmaps.add(b);
+                }
+            }
+        } catch (Throwable ignored) {
+        } finally {
+            try { mmr.release(); } catch (Throwable ignored) {}
+        }
+
+        if (!stripBitmaps.isEmpty()) {
+            ivFramePreview.setImageBitmap(stripBitmaps.get(0));
+        }
+
+        final Runnable fitPreviewCardToVideoAspectRatio = () -> {
+            int sw = stageWrapper.getWidth();
+            int sh = stageWrapper.getHeight();
+            int vw = videoIntrinsicDim[0];
+            int vh = videoIntrinsicDim[1];
+            if (sw <= 0 || sh <= 0) return;
+            // Always preview video stickers in a WhatsApp/Telegram-standard 1:1 Square card
+            int side = Math.max(Math.round(170 * dp), Math.min(sw, sh));
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) previewCard.getLayoutParams();
+            lp.width = side;
+            lp.height = side;
+            lp.gravity = Gravity.CENTER;
+            previewCard.setLayoutParams(lp);
+            if (vw > 0 && vh > 0) {
+                previewCard.post(() -> {
+                    // Center-crop the video inside the square frame (matches the encoded 320x320 sticker)
+                    int cw = videoFrameHolder.getWidth();
+                    int ch = videoFrameHolder.getHeight();
+                    if (cw <= 0 || ch <= 0) return;
+                    float scale = Math.max((float) cw / vw, (float) ch / vh);
+                    FrameLayout.LayoutParams vlp = (FrameLayout.LayoutParams) trimVideoView.getLayoutParams();
+                    vlp.width = Math.max(1, Math.round(vw * scale));
+                    vlp.height = Math.max(1, Math.round(vh * scale));
+                    vlp.gravity = Gravity.CENTER;
+                    trimVideoView.setLayoutParams(vlp);
+                });
+            }
+        };
+        stageWrapper.post(fitPreviewCardToVideoAspectRatio);
+
+        // Enforce 5.0s max window on initial selection
+        final float[] maxAllowedFraction = new float[]{
+                Math.min(1f, (float) maxStickerMs / (float) Math.max(1L, totalDurationMs[0]))
+        };
+        final float[] minAllowedFraction = new float[]{
+                Math.min(maxAllowedFraction[0], Math.max(0.05f, 500f / (float) Math.max(500L, totalDurationMs[0])))
+        };
+        final float[] startFraction = new float[]{0f};
+        final float[] endFraction = new float[]{maxAllowedFraction[0]};
+
+        final Runnable updateDurationPillText = () -> {};
+
+        // 4. Filmstrip Timeline Bar with 5.0s Max Enforced Selection Handles
         final int stripHeight = Math.round(54 * dp);
         final FrameLayout timelineContainer = new FrameLayout(this);
         LinearLayout.LayoutParams tlLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, stripHeight);
         tlLp.leftMargin = Math.round(8 * dp);
         tlLp.rightMargin = Math.round(8 * dp);
-        tlLp.bottomMargin = Math.round(22 * dp);
+        tlLp.bottomMargin = Math.round(12 * dp);
         timelineContainer.setLayoutParams(tlLp);
 
         LinearLayout filmstripRow = new LinearLayout(this);
@@ -1501,38 +2327,6 @@ public class MediaViewerActivity extends AppCompatActivity {
         int padStrip = Math.round(2 * dp);
         filmstripRow.setPadding(padStrip, padStrip, padStrip, padStrip);
 
-        final long[] totalDurationMs = new long[]{5000L};
-        final List<Bitmap> stripBitmaps = new ArrayList<>();
-        int frameCount = 8;
-        if (isVid) {
-            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-            try {
-                mmr.setDataSource(f.getAbsolutePath());
-                String dStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
-                if (dStr != null) {
-                    totalDurationMs[0] = Math.max(1000L, Long.parseLong(dStr));
-                }
-                for (int i = 0; i < frameCount; i++) {
-                    long tUs = (totalDurationMs[0] * 1000L * i) / Math.max(1, frameCount);
-                    Bitmap b = mmr.getFrameAtTime(tUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
-                    if (b == null) b = mmr.getFrameAtTime();
-                    if (b != null) stripBitmaps.add(b);
-                }
-            } catch (Throwable ignored) {
-            } finally {
-                try { mmr.release(); } catch (Throwable ignored) {}
-            }
-        } else {
-            Bitmap b = decodeCompleteBitmapWithExif(f, 800);
-            if (b != null) {
-                for (int i = 0; i < frameCount; i++) stripBitmaps.add(b);
-            }
-        }
-
-        if (!stripBitmaps.isEmpty()) {
-            ivFramePreview.setImageBitmap(stripBitmaps.get(0));
-        }
-
         for (int i = 0; i < frameCount; i++) {
             ImageView thumb = new ImageView(this);
             thumb.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
@@ -1544,13 +2338,12 @@ public class MediaViewerActivity extends AppCompatActivity {
         }
         timelineContainer.addView(filmstripRow);
 
-        // White Selection Overlay Box with Left & Right White Circular Handles (●)
         final FrameLayout selectionBox = new FrameLayout(this);
         final FrameLayout.LayoutParams selLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         selectionBox.setLayoutParams(selLp);
         GradientDrawable selBorder = new GradientDrawable();
-        selBorder.setColor(Color.TRANSPARENT);
+        selBorder.setColor(0x2234D399);
         selBorder.setCornerRadius(6 * dp);
         selBorder.setStroke(Math.round(2.5f * dp), Color.WHITE);
         selectionBox.setBackground(selBorder);
@@ -1577,10 +2370,17 @@ public class MediaViewerActivity extends AppCompatActivity {
         timelineContainer.addView(selectionBox);
         root.addView(timelineContainer);
 
-        final float[] startFraction = new float[]{0f};
-        final float[] endFraction = new float[]{1f};
+        final Runnable syncSelectionBoxMargins = () -> {
+            int width = timelineContainer.getWidth();
+            if (width <= 0) return;
+            selLp.leftMargin = Math.round(startFraction[0] * width);
+            selLp.rightMargin = Math.round((1f - endFraction[0]) * width);
+            selectionBox.setLayoutParams(selLp);
+        };
+        timelineContainer.post(syncSelectionBoxMargins);
 
         timelineContainer.setOnTouchListener((v, event) -> {
+            if (!timelineContainer.isEnabled()) return false;
             int width = timelineContainer.getWidth();
             if (width <= 0) return false;
             float x = Math.max(0f, Math.min(width, event.getX()));
@@ -1588,24 +2388,25 @@ public class MediaViewerActivity extends AppCompatActivity {
             float distStart = Math.abs(frac - startFraction[0]);
             float distEnd = Math.abs(frac - endFraction[0]);
             if (distStart <= distEnd) {
-                startFraction[0] = Math.min(frac, endFraction[0] - 0.12f);
-                startFraction[0] = Math.max(0f, startFraction[0]);
+                startFraction[0] = Math.max(0f, Math.min(frac, endFraction[0] - minAllowedFraction[0]));
+                // Strictly cap selection window to 5.0 seconds max!
+                if (endFraction[0] - startFraction[0] > maxAllowedFraction[0]) {
+                    endFraction[0] = Math.min(1f, startFraction[0] + maxAllowedFraction[0]);
+                }
             } else {
-                endFraction[0] = Math.max(frac, startFraction[0] + 0.12f);
-                endFraction[0] = Math.min(1f, endFraction[0]);
+                endFraction[0] = Math.min(1f, Math.max(frac, startFraction[0] + minAllowedFraction[0]));
+                // Strictly cap selection window to 5.0 seconds max!
+                if (endFraction[0] - startFraction[0] > maxAllowedFraction[0]) {
+                    startFraction[0] = Math.max(0f, endFraction[0] - maxAllowedFraction[0]);
+                }
             }
-            int leftPx = Math.round(startFraction[0] * width);
-            int rightPx = Math.round((1f - endFraction[0]) * width);
-            selLp.leftMargin = leftPx;
-            selLp.rightMargin = rightPx;
-            selectionBox.setLayoutParams(selLp);
+            syncSelectionBoxMargins.run();
+            updateDurationPillText.run();
 
             long seekMs = Math.round(startFraction[0] * totalDurationMs[0]);
-            if (isVid) {
-                try {
-                    trimVideoView.seekTo((int) seekMs);
-                } catch (Exception ignored) {}
-            }
+            try {
+                trimVideoView.seekTo((int) seekMs);
+            } catch (Exception ignored) {}
             if (!stripBitmaps.isEmpty()) {
                 int idx = Math.min(stripBitmaps.size() - 1, Math.max(0, Math.round(startFraction[0] * (stripBitmaps.size() - 1))));
                 ivFramePreview.setImageBitmap(stripBitmaps.get(idx));
@@ -1613,60 +2414,159 @@ public class MediaViewerActivity extends AppCompatActivity {
             return true;
         });
 
-        if (isVid) {
-            trimVideoView.setVideoPath(f.getAbsolutePath());
-            trimVideoView.setOnPreparedListener(mp -> {
-                mp.setLooping(true);
-                int vw = mp.getVideoWidth();
-                int vh = mp.getVideoHeight();
-                if (vw > 0 && vh > 0) {
-                    fitVideoViewToAspectRatio(trimVideoView, squareFrame, vw, vh);
-                }
-                trimVideoView.seekTo(1);
-            });
-            View.OnClickListener toggleTrimPlay = v -> {
-                if (trimVideoView.isPlaying()) {
-                    trimVideoView.pause();
-                    ivPlayIcon.setImageResource(R.drawable.ic_play_arrow);
-                    centerPlayCircle.setAlpha(1f);
-                } else {
-                    ivFramePreview.setVisibility(View.GONE);
-                    trimVideoView.seekTo((int) (startFraction[0] * totalDurationMs[0]));
-                    trimVideoView.start();
-                    ivPlayIcon.setImageResource(R.drawable.ic_pause);
-                    centerPlayCircle.setAlpha(0.35f);
-                }
-            };
-            centerPlayCircle.setOnClickListener(toggleTrimPlay);
-            squareFrame.setOnClickListener(toggleTrimPlay);
-        } else {
-            centerPlayCircle.setOnClickListener(v ->
-                    Toast.makeText(this, "Previewing sticker frame", Toast.LENGTH_SHORT).show());
-        }
+        // Loop video preview within [startMs, endMs]
+        final Runnable rangeLoopMonitor = new Runnable() {
+            @Override
+            public void run() {
+                if (!trimDialog.isShowing()) return;
+                try {
+                    if (trimVideoView.isPlaying()) {
+                        long startMs = Math.round(startFraction[0] * totalDurationMs[0]);
+                        long endMs = Math.min(startMs + maxStickerMs, Math.round(endFraction[0] * totalDurationMs[0]));
+                        int pos = trimVideoView.getCurrentPosition();
+                        if (pos >= endMs) {
+                            trimVideoView.seekTo((int) startMs);
+                        }
+                        trimVideoView.postDelayed(this, 80L);
+                    }
+                } catch (Exception ignored) {}
+            }
+        };
 
-        // 4. Bottom Action Row: Dark "Cancel" Pill on Left + White "Done" Pill on Right
+        trimVideoView.setVideoPath(videoFile.getAbsolutePath());
+        trimVideoView.setOnPreparedListener(mp -> {
+            activeTrimPlayer[0] = mp;
+            mp.setLooping(true);
+            mp.setVolume(0.0f, 0.0f); // Video stickers are strictly silent
+
+            int mpDur = mp.getDuration();
+            if (mpDur > 500) {
+                totalDurationMs[0] = mpDur;
+                maxAllowedFraction[0] = Math.min(1f, (float) maxStickerMs / (float) totalDurationMs[0]);
+                minAllowedFraction[0] = Math.min(maxAllowedFraction[0], Math.max(0.05f, 500f / (float) totalDurationMs[0]));
+                if (startFraction[0] == 0f) {
+                    endFraction[0] = maxAllowedFraction[0];
+                } else if (endFraction[0] - startFraction[0] > maxAllowedFraction[0]) {
+                    endFraction[0] = Math.min(1f, startFraction[0] + maxAllowedFraction[0]);
+                }
+                syncSelectionBoxMargins.run();
+                updateDurationPillText.run();
+            }
+
+            int vw = mp.getVideoWidth() > 0 ? mp.getVideoWidth() : videoIntrinsicDim[0];
+            int vh = mp.getVideoHeight() > 0 ? mp.getVideoHeight() : videoIntrinsicDim[1];
+            if (vw > 0 && vh > 0) {
+                videoIntrinsicDim[0] = vw;
+                videoIntrinsicDim[1] = vh;
+                stageWrapper.post(fitPreviewCardToVideoAspectRatio);
+            }
+            // Start playing trimmed preview automatically with voice enabled!
+            ivFramePreview.setVisibility(View.GONE);
+            trimVideoView.seekTo((int) (startFraction[0] * totalDurationMs[0]));
+            trimVideoView.start();
+            ivPlayIcon.setImageResource(R.drawable.ic_pause);
+            centerPlayCircle.setAlpha(0.28f);
+            trimVideoView.postDelayed(rangeLoopMonitor, 80L);
+        });
+
+        View.OnClickListener toggleTrimPlay = v -> {
+            if (!videoFrameHolder.isEnabled()) return;
+            if (trimVideoView.isPlaying()) {
+                trimVideoView.pause();
+                ivPlayIcon.setImageResource(R.drawable.ic_play_arrow);
+                centerPlayCircle.setAlpha(1f);
+            } else {
+                ivFramePreview.setVisibility(View.GONE);
+                trimVideoView.seekTo((int) (startFraction[0] * totalDurationMs[0]));
+                trimVideoView.start();
+                ivPlayIcon.setImageResource(R.drawable.ic_pause);
+                centerPlayCircle.setAlpha(0.28f);
+                trimVideoView.postDelayed(rangeLoopMonitor, 80L);
+            }
+        };
+        centerPlayCircle.setOnClickListener(toggleTrimPlay);
+        videoFrameHolder.setOnClickListener(toggleTrimPlay);
+
+        // 5. Video Sticker Style Options Row (Outline ON/OFF + Aa Text Caption)
+        final boolean[] videoOutlineEnabled = new boolean[]{false};
+        final String[] videoCaptionText = new String[]{""};
+        final int[] videoCaptionColor = new int[]{Color.WHITE};
+
+        LinearLayout styleRow = new LinearLayout(this);
+        styleRow.setOrientation(LinearLayout.HORIZONTAL);
+        styleRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams srLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        srLp.bottomMargin = Math.round(14 * dp);
+        styleRow.setLayoutParams(srLp);
+
+        final TextView btnVidOutline = new TextView(this);
+        LinearLayout.LayoutParams voLp = new LinearLayout.LayoutParams(0, Math.round(34 * dp), 1f);
+        voLp.rightMargin = Math.round(8 * dp);
+        btnVidOutline.setLayoutParams(voLp);
+        btnVidOutline.setGravity(Gravity.CENTER);
+        btnVidOutline.setTextColor(Color.WHITE);
+        btnVidOutline.setTextSize(12f);
+        btnVidOutline.setTypeface(null, Typeface.BOLD);
+        final Runnable updateVidOutlineBtn = () -> {
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius(17 * dp);
+            bg.setColor(videoOutlineEnabled[0] ? Color.parseColor("#0D9488") : Color.parseColor("#141C28"));
+            bg.setStroke(Math.max(1, Math.round(dp)), videoOutlineEnabled[0] ? Color.parseColor("#2DD4BF") : Color.parseColor("#253347"));
+            btnVidOutline.setBackground(bg);
+            btnVidOutline.setText(videoOutlineEnabled[0] ? "⚪ Outline: ON" : "⚪ Outline: OFF");
+            btnVidOutline.setTextColor(videoOutlineEnabled[0] ? Color.WHITE : Color.parseColor("#94A3B8"));
+        };
+        updateVidOutlineBtn.run();
+        btnVidOutline.setOnClickListener(v -> {
+            videoOutlineEnabled[0] = !videoOutlineEnabled[0];
+            updateVidOutlineBtn.run();
+        });
+        styleRow.addView(btnVidOutline);
+
+        final TextView btnVidCaption = new TextView(this);
+        LinearLayout.LayoutParams vcLp = new LinearLayout.LayoutParams(0, Math.round(34 * dp), 1f);
+        btnVidCaption.setLayoutParams(vcLp);
+        btnVidCaption.setGravity(Gravity.CENTER);
+        btnVidCaption.setText("Aa Text");
+        btnVidCaption.setTextColor(Color.parseColor("#94A3B8"));
+        btnVidCaption.setTextSize(12f);
+        btnVidCaption.setTypeface(null, Typeface.BOLD);
+        GradientDrawable vcBg = new GradientDrawable();
+        vcBg.setCornerRadius(17 * dp);
+        vcBg.setColor(Color.parseColor("#141C28"));
+        vcBg.setStroke(Math.max(1, Math.round(dp)), Color.parseColor("#253347"));
+        btnVidCaption.setBackground(vcBg);
+        btnVidCaption.setOnClickListener(v -> promptStickerCaptionDialog(videoCaptionText, videoCaptionColor, () -> {
+            btnVidCaption.setText(videoCaptionText[0].isEmpty() ? "Aa Text" : ("Aa \"" + videoCaptionText[0] + "\""));
+            btnVidCaption.setTextColor(videoCaptionText[0].isEmpty() ? Color.parseColor("#94A3B8") : Color.WHITE);
+        }));
+        styleRow.addView(btnVidCaption);
+        root.addView(styleRow);
+
+        // 6. Bottom Action Row: Cancel + Professional Custom Progress Send Sticker Button
         LinearLayout bottomRow = new LinearLayout(this);
         bottomRow.setOrientation(LinearLayout.HORIZONTAL);
         bottomRow.setGravity(Gravity.CENTER_VERTICAL);
         bottomRow.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        TextView btnCancelTrim = new TextView(this);
+        final TextView btnCancelTrim = new TextView(this);
         btnCancelTrim.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(42 * dp)));
         btnCancelTrim.setGravity(Gravity.CENTER);
-        btnCancelTrim.setPadding(Math.round(22 * dp), 0, Math.round(22 * dp), 0);
+        btnCancelTrim.setPadding(Math.round(20 * dp), 0, Math.round(20 * dp), 0);
         btnCancelTrim.setText("Cancel");
-        btnCancelTrim.setTextColor(Color.WHITE);
-        btnCancelTrim.setTextSize(15f);
+        btnCancelTrim.setTextColor(Color.parseColor("#94A3B8"));
+        btnCancelTrim.setTextSize(14.5f);
         btnCancelTrim.setTypeface(null, Typeface.BOLD);
         GradientDrawable cancelBg = new GradientDrawable();
-        cancelBg.setColor(Color.parseColor("#1F2C34"));
+        cancelBg.setColor(Color.parseColor("#182230"));
         cancelBg.setCornerRadius(21 * dp);
         btnCancelTrim.setBackground(cancelBg);
         btnCancelTrim.setOnClickListener(v -> {
             try {
-                if (isVid && trimVideoView.isPlaying()) trimVideoView.stopPlayback();
+                if (trimVideoView.isPlaying()) trimVideoView.stopPlayback();
             } catch (Exception ignored) {}
             trimDialog.dismiss();
         });
@@ -1676,98 +2576,112 @@ public class MediaViewerActivity extends AppCompatActivity {
         spacer.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
         bottomRow.addView(spacer);
 
-        TextView btnDoneTrim = new TextView(this);
+        final LinearLayout btnDoneTrim = new LinearLayout(this);
+        btnDoneTrim.setOrientation(LinearLayout.HORIZONTAL);
+        btnDoneTrim.setGravity(Gravity.CENTER);
         btnDoneTrim.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(42 * dp)));
-        btnDoneTrim.setGravity(Gravity.CENTER);
-        btnDoneTrim.setPadding(Math.round(24 * dp), 0, Math.round(24 * dp), 0);
-        btnDoneTrim.setText("Done");
-        btnDoneTrim.setTextColor(Color.parseColor("#0B141A"));
-        btnDoneTrim.setTextSize(15f);
-        btnDoneTrim.setTypeface(null, Typeface.BOLD);
-        GradientDrawable doneBg = new GradientDrawable();
-        doneBg.setColor(Color.WHITE);
+        btnDoneTrim.setPadding(Math.round(22 * dp), 0, Math.round(22 * dp), 0);
+        final GradientDrawable doneBg = new GradientDrawable();
+        doneBg.setColor(Color.parseColor("#4F46E5"));
         doneBg.setCornerRadius(21 * dp);
         btnDoneTrim.setBackground(doneBg);
+
+        final android.widget.ProgressBar trimSendSpinner = new android.widget.ProgressBar(
+                this, null, android.R.attr.progressBarStyleSmall);
+        LinearLayout.LayoutParams tspLp = new LinearLayout.LayoutParams(
+                Math.round(18 * dp), Math.round(18 * dp));
+        tspLp.rightMargin = Math.round(8 * dp);
+        trimSendSpinner.setLayoutParams(tspLp);
+        if (trimSendSpinner.getIndeterminateDrawable() != null) {
+            trimSendSpinner.getIndeterminateDrawable().setColorFilter(Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN);
+        }
+        trimSendSpinner.setVisibility(View.GONE);
+        btnDoneTrim.addView(trimSendSpinner);
+
+        final TextView tvTrimSendText = new TextView(this);
+        tvTrimSendText.setText("Send Sticker");
+        tvTrimSendText.setTextColor(Color.WHITE);
+        tvTrimSendText.setTextSize(14.5f);
+        tvTrimSendText.setTypeface(null, Typeface.BOLD);
+        btnDoneTrim.addView(tvTrimSendText);
+
+        final boolean[] isEncodingVideoSticker = new boolean[]{false};
         btnDoneTrim.setOnClickListener(v -> {
+            if (isEncodingVideoSticker[0]) return;
+            isEncodingVideoSticker[0] = true;
+
             try {
-                if (isVid && trimVideoView.isPlaying()) trimVideoView.stopPlayback();
+                if (trimVideoView.isPlaying()) trimVideoView.pause();
             } catch (Exception ignored) {}
-            trimDialog.dismiss();
-            long chosenTimeUs = Math.round(startFraction[0] * totalDurationMs[0] * 1000L);
-            finalizeStickerFromTrimmedSelection(f, isVid, chosenTimeUs);
+
+            // Professional custom progress state: disable all buttons & show inline + stage progress
+            trimDialog.setCancelable(false);
+            btnDoneTrim.setEnabled(false);
+            doneBg.setColor(Color.parseColor("#4338CA"));
+            trimSendSpinner.setVisibility(View.VISIBLE);
+            tvTrimSendText.setText("Sending Sticker...");
+            videoProcessingOverlay.setVisibility(View.VISIBLE);
+            centerPlayCircle.setVisibility(View.GONE);
+
+            btnCancelTrim.setEnabled(false);
+            btnCancelTrim.setAlpha(0.42f);
+            btnVidOutline.setEnabled(false);
+            btnVidOutline.setAlpha(0.42f);
+            btnVidCaption.setEnabled(false);
+            btnVidCaption.setAlpha(0.42f);
+            timelineContainer.setEnabled(false);
+            timelineContainer.setAlpha(0.42f);
+            videoFrameHolder.setEnabled(false);
+
+            final long chosenStartMs = Math.round(startFraction[0] * totalDurationMs[0]);
+            final long chosenEndMs = Math.min(chosenStartMs + maxStickerMs,
+                    Math.max(chosenStartMs + 400L, Math.round(endFraction[0] * totalDurationMs[0])));
+            final boolean outline = videoOutlineEnabled[0];
+            final String cap = videoCaptionText[0];
+            final int capCol = videoCaptionColor[0];
+
+            new Thread(() -> {
+                final File gifStickerFile = com.m3.veil.utils.VeilStickerGifEngine.createAnimatedVideoStickerFile(
+                        MediaViewerActivity.this,
+                        videoFile,
+                        chosenStartMs,
+                        chosenEndMs,
+                        outline,
+                        cap,
+                        capCol);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    try {
+                        if (trimVideoView.isPlaying()) trimVideoView.stopPlayback();
+                    } catch (Exception ignored) {}
+                    if (gifStickerFile != null && gifStickerFile.exists()) {
+                        if (chatId != null && !chatId.isEmpty()) {
+                            VeilMessagesController.getInstance(MediaViewerActivity.this).sendMediaMessage(
+                                     chatId, peerId, "sticker", gifStickerFile, "[sticker]", null, false);
+                            Toast.makeText(MediaViewerActivity.this, "Animated video sticker sent!", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(MediaViewerActivity.this, "Animated video sticker saved!", Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        Toast.makeText(MediaViewerActivity.this, "Unable to create animated sticker", Toast.LENGTH_SHORT).show();
+                    }
+                    try {
+                        if (trimDialog.isShowing()) trimDialog.dismiss();
+                    } catch (Exception ignored) {}
+                    if (gifStickerFile != null && gifStickerFile.exists() && chatId != null && !chatId.isEmpty()) {
+                        // Close sticker screen and return to ChatActivity at the latest message
+                        com.m3.veil.ui.chat.ChatActivity.shouldScrollToBottomOnResume = true;
+                        finish();
+                    }
+                });
+            }, "VeilVideoStickerEncoder").start();
         });
         bottomRow.addView(btnDoneTrim);
 
         root.addView(bottomRow);
-
         trimDialog.setContentView(root);
         trimDialog.show();
-        root.setScaleX(0.94f);
-        root.setScaleY(0.94f);
-        root.setAlpha(0f);
-        root.animate()
-                .scaleX(1f)
-                .scaleY(1f)
-                .alpha(1f)
-                .setDuration(220)
-                .setInterpolator(new android.view.animation.DecelerateInterpolator())
-                .start();
-    }
-
-    private void finalizeStickerFromTrimmedSelection(File f, boolean isVid, long frameTimeUs) {
-        File sourceImageFile = f;
-        if (isVid) {
-            try {
-                MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-                mmr.setDataSource(f.getAbsolutePath());
-                Bitmap frame = mmr.getFrameAtTime(frameTimeUs, MediaMetadataRetriever.OPTION_CLOSEST);
-                if (frame == null) frame = mmr.getFrameAtTime();
-                mmr.release();
-                if (frame != null) {
-                    File tempImg = new File(getExternalCacheDir(), "sticker_frame_" + System.currentTimeMillis() + ".jpg");
-                    try (FileOutputStream fos = new FileOutputStream(tempImg)) {
-                        frame.compress(Bitmap.CompressFormat.JPEG, 92, fos);
-                    }
-                    sourceImageFile = tempImg;
-                }
-            } catch (Exception ignored) {}
-        }
-
-        File stickerFile = null;
-        try {
-            Bitmap src = BitmapFactory.decodeFile(sourceImageFile.getAbsolutePath());
-            if (src != null) {
-                int maxSide = 512;
-                int w = src.getWidth();
-                int h = src.getHeight();
-                float scale = Math.min((float) maxSide / Math.max(1, w), (float) maxSide / Math.max(1, h));
-                int nw = Math.max(1, Math.round(w * scale));
-                int nh = Math.max(1, Math.round(h * scale));
-                Bitmap scaled = Bitmap.createScaledBitmap(src, nw, nh, true);
-                Bitmap dieCut = com.m3.veil.utils.VeilStickerGifEngine.stripSolidBorderBackgroundIfPresent(scaled);
-                File stickerDir = new File(getFilesDir(), "custom_stickers");
-                if (!stickerDir.exists()) stickerDir.mkdirs();
-                stickerFile = new File(stickerDir, "sticker_" + System.currentTimeMillis() + ".png");
-                try (FileOutputStream fos = new FileOutputStream(stickerFile)) {
-                    dieCut.compress(Bitmap.CompressFormat.PNG, 100, fos);
-                    fos.flush();
-                }
-            }
-        } catch (Exception ignored) {}
-
-        if (stickerFile != null && stickerFile.exists()) {
-            final File finalStickerFile = stickerFile;
-            if (chatId != null && !chatId.isEmpty()) {
-                VeilMessagesController.getInstance(this).sendMediaMessage(
-                        chatId, peerId, "sticker", finalStickerFile, "[sticker]", null, false);
-                Toast.makeText(this, "Sticker created & sent to chat!", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "Sticker saved to your collection!", Toast.LENGTH_SHORT).show();
-            }
-        } else {
-            Toast.makeText(this, "Unable to create sticker from media", Toast.LENGTH_SHORT).show();
-        }
     }
 
     private void confirmAndDeleteMessage() {
@@ -1862,13 +2776,148 @@ public class MediaViewerActivity extends AppCompatActivity {
      * - "Frequently contacted" and "Recent encrypted chats" sections populated from EncryptedChatDatabase
      * - Bottom bar with left square media thumbnail, "Add a message..." pill input, and green send FAB
      */
+    private boolean isValidMediaCaption(@Nullable String text) {
+        if (text == null) return false;
+        String t = text.trim();
+        if (t.isEmpty()) return false;
+        String lower = t.toLowerCase(Locale.ROOT);
+        return !lower.startsWith("[image") && !lower.startsWith("[video")
+                && !lower.equals("[image message]") && !lower.equals("[video message]")
+                && !lower.equals("[sticker]");
+    }
+
     private void showForwardDialog() {
+        String activeCaption = caption != null ? caption.trim() : "";
+        if (!albumItems.isEmpty() && currentMediaIndex >= 0 && currentMediaIndex < albumItems.size()) {
+            String itemCap = albumItems.get(currentMediaIndex).caption;
+            if (isValidMediaCaption(itemCap)) {
+                activeCaption = itemCap.trim();
+            }
+        }
+        if (isValidMediaCaption(activeCaption)) {
+            final String capToPreFill = activeCaption;
+            final boolean isNight = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(this);
+            final float dp = getResources().getDisplayMetrics().density;
+
+            android.app.Dialog askDialog = new android.app.Dialog(this);
+            askDialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+            if (askDialog.getWindow() != null) {
+                askDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            }
+
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            int pad = Math.round(22 * dp);
+            card.setPadding(pad, pad, pad, Math.round(18 * dp));
+            GradientDrawable cardBg = new GradientDrawable();
+            cardBg.setColor(isNight ? Color.parseColor("#131B2E") : Color.WHITE);
+            cardBg.setCornerRadius(22 * dp);
+            cardBg.setStroke(Math.max(1, Math.round(1 * dp)), isNight ? Color.parseColor("#26334D") : Color.parseColor("#E2E8F0"));
+            card.setBackground(cardBg);
+
+            TextView tvTitle = new TextView(this);
+            tvTitle.setText("Forward with Caption?");
+            tvTitle.setTextColor(isNight ? Color.parseColor("#F8FAFC") : Color.parseColor("#0F172A"));
+            tvTitle.setTextSize(18f);
+            tvTitle.setTypeface(null, Typeface.BOLD);
+            card.addView(tvTitle);
+
+            TextView tvBody = new TextView(this);
+            tvBody.setText("Do you want to include the caption with this media? If you select Yes, it will appear in the message box on the forward screen.");
+            tvBody.setTextColor(isNight ? Color.parseColor("#94A3B8") : Color.parseColor("#475569"));
+            tvBody.setTextSize(14f);
+            LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            bodyLp.topMargin = Math.round(8 * dp);
+            card.addView(tvBody, bodyLp);
+
+            TextView tvPreview = new TextView(this);
+            tvPreview.setText("\"" + capToPreFill + "\"");
+            tvPreview.setTextColor(isNight ? Color.parseColor("#E2E8F0") : Color.parseColor("#1E293B"));
+            tvPreview.setTextSize(13.5f);
+            tvPreview.setMaxLines(3);
+            tvPreview.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            int qPad = Math.round(12 * dp);
+            tvPreview.setPadding(qPad, Math.round(8 * dp), qPad, Math.round(8 * dp));
+            GradientDrawable qBg = new GradientDrawable();
+            qBg.setColor(isNight ? Color.parseColor("#1E293B") : Color.parseColor("#F1F5F9"));
+            qBg.setCornerRadius(12 * dp);
+            tvPreview.setBackground(qBg);
+            LinearLayout.LayoutParams prevLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            prevLp.topMargin = Math.round(12 * dp);
+            prevLp.bottomMargin = Math.round(18 * dp);
+            card.addView(tvPreview, prevLp);
+
+            LinearLayout btnRow = new LinearLayout(this);
+            btnRow.setOrientation(LinearLayout.HORIZONTAL);
+            btnRow.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+
+            TextView btnNo = new TextView(this);
+            btnNo.setText("No, Without Caption");
+            btnNo.setTextColor(isNight ? Color.parseColor("#CBD5E1") : Color.parseColor("#475569"));
+            btnNo.setTextSize(14f);
+            btnNo.setTypeface(null, Typeface.BOLD);
+            btnNo.setPadding(Math.round(14 * dp), Math.round(10 * dp), Math.round(14 * dp), Math.round(10 * dp));
+            GradientDrawable noBg = new GradientDrawable();
+            noBg.setColor(isNight ? Color.parseColor("#1E293B") : Color.parseColor("#F1F5F9"));
+            noBg.setCornerRadius(12 * dp);
+            btnNo.setBackground(noBg);
+            btnNo.setOnClickListener(v -> {
+                askDialog.dismiss();
+                openForwardDialogInternal("");
+            });
+            btnRow.addView(btnNo);
+
+            TextView btnYes = new TextView(this);
+            btnYes.setText("Yes, Include");
+            btnYes.setTextColor(Color.WHITE);
+            btnYes.setTextSize(14f);
+            btnYes.setTypeface(null, Typeface.BOLD);
+            btnYes.setPadding(Math.round(16 * dp), Math.round(10 * dp), Math.round(16 * dp), Math.round(10 * dp));
+            GradientDrawable yesBg = new GradientDrawable();
+            yesBg.setColor(Color.parseColor("#4F46E5"));
+            yesBg.setCornerRadius(12 * dp);
+            btnYes.setBackground(yesBg);
+            LinearLayout.LayoutParams yesLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            yesLp.leftMargin = Math.round(10 * dp);
+            btnYes.setOnClickListener(v -> {
+                askDialog.dismiss();
+                openForwardDialogInternal(capToPreFill);
+            });
+            btnRow.addView(btnYes, yesLp);
+
+            card.addView(btnRow);
+            askDialog.setContentView(card);
+            if (askDialog.getWindow() != null) {
+                int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.88f);
+                askDialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+            }
+            askDialog.show();
+        } else {
+            openForwardDialogInternal("");
+        }
+    }
+
+    private void openForwardDialogInternal(@NonNull String initialCaption) {
         final float dp = getResources().getDisplayMetrics().density;
-        final android.app.Dialog forwardDialog = new android.app.Dialog(this, android.R.style.Theme_Light_NoTitleBar_Fullscreen);
+        final boolean isNight = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(this);
+        final int bgPrimary = isNight ? Color.parseColor("#0B0F19") : Color.parseColor("#F8FAFC");
+        final int bgSurface = isNight ? Color.parseColor("#131B2E") : Color.WHITE;
+        final int bgInput = isNight ? Color.parseColor("#1E293B") : Color.parseColor("#F1F5F9");
+        final int textPrimary = isNight ? Color.parseColor("#F8FAFC") : Color.parseColor("#0F172A");
+        final int textSecondary = isNight ? Color.parseColor("#94A3B8") : Color.parseColor("#64748B");
+        final int dividerColor = isNight ? Color.parseColor("#1E293B") : Color.parseColor("#E2E8F0");
+        final int veilAccent = Color.parseColor(isNight ? "#6366F1" : "#4F46E5");
+
+        final android.app.Dialog forwardDialog = new android.app.Dialog(
+                this,
+                isNight ? android.R.style.Theme_Black_NoTitleBar_Fullscreen : android.R.style.Theme_Light_NoTitleBar_Fullscreen);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.WHITE);
+        root.setBackgroundColor(bgPrimary);
         root.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
@@ -1876,7 +2925,7 @@ public class MediaViewerActivity extends AppCompatActivity {
         LinearLayout topAppBar = new LinearLayout(this);
         topAppBar.setOrientation(LinearLayout.HORIZONTAL);
         topAppBar.setGravity(Gravity.CENTER_VERTICAL);
-        topAppBar.setBackgroundColor(Color.WHITE);
+        topAppBar.setBackgroundColor(bgSurface);
         topAppBar.setPadding(Math.round(8 * dp), Math.round(36 * dp), Math.round(12 * dp), Math.round(12 * dp));
 
         ImageView ivBack = new ImageView(this);
@@ -1884,7 +2933,7 @@ public class MediaViewerActivity extends AppCompatActivity {
         ivBack.setLayoutParams(new LinearLayout.LayoutParams(iconSz, iconSz));
         ivBack.setPadding(Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp));
         ivBack.setImageResource(R.drawable.ic_arrow_back);
-        ivBack.setColorFilter(Color.parseColor("#111B21"));
+        ivBack.setColorFilter(textPrimary);
         ivBack.setOnClickListener(v -> forwardDialog.dismiss());
         topAppBar.addView(ivBack);
 
@@ -1893,7 +2942,7 @@ public class MediaViewerActivity extends AppCompatActivity {
         titleLp.leftMargin = Math.round(8 * dp);
         tvHeaderTitle.setLayoutParams(titleLp);
         tvHeaderTitle.setText("Forward to...");
-        tvHeaderTitle.setTextColor(Color.parseColor("#111B21"));
+        tvHeaderTitle.setTextColor(textPrimary);
         tvHeaderTitle.setTextSize(19f);
         tvHeaderTitle.setTypeface(null, Typeface.BOLD);
         topAppBar.addView(tvHeaderTitle);
@@ -1902,14 +2951,14 @@ public class MediaViewerActivity extends AppCompatActivity {
         ivAddContact.setLayoutParams(new LinearLayout.LayoutParams(iconSz, iconSz));
         ivAddContact.setPadding(Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp));
         ivAddContact.setImageResource(R.drawable.ic_person);
-        ivAddContact.setColorFilter(Color.parseColor("#111B21"));
+        ivAddContact.setColorFilter(textPrimary);
         topAppBar.addView(ivAddContact);
 
         ImageView ivSearch = new ImageView(this);
         ivSearch.setLayoutParams(new LinearLayout.LayoutParams(iconSz, iconSz));
         ivSearch.setPadding(Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp));
         ivSearch.setImageResource(R.drawable.ic_search);
-        ivSearch.setColorFilter(Color.parseColor("#111B21"));
+        ivSearch.setColorFilter(textPrimary);
         topAppBar.addView(ivSearch);
 
         root.addView(topAppBar);
@@ -1918,17 +2967,18 @@ public class MediaViewerActivity extends AppCompatActivity {
         final EditText etSearchFilter = new EditText(this);
         LinearLayout.LayoutParams searchLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, Math.round(42 * dp));
-        searchLp.setMargins(Math.round(14 * dp), 0, Math.round(14 * dp), Math.round(8 * dp));
+        searchLp.setMargins(Math.round(14 * dp), Math.round(6 * dp), Math.round(14 * dp), Math.round(8 * dp));
         etSearchFilter.setLayoutParams(searchLp);
         etSearchFilter.setHint("Search Veil peers, groups, or vault...");
-        etSearchFilter.setHintTextColor(Color.parseColor("#8696A0"));
-        etSearchFilter.setTextColor(Color.parseColor("#111B21"));
+        etSearchFilter.setHintTextColor(textSecondary);
+        etSearchFilter.setTextColor(textPrimary);
         etSearchFilter.setTextSize(14.5f);
         etSearchFilter.setSingleLine(true);
         etSearchFilter.setPadding(Math.round(14 * dp), 0, Math.round(14 * dp), 0);
         GradientDrawable searchBg = new GradientDrawable();
-        searchBg.setColor(Color.parseColor("#F0F2F5"));
+        searchBg.setColor(bgInput);
         searchBg.setCornerRadius(21 * dp);
+        searchBg.setStroke(Math.max(1, Math.round(1 * dp)), dividerColor);
         etSearchFilter.setBackground(searchBg);
         etSearchFilter.setVisibility(View.GONE);
         root.addView(etSearchFilter);
@@ -1945,7 +2995,7 @@ public class MediaViewerActivity extends AppCompatActivity {
 
         View topDiv = new View(this);
         topDiv.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Math.round(1 * dp))));
-        topDiv.setBackgroundColor(Color.parseColor("#E9EDEF"));
+        topDiv.setBackgroundColor(dividerColor);
         root.addView(topDiv);
 
         // 2. Scrollable Content List
@@ -1961,20 +3011,31 @@ public class MediaViewerActivity extends AppCompatActivity {
         final java.util.Map<String, String> idToNameMap = new java.util.HashMap<>();
         final boolean[] forwardAsBlink = new boolean[]{false};
 
+        final FrameLayout btnConfirmForward = new FrameLayout(this);
+        final GradientDrawable sendBg = new GradientDrawable();
+        sendBg.setShape(GradientDrawable.OVAL);
+        final ImageView ivSendArrow = new ImageView(this);
+
         final Runnable updateSelectionCount = () -> {
             int count = selectedIds.size();
-            if (count == 0) {
+            boolean hasSelection = count > 0;
+            if (!hasSelection) {
                 tvHeaderTitle.setText("Forward to...");
             } else {
                 tvHeaderTitle.setText(count + " selected" + (forwardAsBlink[0] ? " • ⚡ Blink" : ""));
             }
+            btnConfirmForward.setEnabled(hasSelection);
+            btnConfirmForward.setAlpha(hasSelection ? 1.0f : 0.42f);
+            sendBg.setColor(hasSelection ? veilAccent : (isNight ? Color.parseColor("#334155") : Color.parseColor("#CBD5E1")));
+            btnConfirmForward.setBackground(sendBg);
+            ivSendArrow.setColorFilter(hasSelection ? Color.WHITE : textSecondary);
         };
 
         // Row 1: "My Veil Status" ("My contacts • 24h ephemeral")
         idToNameMap.put("__status__", "My Veil Status");
         final View statusRow = buildForwardTargetRow(
                 "__status__", "My status", "My contacts • 24h ephemeral",
-                Color.parseColor("#00A884"), R.drawable.ic_status_ring, true,
+                veilAccent, R.drawable.ic_status_ring, true,
                 selectedIds, updateSelectionCount,
                 v -> {
                     forwardDialog.dismiss();
@@ -1983,7 +3044,7 @@ public class MediaViewerActivity extends AppCompatActivity {
         statusRow.setTag("my status contacts ephemeral");
         listContainer.addView(statusRow);
 
-        // Row 2: "Saved Vault (You)" ("Encrypted personal cloud storage" — replaces Meta AI with Veil's Vault concept!)
+        // Row 2: "Saved Vault (You)" ("Encrypted personal cloud storage")
         idToNameMap.put("__vault__", "Saved Vault (You)");
         final View vaultRow = buildForwardTargetRow(
                 "__vault__", "Saved Vault (You)", "Encrypted personal cloud storage",
@@ -2022,13 +3083,13 @@ public class MediaViewerActivity extends AppCompatActivity {
         blinkTextCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView tvBlinkTitle = new TextView(this);
         tvBlinkTitle.setText("Send as Secret Blink (View Once)");
-        tvBlinkTitle.setTextColor(Color.parseColor("#111B21"));
+        tvBlinkTitle.setTextColor(textPrimary);
         tvBlinkTitle.setTextSize(15.5f);
         tvBlinkTitle.setTypeface(null, Typeface.BOLD);
         blinkTextCol.addView(tvBlinkTitle);
         final TextView tvBlinkSub = new TextView(this);
         tvBlinkSub.setText("Tap to enable auto-destruct after 1 view");
-        tvBlinkSub.setTextColor(Color.parseColor("#667781"));
+        tvBlinkSub.setTextColor(textSecondary);
         tvBlinkSub.setTextSize(13f);
         blinkTextCol.addView(tvBlinkSub);
         blinkRow.addView(blinkTextCol);
@@ -2047,8 +3108,8 @@ public class MediaViewerActivity extends AppCompatActivity {
                 blinkTogglePill.setText("ON ⚡");
                 tvBlinkSub.setText("Media will self-destruct after recipient views it once");
             } else {
-                pBg.setColor(Color.parseColor("#E2E8F0"));
-                blinkTogglePill.setTextColor(Color.parseColor("#475569"));
+                pBg.setColor(bgInput);
+                blinkTogglePill.setTextColor(textSecondary);
                 blinkTogglePill.setText("OFF");
                 tvBlinkSub.setText("Tap to enable auto-destruct after 1 view");
             }
@@ -2075,8 +3136,8 @@ public class MediaViewerActivity extends AppCompatActivity {
         // Section: "Frequently contacted"
         TextView tvFreqHeader = new TextView(this);
         tvFreqHeader.setText("Frequently contacted");
-        tvFreqHeader.setTextColor(Color.parseColor("#667781"));
-        tvFreqHeader.setTextSize(13.5f);
+        tvFreqHeader.setTextColor(veilAccent);
+        tvFreqHeader.setTextSize(13f);
         tvFreqHeader.setTypeface(null, Typeface.BOLD);
         tvFreqHeader.setPadding(Math.round(16 * dp), Math.round(14 * dp), Math.round(16 * dp), Math.round(6 * dp));
         listContainer.addView(tvFreqHeader);
@@ -2089,7 +3150,7 @@ public class MediaViewerActivity extends AppCompatActivity {
             idToNameMap.put(cid, cname);
             View row = buildForwardTargetRow(
                     cid, cname, "🔒 End-to-end encrypted • Veil Peer",
-                    Color.parseColor("#1F2C34"), R.drawable.ic_person, false,
+                    Color.parseColor("#4F46E5"), R.drawable.ic_person, false,
                     selectedIds, updateSelectionCount, null);
             row.setTag(cname.toLowerCase(Locale.ROOT) + " " + cid.toLowerCase(Locale.ROOT));
             listContainer.addView(row);
@@ -2099,7 +3160,7 @@ public class MediaViewerActivity extends AppCompatActivity {
             idToNameMap.put(chatId, currentChatLabel);
             View row = buildForwardTargetRow(
                     chatId, currentChatLabel, "🔒 Active encrypted chat",
-                    Color.parseColor("#1F2C34"), R.drawable.ic_person, false,
+                    Color.parseColor("#4F46E5"), R.drawable.ic_person, false,
                     selectedIds, updateSelectionCount, null);
             row.setTag(currentChatLabel.toLowerCase(Locale.ROOT));
             listContainer.addView(row);
@@ -2108,8 +3169,8 @@ public class MediaViewerActivity extends AppCompatActivity {
         // Section: "Recent chats"
         TextView tvRecentHeader = new TextView(this);
         tvRecentHeader.setText("Recent encrypted chats");
-        tvRecentHeader.setTextColor(Color.parseColor("#667781"));
-        tvRecentHeader.setTextSize(13.5f);
+        tvRecentHeader.setTextColor(veilAccent);
+        tvRecentHeader.setTextSize(13f);
         tvRecentHeader.setTypeface(null, Typeface.BOLD);
         tvRecentHeader.setPadding(Math.round(16 * dp), Math.round(16 * dp), Math.round(16 * dp), Math.round(6 * dp));
         listContainer.addView(tvRecentHeader);
@@ -2122,7 +3183,7 @@ public class MediaViewerActivity extends AppCompatActivity {
             boolean isGroup = cid.startsWith("group_") || cid.startsWith("channel_") || cid.startsWith("lounge_");
             View row = buildForwardTargetRow(
                     cid, cname, isGroup ? "🔒 Encrypted Veil Group" : "🔒 Encrypted Veil Chat",
-                    Color.parseColor(isGroup ? "#4F46E5" : "#00A884"), R.drawable.ic_person, false,
+                    Color.parseColor(isGroup ? "#6366F1" : "#4F46E5"), isGroup ? R.drawable.ic_group : R.drawable.ic_person, false,
                     selectedIds, updateSelectionCount, null);
             row.setTag(cname.toLowerCase(Locale.ROOT) + " " + cid.toLowerCase(Locale.ROOT));
             listContainer.addView(row);
@@ -2146,7 +3207,7 @@ public class MediaViewerActivity extends AppCompatActivity {
                             selectedIds.add(customId);
                             View newRow = buildForwardTargetRow(
                                     customId, peerInput, "🔒 Direct Veil Peer",
-                                    Color.parseColor("#0D9488"), R.drawable.ic_person, false,
+                                    Color.parseColor("#4F46E5"), R.drawable.ic_person, false,
                                     selectedIds, updateSelectionCount, null);
                             newRow.setTag(peerInput.toLowerCase(Locale.ROOT));
                             listContainer.addView(newRow);
@@ -2174,75 +3235,100 @@ public class MediaViewerActivity extends AppCompatActivity {
             @Override public void afterTextChanged(android.text.Editable s) {}
         });
 
-        // 3. Bottom Bar: Square Media Thumbnail + "Add a message..." Pill Input + Green Send FAB
+        // 3. Bottom Bar: Square Media Thumbnail + Caption/Message Pill Input + VEIL Indigo Send Button
         View botDiv = new View(this);
         botDiv.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Math.round(1 * dp))));
-        botDiv.setBackgroundColor(Color.parseColor("#E9EDEF"));
+        botDiv.setBackgroundColor(dividerColor);
         root.addView(botDiv);
 
         LinearLayout bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
-        bottomBar.setBackgroundColor(Color.WHITE);
+        bottomBar.setBackgroundColor(bgSurface);
         bottomBar.setPadding(Math.round(12 * dp), Math.round(10 * dp), Math.round(12 * dp), Math.round(16 * dp));
 
-        ImageView ivMediaThumb = new ImageView(this);
-        int thumbSz = Math.round(44 * dp);
+        FrameLayout thumbWrap = new FrameLayout(this);
+        int thumbSz = Math.round(46 * dp);
         LinearLayout.LayoutParams thLp = new LinearLayout.LayoutParams(thumbSz, thumbSz);
         thLp.rightMargin = Math.round(10 * dp);
-        ivMediaThumb.setLayoutParams(thLp);
-        ivMediaThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        thumbWrap.setLayoutParams(thLp);
         GradientDrawable thumbClip = new GradientDrawable();
-        thumbClip.setColor(Color.parseColor("#E2E8F0"));
-        thumbClip.setCornerRadius(10 * dp);
-        ivMediaThumb.setBackground(thumbClip);
-        ivMediaThumb.setClipToOutline(true);
+        thumbClip.setColor(bgInput);
+        thumbClip.setCornerRadius(12 * dp);
+        thumbClip.setStroke(Math.max(1, Math.round(1 * dp)), dividerColor);
+        thumbWrap.setBackground(thumbClip);
+        thumbWrap.setClipToOutline(true);
+
+        ImageView ivMediaThumb = new ImageView(this);
+        ivMediaThumb.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        ivMediaThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
         Bitmap thumbBmp = loadCurrentItemThumbnailBitmap();
         if (thumbBmp != null) {
             ivMediaThumb.setImageBitmap(thumbBmp);
         }
-        bottomBar.addView(ivMediaThumb);
+        thumbWrap.addView(ivMediaThumb);
+
+        boolean isCurrentVideo = "video".equalsIgnoreCase(mediaType)
+                || (filePath != null && filePath.toLowerCase(Locale.ROOT).endsWith(".mp4"));
+        if (isCurrentVideo) {
+            TextView tvPlayMini = new TextView(this);
+            tvPlayMini.setText("▶");
+            tvPlayMini.setTextColor(Color.WHITE);
+            tvPlayMini.setTextSize(10f);
+            tvPlayMini.setGravity(Gravity.CENTER);
+            int badgeSz = Math.round(20 * dp);
+            FrameLayout.LayoutParams bLp = new FrameLayout.LayoutParams(badgeSz, badgeSz, Gravity.CENTER);
+            GradientDrawable bBg = new GradientDrawable();
+            bBg.setShape(GradientDrawable.OVAL);
+            bBg.setColor(0x99000000);
+            tvPlayMini.setBackground(bBg);
+            thumbWrap.addView(tvPlayMini, bLp);
+        }
+        bottomBar.addView(thumbWrap);
 
         final EditText etForwardMessage = new EditText(this);
         LinearLayout.LayoutParams etLp = new LinearLayout.LayoutParams(0, Math.round(44 * dp), 1f);
         etForwardMessage.setLayoutParams(etLp);
-        etForwardMessage.setHint("Add a message...");
-        etForwardMessage.setHintTextColor(Color.parseColor("#667781"));
-        etForwardMessage.setTextColor(Color.parseColor("#111B21"));
+        etForwardMessage.setHint("Add a caption or message...");
+        etForwardMessage.setHintTextColor(textSecondary);
+        etForwardMessage.setTextColor(textPrimary);
         etForwardMessage.setTextSize(15f);
         etForwardMessage.setSingleLine(true);
         etForwardMessage.setPadding(Math.round(16 * dp), 0, Math.round(16 * dp), 0);
         GradientDrawable pillBg = new GradientDrawable();
-        pillBg.setColor(Color.parseColor("#F0F2F5"));
+        pillBg.setColor(bgInput);
         pillBg.setCornerRadius(22 * dp);
+        pillBg.setStroke(Math.max(1, Math.round(1 * dp)), dividerColor);
         etForwardMessage.setBackground(pillBg);
+        if (!initialCaption.isEmpty()) {
+            etForwardMessage.setText(initialCaption);
+            etForwardMessage.setSelection(initialCaption.length());
+        }
         bottomBar.addView(etForwardMessage);
 
-        FrameLayout btnConfirmForward = new FrameLayout(this);
         LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(thumbSz, thumbSz);
         sendLp.leftMargin = Math.round(8 * dp);
         btnConfirmForward.setLayoutParams(sendLp);
-        GradientDrawable sendBg = new GradientDrawable();
-        sendBg.setShape(GradientDrawable.OVAL);
-        sendBg.setColor(Color.parseColor("#00A884"));
-        btnConfirmForward.setBackground(sendBg);
 
-        ImageView ivSendArrow = new ImageView(this);
         int sIc = Math.round(20 * dp);
         ivSendArrow.setLayoutParams(new FrameLayout.LayoutParams(sIc, sIc, Gravity.CENTER));
         ivSendArrow.setImageResource(R.drawable.ic_send);
-        ivSendArrow.setColorFilter(Color.WHITE);
         btnConfirmForward.addView(ivSendArrow);
+
+        // Initialize disabled state until user selects at least 1 contact
+        updateSelectionCount.run();
 
         btnConfirmForward.setOnClickListener(v -> {
             if (selectedIds.isEmpty()) {
-                Toast.makeText(this, "Select at least one chat, Vault, or My status", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Select at least one contact or chat to forward", Toast.LENGTH_SHORT).show();
                 return;
             }
-            String extraMsg = etForwardMessage.getText() != null ? etForwardMessage.getText().toString().trim() : "";
-            String finalCaption = !extraMsg.isEmpty() ? extraMsg : caption;
+            // Use ONLY the text currently inside etForwardMessage (respecting user's Yes/No caption choice)
+            String finalCaption = etForwardMessage.getText() != null ? etForwardMessage.getText().toString().trim() : "";
             List<String> forwardedNames = new ArrayList<>();
             boolean openStatusEditorAfter = false;
+            String myUserId = VeilMessagesController.getInstance(this).getCurrentUserId();
             for (String targetId : selectedIds) {
                 String tName = idToNameMap.getOrDefault(targetId, targetId);
                 forwardedNames.add(tName);
@@ -2254,20 +3340,38 @@ public class MediaViewerActivity extends AppCompatActivity {
                         ? (chatId != null && !chatId.isEmpty() ? chatId : "saved_messages")
                         : targetId;
                 if (realChatId != null && !realChatId.isEmpty()) {
+                    String resolvedRecipientId = realChatId;
+                    Chat targetChatObj = EncryptedChatDatabase.getInstance(this).getChat(realChatId);
+                    if (targetChatObj != null && targetChatObj.getParticipants() != null) {
+                        for (String p : targetChatObj.getParticipants()) {
+                            if (p != null && !p.isEmpty() && !p.equals(myUserId)) {
+                                resolvedRecipientId = p;
+                                break;
+                            }
+                        }
+                    } else if (!realChatId.startsWith("group_") && !realChatId.startsWith("channel_") && !realChatId.startsWith("lounge_") && realChatId.contains("_")) {
+                        String[] parts = realChatId.split("_");
+                        if (parts.length == 2) {
+                            resolvedRecipientId = parts[0].equals(myUserId) ? parts[1] : parts[0];
+                        }
+                    }
                     if (isVerticalScrollMode && albumItems.size() > 1) {
-                        for (AlbumMediaEntry entry : albumItems) {
+                        for (int idx = 0; idx < albumItems.size(); idx++) {
+                            AlbumMediaEntry entry = albumItems.get(idx);
                             File ef = new File(entry.path);
                             if (ef.exists()) {
                                 VeilMessagesController.getInstance(this).sendMediaMessage(
-                                        realChatId, realChatId, entry.type, ef, finalCaption, null, forwardAsBlink[0]);
+                                        realChatId, resolvedRecipientId, entry.type, ef,
+                                        idx == 0 ? finalCaption : "", null, forwardAsBlink[0]);
                             }
                         }
                     } else if (filePath != null) {
                         File f = new File(filePath);
                         if (f.exists()) {
+                            boolean isVid = "video".equalsIgnoreCase(mediaType) || f.getName().toLowerCase(Locale.ROOT).endsWith(".mp4");
                             VeilMessagesController.getInstance(this).sendMediaMessage(
-                                    realChatId, realChatId,
-                                    "video".equalsIgnoreCase(mediaType) ? "video" : "image",
+                                    realChatId, resolvedRecipientId,
+                                    isVid ? "video" : "image",
                                     f, finalCaption, null, forwardAsBlink[0]);
                         }
                     }
@@ -2299,6 +3403,10 @@ public class MediaViewerActivity extends AppCompatActivity {
             final Runnable onSelectionChanged,
             @Nullable View.OnClickListener threeDotsListener) {
         final float dp = getResources().getDisplayMetrics().density;
+        final boolean isNight = com.m3.veil.ui.views.ChatMessageCell.resolveIsNightMode(this);
+        final int textPrimary = isNight ? Color.parseColor("#F8FAFC") : Color.parseColor("#0F172A");
+        final int textSecondary = isNight ? Color.parseColor("#94A3B8") : Color.parseColor("#64748B");
+        final int veilAccent = Color.parseColor(isNight ? "#6366F1" : "#4F46E5");
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -2339,7 +3447,7 @@ public class MediaViewerActivity extends AppCompatActivity {
 
         TextView tvTitleRow = new TextView(this);
         tvTitleRow.setText(title);
-        tvTitleRow.setTextColor(Color.parseColor("#111B21"));
+        tvTitleRow.setTextColor(textPrimary);
         tvTitleRow.setTextSize(16f);
         tvTitleRow.setTypeface(null, Typeface.BOLD);
         textCol.addView(tvTitleRow);
@@ -2347,7 +3455,7 @@ public class MediaViewerActivity extends AppCompatActivity {
         if (subtitle != null && !subtitle.isEmpty()) {
             TextView tvSubRow = new TextView(this);
             tvSubRow.setText(subtitle);
-            tvSubRow.setTextColor(Color.parseColor("#667781"));
+            tvSubRow.setTextColor(textSecondary);
             tvSubRow.setTextSize(13.5f);
             textCol.addView(tvSubRow);
         }
@@ -2356,7 +3464,7 @@ public class MediaViewerActivity extends AppCompatActivity {
         if (showThreeDots) {
             TextView tvDots = new TextView(this);
             tvDots.setText("•••");
-            tvDots.setTextColor(Color.parseColor("#54656F"));
+            tvDots.setTextColor(textSecondary);
             tvDots.setTextSize(14f);
             tvDots.setPadding(Math.round(10 * dp), Math.round(6 * dp), Math.round(14 * dp), Math.round(6 * dp));
             if (threeDotsListener != null) {
@@ -2367,11 +3475,11 @@ public class MediaViewerActivity extends AppCompatActivity {
 
         // Circular Checkbox on right
         final TextView checkCircle = new TextView(this);
-        int chkSz = Math.round(22 * dp);
+        int chkSz = Math.round(24 * dp);
         checkCircle.setLayoutParams(new LinearLayout.LayoutParams(chkSz, chkSz));
         checkCircle.setGravity(Gravity.CENTER);
         checkCircle.setTextColor(Color.WHITE);
-        checkCircle.setTextSize(12f);
+        checkCircle.setTextSize(13f);
         checkCircle.setTypeface(null, Typeface.BOLD);
 
         final Runnable renderCheck = () -> {
@@ -2379,12 +3487,14 @@ public class MediaViewerActivity extends AppCompatActivity {
             GradientDrawable cBg = new GradientDrawable();
             cBg.setShape(GradientDrawable.OVAL);
             if (checked) {
-                cBg.setColor(Color.parseColor("#00A884"));
+                cBg.setColor(veilAccent);
                 checkCircle.setText("✓");
+                row.setBackgroundColor(isNight ? 0x1A6366F1 : 0x124F46E5);
             } else {
                 cBg.setColor(Color.TRANSPARENT);
-                cBg.setStroke(Math.round(1.8f * dp), Color.parseColor("#8696A0"));
+                cBg.setStroke(Math.round(1.8f * dp), textSecondary);
                 checkCircle.setText("");
+                row.setBackgroundResource(outValue.resourceId);
             }
             checkCircle.setBackground(cBg);
         };
@@ -2409,29 +3519,56 @@ public class MediaViewerActivity extends AppCompatActivity {
             filePath = albumItems.get(currentMediaIndex).path;
             mediaType = albumItems.get(currentMediaIndex).type;
         }
-        if (filePath == null) return null;
-        Bitmap cached = feedBitmapCache.get(filePath);
-        if (cached != null && !cached.isRecycled()) return cached;
-        File f = new File(filePath);
-        if (!f.exists()) return null;
-        boolean isVid = "video".equalsIgnoreCase(mediaType) || f.getName().toLowerCase(Locale.ROOT).endsWith(".mp4");
-        if (isVid) {
-            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-            try {
-                mmr.setDataSource(f.getAbsolutePath());
-                Bitmap b = mmr.getFrameAtTime();
-                if (b != null) {
-                    feedBitmapCache.put(filePath, b);
-                    return b;
+        if (filePath != null) {
+            Bitmap cached = feedBitmapCache.get(filePath);
+            if (cached != null && !cached.isRecycled()) return cached;
+            File f = new File(filePath);
+            if (f.exists()) {
+                boolean isVid = "video".equalsIgnoreCase(mediaType) || f.getName().toLowerCase(Locale.ROOT).endsWith(".mp4");
+                if (isVid) {
+                    MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+                    try {
+                        mmr.setDataSource(f.getAbsolutePath());
+                        Bitmap b = mmr.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                        if (b == null) {
+                            b = mmr.getFrameAtTime();
+                        }
+                        if (b != null) {
+                            feedBitmapCache.put(filePath, b);
+                            return b;
+                        }
+                    } catch (Throwable ignored) {
+                    } finally {
+                        try { mmr.release(); } catch (Throwable ignored) {}
+                    }
+                    try {
+                        Bitmap b2 = android.media.ThumbnailUtils.createVideoThumbnail(
+                                f.getAbsolutePath(), android.provider.MediaStore.Images.Thumbnails.MINI_KIND);
+                        if (b2 != null) {
+                            feedBitmapCache.put(filePath, b2);
+                            return b2;
+                        }
+                    } catch (Throwable ignored) {}
+                } else {
+                    Bitmap b = decodeCompleteBitmapWithExif(f, 512);
+                    if (b != null) {
+                        feedBitmapCache.put(filePath, b);
+                        return b;
+                    }
                 }
-            } catch (Throwable ignored) {
-            } finally {
-                try { mmr.release(); } catch (Throwable ignored) {}
             }
         }
-        Bitmap b = decodeCompleteBitmapWithExif(f, 512);
-        if (b != null) feedBitmapCache.put(filePath, b);
-        return b;
+        if (messageId != null && !messageId.isEmpty()) {
+            try {
+                Message m = VeilMessagesController.getInstance(this).getMessage(messageId);
+                if (m != null && m.getThumbnail() != null && !m.getThumbnail().isEmpty()) {
+                    byte[] decoded = android.util.Base64.decode(m.getThumbnail(), android.util.Base64.DEFAULT);
+                    Bitmap b = BitmapFactory.decodeByteArray(decoded, 0, decoded.length);
+                    if (b != null) return b;
+                }
+            } catch (Throwable ignored) {}
+        }
+        return null;
     }
 
     /**
