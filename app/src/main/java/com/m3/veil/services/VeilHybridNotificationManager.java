@@ -803,18 +803,41 @@ public class VeilHybridNotificationManager {
         } catch (Throwable ignored) {}
     }
 
-    public static final String KEY_CHAT_SOUND_SET = "chat_sound_set_index"; // 1..5
+    public static final String KEY_CHAT_SEND_SOUND_SET = "chat_send_sound_set_index"; // 1..5, default 5 (Studio Pulse)
+    public static final String KEY_CHAT_RECEIVE_SOUND_SET = "chat_receive_sound_set_index"; // 1..5, default 1 (Organic Bubble & Kalimba)
+    public static final String KEY_CHAT_SOUND_SET = "chat_sound_set_index"; // legacy
 
-    public static int getSelectedSoundSet(@NonNull Context context) {
+    public static int getSelectedSendSoundSet(@NonNull Context context) {
         SharedPreferences prefs = context.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
-        int set = prefs.getInt(KEY_CHAT_SOUND_SET, 1);
+        int set = prefs.getInt(KEY_CHAT_SEND_SOUND_SET, 5);
+        return (set >= 1 && set <= 5) ? set : 5;
+    }
+
+    public static void setSelectedSendSoundSet(@NonNull Context context, int setIndex) {
+        int clamped = Math.max(1, Math.min(5, setIndex));
+        SharedPreferences prefs = context.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putInt(KEY_CHAT_SEND_SOUND_SET, clamped).apply();
+    }
+
+    public static int getSelectedReceiveSoundSet(@NonNull Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
+        int set = prefs.getInt(KEY_CHAT_RECEIVE_SOUND_SET, 1);
         return (set >= 1 && set <= 5) ? set : 1;
     }
 
-    public static void setSelectedSoundSet(@NonNull Context context, int setIndex) {
+    public static void setSelectedReceiveSoundSet(@NonNull Context context, int setIndex) {
         int clamped = Math.max(1, Math.min(5, setIndex));
         SharedPreferences prefs = context.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KEY_CHAT_SOUND_SET, clamped).apply();
+        prefs.edit().putInt(KEY_CHAT_RECEIVE_SOUND_SET, clamped).apply();
+    }
+
+    public static int getSelectedSoundSet(@NonNull Context context) {
+        return getSelectedSendSoundSet(context);
+    }
+
+    public static void setSelectedSoundSet(@NonNull Context context, int setIndex) {
+        setSelectedSendSoundSet(context, setIndex);
+        setSelectedReceiveSoundSet(context, setIndex);
     }
 
     public static String getSoundSetName(int setIndex) {
@@ -844,7 +867,7 @@ public class VeilHybridNotificationManager {
             if (!prefs.getBoolean(NotificationSettingsActivity.KEY_INAPP_SOUNDS, true)) {
                 return;
             }
-            final int soundSet = getSelectedSoundSet(mContext);
+            final int soundSet = getSelectedSendSoundSet(mContext);
             new Thread(() -> {
                 try {
                     short[] pcm = synthesizeSentPcm(soundSet, 44100);
@@ -860,7 +883,7 @@ public class VeilHybridNotificationManager {
             if (!prefs.getBoolean(NotificationSettingsActivity.KEY_INAPP_SOUNDS, true)) {
                 return;
             }
-            final int soundSet = getSelectedSoundSet(mContext);
+            final int soundSet = getSelectedReceiveSoundSet(mContext);
             new Thread(() -> {
                 try {
                     short[] pcm = synthesizeReceivedPcm(soundSet, 44100);

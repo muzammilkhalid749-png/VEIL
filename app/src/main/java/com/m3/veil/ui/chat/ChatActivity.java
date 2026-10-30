@@ -1288,14 +1288,10 @@ public class ChatActivity extends AppCompatActivity {
                 }
             }
 
-            menu.add(0, 999101, 0, "🔊 Sound Sets (Play & Choose)");
 
             popup.setOnMenuItemClickListener(item -> {
                 int id = item.getItemId();
-                if (id == 999101) {
-                    showSoundSetsAuditionDialog();
-                    return true;
-                } else if (id == R.id.action_view_profile) {
+                if (id == R.id.action_view_profile) {
                     findViewById(R.id.profileArea).performClick();
                     return true;
                 } else if (id == R.id.action_blink_mode) {
@@ -3610,98 +3606,6 @@ public class ChatActivity extends AppCompatActivity {
 
         btnCancel.setOnClickListener(v -> sheet.dismiss());
 
-        sheet.show();
-    }
-
-    private void showSoundSetsAuditionDialog() {
-        com.google.android.material.bottomsheet.BottomSheetDialog sheet =
-                new com.google.android.material.bottomsheet.BottomSheetDialog(this);
-        float dp = getResources().getDisplayMetrics().density;
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        int pad = (int) (18 * dp);
-        root.setPadding(pad, pad, pad, pad);
-        root.setBackgroundColor(0xFF141722);
-
-        TextView title = new TextView(this);
-        title.setText("🔊 Audition & Select Chat Sound Set");
-        title.setTextSize(17f);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setTextColor(getResources().getColor(R.color.text_primary));
-        root.addView(title);
-
-        TextView sub = new TextView(this);
-        sub.setText("Tap Play Send or Play Receive to listen on your phone speaker, then tap Select to lock in your favorite set.");
-        sub.setTextSize(12.5f);
-        sub.setTextColor(getResources().getColor(R.color.text_secondary));
-        sub.setPadding(0, (int) (4 * dp), 0, (int) (12 * dp));
-        root.addView(sub);
-
-        int currentSet = com.m3.veil.services.VeilHybridNotificationManager.getSelectedSoundSet(this);
-        com.m3.veil.services.VeilHybridNotificationManager notifMgr =
-                com.m3.veil.services.VeilHybridNotificationManager.getInstance(this);
-
-        for (int s = 1; s <= 5; s++) {
-            final int setIdx = s;
-            LinearLayout card = new LinearLayout(this);
-            card.setOrientation(LinearLayout.VERTICAL);
-            int cPad = (int) (12 * dp);
-            card.setPadding(cPad, cPad, cPad, cPad);
-            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            cardLp.bottomMargin = (int) (10 * dp);
-            card.setLayoutParams(cardLp);
-            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-            bg.setCornerRadius(12 * dp);
-            bg.setColor(0xFF1D2232);
-            bg.setStroke((int) ((setIdx == currentSet ? 2 : 1) * dp),
-                    setIdx == currentSet ? getResources().getColor(R.color.veil_accent) : 0x33FFFFFF);
-            card.setBackground(bg);
-
-            TextView tvName = new TextView(this);
-            tvName.setText((setIdx == currentSet ? "✓ " : "") + com.m3.veil.services.VeilHybridNotificationManager.getSoundSetName(setIdx));
-            tvName.setTextSize(14f);
-            tvName.setTypeface(null, android.graphics.Typeface.BOLD);
-            tvName.setTextColor(getResources().getColor(setIdx == currentSet ? R.color.veil_accent : R.color.text_primary));
-            card.addView(tvName);
-
-            LinearLayout btnRow = new LinearLayout(this);
-            btnRow.setOrientation(LinearLayout.HORIZONTAL);
-            btnRow.setPadding(0, (int) (8 * dp), 0, 0);
-
-            android.widget.Button btnSend = new android.widget.Button(this);
-            btnSend.setText("▶ Send");
-            btnSend.setAllCaps(false);
-            btnSend.setTextSize(12f);
-            btnSend.setOnClickListener(v -> notifMgr.previewSoundSet(setIdx, true));
-            btnRow.addView(btnSend, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-            android.widget.Button btnRecv = new android.widget.Button(this);
-            btnRecv.setText("▶ Receive");
-            btnRecv.setAllCaps(false);
-            btnRecv.setTextSize(12f);
-            btnRecv.setOnClickListener(v -> notifMgr.previewSoundSet(setIdx, false));
-            btnRow.addView(btnRecv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-            android.widget.Button btnUse = new android.widget.Button(this);
-            btnUse.setText(setIdx == currentSet ? "Active" : "Select");
-            btnUse.setAllCaps(false);
-            btnUse.setTextSize(12f);
-            btnUse.setOnClickListener(v -> {
-                com.m3.veil.services.VeilHybridNotificationManager.setSelectedSoundSet(ChatActivity.this, setIdx);
-                notifMgr.previewSoundSet(setIdx, false);
-                Toast.makeText(ChatActivity.this, "Selected " + com.m3.veil.services.VeilHybridNotificationManager.getSoundSetName(setIdx), Toast.LENGTH_SHORT).show();
-                sheet.dismiss();
-            });
-            btnRow.addView(btnUse, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-            card.addView(btnRow);
-            root.addView(card);
-        }
-
-        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
-        scroll.addView(root);
-        sheet.setContentView(scroll);
         sheet.show();
     }
 
