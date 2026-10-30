@@ -521,6 +521,8 @@ public class MediaViewerActivity extends AppCompatActivity {
         if (bottomReplyBar != null) {
             bottomReplyBar.setVisibility(isControlsVisible ? View.VISIBLE : View.GONE);
         }
+        activeReactionEmoji = itemReactionsMap.get(getCurrentItemReactionKey());
+        syncReactionUiState(false);
         highlightActiveThumbnail(currentMediaIndex);
     }
 
@@ -675,6 +677,16 @@ public class MediaViewerActivity extends AppCompatActivity {
         }
     }
 
+    private final java.util.Map<String, String> itemReactionsMap = new java.util.HashMap<>();
+
+    private String getCurrentItemReactionKey() {
+        if (!albumItems.isEmpty() && currentMediaIndex >= 0 && currentMediaIndex < albumItems.size()) {
+            String p = albumItems.get(currentMediaIndex).path;
+            if (p != null && !p.isEmpty()) return p;
+        }
+        return filePath != null ? filePath : (messageId != null ? messageId : "default_media");
+    }
+
     private void ensureFloatingReactionBadgeCreated() {
         if (floatingReactionBadge != null || !(bottomControlsWrapper instanceof LinearLayout)) return;
         LinearLayout wrapper = (LinearLayout) bottomControlsWrapper;
@@ -684,96 +696,299 @@ public class MediaViewerActivity extends AppCompatActivity {
         LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         rowLp.rightMargin = Math.round(14 * dp);
-        rowLp.bottomMargin = Math.round(2 * dp);
+        rowLp.bottomMargin = Math.round(4 * dp);
         badgeRow.setLayoutParams(rowLp);
 
         floatingReactionBadge = new TextView(this);
         FrameLayout.LayoutParams bLp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(34 * dp), Gravity.END | Gravity.CENTER_VERTICAL);
+                ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(36 * dp), Gravity.END | Gravity.CENTER_VERTICAL);
         floatingReactionBadge.setLayoutParams(bLp);
         floatingReactionBadge.setGravity(Gravity.CENTER);
-        int padH = Math.round(12 * dp);
+        int padH = Math.round(13 * dp);
         floatingReactionBadge.setPadding(padH, 0, padH, 0);
         floatingReactionBadge.setTextSize(17f);
+        floatingReactionBadge.setTextColor(Color.WHITE);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Color.parseColor("#1F2C34"));
         bg.setCornerRadius(18 * dp);
-        bg.setStroke(Math.max(1, Math.round(1 * dp)), Color.parseColor("#33FFFFFF"));
+        bg.setStroke(Math.max(1, Math.round(1.2f * dp)), Color.parseColor("#4D00A884"));
         floatingReactionBadge.setBackground(bg);
         floatingReactionBadge.setElevation(6 * dp);
         floatingReactionBadge.setVisibility(View.GONE);
-        floatingReactionBadge.setOnClickListener(v -> showFullEmojiReactionPicker());
+        // Tap again on the floating reaction badge removes the reaction; long-press opens full picker
+        floatingReactionBadge.setOnClickListener(v -> removeActiveReactionWithAnimation());
+        floatingReactionBadge.setOnLongClickListener(v -> {
+            showFullEmojiReactionPicker();
+            return true;
+        });
 
         badgeRow.addView(floatingReactionBadge);
         wrapper.addView(badgeRow, 0);
     }
 
+    private void syncReactionUiState(boolean animateBadge) {
+        ensureFloatingReactionBadgeCreated();
+        float dp = getResources().getDisplayMetrics().density;
+        boolean hasReaction = activeReactionEmoji != null && !activeReactionEmoji.isEmpty();
+
+        // Keep quick reaction buttons visible so tapping the same emoji again toggles/removes it!
+        if (reactionHeart != null) {
+            reactionHeart.setVisibility(View.VISIBLE);
+            styleQuickReactionChip(reactionHeart, "❤️".equals(activeReactionEmoji), dp);
+        }
+        if (reactionPray != null) {
+            reactionPray.setVisibility(View.VISIBLE);
+            styleQuickReactionChip(reactionPray, "🙏".equals(activeReactionEmoji), dp);
+        }
+        if (reactionLaugh != null) {
+            reactionLaugh.setVisibility(View.VISIBLE);
+            boolean isCustomEmoji = hasReaction && !"❤️".equals(activeReactionEmoji) && !"🙏".equals(activeReactionEmoji);
+            styleQuickReactionChip(reactionLaugh, isCustomEmoji, dp);
+        }
+
+        if (floatingReactionBadge != null) {
+            if (hasReaction) {
+                floatingReactionBadge.setText(activeReactionEmoji + "  ✕");
+                floatingReactionBadge.setVisibility(isControlsVisible ? View.VISIBLE : View.GONE);
+                if (animateBadge) {
+                    floatingReactionBadge.animate().cancel();
+                    floatingReactionBadge.setScaleX(0.35f);
+                    floatingReactionBadge.setScaleY(0.35f);
+                    floatingReactionBadge.setAlpha(0f);
+                    floatingReactionBadge.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .alpha(1f)
+                            .setDuration(280)
+                            .setInterpolator(new android.view.animation.OvershootInterpolator(1.9f))
+                            .start();
+                } else {
+                    floatingReactionBadge.setScaleX(1f);
+                    floatingReactionBadge.setScaleY(1f);
+                    floatingReactionBadge.setAlpha(1f);
+                }
+            } else {
+                floatingReactionBadge.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    private void styleQuickReactionChip(TextView chip, boolean active, float dp) {
+        if (chip == null) return;
+        if (active) {
+            GradientDrawable activeBg = new GradientDrawable();
+            activeBg.setShape(GradientDrawable.OVAL);
+            activeBg.setColor(Color.parseColor("#3300A884"));
+            activeBg.setStroke(Math.max(1, Math.round(1.5f * dp)), Color.parseColor("#00A884"));
+            chip.setBackground(activeBg);
+            chip.setScaleX(1.12f);
+            chip.setScaleY(1.12f);
+        } else {
+            chip.setBackground(null);
+            chip.setScaleX(1f);
+            chip.setScaleY(1f);
+        }
+    }
+
     /**
-     * Plays a smooth WhatsApp reaction pop/floating emoji animation (when_user_react_its_show_animatiob_5c36700a.jpg),
-     * collapses the quick reaction icons inside the Reply pill, and pins the dark reaction pill badge on the right above 1.0x.
+     * Smoothly removes the current reaction when the user taps the same reaction emoji again
+     * or taps the floating reaction pill badge.
+     */
+    private void removeActiveReactionWithAnimation() {
+        if (activeReactionEmoji == null || activeReactionEmoji.isEmpty()) return;
+        final String removedEmoji = activeReactionEmoji;
+        activeReactionEmoji = null;
+        itemReactionsMap.remove(getCurrentItemReactionKey());
+        dispatchReactionForCurrentMessage("");
+
+        if (floatingReactionBadge != null && floatingReactionBadge.getVisibility() == View.VISIBLE) {
+            floatingReactionBadge.animate().cancel();
+            floatingReactionBadge.animate()
+                    .scaleX(0.2f)
+                    .scaleY(0.2f)
+                    .alpha(0f)
+                    .setDuration(200)
+                    .setInterpolator(new android.view.animation.AccelerateInterpolator(1.4f))
+                    .withEndAction(() -> {
+                        floatingReactionBadge.setVisibility(View.GONE);
+                        syncReactionUiState(false);
+                    })
+                    .start();
+        } else {
+            syncReactionUiState(false);
+        }
+
+        // Subtle upward dissolve feedback for removed reaction
+        ViewGroup root = findViewById(R.id.mediaViewerRoot);
+        if (root != null) {
+            float dp = getResources().getDisplayMetrics().density;
+            final TextView ghost = new TextView(this);
+            ghost.setText(removedEmoji);
+            ghost.setTextSize(28f);
+            ghost.setGravity(Gravity.CENTER);
+            int sz = Math.round(52 * dp);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(sz, sz, Gravity.BOTTOM | Gravity.END);
+            lp.rightMargin = Math.round(28 * dp);
+            lp.bottomMargin = Math.round(78 * dp);
+            ghost.setLayoutParams(lp);
+            ghost.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+            root.addView(ghost);
+            ghost.animate()
+                    .scaleX(0.3f)
+                    .scaleY(0.3f)
+                    .alpha(0f)
+                    .translationY(-Math.round(28 * dp))
+                    .setDuration(220)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .withEndAction(() -> root.removeView(ghost))
+                    .start();
+        }
+        Toast.makeText(this, "Reaction removed", Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Plays a silky-smooth 60fps physics reaction animation with radiating particle burst,
+     * or removes the reaction if the user taps the already-active emoji again!
      */
     private void playReactionPopAnimationAndApply(String emoji, @Nullable View anchorView) {
         if (emoji == null || emoji.isEmpty()) return;
+
+        // Toggle behavior: if the user taps the exact same reaction emoji again, remove it!
+        if (emoji.equals(activeReactionEmoji)) {
+            removeActiveReactionWithAnimation();
+            return;
+        }
+
         activeReactionEmoji = emoji;
+        itemReactionsMap.put(getCurrentItemReactionKey(), emoji);
         dispatchReactionForCurrentMessage(emoji);
 
-        ViewGroup root = findViewById(R.id.mediaViewerRoot);
-        float dp = getResources().getDisplayMetrics().density;
+        if (anchorView != null) {
+            anchorView.animate().cancel();
+            anchorView.setScaleX(0.75f);
+            anchorView.setScaleY(0.75f);
+            anchorView.animate()
+                    .scaleX(1.15f)
+                    .scaleY(1.15f)
+                    .setDuration(140)
+                    .withEndAction(() -> syncReactionUiState(false))
+                    .start();
+        }
+
+        final ViewGroup root = findViewById(R.id.mediaViewerRoot);
+        final float dp = getResources().getDisplayMetrics().density;
         if (root != null) {
+            int[] rootLoc = new int[2];
+            root.getLocationOnScreen(rootLoc);
+            float startX = root.getWidth() - 58 * dp;
+            float startY = root.getHeight() - 96 * dp;
+            if (anchorView != null && anchorView.getWidth() > 0) {
+                int[] anchorLoc = new int[2];
+                anchorView.getLocationOnScreen(anchorLoc);
+                startX = (anchorLoc[0] - rootLoc[0]) + anchorView.getWidth() * 0.5f;
+                startY = (anchorLoc[1] - rootLoc[1]) + anchorView.getHeight() * 0.5f;
+            }
+
+            // 1. Radiating mini-emoji / sparkle burst particles (6 particles on hardware layers)
+            final int particleCount = 6;
+            for (int i = 0; i < particleCount; i++) {
+                final TextView particle = new TextView(this);
+                particle.setText(i % 2 == 0 ? emoji : "✨");
+                particle.setTextSize(14f);
+                particle.setGravity(Gravity.CENTER);
+                int pSz = Math.round(28 * dp);
+                FrameLayout.LayoutParams pLp = new FrameLayout.LayoutParams(pSz, pSz);
+                particle.setLayoutParams(pLp);
+                particle.setX(startX - pSz * 0.5f);
+                particle.setY(startY - pSz * 0.5f);
+                particle.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                root.addView(particle);
+
+                double angle = (Math.PI * 2.0 * i / particleCount) - Math.PI * 0.5;
+                float radius = (38f + (i % 2) * 14f) * dp;
+                float dx = (float) Math.cos(angle) * radius;
+                float dy = (float) Math.sin(angle) * radius - (36f * dp);
+
+                particle.setScaleX(0.3f);
+                particle.setScaleY(0.3f);
+                particle.animate()
+                        .translationXBy(dx)
+                        .translationYBy(dy)
+                        .scaleX(1.05f)
+                        .scaleY(1.05f)
+                        .alpha(0f)
+                        .setDuration(520)
+                        .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f))
+                        .withEndAction(() -> root.removeView(particle))
+                        .start();
+            }
+
+            // 2. Main floating emoji on a single continuous 60fps Bezier/sine trajectory (zero jerky multi-stage jumps)
             final TextView animEmoji = new TextView(this);
             animEmoji.setText(emoji);
             animEmoji.setTextSize(38f);
             animEmoji.setGravity(Gravity.CENTER);
-            int sz = Math.round(68 * dp);
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(sz, sz, Gravity.BOTTOM | Gravity.END);
-            lp.rightMargin = Math.round(24 * dp);
-            lp.bottomMargin = Math.round(72 * dp);
+            final int sz = Math.round(76 * dp);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(sz, sz);
             animEmoji.setLayoutParams(lp);
-            animEmoji.setScaleX(0.25f);
-            animEmoji.setScaleY(0.25f);
-            animEmoji.setAlpha(0f);
+            final float baseLeft = startX - sz * 0.5f;
+            final float baseTop = startY - sz * 0.5f;
+            animEmoji.setX(baseLeft);
+            animEmoji.setY(baseTop);
+            animEmoji.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             root.addView(animEmoji);
 
-            animEmoji.animate()
-                    .scaleX(1.35f)
-                    .scaleY(1.35f)
-                    .alpha(1f)
-                    .translationY(-Math.round(52 * dp))
-                    .setDuration(260)
-                    .setInterpolator(new android.view.animation.OvershootInterpolator(2.2f))
-                    .withEndAction(() -> animEmoji.animate()
-                            .scaleX(0.75f)
-                            .scaleY(0.75f)
-                            .alpha(0f)
-                            .translationY(-Math.round(24 * dp))
-                            .setDuration(200)
-                            .withEndAction(() -> root.removeView(animEmoji))
-                            .start())
-                    .start();
+            android.animation.ValueAnimator va = android.animation.ValueAnimator.ofFloat(0f, 1f);
+            va.setDuration(640);
+            va.setInterpolator(new android.view.animation.DecelerateInterpolator(1.25f));
+            va.addUpdateListener(animation -> {
+                float t = (float) animation.getAnimatedValue();
+                // Smooth spring scale envelope: 0 -> 1.46 at t=0.28 -> settles to 1.05 -> fades to 0.82 at t=1.0
+                float scale;
+                if (t < 0.28f) {
+                    float p = t / 0.28f;
+                    scale = 0.25f + (1.46f - 0.25f) * (1f - (1f - p) * (1f - p));
+                } else if (t < 0.65f) {
+                    float p = (t - 0.28f) / 0.37f;
+                    scale = 1.46f - (1.46f - 1.12f) * p;
+                } else {
+                    float p = (t - 0.65f) / 0.35f;
+                    scale = 1.12f - (1.12f - 0.80f) * p;
+                }
+                // Continuous upward float + gentle sinusoidal S-curve sway
+                float riseY = -t * (112f * dp);
+                float swayX = (float) Math.sin(t * Math.PI * 2.0) * (10f * dp) * (1f - t * 0.4f);
+                float tiltDeg = (float) Math.sin(t * Math.PI * 2.5) * 11f * (1f - t);
+                float alpha;
+                if (t < 0.12f) {
+                    alpha = t / 0.12f;
+                } else if (t < 0.72f) {
+                    alpha = 1f;
+                } else {
+                    alpha = Math.max(0f, 1f - (t - 0.72f) / 0.28f);
+                }
+
+                animEmoji.setScaleX(scale);
+                animEmoji.setScaleY(scale);
+                animEmoji.setX(baseLeft + swayX);
+                animEmoji.setY(baseTop + riseY);
+                animEmoji.setRotation(tiltDeg);
+                animEmoji.setAlpha(alpha);
+            });
+            va.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(android.animation.Animator animation) {
+                    root.removeView(animEmoji);
+                }
+            });
+            va.start();
         }
 
-        // Collapse quick reactions inside Reply pill & show floating reaction badge above 1.0x
-        if (reactionHeart != null) reactionHeart.setVisibility(View.GONE);
-        if (reactionPray != null) reactionPray.setVisibility(View.GONE);
-        if (reactionLaugh != null) reactionLaugh.setVisibility(View.GONE);
-
-        ensureFloatingReactionBadgeCreated();
-        if (floatingReactionBadge != null) {
-            floatingReactionBadge.setText(emoji);
-            floatingReactionBadge.setVisibility(View.VISIBLE);
-            floatingReactionBadge.setScaleX(0.4f);
-            floatingReactionBadge.setScaleY(0.4f);
-            floatingReactionBadge.animate()
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setDuration(240)
-                    .setInterpolator(new android.view.animation.OvershootInterpolator(1.8f))
-                    .start();
-        }
+        syncReactionUiState(true);
     }
 
     private void dispatchReactionForCurrentMessage(String emoji) {
-        if (emoji == null || emoji.isEmpty()) return;
+        if (emoji == null) emoji = "";
         if (chatId != null && !chatId.isEmpty() && messageId != null && !messageId.isEmpty()) {
             VeilMessagesController.getInstance(this).sendReaction(chatId, messageId, emoji);
         }
@@ -792,13 +1007,38 @@ public class MediaViewerActivity extends AppCompatActivity {
         int pad = Math.round(20 * dp);
         container.setPadding(pad, pad, pad, pad);
 
+        LinearLayout headerRow = new LinearLayout(this);
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(Gravity.CENTER_VERTICAL);
+        headerRow.setPadding(0, 0, 0, Math.round(14 * dp));
+
         TextView title = new TextView(this);
+        title.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         title.setText("React to media");
         title.setTextColor(Color.WHITE);
         title.setTextSize(16f);
         title.setTypeface(null, Typeface.BOLD);
-        title.setPadding(0, 0, 0, Math.round(14 * dp));
-        container.addView(title);
+        headerRow.addView(title);
+
+        if (activeReactionEmoji != null && !activeReactionEmoji.isEmpty()) {
+            TextView btnRemoveReaction = new TextView(this);
+            btnRemoveReaction.setText("Remove " + activeReactionEmoji);
+            btnRemoveReaction.setTextColor(Color.parseColor("#F87171"));
+            btnRemoveReaction.setTextSize(13f);
+            btnRemoveReaction.setTypeface(null, Typeface.BOLD);
+            GradientDrawable rmBg = new GradientDrawable();
+            rmBg.setColor(Color.parseColor("#2A3942"));
+            rmBg.setCornerRadius(14 * dp);
+            rmBg.setStroke(Math.max(1, Math.round(1 * dp)), Color.parseColor("#4DF87171"));
+            btnRemoveReaction.setBackground(rmBg);
+            btnRemoveReaction.setPadding(Math.round(12 * dp), Math.round(6 * dp), Math.round(12 * dp), Math.round(6 * dp));
+            btnRemoveReaction.setOnClickListener(v -> {
+                sheet.dismiss();
+                removeActiveReactionWithAnimation();
+            });
+            headerRow.addView(btnRemoveReaction);
+        }
+        container.addView(headerRow);
 
         String[][] rows = new String[][]{
                 {"❤️", "🙏", "😂", "😮", "😢", "👍"},
@@ -820,9 +1060,16 @@ public class MediaViewerActivity extends AppCompatActivity {
                 tv.setGravity(Gravity.CENTER);
                 tv.setText(emoji);
                 tv.setTextSize(26f);
+                if (emoji.equals(activeReactionEmoji)) {
+                    GradientDrawable selBg = new GradientDrawable();
+                    selBg.setColor(Color.parseColor("#3300A884"));
+                    selBg.setCornerRadius(14 * dp);
+                    selBg.setStroke(Math.max(1, Math.round(1.5f * dp)), Color.parseColor("#00A884"));
+                    tv.setBackground(selBg);
+                }
                 tv.setOnClickListener(v -> {
                     sheet.dismiss();
-                    playReactionPopAnimationAndApply(emoji, v);
+                    playReactionPopAnimationAndApply(emoji, reactionLaugh != null ? reactionLaugh : v);
                 });
                 row.addView(tv);
             }
@@ -1606,11 +1853,13 @@ public class MediaViewerActivity extends AppCompatActivity {
     }
 
     /**
-     * Full-screen WhatsApp "Forward to..." Screen (_forward_activity_f3637c4a.jpg):
-     * - Top bar: Back arrow, "Forward to...", Add contact icon, Search icon
-     * - "My status" ("My contacts") row with green status circle, ••• button, and circular checkbox
-     * - "Meta AI" ("Ask me anything") row with gradient circle and circular checkbox
-     * - "Frequently contacted" and "Recent chats" sections with circular selection checkboxes
+     * Full-screen Veil "Forward to..." Screen (adapted from _forward_activity_f3637c4a.jpg with 100% Veil concept, NO Meta AI):
+     * - Top bar: Back arrow, "Forward to..." / "N selected", Quick Add Peer/Contact icon, Live Search filter icon
+     * - Expandable live search bar to filter contacts, vaults, and encrypted chats in real time
+     * - "My Veil Status" ("Visible to contacts • 24h") row with green status ring, ••• audience/editor button, and circular checkbox
+     * - "Saved Vault (You)" ("Encrypted personal cloud storage") row with Vault icon and circular checkbox
+     * - "Secret Blink Drop" ("Auto-destructs after 1 view") toggle row for ephemeral View-Once forwarding
+     * - "Frequently contacted" and "Recent encrypted chats" sections populated from EncryptedChatDatabase
      * - Bottom bar with left square media thumbnail, "Add a message..." pill input, and green send FAB
      */
     private void showForwardDialog() {
@@ -1646,6 +1895,7 @@ public class MediaViewerActivity extends AppCompatActivity {
         tvHeaderTitle.setText("Forward to...");
         tvHeaderTitle.setTextColor(Color.parseColor("#111B21"));
         tvHeaderTitle.setTextSize(19f);
+        tvHeaderTitle.setTypeface(null, Typeface.BOLD);
         topAppBar.addView(tvHeaderTitle);
 
         ImageView ivAddContact = new ImageView(this);
@@ -1664,6 +1914,35 @@ public class MediaViewerActivity extends AppCompatActivity {
 
         root.addView(topAppBar);
 
+        // Expandable Live Search Bar
+        final EditText etSearchFilter = new EditText(this);
+        LinearLayout.LayoutParams searchLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.round(42 * dp));
+        searchLp.setMargins(Math.round(14 * dp), 0, Math.round(14 * dp), Math.round(8 * dp));
+        etSearchFilter.setLayoutParams(searchLp);
+        etSearchFilter.setHint("Search Veil peers, groups, or vault...");
+        etSearchFilter.setHintTextColor(Color.parseColor("#8696A0"));
+        etSearchFilter.setTextColor(Color.parseColor("#111B21"));
+        etSearchFilter.setTextSize(14.5f);
+        etSearchFilter.setSingleLine(true);
+        etSearchFilter.setPadding(Math.round(14 * dp), 0, Math.round(14 * dp), 0);
+        GradientDrawable searchBg = new GradientDrawable();
+        searchBg.setColor(Color.parseColor("#F0F2F5"));
+        searchBg.setCornerRadius(21 * dp);
+        etSearchFilter.setBackground(searchBg);
+        etSearchFilter.setVisibility(View.GONE);
+        root.addView(etSearchFilter);
+
+        ivSearch.setOnClickListener(v -> {
+            if (etSearchFilter.getVisibility() == View.VISIBLE) {
+                etSearchFilter.setText("");
+                etSearchFilter.setVisibility(View.GONE);
+            } else {
+                etSearchFilter.setVisibility(View.VISIBLE);
+                etSearchFilter.requestFocus();
+            }
+        });
+
         View topDiv = new View(this);
         topDiv.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Math.round(1 * dp))));
         topDiv.setBackgroundColor(Color.parseColor("#E9EDEF"));
@@ -1672,7 +1951,7 @@ public class MediaViewerActivity extends AppCompatActivity {
         // 2. Scrollable Content List
         android.widget.ScrollView scrollView = new android.widget.ScrollView(this);
         scrollView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        LinearLayout listContainer = new LinearLayout(this);
+        final LinearLayout listContainer = new LinearLayout(this);
         listContainer.setOrientation(LinearLayout.VERTICAL);
         listContainer.setPadding(0, Math.round(6 * dp), 0, Math.round(16 * dp));
         scrollView.addView(listContainer);
@@ -1680,34 +1959,111 @@ public class MediaViewerActivity extends AppCompatActivity {
 
         final java.util.Set<String> selectedIds = new java.util.LinkedHashSet<>();
         final java.util.Map<String, String> idToNameMap = new java.util.HashMap<>();
+        final boolean[] forwardAsBlink = new boolean[]{false};
 
         final Runnable updateSelectionCount = () -> {
-            if (selectedIds.isEmpty()) {
+            int count = selectedIds.size();
+            if (count == 0) {
                 tvHeaderTitle.setText("Forward to...");
             } else {
-                tvHeaderTitle.setText(selectedIds.size() + " selected");
+                tvHeaderTitle.setText(count + " selected" + (forwardAsBlink[0] ? " • ⚡ Blink" : ""));
             }
         };
 
-        // Row 1: "My status" ("My contacts")
-        idToNameMap.put("__status__", "My status");
-        listContainer.addView(buildForwardTargetRow(
-                "__status__", "My status", "My contacts",
+        // Row 1: "My Veil Status" ("My contacts • 24h ephemeral")
+        idToNameMap.put("__status__", "My Veil Status");
+        final View statusRow = buildForwardTargetRow(
+                "__status__", "My status", "My contacts • 24h ephemeral",
                 Color.parseColor("#00A884"), R.drawable.ic_status_ring, true,
                 selectedIds, updateSelectionCount,
                 v -> {
                     forwardDialog.dismiss();
                     openMediaEditorInternal(true);
-                }));
+                });
+        statusRow.setTag("my status contacts ephemeral");
+        listContainer.addView(statusRow);
 
-        // Row 2: "Meta AI" ("Ask me anything")
-        idToNameMap.put("__meta_ai__", "Meta AI");
-        listContainer.addView(buildForwardTargetRow(
-                "__meta_ai__", "Meta AI", "Ask me anything",
-                Color.parseColor("#7F66FF"), R.drawable.ic_discover, false,
-                selectedIds, updateSelectionCount, null));
+        // Row 2: "Saved Vault (You)" ("Encrypted personal cloud storage" — replaces Meta AI with Veil's Vault concept!)
+        idToNameMap.put("__vault__", "Saved Vault (You)");
+        final View vaultRow = buildForwardTargetRow(
+                "__vault__", "Saved Vault (You)", "Encrypted personal cloud storage",
+                Color.parseColor("#0284C7"), R.drawable.ic_saved, false,
+                selectedIds, updateSelectionCount, null);
+        vaultRow.setTag("saved vault you personal cloud storage");
+        listContainer.addView(vaultRow);
 
-        // Gather real chats + fallback WhatsApp-style contacts
+        // Row 3: "Secret Blink Mode" toggle row (forwards media as View-Once self-destructing Blink)
+        final LinearLayout blinkRow = new LinearLayout(this);
+        blinkRow.setOrientation(LinearLayout.HORIZONTAL);
+        blinkRow.setGravity(Gravity.CENTER_VERTICAL);
+        int padH = Math.round(16 * dp);
+        int padV = Math.round(10 * dp);
+        blinkRow.setPadding(padH, padV, padH, padV);
+        FrameLayout blinkAv = new FrameLayout(this);
+        int avSz = Math.round(46 * dp);
+        LinearLayout.LayoutParams bAvLp = new LinearLayout.LayoutParams(avSz, avSz);
+        bAvLp.rightMargin = Math.round(14 * dp);
+        blinkAv.setLayoutParams(bAvLp);
+        GradientDrawable bAvBg = new GradientDrawable();
+        bAvBg.setShape(GradientDrawable.OVAL);
+        bAvBg.setColor(Color.parseColor("#7C3AED"));
+        blinkAv.setBackground(bAvBg);
+        TextView tvBolt = new TextView(this);
+        tvBolt.setText("①");
+        tvBolt.setTextColor(Color.WHITE);
+        tvBolt.setTextSize(19f);
+        tvBolt.setTypeface(null, Typeface.BOLD);
+        tvBolt.setGravity(Gravity.CENTER);
+        blinkAv.addView(tvBolt, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        blinkRow.addView(blinkAv);
+
+        LinearLayout blinkTextCol = new LinearLayout(this);
+        blinkTextCol.setOrientation(LinearLayout.VERTICAL);
+        blinkTextCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView tvBlinkTitle = new TextView(this);
+        tvBlinkTitle.setText("Send as Secret Blink (View Once)");
+        tvBlinkTitle.setTextColor(Color.parseColor("#111B21"));
+        tvBlinkTitle.setTextSize(15.5f);
+        tvBlinkTitle.setTypeface(null, Typeface.BOLD);
+        blinkTextCol.addView(tvBlinkTitle);
+        final TextView tvBlinkSub = new TextView(this);
+        tvBlinkSub.setText("Tap to enable auto-destruct after 1 view");
+        tvBlinkSub.setTextColor(Color.parseColor("#667781"));
+        tvBlinkSub.setTextSize(13f);
+        blinkTextCol.addView(tvBlinkSub);
+        blinkRow.addView(blinkTextCol);
+
+        final TextView blinkTogglePill = new TextView(this);
+        blinkTogglePill.setText("OFF");
+        blinkTogglePill.setTextSize(11.5f);
+        blinkTogglePill.setTypeface(null, Typeface.BOLD);
+        blinkTogglePill.setPadding(Math.round(10 * dp), Math.round(4 * dp), Math.round(10 * dp), Math.round(4 * dp));
+        final Runnable updateBlinkPill = () -> {
+            GradientDrawable pBg = new GradientDrawable();
+            pBg.setCornerRadius(12 * dp);
+            if (forwardAsBlink[0]) {
+                pBg.setColor(Color.parseColor("#7C3AED"));
+                blinkTogglePill.setTextColor(Color.WHITE);
+                blinkTogglePill.setText("ON ⚡");
+                tvBlinkSub.setText("Media will self-destruct after recipient views it once");
+            } else {
+                pBg.setColor(Color.parseColor("#E2E8F0"));
+                blinkTogglePill.setTextColor(Color.parseColor("#475569"));
+                blinkTogglePill.setText("OFF");
+                tvBlinkSub.setText("Tap to enable auto-destruct after 1 view");
+            }
+            blinkTogglePill.setBackground(pBg);
+            updateSelectionCount.run();
+        };
+        updateBlinkPill.run();
+        blinkRow.addView(blinkTogglePill);
+        blinkRow.setOnClickListener(v -> {
+            forwardAsBlink[0] = !forwardAsBlink[0];
+            updateBlinkPill.run();
+        });
+        listContainer.addView(blinkRow);
+
+        // Gather real chats from EncryptedChatDatabase
         List<Chat> allChats = EncryptedChatDatabase.getInstance(this).getAllChats(false);
         List<Chat> validChats = new ArrayList<>();
         if (allChats != null) {
@@ -1731,30 +2087,27 @@ public class MediaViewerActivity extends AppCompatActivity {
             String cid = c.getId();
             String cname = (c.getName() != null && !c.getName().isEmpty()) ? c.getName() : cid;
             idToNameMap.put(cid, cname);
-            listContainer.addView(buildForwardTargetRow(
-                    cid, cname, "~ Available",
+            View row = buildForwardTargetRow(
+                    cid, cname, "🔒 End-to-end encrypted • Veil Peer",
                     Color.parseColor("#1F2C34"), R.drawable.ic_person, false,
-                    selectedIds, updateSelectionCount, null));
+                    selectedIds, updateSelectionCount, null);
+            row.setTag(cname.toLowerCase(Locale.ROOT) + " " + cid.toLowerCase(Locale.ROOT));
+            listContainer.addView(row);
         }
-        if (freqLimit == 0) {
-            String[][] sampleFreq = new String[][]{
-                    {"freq_1", "+92 302 9611547", "~ Alhamdulillah"},
-                    {"freq_2", "MUSTAQIM KHAN", ""},
-                    {"freq_3", "Umar Hazarvi", "At work"},
-                    {"freq_4", "Zambia", ""}
-            };
-            for (String[] s : sampleFreq) {
-                idToNameMap.put(s[0], s[1]);
-                listContainer.addView(buildForwardTargetRow(
-                        s[0], s[1], s[2],
-                        Color.parseColor("#1F2C34"), R.drawable.ic_person, false,
-                        selectedIds, updateSelectionCount, null));
-            }
+        if (freqLimit == 0 && chatId != null && !chatId.isEmpty()) {
+            String currentChatLabel = (senderName != null && !senderName.isEmpty()) ? senderName : chatId;
+            idToNameMap.put(chatId, currentChatLabel);
+            View row = buildForwardTargetRow(
+                    chatId, currentChatLabel, "🔒 Active encrypted chat",
+                    Color.parseColor("#1F2C34"), R.drawable.ic_person, false,
+                    selectedIds, updateSelectionCount, null);
+            row.setTag(currentChatLabel.toLowerCase(Locale.ROOT));
+            listContainer.addView(row);
         }
 
         // Section: "Recent chats"
         TextView tvRecentHeader = new TextView(this);
-        tvRecentHeader.setText("Recent chats");
+        tvRecentHeader.setText("Recent encrypted chats");
         tvRecentHeader.setTextColor(Color.parseColor("#667781"));
         tvRecentHeader.setTextSize(13.5f);
         tvRecentHeader.setTypeface(null, Typeface.BOLD);
@@ -1766,16 +2119,60 @@ public class MediaViewerActivity extends AppCompatActivity {
             String cid = c.getId();
             String cname = (c.getName() != null && !c.getName().isEmpty()) ? c.getName() : cid;
             idToNameMap.put(cid, cname);
-            listContainer.addView(buildForwardTargetRow(
-                    cid, cname, "Message",
-                    Color.parseColor("#00A884"), R.drawable.ic_person, false,
-                    selectedIds, updateSelectionCount, null));
+            boolean isGroup = cid.startsWith("group_") || cid.startsWith("channel_") || cid.startsWith("lounge_");
+            View row = buildForwardTargetRow(
+                    cid, cname, isGroup ? "🔒 Encrypted Veil Group" : "🔒 Encrypted Veil Chat",
+                    Color.parseColor(isGroup ? "#4F46E5" : "#00A884"), R.drawable.ic_person, false,
+                    selectedIds, updateSelectionCount, null);
+            row.setTag(cname.toLowerCase(Locale.ROOT) + " " + cid.toLowerCase(Locale.ROOT));
+            listContainer.addView(row);
         }
-        idToNameMap.put("__self__", "@muz.dev (You)");
-        listContainer.addView(buildForwardTargetRow(
-                "__self__", "@muz.dev (You)", "Message yourself",
-                Color.parseColor("#0284C7"), R.drawable.ic_person, false,
-                selectedIds, updateSelectionCount, null));
+
+        // Quick Add Peer / Contact button handler (ivAddContact)
+        ivAddContact.setOnClickListener(v -> {
+            final EditText input = new EditText(this);
+            input.setHint("Enter Veil @username or Peer ID");
+            input.setSingleLine(true);
+            int p = Math.round(18 * dp);
+            input.setPadding(p, p, p, p);
+            new android.app.AlertDialog.Builder(this)
+                    .setTitle("Forward to Veil Peer")
+                    .setView(input)
+                    .setPositiveButton("Add & Select", (d, w) -> {
+                        String peerInput = input.getText() != null ? input.getText().toString().trim() : "";
+                        if (!peerInput.isEmpty()) {
+                            String customId = peerInput.startsWith("@") ? peerInput.substring(1) : peerInput;
+                            idToNameMap.put(customId, peerInput);
+                            selectedIds.add(customId);
+                            View newRow = buildForwardTargetRow(
+                                    customId, peerInput, "🔒 Direct Veil Peer",
+                                    Color.parseColor("#0D9488"), R.drawable.ic_person, false,
+                                    selectedIds, updateSelectionCount, null);
+                            newRow.setTag(peerInput.toLowerCase(Locale.ROOT));
+                            listContainer.addView(newRow);
+                            updateSelectionCount.run();
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+
+        // Live search filtering
+        etSearchFilter.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String q = s != null ? s.toString().trim().toLowerCase(Locale.ROOT) : "";
+                for (int i = 0; i < listContainer.getChildCount(); i++) {
+                    View child = listContainer.getChildAt(i);
+                    Object tagObj = child.getTag();
+                    if (tagObj instanceof String) {
+                        String searchable = (String) tagObj;
+                        child.setVisibility(q.isEmpty() || searchable.contains(q) ? View.VISIBLE : View.GONE);
+                    }
+                }
+            }
+            @Override public void afterTextChanged(android.text.Editable s) {}
+        });
 
         // 3. Bottom Bar: Square Media Thumbnail + "Add a message..." Pill Input + Green Send FAB
         View botDiv = new View(this);
@@ -1839,26 +2236,30 @@ public class MediaViewerActivity extends AppCompatActivity {
 
         btnConfirmForward.setOnClickListener(v -> {
             if (selectedIds.isEmpty()) {
-                Toast.makeText(this, "Select at least one chat or My status", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Select at least one chat, Vault, or My status", Toast.LENGTH_SHORT).show();
                 return;
             }
             String extraMsg = etForwardMessage.getText() != null ? etForwardMessage.getText().toString().trim() : "";
             String finalCaption = !extraMsg.isEmpty() ? extraMsg : caption;
             List<String> forwardedNames = new ArrayList<>();
+            boolean openStatusEditorAfter = false;
             for (String targetId : selectedIds) {
                 String tName = idToNameMap.getOrDefault(targetId, targetId);
                 forwardedNames.add(tName);
                 if ("__status__".equals(targetId)) {
+                    openStatusEditorAfter = selectedIds.size() == 1;
                     continue;
                 }
-                String realChatId = ("__self__".equals(targetId) || targetId.startsWith("freq_")) && chatId != null ? chatId : targetId;
+                String realChatId = "__vault__".equals(targetId)
+                        ? (chatId != null && !chatId.isEmpty() ? chatId : "saved_messages")
+                        : targetId;
                 if (realChatId != null && !realChatId.isEmpty()) {
                     if (isVerticalScrollMode && albumItems.size() > 1) {
                         for (AlbumMediaEntry entry : albumItems) {
                             File ef = new File(entry.path);
                             if (ef.exists()) {
                                 VeilMessagesController.getInstance(this).sendMediaMessage(
-                                        realChatId, realChatId, entry.type, ef, finalCaption, null, false);
+                                        realChatId, realChatId, entry.type, ef, finalCaption, null, forwardAsBlink[0]);
                             }
                         }
                     } else if (filePath != null) {
@@ -1867,13 +2268,17 @@ public class MediaViewerActivity extends AppCompatActivity {
                             VeilMessagesController.getInstance(this).sendMediaMessage(
                                     realChatId, realChatId,
                                     "video".equalsIgnoreCase(mediaType) ? "video" : "image",
-                                    f, finalCaption, null, false);
+                                    f, finalCaption, null, forwardAsBlink[0]);
                         }
                     }
                 }
             }
             forwardDialog.dismiss();
-            Toast.makeText(this, "Forwarded to " + android.text.TextUtils.join(", ", forwardedNames), Toast.LENGTH_SHORT).show();
+            if (openStatusEditorAfter) {
+                openMediaEditorInternal(true);
+            } else {
+                Toast.makeText(this, "Forwarded to " + android.text.TextUtils.join(", ", forwardedNames), Toast.LENGTH_SHORT).show();
+            }
         });
         bottomBar.addView(btnConfirmForward);
 

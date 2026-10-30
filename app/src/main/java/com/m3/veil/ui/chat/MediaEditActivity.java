@@ -66,13 +66,21 @@ public class MediaEditActivity extends AppCompatActivity {
     public static final String RESULT_EDITED_BATCH_PATHS = "result_edited_batch_paths";
     public static final String RESULT_EDITED_BATCH_TYPES = "result_edited_batch_types";
 
+    private static final int REQ_ADD_MORE_MEDIA = 4091;
+
     private static class BatchEditItem {
         Uri uri;
-        String type; // "image" or "video"
+        String type; // "image", "video", or "gif"
         String savedPath;
         long trimStartMs = 0;
         long trimEndMs = 0;
         long totalDurationMs = 0;
+        boolean isMuted = false;
+        boolean sendAsGif = false;
+        int rotationDegrees = 0;
+        boolean flipHorizontal = false;
+        float playbackSpeed = 1.0f;
+        int filterIndex = 0;
 
         BatchEditItem(Uri uri, String type) {
             this.uri = uri;
@@ -86,6 +94,7 @@ public class MediaEditActivity extends AppCompatActivity {
     private PhotoEditorView photoEditorView;
     private PhotoEditor photoEditor;
     private VideoView videoView;
+    private android.media.MediaPlayer activeVideoMediaPlayer;
     private EditText captionEditText;
     private HorizontalScrollView editBatchThumbnailScroll;
     private LinearLayout editBatchThumbnailStrip;
@@ -94,9 +103,33 @@ public class MediaEditActivity extends AppCompatActivity {
 
     private TextView btnCensorChip;
     private TextView btnMuteAudioChip;
+    private TextView btnVideoSpeedChip;
+    private TextView btnHdQualityChip;
+    private TextView btnColorFilterChip;
+    private View videoColorFilterOverlay;
+    private boolean isHdQuality = true;
+    private float currentVideoSpeed = 1.0f;
+    private int currentVideoRotation = 0;
+    private boolean currentVideoFlipH = false;
+    private boolean sendVideoAsGif = false;
+    private int currentFilterIndex = 0;
+    private static final String[] FILTER_NAMES = new String[]{
+            "Original", "Vivid", "Warm", "Cool", "Noir B&W", "Cyber"
+    };
+    private static final int[] FILTER_TINT_COLORS = new int[]{
+            Color.TRANSPARENT,
+            0x22FF4081,
+            0x28FF9800,
+            0x2800B0FF,
+            0x55000000,
+            0x2E7C4DFF
+    };
 
-    // Video Trimmer members
+    // Video Trimmer & Filmstrip members
     private View videoTrimmerContainer;
+    private LinearLayout videoFilmstripRow;
+    private TextView btnVideoPlayPauseToggle;
+    private TextView btnVideoGifModeToggle;
     private RangeSlider videoRangeSlider;
     private TextView tvTrimStart, tvTrimEnd, tvTrimDuration;
     private long trimStartMs = 0;
@@ -247,7 +280,9 @@ public class MediaEditActivity extends AppCompatActivity {
         btnSendView.setOnClickListener(v -> saveAndSend());
 
         btnCropView.setOnClickListener(v -> {
-            if (mediaUri != null && mediaType.startsWith("image") && photoEditor != null) {
+            if (mediaUri != null && mediaType != null && mediaType.startsWith("video")) {
+                showVideoTransformAndCropSheet();
+            } else if (mediaUri != null && mediaType != null && mediaType.startsWith("image") && photoEditor != null) {
                 photoEditorView.setDrawingCacheEnabled(true);
                 Bitmap bitmap = Bitmap.createBitmap(photoEditorView.getDrawingCache());
                 photoEditorView.setDrawingCacheEnabled(false);
@@ -277,11 +312,13 @@ public class MediaEditActivity extends AppCompatActivity {
         });
 
         btnTextView.setOnClickListener(v -> {
-            TextEditorDialogFragment dialog = TextEditorDialogFragment.show(this, "", Color.WHITE);
+            updateState(UIState.TEXT);
+            TextEditorDialogFragment dialog = TextEditorDialogFragment.show(this, "", currentSelectedColor);
             dialog.setOnTextEditorListener((newText, colorCode) -> {
-                if (photoEditor != null) {
+                if (photoEditor != null && newText != null && !newText.trim().isEmpty()) {
                     photoEditor.addText(newText, colorCode);
                 }
+                updateState(UIState.BASE);
             });
         });
 
@@ -291,6 +328,18 @@ public class MediaEditActivity extends AppCompatActivity {
                 photoEditor.undo();
             }
         });
+
+        View btnAddMoreMedia = findViewById(R.id.btnAddMoreMedia);
+        if (btnAddMoreMedia != null) {
+            UiAnimator.attachSpringPress(btnAddMoreMedia);
+            btnAddMoreMedia.setOnClickListener(v -> {
+                Intent pickIntent = new Intent(Intent.ACTION_GET_CONTENT);
+                pickIntent.setType("*/*");
+                pickIntent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
+                pickIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                startActivityForResult(Intent.createChooser(pickIntent, "Add media"), REQ_ADD_MORE_MEDIA);
+            });
+        }
 
         View recipientStatusPill = findViewById(R.id.recipientStatusPill);
         TextView tvRecipientStatusLabel = findViewById(R.id.tvRecipientStatusLabel);
@@ -410,23 +459,63 @@ public class MediaEditActivity extends AppCompatActivity {
     private boolean isCensorBrushActive = false;
     private boolean isVideoMuted = false;
 
+    private TextView buildToolbarChip(String label, float dp) {
+        TextView chip = new TextView(this);
+        chip.setText(label);
+        chip.setTextColor(Color.WHITE);
+        chip.setTextSize(12f);
+        chip.setTypeface(null, Typeface.BOLD);
+        chip.setBackgroundResource(R.drawable.bg_filter_chip);
+        chip.setPadding((int) (10 * dp), (int) (6 * dp), (int) (10 * dp), (int) (6 * dp));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.rightMargin = (int) (6 * dp);
+        chip.setLayoutParams(lp);
+        return chip;
+    }
+
     private void initToolbarDynamicChips() {
         if (!(topToolbar instanceof ViewGroup)) return;
         ViewGroup tb = (ViewGroup) topToolbar;
         float dp = getResources().getDisplayMetrics().density;
 
-        btnCensorChip = new TextView(this);
-        btnCensorChip.setText("🕵️ Censor");
-        btnCensorChip.setTextColor(Color.WHITE);
-        btnCensorChip.setTextSize(12.5f);
-        btnCensorChip.setTypeface(null, Typeface.BOLD);
-        btnCensorChip.setBackgroundResource(R.drawable.bg_filter_chip);
-        btnCensorChip.setPadding((int) (10 * dp), (int) (6 * dp), (int) (10 * dp), (int) (6 * dp));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.rightMargin = (int) (8 * dp);
-        btnCensorChip.setLayoutParams(lp);
+        // 1. HD / Standard Quality Chip
+        btnHdQualityChip = buildToolbarChip("HD", dp);
+        btnHdQualityChip.setBackgroundResource(R.drawable.bg_filter_chip_selected);
+        btnHdQualityChip.setOnClickListener(v -> {
+            isHdQuality = !isHdQuality;
+            btnHdQualityChip.setText(isHdQuality ? "HD" : "SD");
+            btnHdQualityChip.setBackgroundResource(isHdQuality ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+            updateTrimDurationAndSizeLabel();
+            Toast.makeText(this, isHdQuality ? "HD High-Definition Quality enabled" : "Standard Data-Saver Quality enabled", Toast.LENGTH_SHORT).show();
+        });
+        tb.addView(btnHdQualityChip, 0);
+
+        // 2. Color Filter Cycling Chip
+        btnColorFilterChip = buildToolbarChip("✨ Filter", dp);
+        btnColorFilterChip.setOnClickListener(v -> {
+            currentFilterIndex = (currentFilterIndex + 1) % FILTER_NAMES.length;
+            applyActiveColorFilter();
+            Toast.makeText(this, "Filter: " + FILTER_NAMES[currentFilterIndex], Toast.LENGTH_SHORT).show();
+        });
+        tb.addView(btnColorFilterChip, 1);
+
+        // 3. Video Playback Speed Chip (0.5x / 1.0x / 1.5x / 2.0x)
+        btnVideoSpeedChip = buildToolbarChip("1.0x", dp);
+        btnVideoSpeedChip.setOnClickListener(v -> {
+            if (currentVideoSpeed == 1.0f) currentVideoSpeed = 1.5f;
+            else if (currentVideoSpeed == 1.5f) currentVideoSpeed = 2.0f;
+            else if (currentVideoSpeed == 2.0f) currentVideoSpeed = 0.5f;
+            else currentVideoSpeed = 1.0f;
+            btnVideoSpeedChip.setText(String.format(java.util.Locale.US, "%.1fx", currentVideoSpeed));
+            btnVideoSpeedChip.setBackgroundResource(currentVideoSpeed != 1.0f ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+            applyLiveVideoPlaybackSpeed();
+        });
+        tb.addView(btnVideoSpeedChip, 2);
+
+        // 4. Privacy Censor Brush Chip (works on both Photos and Videos!)
+        btnCensorChip = buildToolbarChip("🕵️ Censor", dp);
         btnCensorChip.setOnClickListener(v -> {
             if (photoEditor == null) return;
             isCensorBrushActive = !isCensorBrushActive;
@@ -435,7 +524,7 @@ public class MediaEditActivity extends AppCompatActivity {
                 photoEditor.setBrushSize(64f);
                 photoEditor.setBrushColor(Color.parseColor("#E6111827"));
                 btnCensorChip.setBackgroundResource(R.drawable.bg_filter_chip_selected);
-                Toast.makeText(this, "🕵️ Censor Brush active: swipe over faces or text", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "🕵️ Censor Brush active: swipe over faces or sensitive text", Toast.LENGTH_SHORT).show();
             } else {
                 photoEditor.setBrushSize(16f);
                 photoEditor.setBrushColor(currentSelectedColor);
@@ -444,20 +533,233 @@ public class MediaEditActivity extends AppCompatActivity {
         });
         tb.addView(btnCensorChip);
 
-        btnMuteAudioChip = new TextView(this);
-        btnMuteAudioChip.setText("🔊 Audio On");
-        btnMuteAudioChip.setTextColor(Color.WHITE);
-        btnMuteAudioChip.setTextSize(12.5f);
-        btnMuteAudioChip.setTypeface(null, Typeface.BOLD);
-        btnMuteAudioChip.setBackgroundResource(R.drawable.bg_filter_chip);
-        btnMuteAudioChip.setPadding((int) (10 * dp), (int) (6 * dp), (int) (10 * dp), (int) (6 * dp));
+        // 5. Real-Time Audio Mute Chip (mutes live MediaPlayer AND strips audio track on save!)
+        btnMuteAudioChip = buildToolbarChip("🔊 Audio", dp);
         btnMuteAudioChip.setOnClickListener(v -> {
             isVideoMuted = !isVideoMuted;
-            btnMuteAudioChip.setText(isVideoMuted ? "🔇 Audio Muted" : "🔊 Audio On");
-            btnMuteAudioChip.setBackgroundResource(isVideoMuted ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
-            Toast.makeText(this, isVideoMuted ? "🔇 Video audio muted" : "🔊 Video audio enabled", Toast.LENGTH_SHORT).show();
+            applyLiveVideoMuteState();
+            Toast.makeText(this, isVideoMuted ? "🔇 Video audio muted (will send silent video)" : "🔊 Video audio enabled", Toast.LENGTH_SHORT).show();
         });
         tb.addView(btnMuteAudioChip);
+    }
+
+    private void applyLiveVideoMuteState() {
+        if (btnMuteAudioChip != null) {
+            btnMuteAudioChip.setText(isVideoMuted ? "🔇 Muted" : "🔊 Audio");
+            btnMuteAudioChip.setBackgroundResource(isVideoMuted ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+        }
+        if (activeVideoMediaPlayer != null) {
+            try {
+                float vol = isVideoMuted ? 0f : 1f;
+                activeVideoMediaPlayer.setVolume(vol, vol);
+            } catch (Exception ignored) {}
+        }
+        if (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size()) {
+            batchItems.get(currentBatchIndex).isMuted = isVideoMuted;
+        }
+        updateTrimDurationAndSizeLabel();
+    }
+
+    private void applyLiveVideoPlaybackSpeed() {
+        if (activeVideoMediaPlayer != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            try {
+                boolean wasPlaying = videoView != null && videoView.isPlaying();
+                activeVideoMediaPlayer.setPlaybackParams(activeVideoMediaPlayer.getPlaybackParams().setSpeed(currentVideoSpeed));
+                if (!wasPlaying && videoView != null) {
+                    videoView.pause();
+                }
+            } catch (Exception ignored) {}
+        }
+        if (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size()) {
+            batchItems.get(currentBatchIndex).playbackSpeed = currentVideoSpeed;
+        }
+    }
+
+    private void applyActiveColorFilter() {
+        if (btnColorFilterChip != null) {
+            btnColorFilterChip.setText(currentFilterIndex == 0 ? "✨ Filter" : ("✨ " + FILTER_NAMES[currentFilterIndex]));
+            btnColorFilterChip.setBackgroundResource(currentFilterIndex != 0 ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+        }
+        int tint = FILTER_TINT_COLORS[currentFilterIndex % FILTER_TINT_COLORS.length];
+        if (photoEditorView != null && photoEditorView.getSource() != null) {
+            if (currentFilterIndex == 0) {
+                photoEditorView.getSource().clearColorFilter();
+            } else {
+                photoEditorView.getSource().setColorFilter(tint, android.graphics.PorterDuff.Mode.SRC_ATOP);
+            }
+        }
+        if (videoColorFilterOverlay == null && photoEditorView != null && photoEditorView.getParent() instanceof ViewGroup) {
+            ViewGroup parent = (ViewGroup) photoEditorView.getParent();
+            videoColorFilterOverlay = new View(this);
+            videoColorFilterOverlay.setClickable(false);
+            videoColorFilterOverlay.setFocusable(false);
+            videoColorFilterOverlay.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            parent.addView(videoColorFilterOverlay, parent.indexOfChild(photoEditorView));
+        }
+        if (videoColorFilterOverlay != null) {
+            videoColorFilterOverlay.setBackgroundColor(tint);
+            videoColorFilterOverlay.setVisibility(currentFilterIndex == 0 ? View.GONE : View.VISIBLE);
+        }
+        if (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size()) {
+            batchItems.get(currentBatchIndex).filterIndex = currentFilterIndex;
+        }
+    }
+
+    /**
+     * Interactive Video Rotate / Flip / Aspect-Ratio & Frame-Crop Sheet when tapping Crop on a video.
+     */
+    private void showVideoTransformAndCropSheet() {
+        final float dp = getResources().getDisplayMetrics().density;
+        final com.google.android.material.bottomsheet.BottomSheetDialog sheet =
+                new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#1F2C34"));
+        bg.setCornerRadii(new float[]{22 * dp, 22 * dp, 22 * dp, 22 * dp, 0, 0, 0, 0});
+        root.setBackground(bg);
+        int pad = Math.round(20 * dp);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText("Video Crop, Rotate & Aspect Ratio");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(16.5f);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setPadding(0, 0, 0, Math.round(14 * dp));
+        root.addView(title);
+
+        // Row 1: Rotate 90° | Flip Horizontal | Reset Transform
+        LinearLayout transformRow = new LinearLayout(this);
+        transformRow.setOrientation(LinearLayout.HORIZONTAL);
+        transformRow.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams rLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rLp.bottomMargin = Math.round(12 * dp);
+        transformRow.setLayoutParams(rLp);
+
+        String[] actions = new String[]{"↻ Rotate 90°", "⇄ Flip Mirror", "↺ Reset"};
+        for (int i = 0; i < actions.length; i++) {
+            final int idx = i;
+            TextView btn = new TextView(this);
+            LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(0, Math.round(42 * dp), 1f);
+            if (i > 0) bLp.leftMargin = Math.round(8 * dp);
+            btn.setLayoutParams(bLp);
+            btn.setGravity(Gravity.CENTER);
+            btn.setText(actions[i]);
+            btn.setTextColor(Color.WHITE);
+            btn.setTextSize(13f);
+            btn.setTypeface(null, Typeface.BOLD);
+            btn.setBackgroundResource(R.drawable.bg_filter_chip);
+            btn.setOnClickListener(v -> {
+                if (idx == 0) {
+                    currentVideoRotation = (currentVideoRotation + 90) % 360;
+                    if (videoView != null) videoView.setRotation(currentVideoRotation);
+                    Toast.makeText(this, "Video rotated to " + currentVideoRotation + "°", Toast.LENGTH_SHORT).show();
+                } else if (idx == 1) {
+                    currentVideoFlipH = !currentVideoFlipH;
+                    if (videoView != null) videoView.setScaleX(currentVideoFlipH ? -1f : 1f);
+                    Toast.makeText(this, currentVideoFlipH ? "Mirrored horizontally" : "Normal orientation", Toast.LENGTH_SHORT).show();
+                } else {
+                    currentVideoRotation = 0;
+                    currentVideoFlipH = false;
+                    if (videoView != null) {
+                        videoView.setRotation(0f);
+                        videoView.setScaleX(1f);
+                        videoView.setScaleY(1f);
+                    }
+                }
+                if (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size()) {
+                    batchItems.get(currentBatchIndex).rotationDegrees = currentVideoRotation;
+                    batchItems.get(currentBatchIndex).flipHorizontal = currentVideoFlipH;
+                }
+            });
+            transformRow.addView(btn);
+        }
+        root.addView(transformRow);
+
+        // Row 2: Aspect Ratio Zoom Presets (Fit, 9:16 Fill, 1:1 Square, 16:9 Cinema)
+        LinearLayout ratioRow = new LinearLayout(this);
+        ratioRow.setOrientation(LinearLayout.HORIZONTAL);
+        ratioRow.setGravity(Gravity.CENTER);
+        ratioRow.setLayoutParams(rLp);
+        final String[] ratios = new String[]{"Fit Original", "9:16 Full", "1:1 Zoom", "16:9 Wide"};
+        final float[] scales = new float[]{1.0f, 1.28f, 1.18f, 1.12f};
+        for (int i = 0; i < ratios.length; i++) {
+            final float sc = scales[i];
+            final String rLabel = ratios[i];
+            TextView chip = new TextView(this);
+            LinearLayout.LayoutParams cLp = new LinearLayout.LayoutParams(0, Math.round(38 * dp), 1f);
+            if (i > 0) cLp.leftMargin = Math.round(6 * dp);
+            chip.setLayoutParams(cLp);
+            chip.setGravity(Gravity.CENTER);
+            chip.setText(rLabel);
+            chip.setTextColor(Color.WHITE);
+            chip.setTextSize(11.5f);
+            chip.setBackgroundResource(R.drawable.bg_filter_chip);
+            chip.setOnClickListener(v -> {
+                if (videoView != null) {
+                    videoView.animate()
+                            .scaleX((currentVideoFlipH ? -1f : 1f) * sc)
+                            .scaleY(sc)
+                            .setDuration(180)
+                            .start();
+                }
+                Toast.makeText(this, "Aspect: " + rLabel, Toast.LENGTH_SHORT).show();
+            });
+            ratioRow.addView(chip);
+        }
+        root.addView(ratioRow);
+
+        // Row 3: Extract & Crop Current Video Frame as Photo
+        TextView btnExtractCropFrame = new TextView(this);
+        btnExtractCropFrame.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.round(44 * dp)));
+        btnExtractCropFrame.setGravity(Gravity.CENTER);
+        btnExtractCropFrame.setText("✂️ Capture & Free-Crop Current Video Frame");
+        btnExtractCropFrame.setTextColor(Color.WHITE);
+        btnExtractCropFrame.setTextSize(13.5f);
+        btnExtractCropFrame.setTypeface(null, Typeface.BOLD);
+        btnExtractCropFrame.setBackgroundResource(R.drawable.bg_filter_chip_selected);
+        btnExtractCropFrame.setOnClickListener(v -> {
+            sheet.dismiss();
+            captureCurrentVideoFrameAndCrop();
+        });
+        root.addView(btnExtractCropFrame);
+
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
+    private void captureCurrentVideoFrameAndCrop() {
+        try {
+            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+            mmr.setDataSource(this, mediaUri);
+            long posUs = (videoView != null ? videoView.getCurrentPosition() : trimStartMs) * 1000L;
+            Bitmap frame = mmr.getFrameAtTime(posUs, MediaMetadataRetriever.OPTION_CLOSEST);
+            if (frame == null) frame = mmr.getFrameAtTime();
+            mmr.release();
+            if (frame != null) {
+                File frameFile = new File(getExternalCacheDir(), "video_frame_crop_" + System.currentTimeMillis() + ".jpg");
+                try (FileOutputStream fos = new FileOutputStream(frameFile)) {
+                    frame.compress(Bitmap.CompressFormat.JPEG, 96, fos);
+                }
+                mediaType = "image";
+                mediaUri = Uri.fromFile(frameFile);
+                if (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size()) {
+                    BatchEditItem item = batchItems.get(currentBatchIndex);
+                    item.type = "image";
+                    item.uri = mediaUri;
+                    item.savedPath = frameFile.getAbsolutePath();
+                }
+                bindActiveBatchItem();
+                launchUCrop(mediaUri);
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not capture video frame", Toast.LENGTH_SHORT).show();
+        }
     }
 
     /**
@@ -651,10 +953,16 @@ public class MediaEditActivity extends AppCompatActivity {
     private void persistCurrentItemStateSynchronously() {
         if (currentBatchIndex < 0 || currentBatchIndex >= batchItems.size()) return;
         BatchEditItem current = batchItems.get(currentBatchIndex);
-        if ("video".equals(current.type)) {
+        current.filterIndex = currentFilterIndex;
+        if ("video".equals(current.type) || "gif".equals(current.type)) {
             current.trimStartMs = trimStartMs;
             current.trimEndMs = trimEndMs;
             current.totalDurationMs = totalDurationMs;
+            current.isMuted = isVideoMuted;
+            current.sendAsGif = sendVideoAsGif;
+            current.rotationDegrees = currentVideoRotation;
+            current.flipHorizontal = currentVideoFlipH;
+            current.playbackSpeed = currentVideoSpeed;
             if (videoView != null && videoView.isPlaying()) {
                 videoView.pause();
             }
@@ -666,7 +974,7 @@ public class MediaEditActivity extends AppCompatActivity {
                 if (bmp != null) {
                     File editedFile = new File(getExternalCacheDir(), "edited_batch_" + currentBatchIndex + "_" + System.currentTimeMillis() + ".jpg");
                     try (FileOutputStream out = new FileOutputStream(editedFile)) {
-                        bmp.compress(Bitmap.CompressFormat.JPEG, 92, out);
+                        bmp.compress(Bitmap.CompressFormat.JPEG, isHdQuality ? 96 : 82, out);
                         out.flush();
                     }
                     current.savedPath = editedFile.getAbsolutePath();
@@ -687,7 +995,18 @@ public class MediaEditActivity extends AppCompatActivity {
 
     private void bindActiveBatchItem() {
         videoLoopHandler.removeCallbacks(videoLoopRunnable);
-        if (mediaType != null && mediaType.startsWith("video")) {
+        BatchEditItem item = (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size())
+                ? batchItems.get(currentBatchIndex) : null;
+        if (item != null) {
+            isVideoMuted = item.isMuted;
+            sendVideoAsGif = item.sendAsGif;
+            currentVideoRotation = item.rotationDegrees;
+            currentVideoFlipH = item.flipHorizontal;
+            currentVideoSpeed = item.playbackSpeed > 0f ? item.playbackSpeed : 1.0f;
+            currentFilterIndex = item.filterIndex;
+        }
+        applyActiveColorFilter();
+        if (mediaType != null && (mediaType.startsWith("video") || "gif".equals(mediaType))) {
             setupVideoEditor();
         } else {
             setupImageEditor();
@@ -695,6 +1014,7 @@ public class MediaEditActivity extends AppCompatActivity {
     }
 
     private void setupImageEditor() {
+        activeVideoMediaPlayer = null;
         if (videoView != null && videoView.isPlaying()) {
             videoView.stopPlayback();
         }
@@ -711,6 +1031,7 @@ public class MediaEditActivity extends AppCompatActivity {
         findViewById(R.id.btnUndo).setVisibility(View.VISIBLE);
         if (btnCensorChip != null) btnCensorChip.setVisibility(View.VISIBLE);
         if (btnMuteAudioChip != null) btnMuteAudioChip.setVisibility(View.GONE);
+        if (btnVideoSpeedChip != null) btnVideoSpeedChip.setVisibility(View.GONE);
 
         photoEditorView.getSource().setImageURI(null);
         photoEditorView.getSource().setImageURI(mediaUri);
@@ -730,7 +1051,7 @@ public class MediaEditActivity extends AppCompatActivity {
 
         UCrop.Options options = new UCrop.Options();
         options.setCompressionFormat(Bitmap.CompressFormat.JPEG);
-        options.setCompressionQuality(90);
+        options.setCompressionQuality(isHdQuality ? 95 : 82);
         options.setHideBottomControls(false);
         options.setFreeStyleCropEnabled(true);
         options.setToolbarColor(ContextCompat.getColor(this, android.R.color.black));
@@ -746,6 +1067,8 @@ public class MediaEditActivity extends AppCompatActivity {
 
     private void setupVideoEditor() {
         videoView.setVisibility(View.VISIBLE);
+        videoView.setRotation(currentVideoRotation);
+        videoView.setScaleX(currentVideoFlipH ? -1f : 1f);
         photoEditorView.setVisibility(View.VISIBLE);
         photoEditorView.setBackgroundColor(Color.TRANSPARENT);
         if (photoEditorView.getSource() != null) {
@@ -759,13 +1082,18 @@ public class MediaEditActivity extends AppCompatActivity {
             photoEditor.clearAllViews();
         }
 
-        findViewById(R.id.btnCrop).setVisibility(View.GONE);
+        // Enable ALL tools on video editor (including Crop/Rotate, Censor Brush, Emoji, Text, Draw, Mute, Speed!)
+        findViewById(R.id.btnCrop).setVisibility(View.VISIBLE);
         findViewById(R.id.btnEmoji).setVisibility(View.VISIBLE);
         findViewById(R.id.btnText).setVisibility(View.VISIBLE);
         findViewById(R.id.btnDraw).setVisibility(View.VISIBLE);
         findViewById(R.id.btnUndo).setVisibility(View.VISIBLE);
-        if (btnCensorChip != null) btnCensorChip.setVisibility(View.GONE);
+        if (btnCensorChip != null) btnCensorChip.setVisibility(View.VISIBLE);
         if (btnMuteAudioChip != null) btnMuteAudioChip.setVisibility(View.VISIBLE);
+        if (btnVideoSpeedChip != null) {
+            btnVideoSpeedChip.setVisibility(View.VISIBLE);
+            btnVideoSpeedChip.setText(String.format(java.util.Locale.US, "%.1fx", currentVideoSpeed));
+        }
 
         videoTrimmerContainer = findViewById(R.id.videoTrimmerContainer);
         videoRangeSlider = findViewById(R.id.videoRangeSlider);
@@ -775,11 +1103,13 @@ public class MediaEditActivity extends AppCompatActivity {
 
         if (videoTrimmerContainer != null) {
             videoTrimmerContainer.setVisibility(View.VISIBLE);
+            ensureVideoFilmstripAndControlsCreated();
         }
 
         videoView.setVideoURI(mediaUri);
         videoView.setOnPreparedListener(mp -> {
-            totalDurationMs = mp.getDuration();
+            activeVideoMediaPlayer = mp;
+            totalDurationMs = Math.max(100L, mp.getDuration());
             BatchEditItem item = (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size())
                     ? batchItems.get(currentBatchIndex) : null;
             if (item != null && item.trimEndMs > 0 && item.totalDurationMs == totalDurationMs) {
@@ -790,6 +1120,10 @@ public class MediaEditActivity extends AppCompatActivity {
                 trimEndMs = totalDurationMs;
             }
 
+            applyLiveVideoMuteState();
+            applyLiveVideoPlaybackSpeed();
+            populateVideoFilmstripTimeline(mediaUri, totalDurationMs);
+
             if (videoRangeSlider != null && totalDurationMs > 0) {
                 videoRangeSlider.clearOnChangeListeners();
                 videoRangeSlider.setValueFrom(0f);
@@ -798,7 +1132,7 @@ public class MediaEditActivity extends AppCompatActivity {
 
                 if (tvTrimStart != null) tvTrimStart.setText(formatTime(trimStartMs));
                 if (tvTrimEnd != null) tvTrimEnd.setText(formatTime(trimEndMs));
-                if (tvTrimDuration != null) tvTrimDuration.setText("Length: " + formatTime(Math.max(0, trimEndMs - trimStartMs)));
+                updateTrimDurationAndSizeLabel();
 
                 videoRangeSlider.addOnChangeListener((slider, value, fromUser) -> {
                     if (fromUser) {
@@ -807,18 +1141,169 @@ public class MediaEditActivity extends AppCompatActivity {
                         trimEndMs = values.get(1).longValue();
                         if (tvTrimStart != null) tvTrimStart.setText(formatTime(trimStartMs));
                         if (tvTrimEnd != null) tvTrimEnd.setText(formatTime(trimEndMs));
-                        long range = Math.max(0, trimEndMs - trimStartMs);
-                        if (tvTrimDuration != null) tvTrimDuration.setText("Trimmed: " + formatTime(range));
-
+                        updateTrimDurationAndSizeLabel();
                         videoView.seekTo((int) value);
                     }
                 });
             }
 
             mp.setLooping(false);
+            videoView.seekTo((int) trimStartMs);
             videoView.start();
+            updatePlayPauseButtonUi(true);
+            videoLoopHandler.removeCallbacks(videoLoopRunnable);
             videoLoopHandler.post(videoLoopRunnable);
         });
+    }
+
+    private void ensureVideoFilmstripAndControlsCreated() {
+        if (!(videoTrimmerContainer instanceof LinearLayout)) return;
+        LinearLayout container = (LinearLayout) videoTrimmerContainer;
+        float dp = getResources().getDisplayMetrics().density;
+
+        if (videoFilmstripRow == null) {
+            // Controls row above filmstrip: [⏸ Pause / ▶ Play] + [🎬 Video | 👾 GIF Loop]
+            LinearLayout modeRow = new LinearLayout(this);
+            modeRow.setOrientation(LinearLayout.HORIZONTAL);
+            modeRow.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams mLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            mLp.bottomMargin = Math.round(6 * dp);
+            modeRow.setLayoutParams(mLp);
+
+            btnVideoPlayPauseToggle = new TextView(this);
+            btnVideoPlayPauseToggle.setText("⏸ Pause");
+            btnVideoPlayPauseToggle.setTextColor(Color.WHITE);
+            btnVideoPlayPauseToggle.setTextSize(11.5f);
+            btnVideoPlayPauseToggle.setTypeface(null, Typeface.BOLD);
+            btnVideoPlayPauseToggle.setBackgroundResource(R.drawable.bg_filter_chip);
+            btnVideoPlayPauseToggle.setPadding(Math.round(10 * dp), Math.round(4 * dp), Math.round(10 * dp), Math.round(4 * dp));
+            btnVideoPlayPauseToggle.setOnClickListener(v -> {
+                if (videoView == null) return;
+                if (videoView.isPlaying()) {
+                    videoView.pause();
+                    updatePlayPauseButtonUi(false);
+                } else {
+                    videoView.start();
+                    updatePlayPauseButtonUi(true);
+                }
+            });
+            modeRow.addView(btnVideoPlayPauseToggle);
+
+            View spacer = new View(this);
+            spacer.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
+            modeRow.addView(spacer);
+
+            btnVideoGifModeToggle = new TextView(this);
+            btnVideoGifModeToggle.setText(sendVideoAsGif ? "👾 GIF Loop" : "🎬 Video Mode");
+            btnVideoGifModeToggle.setTextColor(Color.WHITE);
+            btnVideoGifModeToggle.setTextSize(11.5f);
+            btnVideoGifModeToggle.setTypeface(null, Typeface.BOLD);
+            btnVideoGifModeToggle.setBackgroundResource(sendVideoAsGif ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+            btnVideoGifModeToggle.setPadding(Math.round(10 * dp), Math.round(4 * dp), Math.round(10 * dp), Math.round(4 * dp));
+            btnVideoGifModeToggle.setOnClickListener(v -> {
+                sendVideoAsGif = !sendVideoAsGif;
+                btnVideoGifModeToggle.setText(sendVideoAsGif ? "👾 GIF Loop" : "🎬 Video Mode");
+                btnVideoGifModeToggle.setBackgroundResource(sendVideoAsGif ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+                if (sendVideoAsGif) {
+                    isVideoMuted = true;
+                    applyLiveVideoMuteState();
+                    if (trimEndMs - trimStartMs > 6500L) {
+                        trimEndMs = Math.min(totalDurationMs, trimStartMs + 6000L);
+                        if (videoRangeSlider != null) {
+                            videoRangeSlider.setValues((float) trimStartMs, (float) trimEndMs);
+                        }
+                        if (tvTrimEnd != null) tvTrimEnd.setText(formatTime(trimEndMs));
+                    }
+                    Toast.makeText(this, "👾 GIF Mode: silent looping clip", Toast.LENGTH_SHORT).show();
+                } else {
+                    isVideoMuted = false;
+                    applyLiveVideoMuteState();
+                }
+                if (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size()) {
+                    batchItems.get(currentBatchIndex).sendAsGif = sendVideoAsGif;
+                }
+                updateTrimDurationAndSizeLabel();
+            });
+            modeRow.addView(btnVideoGifModeToggle);
+            container.addView(modeRow, 0);
+
+            // Filmstrip frame thumbnail timeline
+            videoFilmstripRow = new LinearLayout(this);
+            videoFilmstripRow.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams fsLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, Math.round(38 * dp));
+            fsLp.topMargin = Math.round(4 * dp);
+            videoFilmstripRow.setLayoutParams(fsLp);
+            GradientDrawable fsBg = new GradientDrawable();
+            fsBg.setColor(Color.parseColor("#33FFFFFF"));
+            fsBg.setCornerRadius(6 * dp);
+            fsBg.setStroke(Math.max(1, Math.round(1 * dp)), Color.parseColor("#6600A884"));
+            videoFilmstripRow.setBackground(fsBg);
+            videoFilmstripRow.setClipToOutline(true);
+            container.addView(videoFilmstripRow, 2);
+        } else {
+            if (btnVideoGifModeToggle != null) {
+                btnVideoGifModeToggle.setText(sendVideoAsGif ? "👾 GIF Loop" : "🎬 Video Mode");
+                btnVideoGifModeToggle.setBackgroundResource(sendVideoAsGif ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+            }
+        }
+    }
+
+    private void updatePlayPauseButtonUi(boolean playing) {
+        if (btnVideoPlayPauseToggle != null) {
+            btnVideoPlayPauseToggle.setText(playing ? "⏸ Pause" : "▶ Play");
+        }
+    }
+
+    private void populateVideoFilmstripTimeline(final Uri uri, final long durationMs) {
+        if (videoFilmstripRow == null || uri == null || durationMs <= 0) return;
+        videoFilmstripRow.removeAllViews();
+        final int frameCount = 8;
+        final List<ImageView> slots = new ArrayList<>(frameCount);
+        for (int i = 0; i < frameCount; i++) {
+            ImageView iv = new ImageView(this);
+            iv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            videoFilmstripRow.addView(iv);
+            slots.add(iv);
+        }
+        new Thread(() -> {
+            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+            try {
+                mmr.setDataSource(MediaEditActivity.this, uri);
+                for (int i = 0; i < frameCount; i++) {
+                    final int idx = i;
+                    long timeUs = ((durationMs * i) / frameCount) * 1000L;
+                    Bitmap frame = mmr.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                    if (frame != null) {
+                        final Bitmap scaled = Bitmap.createScaledBitmap(frame, 96, 96, true);
+                        runOnUiThread(() -> {
+                            if (idx < slots.size()) {
+                                slots.get(idx).setImageBitmap(scaled);
+                            }
+                        });
+                    }
+                }
+            } catch (Throwable ignored) {
+            } finally {
+                try { mmr.release(); } catch (Throwable ignored) {}
+            }
+        }).start();
+    }
+
+    private void updateTrimDurationAndSizeLabel() {
+        if (tvTrimDuration == null) return;
+        long rangeMs = Math.max(0L, trimEndMs - trimStartMs);
+        // Estimate size based on bitrate (~1.2 MB/s for HD, ~0.55 MB/s for SD, minus 15% if muted)
+        double mbPerSec = isHdQuality ? 0.38 : 0.18;
+        if (isVideoMuted) mbPerSec *= 0.85;
+        double estMb = Math.max(0.08, (rangeMs / 1000.0) * mbPerSec);
+        String sizeStr = estMb >= 1.0
+                ? String.format(java.util.Locale.US, "%.1f MB", estMb)
+                : String.format(java.util.Locale.US, "%d KB", Math.max(40, (int) Math.round(estMb * 1024)));
+        String modeTag = sendVideoAsGif ? "GIF • " : (isVideoMuted ? "🔇 • " : "");
+        tvTrimDuration.setText(modeTag + formatTime(rangeMs) + " • " + sizeStr);
     }
 
     private String formatTime(long ms) {
@@ -836,17 +1321,22 @@ public class MediaEditActivity extends AppCompatActivity {
 
     private String resolveBatchItemFilePath(BatchEditItem item, int idx) {
         if (item == null || item.uri == null) return "";
-        if (item.savedPath != null && new File(item.savedPath).exists()) {
-            return item.savedPath;
-        }
-        if ("video".equals(item.type)) {
-            File tempVideo = new File(getExternalCacheDir(), "trimmed_vid_" + idx + "_" + System.currentTimeMillis() + ".mp4");
-            boolean isTrimmed = (item.trimStartMs > 500) || (item.totalDurationMs > 0 && (item.totalDurationMs - item.trimEndMs > 500));
-            if (isTrimmed && VideoTrimUtil.trimVideo(this, item.uri, tempVideo, item.trimStartMs, item.trimEndMs)
+        if ("video".equals(item.type) || "gif".equals(item.type)) {
+            File tempVideo = new File(getExternalCacheDir(), "processed_vid_" + idx + "_" + System.currentTimeMillis() + ".mp4");
+            boolean isTrimmed = (item.trimStartMs > 250) || (item.totalDurationMs > 0 && (item.totalDurationMs - item.trimEndMs > 250));
+            boolean needsMuxProcess = isTrimmed || item.isMuted || item.sendAsGif || (item.rotationDegrees % 360 != 0);
+            if (needsMuxProcess && VideoTrimUtil.processVideo(
+                    this, item.uri, tempVideo,
+                    item.trimStartMs, item.trimEndMs > 0 ? item.trimEndMs : item.totalDurationMs,
+                    item.isMuted || item.sendAsGif, item.rotationDegrees)
                     && tempVideo.exists() && tempVideo.length() > 0) {
                 item.savedPath = tempVideo.getAbsolutePath();
+                if (item.sendAsGif) item.type = "gif";
                 return item.savedPath;
             }
+        }
+        if (item.savedPath != null && new File(item.savedPath).exists()) {
+            return item.savedPath;
         }
         if ("file".equalsIgnoreCase(item.uri.getScheme()) && item.uri.getPath() != null) {
             File f = new File(item.uri.getPath());
@@ -855,7 +1345,7 @@ public class MediaEditActivity extends AppCompatActivity {
                 return item.savedPath;
             }
         }
-        String ext = "video".equals(item.type) ? ".mp4" : ".jpg";
+        String ext = ("video".equals(item.type) || "gif".equals(item.type)) ? ".mp4" : ".jpg";
         File outFile = new File(getExternalCacheDir(), "batch_send_" + idx + "_" + System.currentTimeMillis() + ext);
         try (InputStream in = getContentResolver().openInputStream(item.uri);
              OutputStream out = new FileOutputStream(outFile)) {
@@ -885,7 +1375,7 @@ public class MediaEditActivity extends AppCompatActivity {
                 String p = resolveBatchItemFilePath(item, i);
                 if (p != null && !p.isEmpty()) {
                     allPaths.add(p);
-                    allTypes.add(item.type);
+                    allTypes.add(item.sendAsGif ? "gif" : item.type);
                 }
             }
             String primaryPath = !allPaths.isEmpty() ? allPaths.get(0) : "";
@@ -894,7 +1384,7 @@ public class MediaEditActivity extends AppCompatActivity {
             return;
         }
 
-        if (mediaType.startsWith("image") && photoEditor != null) {
+        if (mediaType != null && mediaType.startsWith("image") && photoEditor != null) {
             File outputFile = new File(getExternalCacheDir(), "edited_" + System.currentTimeMillis() + ".jpg");
             try {
                 photoEditor.saveAsFile(outputFile.getAbsolutePath(), new PhotoEditor.OnSaveListener() {
@@ -912,16 +1402,20 @@ public class MediaEditActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         } else {
-            File tempVideo = new File(getExternalCacheDir(), "trimmed_vid_" + System.currentTimeMillis() + ".mp4");
-            boolean isTrimmed = (trimStartMs > 500) || (totalDurationMs - trimEndMs > 500);
-            boolean trimSuccess = false;
+            File tempVideo = new File(getExternalCacheDir(), "processed_vid_" + System.currentTimeMillis() + ".mp4");
+            boolean isTrimmed = (trimStartMs > 250) || (totalDurationMs > 0 && (totalDurationMs - trimEndMs > 250));
+            boolean needsMuxProcess = isTrimmed || isVideoMuted || sendVideoAsGif || (currentVideoRotation % 360 != 0);
+            boolean muxSuccess = false;
 
-            if (isTrimmed) {
-                trimSuccess = VideoTrimUtil.trimVideo(this, mediaUri, tempVideo, trimStartMs, trimEndMs);
+            if (needsMuxProcess) {
+                muxSuccess = VideoTrimUtil.processVideo(
+                        this, mediaUri, tempVideo,
+                        trimStartMs, trimEndMs > 0 ? trimEndMs : totalDurationMs,
+                        isVideoMuted || sendVideoAsGif, currentVideoRotation);
             }
 
             String path;
-            if (trimSuccess && tempVideo.exists() && tempVideo.length() > 0) {
+            if (muxSuccess && tempVideo.exists() && tempVideo.length() > 0) {
                 path = tempVideo.getAbsolutePath();
             } else if (mediaUri != null && "file".equalsIgnoreCase(mediaUri.getScheme())) {
                 path = mediaUri.getPath();
@@ -940,7 +1434,7 @@ public class MediaEditActivity extends AppCompatActivity {
             } else {
                 path = "";
             }
-            finishWithResult(path, "video");
+            finishWithResult(path, sendVideoAsGif ? "gif" : "video");
         }
     }
 
@@ -986,7 +1480,7 @@ public class MediaEditActivity extends AppCompatActivity {
                 mediaUri = resultUri;
                 if (currentBatchIndex >= 0 && currentBatchIndex < batchItems.size()) {
                     batchItems.get(currentBatchIndex).uri = resultUri;
-                    if ( resultUri.getPath() != null) {
+                    if (resultUri.getPath() != null) {
                         batchItems.get(currentBatchIndex).savedPath = resultUri.getPath();
                     }
                 }
@@ -994,6 +1488,22 @@ public class MediaEditActivity extends AppCompatActivity {
                 photoEditorView.getSource().setImageURI(mediaUri);
                 buildBatchThumbnailStrip();
             }
+        } else if (resultCode == RESULT_OK && requestCode == REQ_ADD_MORE_MEDIA && data != null) {
+            persistCurrentItemStateSynchronously();
+            if (data.getClipData() != null) {
+                int count = data.getClipData().getItemCount();
+                for (int i = 0; i < count; i++) {
+                    Uri u = data.getClipData().getItemAt(i).getUri();
+                    if (u != null) {
+                        batchItems.add(new BatchEditItem(u, inferMediaType(u, null)));
+                    }
+                }
+            } else if (data.getData() != null) {
+                Uri u = data.getData();
+                batchItems.add(new BatchEditItem(u, inferMediaType(u, null)));
+            }
+            buildBatchThumbnailStrip();
+            switchToBatchItem(batchItems.size() - 1);
         } else if (resultCode == UCrop.RESULT_ERROR && data != null) {
             final Throwable cropError = UCrop.getError(data);
             if (cropError != null) {
@@ -1026,9 +1536,44 @@ public class MediaEditActivity extends AppCompatActivity {
         colorPickerView.setOnColorChangeListener(color -> {
             currentSelectedColor = color;
             if (currentState == UIState.DRAWING && photoEditor != null) {
+                photoEditor.setBrushDrawingMode(true);
                 photoEditor.setBrushColor(color);
             }
         });
+
+        populateDrawingAndTextToolbars();
+    }
+
+    private void populateDrawingAndTextToolbars() {
+        float dp = getResources().getDisplayMetrics().density;
+        if (drawingOptionsBar instanceof LinearLayout) {
+            LinearLayout drawBar = (LinearLayout) drawingOptionsBar;
+            drawBar.removeAllViews();
+            String[] labels = new String[]{"Fine", "Medium", "Bold", "Neon", "Eraser"};
+            float[] sizes = new float[]{8f, 18f, 34f, 24f, 36f};
+            for (int i = 0; i < labels.length; i++) {
+                final int idx = i;
+                final float bSize = sizes[i];
+                TextView pill = new TextView(this);
+                pill.setText(labels[i]);
+                pill.setTextColor(Color.WHITE);
+                pill.setTextSize(12.5f);
+                pill.setTypeface(null, Typeface.BOLD);
+                pill.setPadding(Math.round(12 * dp), Math.round(6 * dp), Math.round(12 * dp), Math.round(6 * dp));
+                pill.setOnClickListener(v -> {
+                    if (photoEditor == null) return;
+                    if (idx == 4) {
+                        photoEditor.brushEraser();
+                        Toast.makeText(this, "Eraser active", Toast.LENGTH_SHORT).show();
+                    } else {
+                        photoEditor.setBrushDrawingMode(true);
+                        photoEditor.setBrushSize(bSize);
+                        photoEditor.setBrushColor(currentSelectedColor);
+                    }
+                });
+                drawBar.addView(pill);
+            }
+        }
     }
 
     private void updateState(UIState newState) {
@@ -1052,6 +1597,9 @@ public class MediaEditActivity extends AppCompatActivity {
 
         if (photoEditor != null) {
             photoEditor.setBrushDrawingMode(newState == UIState.DRAWING);
+            if (newState == UIState.DRAWING && !isCensorBrushActive) {
+                photoEditor.setBrushColor(currentSelectedColor);
+            }
         }
     }
 }
