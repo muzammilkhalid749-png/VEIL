@@ -14,6 +14,10 @@ import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.media.AudioAttributes;
+import android.media.AudioFormat;
+import android.media.AudioManager;
+import android.media.AudioTrack;
 import android.media.RingtoneManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -167,9 +171,9 @@ public class VeilHybridNotificationManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && mNotificationManager != null) {
             NotificationChannel directChannel = new NotificationChannel(
                     CHANNEL_DIRECT_MESSAGES,
-                    "Direct Messages (Hybrid P2P & Cloud)",
+                    "Direct Messages",
                     NotificationManager.IMPORTANCE_HIGH);
-            directChannel.setDescription("Instant 1:1 messages delivered via Direct P2P or Firebase Fallback");
+            directChannel.setDescription("Instant 1:1 messages");
             directChannel.enableLights(true);
             directChannel.setLightColor(Color.parseColor("#6366F1"));
             directChannel.enableVibration(true);
@@ -524,12 +528,13 @@ public class VeilHybridNotificationManager {
                     .build();
 
             NotificationCompat.MessagingStyle messagingStyle = new NotificationCompat.MessagingStyle(mePerson);
-            String transportBadge = deliveredViaDirectP2P ? "⚡ Direct P2P" : "☁️ Cloud Sync";
             if (isGroup && conversationTitle != null && !isPinLockEnabled) {
-                messagingStyle.setConversationTitle(conversationTitle + " • " + transportBadge);
+                messagingStyle.setConversationTitle(deduplicateDisplayName(conversationTitle));
                 messagingStyle.setGroupConversation(true);
-            } else if (!isPinLockEnabled) {
-                messagingStyle.setConversationTitle(effectiveSender + " • " + transportBadge);
+            } else {
+                // For 1:1 chats, leave conversationTitle null so Android MessagingStyle renders
+                // the sender's Person name once as the title instead of duplicating it.
+                messagingStyle.setConversationTitle(null);
                 messagingStyle.setGroupConversation(false);
             }
 
@@ -537,6 +542,7 @@ public class VeilHybridNotificationManager {
                 for (NotifMessageEntry entry : history) {
                     Person msgPerson = new Person.Builder()
                             .setName(entry.senderName)
+                            .setKey(peerId != null ? peerId : chatId)
                             .setIcon(senderIcon)
                             .build();
                     messagingStyle.addMessage(new NotificationCompat.MessagingStyle.Message(
@@ -565,7 +571,7 @@ public class VeilHybridNotificationManager {
             int mutableFlags = PendingIntent.FLAG_UPDATE_CURRENT
                     | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : 0);
             RemoteInput remoteInput = new RemoteInput.Builder(KEY_TEXT_REPLY)
-                    .setLabel(deliveredViaDirectP2P ? "Reply via Direct P2P..." : "Reply...")
+                    .setLabel("Reply...")
                     .build();
 
             Intent replyIntent = new Intent(mContext, VeilBootAndKeepAliveReceiver.class);
@@ -613,8 +619,7 @@ public class VeilHybridNotificationManager {
                     .setStyle(messagingStyle)
                     .setContentTitle(effectiveSender)
                     .setContentText(effectiveBody)
-                    .setSubText(transportBadge)
-                    .setColor(deliveredViaDirectP2P ? Color.parseColor("#10B981") : Color.parseColor("#6366F1"))
+                    .setColor(Color.parseColor("#6366F1"))
                     .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setVisibility(isPinLockEnabled
@@ -782,6 +787,9 @@ public class VeilHybridNotificationManager {
     private void triggerInAppFeedbackIfEnabled() {
         try {
             SharedPreferences prefs = mContext.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
+            if (prefs.getBoolean(NotificationSettingsActivity.KEY_INAPP_SOUNDS, true)) {
+                playMessageReceivedInChatSound();
+            }
             if (prefs.getBoolean(NotificationSettingsActivity.KEY_INAPP_VIBRATE, true)) {
                 Vibrator vib = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
                 if (vib != null && vib.hasVibrator()) {
@@ -795,6 +803,137 @@ public class VeilHybridNotificationManager {
         } catch (Throwable ignored) {}
     }
 
+    /**
+     * Plays a crisp, WhatsApp/Telegram-inspired outbound message sent pop/whoosh sound
+     * when the user sends a message in ChatActivity.
+     */
+    public void playMessageSentSound() {
+        try {
+            SharedPreferences prefs = mContext.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
+            if (!prefs.getBoolean(NotificationSettingsActivity.KEY_INAPP_SOUNDS, true)) {
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    final int sampleRate = 44100;
+                    final int durationMs = 68;
+                    final int numSamples = (sampleRate * durationMs) / 1000;
+                    final short[] pcm = new short[numSamples];
+                    double phase = 0.0;
+                    for (int i = 0; i < numSamples; i++) {
+                        double progress = (double) i / numSamples;
+                        // Fast upward pitch sweep (410 Hz -> 840 Hz) like WhatsApp/Telegram send pop
+                        double freq = 410.0 + 430.0 * Math.pow(progress, 1.35);
+                        phase += (2.0 * Math.PI * freq) / sampleRate;
+                        // Smooth attack (first 12%) + exponential decay
+                        double env = (progress < 0.12)
+                                ? (progress / 0.12)
+                                : Math.exp(-5.2 * (progress - 0.12));
+                        double sample = Math.sin(phase) * 0.85 + Math.sin(phase * 2.0) * 0.15;
+                        pcm[i] = (short) (sample * env * 11500);
+                    }
+                    playSynthesizedPcm(pcm, sampleRate);
+                } catch (Throwable ignored) {}
+            }, "VeilSentSound").start();
+        } catch (Throwable ignored) {}
+    }
+
+    /**
+     * Plays a warm, distinct WhatsApp/Telegram-inspired inbound message received two-tone
+     * marimba/water-drop chime when a message arrives in the active foreground chat.
+     */
+    public void playMessageReceivedInChatSound() {
+        try {
+            SharedPreferences prefs = mContext.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
+            if (!prefs.getBoolean(NotificationSettingsActivity.KEY_INAPP_SOUNDS, true)) {
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    final int sampleRate = 44100;
+                    final int durationMs = 125;
+                    final int numSamples = (sampleRate * durationMs) / 1000;
+                    final short[] pcm = new short[numSamples];
+                    final int splitSample = (int) (numSamples * 0.38);
+                    double phase = 0.0;
+                    for (int i = 0; i < numSamples; i++) {
+                        boolean secondNote = i >= splitSample;
+                        double localProgress = secondNote
+                                ? (double) (i - splitSample) / (numSamples - splitSample)
+                                : (double) i / splitSample;
+                        // Note 1: D5 (587.33 Hz) -> Note 2: A5 (880.0 Hz) resonant interval
+                        double freq = secondNote ? 880.0 : 587.33;
+                        phase += (2.0 * Math.PI * freq) / sampleRate;
+                        double env = (localProgress < 0.08)
+                                ? (localProgress / 0.08)
+                                : Math.exp(-4.6 * (localProgress - 0.08));
+                        double sample = Math.sin(phase) * 0.82 + Math.sin(phase * 2.0) * 0.18;
+                        pcm[i] = (short) (sample * env * 12000);
+                    }
+                    playSynthesizedPcm(pcm, sampleRate);
+                } catch (Throwable ignored) {}
+            }, "VeilRecvSound").start();
+        } catch (Throwable ignored) {}
+    }
+
+    private void playSynthesizedPcm(@NonNull short[] pcm, int sampleRate) {
+        AudioTrack track = null;
+        try {
+            int byteCount = pcm.length * 2;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build();
+                AudioFormat format = new AudioFormat.Builder()
+                        .setSampleRate(sampleRate)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build();
+                track = new AudioTrack(attrs, format, byteCount, AudioTrack.MODE_STATIC, AudioManager.AUDIO_SESSION_ID_GENERATE);
+            } else {
+                track = new AudioTrack(AudioManager.STREAM_NOTIFICATION, sampleRate,
+                        AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
+                        byteCount, AudioTrack.MODE_STATIC);
+            }
+            track.write(pcm, 0, pcm.length);
+            track.play();
+            Thread.sleep(160L);
+        } catch (Throwable ignored) {
+        } finally {
+            if (track != null) {
+                try {
+                    track.stop();
+                } catch (Throwable ignored) {}
+                try {
+                    track.release();
+                } catch (Throwable ignored) {}
+            }
+        }
+    }
+
+    @NonNull
+    private String deduplicateDisplayName(@Nullable String rawName) {
+        if (rawName == null) return "Contact";
+        String cleaned = rawName
+                .replace("• ☁️ Cloud Sync", "")
+                .replace("• ⚡ Direct P2P", "")
+                .replace("☁️ Cloud Sync", "")
+                .replace("⚡ Direct P2P", "")
+                .trim();
+        if (cleaned.isEmpty()) return "Contact";
+        // Collapse accidental duplicate name tokens such as "Alice Alice" or "Alice @Alice"
+        String[] parts = cleaned.split("\\s+");
+        if (parts.length == 2) {
+            String first = parts[0].replaceFirst("^@", "");
+            String second = parts[1].replaceFirst("^@", "");
+            if (first.equalsIgnoreCase(second)) {
+                return parts[0];
+            }
+        }
+        return cleaned;
+    }
+
     @NonNull
     private String resolveSenderDisplayName(@Nullable Chat chat, @NonNull Message message, @Nullable String peerId) {
         String candidate = message.getSenderName();
@@ -802,12 +941,12 @@ public class VeilHybridNotificationManager {
                 && !VeilFeatureManager.isShadowVeilOrGeneric(candidate)
                 && !"Direct Chat".equalsIgnoreCase(candidate)
                 && !"User".equalsIgnoreCase(candidate)) {
-            return candidate.trim();
+            return deduplicateDisplayName(candidate);
         }
         if (chat != null && !chat.isGroupChat() && chat.getName() != null && !chat.getName().trim().isEmpty()
                 && !VeilFeatureManager.isShadowVeilOrGeneric(chat.getName())
                 && !"Direct Chat".equalsIgnoreCase(chat.getName())) {
-            return chat.getName().trim();
+            return deduplicateDisplayName(chat.getName());
         }
         if (peerId != null && !peerId.isEmpty()) {
             return "Peer " + peerId.substring(0, Math.min(6, peerId.length()));

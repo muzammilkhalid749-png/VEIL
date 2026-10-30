@@ -59,6 +59,13 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         SKULL_GHOST,
         LIGHTNING,
         ANGRY,
+        COOL,
+        COLD,
+        SLEEPY,
+        THINKING,
+        DIZZY_SICK,
+        WAVE_CLAP,
+        MUSIC,
         GENERIC
     }
 
@@ -116,6 +123,8 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
 
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setTypeface(Typeface.DEFAULT);
+        textPaint.setColor(Color.WHITE);
+        textPaint.setAlpha(255);
 
         badgePaint.setTextAlign(Paint.Align.CENTER);
         badgePaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
@@ -129,53 +138,100 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         if (emoji.contains("❤️") || emoji.contains("♥️") || emoji.contains("💖") || emoji.contains("💕")
                 || emoji.contains("💓") || emoji.contains("💗") || emoji.contains("💘") || emoji.contains("💝")
                 || emoji.contains("💞") || emoji.contains("💟") || emoji.contains("❣️") || emoji.contains("🫶")
-                || emoji.contains("🩷") || emoji.contains("❤️‍🔥")) {
+                || emoji.contains("🩷") || emoji.contains("🧡") || emoji.contains("💛") || emoji.contains("💚")
+                || emoji.contains("💙") || emoji.contains("💜") || emoji.contains("🖤") || emoji.contains("🤍")
+                || emoji.contains("🤎") || emoji.contains("❤️‍🔥") || emoji.contains("❤️‍🩹") || emoji.contains("💌")) {
             return EmojiType.HEART;
         }
-        if (emoji.contains("🔥") || emoji.contains("🧨")) {
+        if (emoji.contains("🔥") || emoji.contains("🧨") || emoji.contains("🥵") || emoji.contains("🌋")) {
             return EmojiType.FIRE;
         }
         if (emoji.contains("💯")) {
             return EmojiType.HUNDRED;
         }
-        if (emoji.contains("🤯")) {
+        if (emoji.contains("🤯") || emoji.contains("🎆") || emoji.contains("🎇")) {
             return EmojiType.MIND_BLOWN;
         }
-        if (emoji.contains("😍") || emoji.contains("🥰") || emoji.contains("😘") || emoji.contains("😻")) {
+        if (emoji.contains("😍") || emoji.contains("🥰") || emoji.contains("😘") || emoji.contains("😻")
+                || emoji.contains("😚") || emoji.contains("😙") || emoji.contains("💋") || emoji.contains("☺️")
+                || emoji.contains("😊") || emoji.contains("🤗")) {
             return EmojiType.LOVE_EYES;
         }
-        if (emoji.contains("😢") || emoji.contains("😭") || emoji.contains("😿") || emoji.contains("💧") || emoji.contains("🥹")) {
+        if (emoji.contains("😢") || emoji.contains("😭") || emoji.contains("😿") || emoji.contains("💧")
+                || emoji.contains("🥹") || emoji.contains("😥") || emoji.contains("😓") || emoji.contains("😞")
+                || emoji.contains("😔") || emoji.contains("😟") || emoji.contains("😩") || emoji.contains("😫")) {
             return EmojiType.CRY;
         }
-        if (emoji.contains("😮") || emoji.contains("😲") || emoji.contains("😱") || emoji.contains("😯") || emoji.contains("🙀")) {
+        if (emoji.contains("😮") || emoji.contains("😲") || emoji.contains("😱") || emoji.contains("😯")
+                || emoji.contains("🙀") || emoji.contains("😳") || emoji.contains("😧") || emoji.contains("😦")
+                || emoji.contains("🫢") || emoji.contains("🫣")) {
             return EmojiType.SURPRISE;
         }
-        if (emoji.contains("😂") || emoji.contains("🤣") || emoji.contains("😹") || emoji.contains("😆")) {
+        if (emoji.contains("😂") || emoji.contains("🤣") || emoji.contains("😹") || emoji.contains("😆")
+                || emoji.contains("😄") || emoji.contains("😃") || emoji.contains("😀") || emoji.contains("😁")
+                || emoji.contains("😅") || emoji.contains("🤪") || emoji.contains("😜") || emoji.contains("😝")
+                || emoji.contains("🤭")) {
             return EmojiType.LAUGH;
         }
-        if (emoji.contains("👍") || emoji.contains("👏") || emoji.contains("🙌") || emoji.contains("🤝") || emoji.contains("💪")) {
+        if (emoji.contains("👋") || emoji.contains("👏") || emoji.contains("🙌") || emoji.contains("👐")
+                || emoji.contains("🤝") || emoji.contains("🙏") || emoji.contains("🫡")) {
+            return EmojiType.WAVE_CLAP;
+        }
+        if (emoji.contains("👍") || emoji.contains("💪") || emoji.contains("✊") || emoji.contains("👊")
+                || emoji.contains("🤛") || emoji.contains("🤜") || emoji.contains("✌️") || emoji.contains("🤞")
+                || emoji.contains("🤟") || emoji.contains("🤘") || emoji.contains("👌") || emoji.contains("🤙")) {
             return EmojiType.THUMBS_UP;
         }
-        if (emoji.contains("🎉") || emoji.contains("🎊") || emoji.contains("🥳") || emoji.contains("🎈")) {
+        if (emoji.contains("🎉") || emoji.contains("🎊") || emoji.contains("🥳") || emoji.contains("🎈")
+                || emoji.contains("🎂") || emoji.contains("🍾") || emoji.contains("🥂") || emoji.contains("🎁")) {
             return EmojiType.PARTY;
         }
-        if (emoji.contains("🥺")) {
+        if (emoji.contains("🥺") || emoji.contains("☹️") || emoji.contains("🙁") || emoji.contains("😕")) {
             return EmojiType.PLEADING;
         }
-        if (emoji.contains("🚀") || emoji.contains("🛸")) {
+        if (emoji.contains("🚀") || emoji.contains("🛸") || emoji.contains("✈️") || emoji.contains("🏎️")) {
             return EmojiType.ROCKET;
         }
-        if (emoji.contains("💀") || emoji.contains("☠️") || emoji.contains("👻")) {
+        if (emoji.contains("💀") || emoji.contains("☠️") || emoji.contains("👻") || emoji.contains("👽")
+                || emoji.contains("👾") || emoji.contains("🎃")) {
             return EmojiType.SKULL_GHOST;
         }
-        if (emoji.contains("⚡") || emoji.contains("💥") || emoji.contains("🌩️")) {
+        if (emoji.contains("⚡") || emoji.contains("💥") || emoji.contains("🌩️") || emoji.contains("🔋")) {
             return EmojiType.LIGHTNING;
         }
-        if (emoji.contains("😡") || emoji.contains("🤬") || emoji.contains("😤") || emoji.contains("💢")) {
+        if (emoji.contains("😡") || emoji.contains("🤬") || emoji.contains("😤") || emoji.contains("💢")
+                || emoji.contains("😠") || emoji.contains("👿") || emoji.contains("😈")) {
             return EmojiType.ANGRY;
         }
+        if (emoji.contains("😎") || emoji.contains("🤓") || emoji.contains("🥸") || emoji.contains("😏")
+                || emoji.contains("🤠") || emoji.contains("🤑")) {
+            return EmojiType.COOL;
+        }
+        if (emoji.contains("🥶") || emoji.contains("❄️") || emoji.contains("☃️") || emoji.contains("⛄")
+                || emoji.contains("🧊")) {
+            return EmojiType.COLD;
+        }
+        if (emoji.contains("😴") || emoji.contains("🥱") || emoji.contains("😪") || emoji.contains("💤")
+                || emoji.contains("🛌")) {
+            return EmojiType.SLEEPY;
+        }
+        if (emoji.contains("🤔") || emoji.contains("🧐") || emoji.contains("🤨") || emoji.contains("👀")
+                || emoji.contains("👁️") || emoji.contains("💡") || emoji.contains("🧠")) {
+            return EmojiType.THINKING;
+        }
+        if (emoji.contains("🤢") || emoji.contains("🤮") || emoji.contains("😵") || emoji.contains("😵‍💫")
+                || emoji.contains("🥴") || emoji.contains("🤒") || emoji.contains("🤕") || emoji.contains("😷")
+                || emoji.contains("🤧")) {
+            return EmojiType.DIZZY_SICK;
+        }
+        if (emoji.contains("🎵") || emoji.contains("🎶") || emoji.contains("🎼") || emoji.contains("🎧")
+                || emoji.contains("🎤") || emoji.contains("🎸") || emoji.contains("🥁") || emoji.contains("💃")
+                || emoji.contains("🕺")) {
+            return EmojiType.MUSIC;
+        }
         if (emoji.contains("✨") || emoji.contains("⭐") || emoji.contains("🌟") || emoji.contains("👑")
-                || emoji.contains("💎") || emoji.contains("🏆")) {
+                || emoji.contains("💎") || emoji.contains("🏆") || emoji.contains("🥇") || emoji.contains("💫")
+                || emoji.contains("🌈") || emoji.contains("☀️")) {
             return EmojiType.SPARKLE;
         }
         return EmojiType.GENERIC;
@@ -214,10 +270,10 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
             } else if (primaryType == EmojiType.FIRE || primaryType == EmojiType.HUNDRED || primaryType == EmojiType.ANGRY) {
                 s.color = (i % 3 == 0) ? 0xFFFF3D00 : ((i % 3 == 1) ? 0xFFFF9100 : 0xFFFFEA00);
                 s.shape = (i % 2 == 0) ? 2 : 0;
-            } else if (primaryType == EmojiType.CRY || primaryType == EmojiType.LAUGH) {
-                s.color = (i % 2 == 0) ? 0xFF38BDF8 : 0xFF7DD3FC;
+            } else if (primaryType == EmojiType.CRY || primaryType == EmojiType.LAUGH || primaryType == EmojiType.COLD) {
+                s.color = (i % 2 == 0) ? 0xFF00B0FF : 0xFF7DD3FC;
                 s.shape = 0;
-            } else if (primaryType == EmojiType.PARTY || primaryType == EmojiType.MIND_BLOWN) {
+            } else if (primaryType == EmojiType.PARTY || primaryType == EmojiType.MIND_BLOWN || primaryType == EmojiType.MUSIC) {
                 int[] partyColors = new int[]{0xFFFF2D55, 0xFF00E5FF, 0xFFFFD600, 0xFF00E676, 0xFFD500F9};
                 s.color = partyColors[i % partyColors.length];
                 s.shape = 3;
@@ -295,25 +351,75 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         }
     }
 
+    /**
+     * Resets all paint alpha/shader states before rendering each layer so no emoji ever appears transparent.
+     */
+    private void resetPaintState() {
+        fillPaint.setShader(null);
+        fillPaint.setAlpha(255);
+        strokePaint.setShader(null);
+        strokePaint.setAlpha(255);
+        glowPaint.setShader(null);
+        glowPaint.setAlpha(255);
+        textPaint.setShader(null);
+        textPaint.setColor(Color.WHITE);
+        textPaint.setAlpha(255);
+    }
+
+    /**
+     * Draws the authentic high-DPI Unicode emoji glyph at 100% solid opacity with custom 60fps transforms.
+     */
+    private void drawCrispEmojiGlyph(
+            Canvas canvas,
+            String clusterText,
+            float cx,
+            float cy,
+            float size,
+            float offsetX,
+            float offsetY,
+            float scaleX,
+            float scaleY,
+            float rotationDeg,
+            float pivotYOffset) {
+        if (burstProgress > 0f) {
+            scaleX += burstProgress * 0.22f;
+            scaleY += burstProgress * 0.22f;
+        }
+        canvas.save();
+        canvas.translate(cx + offsetX, cy + offsetY);
+        canvas.rotate(rotationDeg, 0f, pivotYOffset);
+        canvas.scale(scaleX, scaleY, 0f, pivotYOffset);
+
+        textPaint.setShader(null);
+        textPaint.setColor(Color.WHITE);
+        textPaint.setAlpha(255);
+        textPaint.setTextSize(size * 0.68f);
+        Paint.FontMetrics fm = textPaint.getFontMetrics();
+        float textY = -(fm.ascent + fm.descent) * 0.5f;
+        canvas.drawText(clusterText, 0f, textY, textPaint);
+        canvas.restore();
+    }
+
     private void drawSingleCluster(Canvas canvas, String clusterText, EmojiType type, float cx, float cy, float size, float t) {
+        resetPaintState();
         switch (type) {
             case HEART:
-                drawAnimatedHeart(canvas, cx, cy, size, t);
+                drawAnimatedHeart(canvas, clusterText, cx, cy, size, t);
                 break;
             case BROKEN_HEART:
                 drawAnimatedBrokenHeart(canvas, cx, cy, size, t);
                 break;
             case FIRE:
-                drawAnimatedFire(canvas, cx, cy, size, t);
+                drawAnimatedFire(canvas, clusterText, cx, cy, size, t);
                 break;
             case CRY:
-                drawAnimatedCrying(canvas, cx, cy, size, t);
+                drawAnimatedCrying(canvas, clusterText, cx, cy, size, t);
                 break;
             case SURPRISE:
-                drawAnimatedSurprised(canvas, cx, cy, size, t);
+                drawAnimatedSurprised(canvas, clusterText, cx, cy, size, t);
                 break;
             case LAUGH:
-                drawAnimatedLaughing(canvas, cx, cy, size, t);
+                drawAnimatedLaughing(canvas, clusterText, cx, cy, size, t);
                 break;
             case HUNDRED:
                 drawAnimatedHundred(canvas, cx, cy, size, t);
@@ -325,13 +431,16 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
                 drawAnimatedMindBlown(canvas, clusterText, cx, cy, size, t);
                 break;
             case LOVE_EYES:
-                drawAnimatedLoveEyes(canvas, cx, cy, size, t);
+                drawAnimatedLoveEyes(canvas, clusterText, cx, cy, size, t);
                 break;
             case ROCKET:
                 drawAnimatedRocket(canvas, clusterText, cx, cy, size, t);
                 break;
             case THUMBS_UP:
                 drawAnimatedThumbsUp(canvas, clusterText, cx, cy, size, t);
+                break;
+            case WAVE_CLAP:
+                drawAnimatedWaveClap(canvas, clusterText, cx, cy, size, t);
                 break;
             case SKULL_GHOST:
                 drawAnimatedSkullGhost(canvas, clusterText, cx, cy, size, t);
@@ -341,6 +450,24 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
                 break;
             case ANGRY:
                 drawAnimatedAngry(canvas, clusterText, cx, cy, size, t);
+                break;
+            case COOL:
+                drawAnimatedCool(canvas, clusterText, cx, cy, size, t);
+                break;
+            case COLD:
+                drawAnimatedCold(canvas, clusterText, cx, cy, size, t);
+                break;
+            case SLEEPY:
+                drawAnimatedSleepy(canvas, clusterText, cx, cy, size, t);
+                break;
+            case THINKING:
+                drawAnimatedThinking(canvas, clusterText, cx, cy, size, t);
+                break;
+            case DIZZY_SICK:
+                drawAnimatedDizzySick(canvas, clusterText, cx, cy, size, t);
+                break;
+            case MUSIC:
+                drawAnimatedMusic(canvas, clusterText, cx, cy, size, t);
                 break;
             case SPARKLE:
             case PLEADING:
@@ -354,7 +481,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
     // ═════════════════════════════════════════════════════════════════════════════
     // 1. 3D BEATING HEART WITH SONAR SHOCKWAVES & ORBITING MINI-HEARTS (❤️, 💖, 💘)
     // ═════════════════════════════════════════════════════════════════════════════
-    private void drawAnimatedHeart(Canvas canvas, float cx, float cy, float size, float t) {
+    private void drawAnimatedHeart(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
         float beatScale = 1.0f;
         float subT = (t * 2.0f) % 1.0f;
         if (subT < 0.14f) {
@@ -377,6 +504,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
 
         // Radiant 3D ambient aura behind heart
         float glowRadius = (size * 0.44f) * beatScale;
+        glowPaint.setAlpha(255);
         glowPaint.setShader(new RadialGradient(cx, cy, glowRadius * 1.35f,
                 new int[]{0x58FF1744, 0x22FF5252, 0x00FF1744}, null, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, glowRadius * 1.35f, glowPaint);
@@ -391,6 +519,13 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
             float hScale = (float) Math.sin(p * Math.PI) * (size * 0.065f);
             fillPaint.setColor(Color.argb(Math.round((float) Math.sin(p * Math.PI) * 210), 255, 64, 129));
             drawMiniHeart(canvas, hx, hy, hScale, fillPaint);
+        }
+
+        // If special heart variant (e.g. 🫶, 💘, 💝, 💙, 💜, 💚, 💛), render its exact glyph with heartbeat
+        boolean isClassicRedHeart = "❤️".equals(clusterText) || "♥️".equals(clusterText) || "❤".equals(clusterText);
+        if (!isClassicRedHeart && clusterText != null && !clusterText.isEmpty()) {
+            drawCrispEmojiGlyph(canvas, clusterText, cx, cy, size, 0f, 0f, beatScale, beatScale, 0f, 0f);
+            return;
         }
 
         canvas.save();
@@ -408,6 +543,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         path1.cubicTo(cx + r * 1.15f, topY - r * 0.35f, cx, topY - r * 0.45f, cx, topY + r * 0.4f);
         path1.close();
 
+        fillPaint.setAlpha(255);
         fillPaint.setShader(new LinearGradient(cx - r, topY, cx + r, botY,
                 new int[]{0xFFFF3366, 0xFFE6002A, 0xFF990018},
                 new float[]{0f, 0.58f, 1f}, Shader.TileMode.CLAMP));
@@ -419,6 +555,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         path2.cubicTo(cx - r * 0.5f, topY - r * 0.15f, cx - r * 0.95f, topY + r * 0.05f, cx - r * 0.85f, topY + r * 0.5f);
         path2.cubicTo(cx - r * 0.85f, topY + r * 0.3f, cx - r * 0.45f, topY + r * 0.05f, cx - r * 0.2f, topY + r * 0.1f);
         path2.close();
+        glowPaint.setAlpha(255);
         glowPaint.setShader(new LinearGradient(cx - r, topY, cx, topY + r * 0.5f,
                 0x90FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
         canvas.drawPath(path2, glowPaint);
@@ -436,6 +573,36 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         path3.cubicTo(cx + r * 1.2f, cy - r * 0.9f, cx, cy - r, cx, cy - r * 0.25f);
         path3.close();
         canvas.drawPath(path3, paint);
+    }
+
+    /**
+     * Draws a glossy 3D water/tear droplet with a crisp white specular highlight.
+     */
+    private void drawGlossy3DTeardrop(Canvas canvas, float x, float y, float radius, float rotationDeg, int alpha) {
+        if (radius <= 0.5f || alpha <= 0) return;
+        canvas.save();
+        canvas.translate(x, y);
+        canvas.rotate(rotationDeg);
+
+        path3.reset();
+        path3.moveTo(0f, -radius * 1.35f);
+        path3.cubicTo(radius * 0.85f, -radius * 0.35f, radius, radius * 0.35f, 0f, radius);
+        path3.cubicTo(-radius, radius * 0.35f, -radius * 0.85f, -radius * 0.35f, 0f, -radius * 1.35f);
+        path3.close();
+
+        fillPaint.setShader(null);
+        fillPaint.setColor(Color.argb(alpha, 14, 165, 233)); // Rich vivid sky-cyan
+        canvas.drawPath(path3, fillPaint);
+
+        // Inner lighter core
+        fillPaint.setColor(Color.argb(alpha, 56, 189, 248));
+        canvas.drawCircle(0f, radius * 0.18f, radius * 0.58f, fillPaint);
+
+        // Specular white highlight dot
+        fillPaint.setColor(Color.argb(Math.min(255, alpha + 20), 255, 255, 255));
+        canvas.drawCircle(-radius * 0.26f, -radius * 0.08f, radius * 0.24f, fillPaint);
+
+        canvas.restore();
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
@@ -456,7 +623,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
                     cy - size,
                     side < 0 ? cx + 1.5f * dp : cx + size,
                     cy + size);
-            drawAnimatedHeart(canvas, cx, cy, size * 0.95f, 0.05f);
+            drawAnimatedHeart(canvas, "❤️", cx, cy, size * 0.95f, 0.05f);
             canvas.restore();
         }
 
@@ -478,14 +645,15 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
-    // 3. PLASMA FIRE WITH RISING EMBERS & WHITE-HOT CORE (🔥)
+    // 3. PLASMA FIRE WITH RISING EMBERS & WHITE-HOT CORE (🔥, 🥵)
     // ═════════════════════════════════════════════════════════════════════════════
-    private void drawAnimatedFire(Canvas canvas, float cx, float cy, float size, float t) {
+    private void drawAnimatedFire(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
         float f1 = (float) Math.sin(t * Math.PI * 6.0) * (size * 0.042f);
         float f2 = (float) Math.cos(t * Math.PI * 8.0) * (size * 0.035f);
         float pulse = 1.0f + 0.055f * (float) Math.sin(t * Math.PI * 4.0) + burstProgress * 0.2f;
 
         // Warm radiant heat glow
+        glowPaint.setAlpha(255);
         glowPaint.setShader(new RadialGradient(cx, cy + size * 0.05f, size * 0.48f,
                 new int[]{0x55FF6D00, 0x22FFAB00, 0x00FF6D00}, null, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy + size * 0.05f, size * 0.48f, glowPaint);
@@ -499,6 +667,11 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
             float er = (1f - ep) * 3.8f * dp;
             fillPaint.setColor(Color.argb(Math.round((1f - ep) * 240), 255, 215, 64));
             canvas.drawCircle(ex, ey, er, fillPaint);
+        }
+
+        if (clusterText != null && !clusterText.contains("🔥")) {
+            drawCrispEmojiGlyph(canvas, clusterText, cx, cy, size, 0f, 0f, pulse, pulse, f1 * 0.6f, 0f);
+            return;
         }
 
         canvas.save();
@@ -516,6 +689,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         path1.cubicTo(cx + wHalf * 0.5f, bot + size * 0.06f, cx - wHalf * 0.5f, bot + size * 0.06f, cx - wHalf, bot);
         path1.close();
 
+        fillPaint.setAlpha(255);
         fillPaint.setShader(new LinearGradient(cx, cy - size * 0.45f, cx, bot,
                 new int[]{0xFFFF1744, 0xFFFF5722, 0xFFFF9100}, null, Shader.TileMode.CLAMP));
         canvas.drawPath(path1, fillPaint);
@@ -527,6 +701,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         path2.cubicTo(cx + wHalf * 0.22f, cy - size * 0.16f, cx + wHalf * 0.68f + f2, cy + size * 0.05f, cx + wHalf * 0.66f, bot - size * 0.02f);
         path2.close();
 
+        fillPaint.setAlpha(255);
         fillPaint.setShader(new LinearGradient(cx, cy - size * 0.34f, cx, bot,
                 new int[]{0xFFFF9100, 0xFFFFC400, 0xFFFFEA00}, null, Shader.TileMode.CLAMP));
         canvas.drawPath(path2, fillPaint);
@@ -538,6 +713,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         path3.cubicTo(cx + f1 * 0.3f, cy + size * 0.01f, cx + wHalf * 0.34f, cy + size * 0.16f, cx + wHalf * 0.34f, bot - size * 0.04f);
         path3.close();
 
+        fillPaint.setAlpha(255);
         fillPaint.setShader(new LinearGradient(cx, cy - size * 0.16f, cx, bot,
                 new int[]{0xFFFFFFFF, 0xFFFFF59D, 0xFFFFD600}, null, Shader.TileMode.CLAMP));
         canvas.drawPath(path3, fillPaint);
@@ -546,179 +722,184 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
-    // 4. WATERFALL CRYING FACE WITH PUDDLE SPLASH (😢, 😭)
+    // 4. OPAQUE HIGH-FIDELITY CRYING & WATERFALL SOBBING (😢, 😭, 😿, 🥹)
     // ═════════════════════════════════════════════════════════════════════════════
-    private void drawAnimatedCrying(Canvas canvas, float cx, float cy, float size, float t) {
-        float headR = size * 0.37f;
-        float heave = (float) Math.sin(t * Math.PI * 4.0);
-        float scaleX = 1.0f - heave * 0.035f;
-        float scaleY = 1.0f + heave * 0.045f;
-        float browTremble = (float) Math.sin(t * Math.PI * 12.0) * (1.3f * dp);
+    private void drawAnimatedCrying(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        boolean isLoudSob = clusterText != null && (clusterText.contains("😭") || clusterText.contains("😿") || clusterText.contains("😩") || clusterText.contains("😫"));
+        float headR = size * 0.35f;
+        float heave = isRunning ? (float) Math.sin(t * Math.PI * 4.0) : 0f;
+        float sobTremorX = isRunning ? (float) Math.sin(t * Math.PI * 16.0) * (isLoudSob ? 1.8f * dp : 0.9f * dp) : 0f;
+        float scaleX = 1.0f - heave * (isLoudSob ? 0.055f : 0.032f);
+        float scaleY = 1.0f + heave * (isLoudSob ? 0.068f : 0.042f);
+        float offsetY = isRunning ? -Math.abs(heave) * (3.2f * dp) : 0f;
 
-        // Tear puddle ripple at bottom
-        float puddleY = cy + headR * 1.04f;
-        float puddleW = headR * (0.75f + 0.12f * (float) Math.sin(t * Math.PI * 6.0));
+        // 1. Expanding tear puddle at bottom (drawn beneath the face)
+        float puddleY = cy + headR * 1.02f;
+        float puddleW = headR * ((isLoudSob ? 0.92f : 0.62f) + 0.14f * (float) Math.sin(t * Math.PI * 6.0));
         fillPaint.setShader(null);
-        fillPaint.setColor(0x6638BDF8);
+        fillPaint.setColor(0x880284C7);
         tempRect.set(cx - puddleW, puddleY - 3.5f * dp, cx + puddleW, puddleY + 4.5f * dp);
         canvas.drawOval(tempRect, fillPaint);
 
-        canvas.save();
-        canvas.scale(scaleX, scaleY, cx, cy + headR);
-
-        // 3D Golden Sphere Head with top-left specular highlight
-        draw3DGoldenHead(canvas, cx, cy, headR);
-
-        // Dual Waterfall Tear Streams under both eyes
-        float tearTop = cy - headR * 0.14f;
-        fillPaint.setShader(new LinearGradient(0, tearTop, 0, puddleY,
-                new int[]{0xEE7DD3FC, 0xEE0284C7, 0x9938BDF8}, null, Shader.TileMode.CLAMP));
-        float waveOffset = (float) Math.sin(t * Math.PI * 8.0) * (2.2f * dp);
-        tempRect.set(cx - headR * 0.48f + waveOffset * 0.3f, tearTop, cx - headR * 0.28f - waveOffset * 0.3f, puddleY);
-        canvas.drawRoundRect(tempRect, 4f * dp, 4f * dp, fillPaint);
-        tempRect.set(cx + headR * 0.28f + waveOffset * 0.3f, tearTop, cx + headR * 0.48f - waveOffset * 0.3f, puddleY);
-        canvas.drawRoundRect(tempRect, 4f * dp, 4f * dp, fillPaint);
-
-        // Sad Brows
         strokePaint.setShader(null);
-        strokePaint.setColor(0xFF5D4037);
-        strokePaint.setStrokeWidth(3.2f * dp);
-        strokePaint.setStrokeCap(Paint.Cap.ROUND);
-        canvas.drawLine(cx - headR * 0.62f, cy - headR * 0.36f + browTremble,
-                cx - headR * 0.18f, cy - headR * 0.50f + browTremble, strokePaint);
-        canvas.drawLine(cx + headR * 0.62f, cy - headR * 0.36f - browTremble,
-                cx + headR * 0.18f, cy - headR * 0.50f - browTremble, strokePaint);
+        strokePaint.setColor(0xAA7DD3FC);
+        strokePaint.setStrokeWidth(1.5f * dp);
+        canvas.drawOval(tempRect, strokePaint);
 
-        // Squeezed Crying Eyes
-        strokePaint.setStrokeWidth(3.8f * dp);
-        tempRect.set(cx - headR * 0.55f, cy - headR * 0.30f, cx - headR * 0.18f, cy - headR * 0.08f);
-        canvas.drawArc(tempRect, 200, 140, false, strokePaint);
-        tempRect.set(cx + headR * 0.18f, cy - headR * 0.30f, cx + headR * 0.55f, cy - headR * 0.08f);
-        canvas.drawArc(tempRect, 200, 140, false, strokePaint);
+        // 2. Render the 100% solid opaque emoji glyph (never transparent!)
+        resetPaintState();
+        drawCrispEmojiGlyph(
+                canvas,
+                clusterText != null && !clusterText.isEmpty() ? clusterText : "😢",
+                cx,
+                cy,
+                size,
+                sobTremorX,
+                offsetY,
+                scaleX,
+                scaleY,
+                sobTremorX * 1.2f,
+                headR * 0.5f);
 
-        // Open Wailing Mouth with quivering lip
-        fillPaint.setShader(null);
-        fillPaint.setColor(0xFF4A0E17);
-        float mouthOpen = headR * (0.28f + 0.07f * (float) Math.abs(Math.sin(t * Math.PI * 6.0)));
-        tempRect.set(cx - headR * 0.32f, cy + headR * 0.16f, cx + headR * 0.32f, cy + headR * 0.16f + mouthOpen);
-        canvas.drawRoundRect(tempRect, 8f * dp, 8f * dp, fillPaint);
+        // 3. Foreground 3D Glossy Tear Streams & Falling Droplets
+        if (isLoudSob) {
+            // Dual gushing waterfall streams + splashing 3D teardrops for 😭 / 😿
+            float eyeY = cy + offsetY - headR * 0.06f;
+            float leftEyeX = cx + sobTremorX - headR * 0.36f;
+            float rightEyeX = cx + sobTremorX + headR * 0.36f;
 
-        canvas.restore();
+            fillPaint.setAlpha(255);
+            fillPaint.setShader(new LinearGradient(0, eyeY, 0, puddleY,
+                    new int[]{0xFF38BDF8, 0xFF0284C7, 0xCC0369A1}, null, Shader.TileMode.CLAMP));
+            float streamW = 4.6f * dp;
+            tempRect.set(leftEyeX - streamW, eyeY, leftEyeX + streamW, puddleY);
+            canvas.drawRoundRect(tempRect, streamW, streamW, fillPaint);
+            tempRect.set(rightEyeX - streamW, eyeY, rightEyeX + streamW, puddleY);
+            canvas.drawRoundRect(tempRect, streamW, streamW, fillPaint);
+
+            // Animated falling 3D teardrops along both streams
+            for (int i = 0; i < 3; i++) {
+                float p = (t * 2.6f + i * 0.33f) % 1.0f;
+                float dropY = eyeY + p * (puddleY - eyeY);
+                float dropR = (3.4f + p * 1.8f) * dp;
+                drawGlossy3DTeardrop(canvas, leftEyeX - 2f * dp, dropY, dropR, 8f, 255);
+                drawGlossy3DTeardrop(canvas, rightEyeX + 2f * dp, dropY, dropR, -8f, 255);
+            }
+        } else {
+            // Single swelling & falling 3D glossy teardrop for 😢 / 🥹 / 😥
+            float p = (t * 1.8f) % 1.0f;
+            float tearX = cx + sobTremorX + headR * 0.38f;
+            float startY = cy + offsetY - headR * 0.02f;
+            float dropY = startY + (p * p) * (puddleY - startY);
+            float dropR = (p < 0.25f ? (0.5f + p * 2.0f) : (1.0f - (p - 0.25f) * 0.2f)) * 5.2f * dp;
+            int alpha = p > 0.88f ? Math.round((1f - (p - 0.88f) / 0.12f) * 255) : 255;
+            drawGlossy3DTeardrop(canvas, tearX, dropY, dropR, -6f, alpha);
+        }
+        resetPaintState();
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
-    // 5. SURPRISED / GASPING FACE (😮, 😱)
+    // 5. SURPRISED / GASPING FACE WITH SHOCK RAYS (😮, 😱, 😲, 😳)
     // ═════════════════════════════════════════════════════════════════════════════
-    private void drawAnimatedSurprised(Canvas canvas, float cx, float cy, float size, float t) {
-        float headR = size * 0.38f;
-        float gasp = (float) Math.sin(t * Math.PI * 4.0);
-        float scaleX = 1.0f - 0.05f * gasp;
-        float scaleY = 1.0f + 0.07f * gasp;
+    private void drawAnimatedSurprised(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        float gasp = isRunning ? (float) Math.sin(t * Math.PI * 4.0) : 0f;
+        float scaleX = 1.0f - 0.065f * gasp;
+        float scaleY = 1.0f + 0.085f * gasp;
+        float jumpY = isRunning ? -Math.max(0f, gasp) * (4.5f * dp) : 0f;
 
-        canvas.save();
-        canvas.scale(scaleX, scaleY, cx, cy);
-
-        draw3DGoldenHead(canvas, cx, cy, headR);
-
-        // High Raised Eyebrows
-        float browLift = Math.max(0f, gasp) * 3.5f * dp;
-        strokePaint.setShader(null);
-        strokePaint.setColor(0xFF5D4037);
-        strokePaint.setStrokeWidth(3.0f * dp);
-        strokePaint.setStrokeCap(Paint.Cap.ROUND);
-        tempRect.set(cx - headR * 0.55f, cy - headR * 0.64f - browLift, cx - headR * 0.15f, cy - headR * 0.36f - browLift);
-        canvas.drawArc(tempRect, 200, 140, false, strokePaint);
-        tempRect.set(cx + headR * 0.15f, cy - headR * 0.64f - browLift, cx + headR * 0.55f, cy - headR * 0.36f - browLift);
-        canvas.drawArc(tempRect, 200, 140, false, strokePaint);
-
-        // Wide Open Eyes with white specular glint
-        fillPaint.setShader(null);
-        fillPaint.setColor(0xFF1E293B);
-        canvas.drawCircle(cx - headR * 0.35f, cy - headR * 0.14f, 6.2f * dp, fillPaint);
-        canvas.drawCircle(cx + headR * 0.35f, cy - headR * 0.14f, 6.2f * dp, fillPaint);
-        fillPaint.setColor(Color.WHITE);
-        canvas.drawCircle(cx - headR * 0.38f, cy - headR * 0.18f, 2.0f * dp, fillPaint);
-        canvas.drawCircle(cx + headR * 0.32f, cy - headR * 0.18f, 2.0f * dp, fillPaint);
-
-        // Expanding 3D Shocked Mouth
-        float mouthH = (headR * 0.42f) * (0.85f + 0.28f * gasp);
-        float mouthW = headR * 0.28f;
-        fillPaint.setColor(0xFF3B0711);
-        tempRect.set(cx - mouthW, cy + headR * 0.10f, cx + mouthW, cy + headR * 0.10f + mouthH);
-        canvas.drawOval(tempRect, fillPaint);
-
-        canvas.restore();
-    }
-
-    // ═════════════════════════════════════════════════════════════════════════════
-    // 6. ROLLING SQUASH-AND-STRETCH LAUGH WITH DUAL TEAR FOUNTAINS (😂, 🤣)
-    // ═════════════════════════════════════════════════════════════════════════════
-    private void drawAnimatedLaughing(Canvas canvas, float cx, float cy, float size, float t) {
-        float headR = size * 0.38f;
-        float laughBounce = (float) Math.sin(t * Math.PI * 12.0) * (2.2f * dp);
-        float tilt = (float) Math.sin(t * Math.PI * 4.0) * 11.5f;
-        float squash = 1.0f + 0.045f * (float) Math.sin(t * Math.PI * 8.0);
-
-        canvas.save();
-        canvas.translate(0, laughBounce);
-        canvas.rotate(tilt, cx, cy);
-        canvas.scale(squash, 2.0f - squash, cx, cy);
-
-        draw3DGoldenHead(canvas, cx, cy, headR);
-
-        // Warm Rosy Laughing Cheeks
-        glowPaint.setShader(new RadialGradient(cx - headR * 0.52f, cy + headR * 0.08f, headR * 0.24f,
-                0x66FF5252, 0x00FF5252, Shader.TileMode.CLAMP));
-        canvas.drawCircle(cx - headR * 0.52f, cy + headR * 0.08f, headR * 0.24f, glowPaint);
-        glowPaint.setShader(new RadialGradient(cx + headR * 0.52f, cy + headR * 0.08f, headR * 0.24f,
-                0x66FF5252, 0x00FF5252, Shader.TileMode.CLAMP));
-        canvas.drawCircle(cx + headR * 0.52f, cy + headR * 0.08f, headR * 0.24f, glowPaint);
-
-        // Squeezed Happy Chevron Eyes (>  <)
-        strokePaint.setShader(null);
-        strokePaint.setColor(0xFF4E342E);
-        strokePaint.setStrokeWidth(4.0f * dp);
-        strokePaint.setStrokeCap(Paint.Cap.ROUND);
-        strokePaint.setStrokeJoin(Paint.Join.ROUND);
-
-        path1.reset();
-        path1.moveTo(cx - headR * 0.58f, cy - headR * 0.22f);
-        path1.lineTo(cx - headR * 0.32f, cy - headR * 0.07f);
-        path1.lineTo(cx - headR * 0.58f, cy + headR * 0.06f);
-        canvas.drawPath(path1, strokePaint);
-
-        path2.reset();
-        path2.moveTo(cx + headR * 0.58f, cy - headR * 0.22f);
-        path2.lineTo(cx + headR * 0.32f, cy - headR * 0.07f);
-        path2.lineTo(cx + headR * 0.58f, cy + headR * 0.06f);
-        canvas.drawPath(path2, strokePaint);
-
-        // Wide Joyful Mouth + Pink Tongue + Crisp White Teeth Bar
-        fillPaint.setShader(null);
-        fillPaint.setColor(0xFF590D22);
-        tempRect.set(cx - headR * 0.56f, cy - headR * 0.04f, cx + headR * 0.56f, cy + headR * 0.68f);
-        canvas.drawArc(tempRect, 0, 180, true, fillPaint);
-
-        fillPaint.setColor(0xFFFF4D6D);
-        tempRect.set(cx - headR * 0.30f, cy + headR * 0.34f, cx + headR * 0.30f, cy + headR * 0.64f);
-        canvas.drawOval(tempRect, fillPaint);
-
-        fillPaint.setColor(Color.WHITE);
-        tempRect.set(cx - headR * 0.48f, cy + headR * 0.01f, cx + headR * 0.48f, cy + headR * 0.20f);
-        canvas.drawRoundRect(tempRect, 3f * dp, 3f * dp, fillPaint);
-
-        // Twin Parabolic Tear Fountains Ejecting Left & Right
-        for (int i = 0; i < 2; i++) {
-            float tearT = (t * 3.2f + i * 0.5f) % 1.0f;
-            float dx = (headR * 0.66f) + tearT * (headR * 0.48f);
-            float dy = -headR * 0.05f + (tearT * tearT - 0.3f * tearT) * (headR * 0.55f);
-            float dropR = (1f - tearT * 0.35f) * 5.6f * dp;
-            fillPaint.setColor(Color.argb(Math.round((1f - tearT * 0.4f) * 255), 56, 189, 248));
-            canvas.drawCircle(cx - dx, cy + dy, dropR, fillPaint);
-            canvas.drawCircle(cx + dx, cy + dy, dropR, fillPaint);
+        // Radiating exclamation shock lines around the top of the head
+        float rayPhase = Math.max(0f, gasp);
+        if (rayPhase > 0.1f) {
+            strokePaint.setShader(null);
+            strokePaint.setColor(Color.argb(Math.round(rayPhase * 220), 255, 193, 7));
+            strokePaint.setStrokeWidth(2.6f * dp);
+            strokePaint.setStrokeCap(Paint.Cap.ROUND);
+            for (int i = -2; i <= 2; i++) {
+                double angle = -Math.PI * 0.5 + i * 0.36;
+                float r1 = size * 0.34f;
+                float r2 = size * (0.39f + rayPhase * 0.06f);
+                canvas.drawLine(
+                        cx + (float) Math.cos(angle) * r1,
+                        cy + jumpY + (float) Math.sin(angle) * r1,
+                        cx + (float) Math.cos(angle) * r2,
+                        cy + jumpY + (float) Math.sin(angle) * r2,
+                        strokePaint);
+            }
         }
 
-        canvas.restore();
+        drawCrispEmojiGlyph(
+                canvas,
+                clusterText != null && !clusterText.isEmpty() ? clusterText : "😮",
+                cx,
+                cy,
+                size,
+                0f,
+                jumpY,
+                scaleX,
+                scaleY,
+                0f,
+                0f);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════
+    // 6. AUTHENTIC LAUGHING FACE WITH 3D TEAR FOUNTAINS (😂, 🤣, 😆, 😹)
+    // ═════════════════════════════════════════════════════════════════════════════
+    private void drawAnimatedLaughing(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        boolean isRofl = clusterText != null && clusterText.contains("🤣");
+        boolean hasTears = clusterText == null || clusterText.contains("😂") || clusterText.contains("🤣") || clusterText.contains("😹") || clusterText.contains("😅");
+        float headR = size * 0.36f;
+
+        // Fast belly-laugh chuckle bounce + squash-and-stretch + rolling tilt
+        float chuckle = isRunning ? (float) Math.sin(t * Math.PI * 10.0) : 0f;
+        float bounceY = isRunning ? -Math.abs(chuckle) * (4.2f * dp) : 0f;
+        float squashX = 1.0f + 0.06f * chuckle;
+        float squashY = 1.0f - 0.055f * chuckle;
+        float tiltDeg = isRunning
+                ? (isRofl
+                    ? (-12f + (float) Math.sin(t * Math.PI * 4.0) * 18f)
+                    : ((float) Math.sin(t * Math.PI * 4.0) * 9.5f))
+                : 0f;
+
+        // Warm joyful golden-amber ambient glow behind laughing face
+        glowPaint.setAlpha(255);
+        glowPaint.setShader(new RadialGradient(cx, cy, size * 0.45f,
+                new int[]{0x40FFD600, 0x15FF9100, 0x00FFD600}, null, Shader.TileMode.CLAMP));
+        canvas.drawCircle(cx, cy, size * 0.45f, glowPaint);
+
+        // 1. Render the authentic 100% opaque 😂 / 🤣 / 😆 glyph
+        resetPaintState();
+        drawCrispEmojiGlyph(
+                canvas,
+                clusterText != null && !clusterText.isEmpty() ? clusterText : "😂",
+                cx,
+                cy,
+                size,
+                0f,
+                bounceY,
+                squashX,
+                squashY,
+                tiltDeg,
+                0f);
+
+        // 2. Twin Parabolic 3D Glossy Tear Fountains Ejecting from Eye Corners for 😂 / 🤣 / 😹
+        if (hasTears) {
+            canvas.save();
+            canvas.translate(cx, cy + bounceY);
+            canvas.rotate(tiltDeg);
+            for (int i = 0; i < 2; i++) {
+                float tearT = (t * 2.8f + i * 0.5f) % 1.0f;
+                float startX = headR * 0.52f;
+                float dx = startX + tearT * (headR * 0.48f);
+                float dy = -headR * 0.12f + (tearT * tearT * 1.35f - 0.42f * tearT) * (headR * 0.68f);
+                float dropR = (1f - tearT * 0.3f) * 5.0f * dp;
+                int alpha = tearT > 0.82f ? Math.round((1f - (tearT - 0.82f) / 0.18f) * 255) : 255;
+
+                drawGlossy3DTeardrop(canvas, -dx, dy, dropR, 48f + tearT * 25f, alpha);
+                drawGlossy3DTeardrop(canvas, dx, dy, dropR, -48f - tearT * 25f, alpha);
+            }
+            canvas.restore();
+        }
+        resetPaintState();
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
@@ -729,6 +910,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         float tilt = -6f + (float) Math.sin(t * Math.PI * 2.0) * 3.5f;
 
         // Fiery neon aura
+        glowPaint.setAlpha(255);
         glowPaint.setShader(new RadialGradient(cx, cy, size * 0.46f,
                 new int[]{0x48FF1744, 0x18FF9100, 0x00FF1744}, null, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, size * 0.46f, glowPaint);
@@ -737,6 +919,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         canvas.rotate(tilt, cx, cy);
         canvas.scale(slam, slam, cx, cy);
 
+        badgePaint.setAlpha(255);
         badgePaint.setTextSize(size * 0.46f);
         badgePaint.setShader(new LinearGradient(cx, cy - size * 0.25f, cx, cy + size * 0.15f,
                 new int[]{0xFFFF2A54, 0xFFD50000}, null, Shader.TileMode.CLAMP));
@@ -745,6 +928,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         badgePaint.setShader(null);
 
         // Twin dynamic neon underline slashes
+        strokePaint.setAlpha(255);
         strokePaint.setShader(new LinearGradient(cx - size * 0.32f, 0, cx + size * 0.32f, 0,
                 new int[]{0xFFFF1744, 0xFFFF9100, 0xFFFF1744}, null, Shader.TileMode.CLAMP));
         strokePaint.setStrokeCap(Paint.Cap.ROUND);
@@ -780,6 +964,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
             canvas.drawRoundRect(-rw, -rh, rw, rh, 1.5f * dp, 1.5f * dp, fillPaint);
             canvas.restore();
         }
+        resetPaintState();
         drawProceduralEmoji(canvas, clusterText, EmojiType.PARTY, cx, cy, size, t);
     }
 
@@ -791,12 +976,14 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         float cloudY = cy - size * (0.20f + blast * 0.16f);
         float cloudR = size * (0.22f + blast * 0.14f);
 
+        glowPaint.setAlpha(255);
         glowPaint.setShader(new RadialGradient(cx, cloudY, cloudR,
                 new int[]{0xAAFF4081, 0x777C4DFF, 0x0000E5FF}, null, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cloudY, cloudR, glowPaint);
 
         // Orbiting cosmic stardust around the top of the head
         fillPaint.setShader(null);
+        fillPaint.setAlpha(255);
         for (int i = 0; i < 6; i++) {
             float angle = (float) (t * Math.PI * 4.0 + i * 1.04);
             float sx = cx + (float) Math.cos(angle) * (cloudR * 0.85f);
@@ -805,33 +992,50 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
             drawFourPointStar(canvas, sx, sy, 3.8f * dp, fillPaint);
         }
 
+        resetPaintState();
         drawProceduralEmoji(canvas, clusterText, EmojiType.MIND_BLOWN, cx, cy + size * 0.04f, size * 0.94f, t);
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
-    // 10. 3D LOVE EYES FACE WITH POPPING HEART EYES (😍, 🥰)
+    // 10. LOVE EYES / AFFECTION FACE WITH FLOATING 3D HEARTS (😍, 🥰, 😘, 😊)
     // ═════════════════════════════════════════════════════════════════════════════
-    private void drawAnimatedLoveEyes(Canvas canvas, float cx, float cy, float size, float t) {
-        float headR = size * 0.38f;
-        float sway = (float) Math.sin(t * Math.PI * 2.0) * 6.5f;
+    private void drawAnimatedLoveEyes(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        float sway = isRunning ? (float) Math.sin(t * Math.PI * 2.0) * 7.5f : 0f;
+        float pulse = isRunning ? 1.0f + 0.06f * (float) Math.sin(t * Math.PI * 4.0) : 1.0f;
 
-        canvas.save();
-        canvas.rotate(sway, cx, cy);
-        draw3DGoldenHead(canvas, cx, cy, headR);
+        // Warm rose romantic aura
+        glowPaint.setAlpha(255);
+        glowPaint.setShader(new RadialGradient(cx, cy, size * 0.45f,
+                new int[]{0x44FF4081, 0x18FF80AB, 0x00FF4081}, null, Shader.TileMode.CLAMP));
+        canvas.drawCircle(cx, cy, size * 0.45f, glowPaint);
 
-        // Warm Smile
+        // Render the authentic 100% opaque 😍 / 🥰 / 😘 glyph
+        resetPaintState();
+        drawCrispEmojiGlyph(
+                canvas,
+                clusterText != null && !clusterText.isEmpty() ? clusterText : "😍",
+                cx,
+                cy,
+                size,
+                0f,
+                0f,
+                pulse,
+                pulse,
+                sway,
+                0f);
+
+        // Floating 3D mini-hearts orbiting & rising from the cheeks/eyes
         fillPaint.setShader(null);
-        fillPaint.setColor(0xFF590D22);
-        tempRect.set(cx - headR * 0.44f, cy + headR * 0.02f, cx + headR * 0.44f, cy + headR * 0.56f);
-        canvas.drawArc(tempRect, 0, 180, true, fillPaint);
-
-        // Twin Popping 3D Heart Eyes beating out of the face
-        float eyeBeat = 1.0f + 0.24f * (float) Math.abs(Math.sin(t * Math.PI * 4.0));
-        fillPaint.setColor(0xFFFF1744);
-        drawMiniHeart(canvas, cx - headR * 0.36f, cy - headR * 0.14f, headR * 0.23f * eyeBeat, fillPaint);
-        drawMiniHeart(canvas, cx + headR * 0.36f, cy - headR * 0.14f, headR * 0.23f * eyeBeat, fillPaint);
-
-        canvas.restore();
+        for (int i = 0; i < 4; i++) {
+            float p = (t * 1.6f + i * 0.25f) % 1.0f;
+            float side = (i % 2 == 0) ? -1f : 1f;
+            float hx = cx + side * (size * (0.24f + p * 0.14f));
+            float hy = cy + size * 0.05f - p * (size * 0.44f);
+            float hr = (float) Math.sin(p * Math.PI) * (size * 0.072f);
+            fillPaint.setColor(Color.argb(Math.round((float) Math.sin(p * Math.PI) * 245), 255, 23, 68));
+            drawMiniHeart(canvas, hx, hy, hr, fillPaint);
+        }
+        resetPaintState();
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
@@ -848,16 +1052,17 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
             fillPaint.setColor(p < 0.4f ? 0xFFFFEA00 : (p < 0.75f ? 0xFFFF6D00 : 0x889E9E9E));
             canvas.drawCircle(px, py, pr, fillPaint);
         }
+        resetPaintState();
         float hoverX = (float) Math.sin(t * Math.PI * 4.0) * (2.5f * dp);
         float hoverY = (float) Math.cos(t * Math.PI * 4.0) * (3.5f * dp);
         drawProceduralEmoji(canvas, clusterText, EmojiType.ROCKET, cx + hoverX, cy + hoverY, size, t);
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
-    // 12. THUMBS UP / CLAP GOLDEN SUNBURST (👍, 👏, 🙌)
+    // 12. THUMBS UP / GESTURE GOLDEN SUNBURST (👍, 💪, ✌️, 👌)
     // ═════════════════════════════════════════════════════════════════════════════
     private void drawAnimatedThumbsUp(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
-        // Rotating golden sunburst rays + sparkles
+        glowPaint.setAlpha(255);
         glowPaint.setShader(new RadialGradient(cx, cy, size * 0.45f,
                 new int[]{0x44FFD600, 0x15FFAB00, 0x00FFD600}, null, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, size * 0.45f, glowPaint);
@@ -871,13 +1076,40 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
             float starSize = (float) (2.5f + 2.2f * Math.abs(Math.sin(t * Math.PI * 4.0 + i))) * dp;
             drawFourPointStar(canvas, sx, sy, starSize, fillPaint);
         }
-        drawProceduralEmoji(canvas, clusterText, EmojiType.THUMBS_UP, cx, cy, size, t);
+        resetPaintState();
+        float popAngle = (float) Math.sin(t * Math.PI * 4.0);
+        float rot = -8f + popAngle * 12f;
+        float scale = 1.0f + Math.max(0f, popAngle) * 0.12f;
+        drawCrispEmojiGlyph(canvas, clusterText, cx, cy, size, 0f, 0f, scale, scale, rot, size * 0.2f);
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
-    // 13. SKULL / GHOST ECTOPLASM LEVITATION (💀, 👻)
+    // 13. WAVE / CLAP / HANDS CHOREOGRAPHY (👋, 👏, 🙌, 🙏)
+    // ═════════════════════════════════════════════════════════════════════════════
+    private void drawAnimatedWaveClap(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        boolean isClap = clusterText != null && clusterText.contains("👏");
+        float wave = isRunning ? (float) Math.sin(t * Math.PI * 6.0) : 0f;
+        if (isClap) {
+            float clapPulse = Math.max(0f, wave);
+            if (clapPulse > 0.2f) {
+                strokePaint.setShader(null);
+                strokePaint.setColor(Color.argb(Math.round(clapPulse * 210), 255, 214, 0));
+                strokePaint.setStrokeWidth(2.4f * dp);
+                canvas.drawCircle(cx, cy, size * (0.28f + clapPulse * 0.14f), strokePaint);
+            }
+            float s = 1.0f + clapPulse * 0.14f;
+            drawCrispEmojiGlyph(canvas, clusterText, cx, cy, size, 0f, 0f, s, s, wave * 6f, 0f);
+        } else {
+            // Pivot wrist wave for 👋 / 🙌 / 🙏
+            drawCrispEmojiGlyph(canvas, clusterText, cx, cy, size, 0f, 0f, 1.04f, 1.04f, wave * 18f, size * 0.24f);
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════
+    // 14. SKULL / GHOST ECTOPLASM LEVITATION (💀, 👻)
     // ═════════════════════════════════════════════════════════════════════════════
     private void drawAnimatedSkullGhost(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        glowPaint.setAlpha(255);
         glowPaint.setShader(new RadialGradient(cx, cy, size * 0.46f,
                 new int[]{0x4800E5FF, 0x207C4DFF, 0x0000E5FF}, null, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, size * 0.46f, glowPaint);
@@ -890,13 +1122,15 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
             fillPaint.setColor(Color.argb(Math.round((1f - p) * 190), 0, 229, 255));
             canvas.drawCircle(wx, wy, (1f - p) * 4.2f * dp, fillPaint);
         }
+        resetPaintState();
         drawProceduralEmoji(canvas, clusterText, EmojiType.SKULL_GHOST, cx, cy, size, t);
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
-    // 14. HIGH-VOLTAGE ELECTRIC ARCS (⚡, 💥)
+    // 15. HIGH-VOLTAGE ELECTRIC ARCS (⚡, 💥)
     // ═════════════════════════════════════════════════════════════════════════════
     private void drawAnimatedLightning(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        glowPaint.setAlpha(255);
         glowPaint.setShader(new RadialGradient(cx, cy, size * 0.46f,
                 new int[]{0x55FFEA00, 0x2200E5FF, 0x00FFEA00}, null, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, size * 0.46f, glowPaint);
@@ -912,13 +1146,15 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
             float y2 = cy + (float) Math.sin(a + 0.35) * (size * 0.38f);
             canvas.drawLine(x1, y1, x2, y2, strokePaint);
         }
+        resetPaintState();
         drawProceduralEmoji(canvas, clusterText, EmojiType.LIGHTNING, cx, cy, size, t);
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
-    // 15. ANGRY BOILING RAGE WITH STEAM JETS (😡, 🤬, 😤)
+    // 16. ANGRY BOILING RAGE WITH STEAM JETS (😡, 🤬, 😤)
     // ═════════════════════════════════════════════════════════════════════════════
     private void drawAnimatedAngry(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        glowPaint.setAlpha(255);
         glowPaint.setShader(new RadialGradient(cx, cy, size * 0.45f,
                 new int[]{0x55FF1744, 0x20FF5252, 0x00FF1744}, null, Shader.TileMode.CLAMP));
         canvas.drawCircle(cx, cy, size * 0.45f, glowPaint);
@@ -932,28 +1168,156 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
             fillPaint.setColor(Color.argb(Math.round((1f - p) * 210), 241, 245, 249));
             canvas.drawCircle(sx, sy, (3.5f + p * 5.5f) * dp, fillPaint);
         }
+        resetPaintState();
         float rageShakeX = (float) Math.sin(t * Math.PI * 24.0) * (2.2f * dp);
         drawProceduralEmoji(canvas, clusterText, EmojiType.ANGRY, cx + rageShakeX, cy, size, t);
     }
 
     // ═════════════════════════════════════════════════════════════════════════════
-    // 16. UNIVERSAL SPRING-PHYSICS SQUASH-AND-STRETCH EMOJI CHOREOGRAPHY
+    // 17. COOL SUNGLASSES SWAGGER & LENS GLINT (😎, 🤓, 🤠, 🤑)
+    // ═════════════════════════════════════════════════════════════════════════════
+    private void drawAnimatedCool(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        float nod = isRunning ? (float) Math.sin(t * Math.PI * 2.0) : 0f;
+        float tilt = nod * 6.0f;
+        float dy = -Math.abs(nod) * (3.0f * dp);
+        drawCrispEmojiGlyph(canvas, clusterText, cx, cy, size, 0f, dy, 1.03f, 1.03f, tilt, 0f);
+
+        // Sparkling lens glint across the sunglasses area
+        float glintPhase = (t * 2.0f) % 1.0f;
+        if (glintPhase < 0.55f) {
+            float gx = cx - size * 0.18f + (glintPhase / 0.55f) * (size * 0.36f);
+            float gy = cy + dy - size * 0.08f;
+            fillPaint.setShader(null);
+            fillPaint.setColor(0xFFFFFFFF);
+            drawFourPointStar(canvas, gx, gy, 5.2f * dp, fillPaint);
+        }
+        resetPaintState();
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════
+    // 18. FREEZING SHIVER & FROST CRYSTALS (🥶, ❄️, ☃️)
+    // ═════════════════════════════════════════════════════════════════════════════
+    private void drawAnimatedCold(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        glowPaint.setAlpha(255);
+        glowPaint.setShader(new RadialGradient(cx, cy, size * 0.45f,
+                new int[]{0x4838BDF8, 0x18E0F2FE, 0x0038BDF8}, null, Shader.TileMode.CLAMP));
+        canvas.drawCircle(cx, cy, size * 0.45f, glowPaint);
+
+        float shiverX = isRunning ? (float) Math.sin(t * Math.PI * 28.0) * (2.0f * dp) : 0f;
+        drawCrispEmojiGlyph(canvas, clusterText, cx, cy, size, shiverX, 0f, 0.98f, 1.02f, 0f, 0f);
+
+        // Floating frost crystals
+        fillPaint.setShader(null);
+        fillPaint.setColor(0xFFE0F2FE);
+        for (int i = 0; i < 4; i++) {
+            float p = (t * 1.4f + i * 0.25f) % 1.0f;
+            float fx = cx + (float) Math.cos(i * 1.7 + p * 3.0) * (size * 0.34f);
+            float fy = cy - size * 0.25f + p * (size * 0.5f);
+            drawFourPointStar(canvas, fx, fy, 3.2f * dp, fillPaint);
+        }
+        resetPaintState();
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════
+    // 19. SLEEPY BREATHING & FLOATING Zzz (😴, 🥱, 💤)
+    // ═════════════════════════════════════════════════════════════════════════════
+    private void drawAnimatedSleepy(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        float breath = isRunning ? (float) Math.sin(t * Math.PI * 2.0) : 0f;
+        float scale = 1.0f + breath * 0.055f;
+        drawCrispEmojiGlyph(canvas, clusterText, cx, cy, size, 0f, 0f, scale, scale, breath * 4.5f, 0f);
+
+        // Floating "Z" letters rising from top-right
+        badgePaint.setShader(null);
+        for (int i = 0; i < 2; i++) {
+            float p = (t + i * 0.5f) % 1.0f;
+            float zx = cx + size * (0.14f + p * 0.22f);
+            float zy = cy - size * (0.12f + p * 0.28f);
+            badgePaint.setTextSize((9f + p * 7f) * dp);
+            badgePaint.setColor(Color.argb(Math.round((float) Math.sin(p * Math.PI) * 235), 125, 211, 252));
+            canvas.drawText("Z", zx, zy, badgePaint);
+        }
+        resetPaintState();
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════
+    // 20. CURIOUS THINKING TILT (🤔, 🧐, 🤨, 👀)
+    // ═════════════════════════════════════════════════════════════════════════════
+    private void drawAnimatedThinking(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        float ponder = isRunning ? (float) Math.sin(t * Math.PI * 2.0) : 0f;
+        float tilt = -6f + ponder * 10f;
+        float liftY = -Math.abs(ponder) * (3.0f * dp);
+        drawCrispEmojiGlyph(canvas, clusterText, cx, cy, size, 0f, liftY, 1.03f, 1.03f, tilt, 0f);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════
+    // 21. DIZZY / SICK SWIRL (🤢, 🤮, 😵, 😵‍💫, 🥴)
+    // ═════════════════════════════════════════════════════════════════════════════
+    private void drawAnimatedDizzySick(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        float angle = (float) (t * Math.PI * 2.0);
+        float wobbleX = isRunning ? (float) Math.cos(angle) * (3.2f * dp) : 0f;
+        float wobbleY = isRunning ? (float) Math.sin(angle * 2.0) * (2.5f * dp) : 0f;
+        float tilt = isRunning ? (float) Math.sin(angle) * 9.5f : 0f;
+        drawCrispEmojiGlyph(canvas, clusterText, cx, cy, size, wobbleX, wobbleY, 1.0f, 1.0f, tilt, 0f);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════
+    // 22. RHYTHMIC MUSIC GROOVE & FLOATING NOTES (🎵, 🎶, 🎧, 💃, 🕺)
+    // ═════════════════════════════════════════════════════════════════════════════
+    private void drawAnimatedMusic(Canvas canvas, String clusterText, float cx, float cy, float size, float t) {
+        float beat = isRunning ? (float) Math.sin(t * Math.PI * 4.0) : 0f;
+        float scaleX = 1.0f + beat * 0.06f;
+        float scaleY = 1.0f - beat * 0.06f;
+        float sway = isRunning ? (float) Math.sin(t * Math.PI * 2.0) * 10f : 0f;
+        drawCrispEmojiGlyph(canvas, clusterText, cx, cy, size, 0f, -Math.abs(beat) * 4f * dp, scaleX, scaleY, sway, 0f);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════
+    // 23. UNIVERSAL SPRING-PHYSICS SQUASH-AND-STRETCH EMOJI CHOREOGRAPHY
+    //     (Fits Every Unicode Emoji with Deterministic Per-Glyph Motion Variety)
     // ═════════════════════════════════════════════════════════════════════════════
     private void drawProceduralEmoji(Canvas canvas, String emojiStr, EmojiType type, float cx, float cy, float size, float t) {
         float angle = (float) (t * Math.PI * 2.0);
-        float hop = (float) Math.sin(angle * 2.0);
-        float bounceY = isRunning ? -Math.abs(hop) * (6.2f * dp) : 0f;
-        float scaleX = isRunning ? (1.0f - hop * 0.055f) : 1.0f;
-        float scaleY = isRunning ? (1.0f + hop * 0.065f) : 1.0f;
-        float tilt = isRunning ? ((float) Math.sin(angle) * 6.5f) : 0f;
+        int hash = emojiStr != null ? Math.abs(emojiStr.hashCode()) : 0;
+        int motionStyle = hash % 3;
 
-        if (burstProgress > 0f) {
-            scaleX += burstProgress * 0.24f;
-            scaleY += burstProgress * 0.24f;
+        float hop = (float) Math.sin(angle * 2.0);
+        float bounceY = 0f;
+        float scaleX = 1.0f;
+        float scaleY = 1.0f;
+        float tilt = 0f;
+
+        if (isRunning) {
+            if (type == EmojiType.PLEADING) {
+                // Gentle puppy-eyes quiver + soft vertical breath
+                bounceY = (float) Math.sin(angle) * (2.4f * dp);
+                scaleX = 1.0f + (float) Math.sin(angle * 2.0) * 0.035f;
+                scaleY = 1.0f - (float) Math.sin(angle * 2.0) * 0.035f;
+                tilt = (float) Math.sin(angle * 4.0) * 3.5f;
+            } else if (motionStyle == 0) {
+                // Elastic spring bounce + squash-and-stretch
+                bounceY = -Math.abs(hop) * (6.2f * dp);
+                scaleX = 1.0f - hop * 0.055f;
+                scaleY = 1.0f + hop * 0.065f;
+                tilt = (float) Math.sin(angle) * 6.5f;
+            } else if (motionStyle == 1) {
+                // Playful pendulum rock + heartbeat pulse
+                bounceY = -Math.abs((float) Math.cos(angle)) * (4.5f * dp);
+                float pulse = 1.0f + 0.06f * (float) Math.sin(angle * 2.0);
+                scaleX = pulse;
+                scaleY = pulse;
+                tilt = (float) Math.sin(angle) * 10.5f;
+            } else {
+                // 3D figure-8 hover dance
+                bounceY = (float) Math.sin(angle * 2.0) * (4.0f * dp);
+                scaleX = 1.0f + 0.05f * (float) Math.cos(angle * 2.0);
+                scaleY = 1.0f - 0.05f * (float) Math.cos(angle * 2.0);
+                tilt = (float) Math.cos(angle) * 7.5f;
+            }
         }
 
         if (type == EmojiType.SPARKLE) {
             fillPaint.setShader(null);
+            fillPaint.setAlpha(255);
             fillPaint.setColor(0xFFFFEA00);
             for (int i = 0; i < 4; i++) {
                 float sa = angle + i * 1.57f;
@@ -963,29 +1327,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
             }
         }
 
-        canvas.save();
-        canvas.translate(cx, cy + bounceY);
-        canvas.rotate(tilt);
-        canvas.scale(scaleX, scaleY);
-
-        textPaint.setTextSize(size * 0.68f);
-        Paint.FontMetrics fm = textPaint.getFontMetrics();
-        float textY = -(fm.ascent + fm.descent) * 0.5f;
-
-        canvas.drawText(emojiStr, 0, textY, textPaint);
-        canvas.restore();
-    }
-
-    private void draw3DGoldenHead(Canvas canvas, float cx, float cy, float headR) {
-        fillPaint.setShader(new RadialGradient(cx - headR * 0.28f, cy - headR * 0.28f, headR * 1.35f,
-                new int[]{0xFFFFF176, 0xFFFFCA28, 0xFFF57F17},
-                new float[]{0f, 0.68f, 1f}, Shader.TileMode.CLAMP));
-        canvas.drawCircle(cx, cy, headR, fillPaint);
-
-        // Top-left 3D glass rim highlight
-        glowPaint.setShader(new RadialGradient(cx - headR * 0.35f, cy - headR * 0.38f, headR * 0.55f,
-                0x55FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
-        canvas.drawCircle(cx - headR * 0.35f, cy - headR * 0.38f, headR * 0.55f, glowPaint);
+        drawCrispEmojiGlyph(canvas, emojiStr, cx, cy, size, 0f, bounceY, scaleX, scaleY, tilt, 0f);
     }
 
     private void drawFourPointStar(Canvas canvas, float sx, float sy, float r, Paint paint) {
@@ -1033,6 +1375,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
                 canvas.drawCircle(px, py, r * 0.75f, fillPaint);
             }
         }
+        resetPaintState();
 
         // 3. Combo Counter Floating Pill Badge when tapped multiple times (2x, 3x, etc.)
         if (tapComboCount >= 2) {

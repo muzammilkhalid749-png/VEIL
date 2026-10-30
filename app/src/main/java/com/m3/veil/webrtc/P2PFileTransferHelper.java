@@ -77,6 +77,9 @@ public class P2PFileTransferHelper {
 
     public interface OnFileRequestListener {
         void onFileRequested(String transferId);
+        default void onFileRequestedResumable(String transferId, BitSet missingChunks) {
+            onFileRequested(transferId);
+        }
         void onFileTransferCanceled(String transferId);
     }
 
@@ -111,6 +114,7 @@ public class P2PFileTransferHelper {
         public long totalBytes;
         public int totalChunks;
         public int lastReportedPercent = -1;
+        public int tailRetryCount = 0;
         public BitSet receivedBitSet;
         public File tempFile;
         public RandomAccessFile raf;
@@ -673,6 +677,18 @@ public class P2PFileTransferHelper {
                 synchronized (transfer) {
                     if (transfer.receivedBitSet.cardinality() >= transfer.totalChunks) {
                         completeTransfer(context, transfer, listener);
+                    } else if (transfer.tailRetryCount < 3) {
+                        transfer.tailRetryCount++;
+                        String targetPeer = peerId != null ? peerId : transfer.peerId;
+                        if (targetPeer != null && context != null) {
+                            DataChannel dc = WebRtcManager.getInstance(context).getChannelForLane(targetPeer, VeilPacket.LANE_MEDIA);
+                            if (dc != null && dc.state() == DataChannel.State.OPEN) {
+                                Log.i(TAG, "Tail recovery (#" + transfer.tailRetryCount + "): requesting "
+                                        + (transfer.totalChunks - transfer.receivedBitSet.cardinality())
+                                        + " missing chunks for " + transferId);
+                                requestFileWithResume(context, dc, transferId);
+                            }
+                        }
                     }
                 }
             }
@@ -783,8 +799,32 @@ public class P2PFileTransferHelper {
         try {
             JSONObject json = new JSONObject(payload);
             String transferId = json.optString("transferId", json.optString("messageId"));
+            String receivedB64 = json.optString("receivedBitSetBase64", "");
+            int totalChunks = json.optInt("totalChunks", 0);
+
+            BitSet missingChunks = null;
+            if (receivedB64 != null && !receivedB64.isEmpty() && totalChunks > 0) {
+                try {
+                    byte[] rawBits = Base64.decode(receivedB64, Base64.NO_WRAP);
+                    BitSet received = BitSet.valueOf(rawBits);
+                    missingChunks = new BitSet(totalChunks);
+                    for (int i = 0; i < totalChunks; i++) {
+                        if (!received.get(i)) {
+                            missingChunks.set(i);
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
+
+            final BitSet finalMissing = missingChunks;
             if (fileRequestListener != null) {
-                mainHandler.post(() -> fileRequestListener.onFileRequested(transferId));
+                mainHandler.post(() -> {
+                    if (finalMissing != null && !finalMissing.isEmpty()) {
+                        fileRequestListener.onFileRequestedResumable(transferId, finalMissing);
+                    } else {
+                        fileRequestListener.onFileRequested(transferId);
+                    }
+                });
             }
         } catch (Exception ignored) {}
     }
@@ -811,17 +851,70 @@ public class P2PFileTransferHelper {
     }
 
     public static void requestFile(DataChannel dataChannel, String messageId) {
-        if (dataChannel == null || dataChannel.state() != DataChannel.State.OPEN) return;
+        requestFileWithResume(com.m3.veil.VeilApplication.getInstance(), dataChannel, messageId);
+    }
+
+    /**
+     * Requests a file from the remote peer, automatically attaching a received-chunk BitSet mask
+     * if partial chunks already exist on disk so interrupted large transfers resume from the exact offset.
+     */
+    public static void requestFileWithResume(Context context, DataChannel dataChannel, String messageId) {
+        if (dataChannel == null || dataChannel.state() != DataChannel.State.OPEN || messageId == null) return;
         try {
             JSONObject req = new JSONObject();
             req.put("action", "FILE_REQUEST");
             req.put("transferId", messageId);
             req.put("messageId", messageId);
+
+            InboundTransfer active = activeInboundTransfers.get(messageId);
+            if (active != null && active.receivedBitSet != null && active.receivedBitSet.cardinality() > 0
+                    && active.tempFile != null && active.tempFile.exists() && active.totalChunks > 0) {
+                String b64 = Base64.encodeToString(active.receivedBitSet.toByteArray(), Base64.NO_WRAP);
+                req.put("receivedBitSetBase64", b64);
+                req.put("totalChunks", active.totalChunks);
+            } else if (context != null) {
+                EncryptedChatDatabase.FileTransferRecord rec =
+                        EncryptedChatDatabase.getInstance(context).getFileTransfer(messageId);
+                if (rec != null && rec.bitsetBytes != null && rec.bitsetBytes.length > 0
+                        && rec.filePath != null && new File(rec.filePath).exists() && rec.totalChunks > 0) {
+                    BitSet saved = BitSet.valueOf(rec.bitsetBytes);
+                    if (saved.cardinality() > 0 && saved.cardinality() < rec.totalChunks) {
+                        String b64 = Base64.encodeToString(rec.bitsetBytes, Base64.NO_WRAP);
+                        req.put("receivedBitSetBase64", b64);
+                        req.put("totalChunks", rec.totalChunks);
+                    }
+                }
+            }
+
             VeilPacket packet = new VeilPacket(VeilPacket.LANE_MEDIA, VeilPacket.TYPE_FILE_REQUEST, req.toString());
             sendPacketOrFallback(dataChannel, packet, req.toString());
         } catch (Exception e) {
-            Log.e(TAG, "Error sending FILE_REQUEST", e);
+            Log.e(TAG, "Error sending resumable FILE_REQUEST", e);
         }
+    }
+
+    /**
+     * Automatically resumes any incomplete inbound transfers with a peer when the P2P DataChannel
+     * reconnects (e.g., after a Wi-Fi <-> 5G handoff).
+     */
+    public static void resumeIncompleteTransfersForPeer(Context context, String peerId, DataChannel dataChannel) {
+        if (peerId == null || dataChannel == null || dataChannel.state() != DataChannel.State.OPEN) return;
+        transferExecutor.execute(() -> {
+            try {
+                for (InboundTransfer transfer : activeInboundTransfers.values()) {
+                    if (transfer != null && !transfer.isCompleted.get()
+                            && peerId.equals(transfer.peerId)
+                            && transfer.receivedBitSet != null
+                            && transfer.receivedBitSet.cardinality() < transfer.totalChunks) {
+                        Log.i(TAG, "Auto-resuming interrupted inbound file transfer " + transfer.transferId
+                                + " from chunk progress " + transfer.receivedBitSet.cardinality() + "/" + transfer.totalChunks);
+                        requestFileWithResume(context, dataChannel, transfer.transferId);
+                    }
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Error resuming incomplete transfers for peer " + peerId + ": " + t.getMessage());
+            }
+        });
     }
 
     public static void cancelFileTransfer(DataChannel dataChannel, String messageId) {

@@ -80,8 +80,10 @@ public class VeilBootAndKeepAliveReceiver extends BroadcastReceiver {
                             Log.w(TAG, "CallEngine notice on boot: " + t.getMessage());
                         }
 
-                        // 4. Ensure WebSocket signaling listeners attached
+                        // 4. Ensure WebSocket signaling listeners attached & sweep any offline wake signals
                         try {
+                            com.m3.veil.webrtc.SignalingClient.getInstance()
+                                    .sweepPendingWakeSignalsOnce(appContext, uid);
                             SovereignIdentityAndDirectoryEngine.getInstance(appContext)
                                     .subscribeToIncomingSignals(uid, (type, fromUid, payload) -> {
                                         Log.d(TAG, "Boot receiver signal channel active: " + type);

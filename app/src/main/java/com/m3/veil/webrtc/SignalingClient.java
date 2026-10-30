@@ -65,6 +65,7 @@ public class SignalingClient {
     private final FirebaseFirestore db;
     private String currentUserId;
     private ListenerRegistration signalListener;
+    private ListenerRegistration meshSignalListener;
     private SignalingListener listener;
     private WebRtcManager webRtcManager;
     private final Map<String, String> peerPublicKeys = new ConcurrentHashMap<>();
@@ -117,7 +118,7 @@ public class SignalingClient {
             this.webRtcManager = manager;
             this.listener = manager;
         }
-        if (cleanUid.equals(this.currentUserId) && this.signalListener != null) {
+        if (cleanUid.equals(this.currentUserId) && this.signalListener != null && this.meshSignalListener != null) {
             return;
         }
 
@@ -167,13 +168,18 @@ public class SignalingClient {
     }
 
     /**
-     * Attaches the primary Firestore real-time signaling listener on "users/{currentUserId}/signals"
+     * Attaches the primary Firestore real-time signaling listeners on both
+     * "users/{currentUserId}/signals" and "users/{currentUserId}/mesh_signals"
      * and purges stale or consumed signal documents immediately for zero-footprint privacy.
      */
     private void listenForSignals() {
         if (this.signalListener != null) {
             this.signalListener.remove();
             this.signalListener = null;
+        }
+        if (this.meshSignalListener != null) {
+            this.meshSignalListener.remove();
+            this.meshSignalListener = null;
         }
         if (this.currentUserId == null || this.currentUserId.isEmpty()) {
             return;
@@ -217,6 +223,94 @@ public class SignalingClient {
                         }
                     });
                 });
+
+        // Attach Hybrid Cloud Fallback Wake & Notification Listener on "users/{currentUserId}/mesh_signals"
+        this.meshSignalListener = this.db.collection("users")
+                .document(this.currentUserId)
+                .collection("mesh_signals")
+                .addSnapshotListener((snapshots, e) -> {
+                    if (e != null || snapshots == null) {
+                        return;
+                    }
+                    final java.util.List<DocumentChange> docChanges = snapshots.getDocumentChanges();
+                    if (docChanges == null || docChanges.isEmpty()) {
+                        return;
+                    }
+                    sigExecutor.execute(() -> {
+                        for (DocumentChange dc : docChanges) {
+                            if (dc.getType() == DocumentChange.Type.ADDED || dc.getType() == DocumentChange.Type.MODIFIED) {
+                                DocumentSnapshot doc = dc.getDocument();
+                                consumeMeshWakeSignalDocument(doc);
+                            }
+                        }
+                    });
+                });
+    }
+
+    private void consumeMeshWakeSignalDocument(DocumentSnapshot doc) {
+        if (doc == null || !doc.exists()) return;
+        try {
+            doc.getReference().delete();
+            String docId = doc.getId();
+            if (!processedSignalIds.add("mesh_" + docId)) {
+                return;
+            }
+            String from = doc.getString("senderId");
+            if (from == null || from.isEmpty()) {
+                from = doc.getString("from");
+            }
+            if (from == null || from.isEmpty() || from.equals(this.currentUserId)) {
+                return;
+            }
+            String chatId = doc.getString("chatId");
+            String messageId = doc.getString("messageId");
+            String encPreview = doc.getString("encPreview");
+
+            // Route fallback notification metadata to VeilHybridNotificationManager if peer is not already notified via P2P
+            Context ctx = resolveContext();
+            if (ctx != null && messageId != null && !messageId.isEmpty()) {
+                Map<String, String> notifData = new HashMap<>();
+                notifData.put("messageId", messageId);
+                notifData.put("chatId", chatId != null ? chatId : WebRtcManager.getChatId(this.currentUserId, from));
+                notifData.put("senderId", from);
+                String sName = doc.getString("senderName");
+                if (sName != null) notifData.put("senderName", sName);
+                String mType = doc.getString("msgType");
+                if (mType != null) notifData.put("msgType", mType);
+                if (encPreview != null) notifData.put("encPreview", encPreview);
+                com.m3.veil.services.VeilHybridNotificationManager.getInstance(ctx)
+                        .onFirebaseWakeOrPushReceived(notifData);
+            }
+
+            // Trigger immediate P2P connection wake-up with sender
+            final SignalingListener target = this.listener != null ? this.listener : this.webRtcManager;
+            if (target != null) {
+                target.onWakeUpReceived(from, chatId != null ? chatId : WebRtcManager.getChatId(this.currentUserId, from));
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Error consuming mesh_signals document: " + t.getMessage());
+        }
+    }
+
+    /**
+     * Sweeps any queued "mesh_signals" and "signals" documents on Doze wake-up, boot, or network switch.
+     */
+    public void sweepPendingWakeSignalsOnce(Context context, String userId) {
+        String targetUid = (userId != null && !userId.trim().isEmpty()) ? userId.trim() : this.currentUserId;
+        if (targetUid == null || targetUid.isEmpty()) return;
+        try {
+            this.db.collection("users")
+                    .document(targetUid)
+                    .collection("mesh_signals")
+                    .limit(30)
+                    .get()
+                    .addOnSuccessListener(sigExecutor, snapshots -> {
+                        if (snapshots == null) return;
+                        for (DocumentSnapshot doc : snapshots.getDocuments()) {
+                            consumeMeshWakeSignalDocument(doc);
+                        }
+                    });
+        } catch (Throwable ignored) {}
     }
 
     public void pruneSignalingForPeer(String peerId) {
@@ -594,6 +688,10 @@ public class SignalingClient {
         if (this.signalListener != null) {
             this.signalListener.remove();
             this.signalListener = null;
+        }
+        if (this.meshSignalListener != null) {
+            this.meshSignalListener.remove();
+            this.meshSignalListener = null;
         }
         if (this.socket != null) {
             this.socket.disconnect();

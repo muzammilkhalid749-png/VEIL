@@ -178,22 +178,37 @@ public class TurnCredentialManager {
     private void initDefaultFleet() {
         mRelayFleet.clear();
 
-        // 1. Primary Global Anycast TURN/STUN Edge
+        // 1. Primary Global Anycast TURN/STUN Edge (Port 80 UDP/TCP & Port 443 TCP/TLS)
         mRelayFleet.add(new RelayNode(
                 "anycast-global", "openrelay.metered.ca", "Global Anycast Edge",
                 80, 80, 443, 443));
 
-        // 2. Standard Global Relay Edge (TCP/TLS 443)
+        // 2. Global Standard Multi-Homed Relay Edge (TCP/TLS 443)
         mRelayFleet.add(new RelayNode(
                 "global-standard", "standard.relay.metered.ca", "Global Standard Relay",
                 80, 80, 443, 443));
 
-        // 3. Google Anycast STUN Primary
+        // 3. North America (US-East / US-West) Low-Latency Edge
+        mRelayFleet.add(new RelayNode(
+                "us-edge-1", "us.relay.metered.ca", "North America Edge",
+                80, 80, 443, 443));
+
+        // 4. Europe (EU-Central Frankfurt/Amsterdam) Low-Latency Edge
+        mRelayFleet.add(new RelayNode(
+                "eu-edge-1", "eu.relay.metered.ca", "Europe Central Edge",
+                80, 80, 443, 443));
+
+        // 5. Asia-Pacific (Singapore / Tokyo) Low-Latency Edge
+        mRelayFleet.add(new RelayNode(
+                "ap-edge-1", "ap.relay.metered.ca", "Asia-Pacific Edge",
+                80, 80, 443, 443));
+
+        // 6. Google Anycast STUN Primary
         mRelayFleet.add(new RelayNode(
                 "google-stun-1", "stun.l.google.com", "Google Global STUN 1",
                 19302, 19302, 19302, 5349));
 
-        // 4. Cloudflare Anycast STUN Edge
+        // 7. Cloudflare Anycast STUN Edge
         mRelayFleet.add(new RelayNode(
                 "cloudflare-stun", "stun.cloudflare.com", "Cloudflare Anycast STUN",
                 3478, 3478, 3478, 5349));

@@ -1223,7 +1223,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 || (msg.getType() != null && !"text".equals(msg.getType()) && !"poll".equals(msg.getType())
                     && !"location".equals(msg.getType()) && !"contact".equals(msg.getType()) && !"call".equals(msg.getType()));
 
-        // 3. Notify UI observers that message was placed in sent queue
+        // 3. Notify UI observers that message was placed in sent queue & play distinct Sent sound
+        com.m3.veil.services.VeilHybridNotificationManager.getInstance(mContext).playMessageSentSound();
         runOnUI(() -> {
             for (MessagesObserver obs : mObservers) {
                 obs.onMessageSent(dialogId, msg);

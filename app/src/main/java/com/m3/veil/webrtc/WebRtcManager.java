@@ -190,7 +190,11 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       TurnCredentialManager.getInstance(context).probeAllNodesAsync();
       P2PFileTransferHelper.setOnFileRequestListener(new P2PFileTransferHelper.OnFileRequestListener() {
          public void onFileRequested(String transferId) {
-            WebRtcManager.this.handleFileRequestFromPeer(transferId);
+            WebRtcManager.this.handleFileRequestFromPeer(transferId, null);
+         }
+
+         public void onFileRequestedResumable(String transferId, java.util.BitSet missingChunks) {
+            WebRtcManager.this.handleFileRequestFromPeer(transferId, missingChunks);
          }
 
          public void onFileTransferCanceled(String transferId) {
@@ -392,6 +396,8 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
                      this.activeNet = network;
                      if (WebRtcManager.this.currentUserId != null) {
+                        SignalingClient.getInstance().sweepPendingWakeSignalsOnce(
+                                WebRtcManager.this.context, WebRtcManager.this.currentUserId);
                         VeilMeshDaemonService daemon = VeilMeshDaemonService.getInstance(WebRtcManager.this.context);
                         if (daemon != null) {
                            daemon.triggerOutboxSync();
@@ -536,14 +542,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                if (sigState == PeerConnection.SignalingState.STABLE
                        || state == IceConnectionState.DISCONNECTED
                        || state == IceConnectionState.FAILED) {
-                  Log.i("WebRtcManager", "Tier 2 Activated: Direct STUN timed out (12,000ms). Falling back to TURN TCP/443 for peer: " + peerId);
+                  Log.i("WebRtcManager", "Tier 2 Activated: Direct STUN timed out (4,500ms). Falling back to TURN TCP/443 for peer: " + peerId);
                   this.restartIceWithTurn(peerId);
                }
             }
 
          };
          this.turnFallbackRunnables.put(peerId, r);
-         this.heartbeatHandler.postDelayed(r, 12000L);
+         this.heartbeatHandler.postDelayed(r, 4500L);
       }
    }
 
@@ -948,6 +954,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   VeilMeshDaemonService.getInstance(WebRtcManager.this.context).flushOutboxForPeer(peerId);
                   WebRtcManager.this.syncVeilBoardGossipWithPeer(peerId, dataChannel);
                   WebRtcManager.this.flushPendingDownloadRequestsForPeer(peerId, dataChannel);
+                  P2PFileTransferHelper.resumeIncompleteTransfersForPeer(WebRtcManager.this.context, peerId, dataChannel);
+               } else if (lane == 2) {
+                  P2PFileTransferHelper.resumeIncompleteTransfersForPeer(WebRtcManager.this.context, peerId, dataChannel);
                }
             } else if (dataChannel.state() == State.CLOSED) {
                PeerChannelHub hub = (PeerChannelHub)WebRtcManager.this.peerHubs.get(peerId);
@@ -2283,6 +2292,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    }
 
    private void handleFileRequestFromPeer(String transferId) {
+      this.handleFileRequestFromPeer(transferId, null);
+   }
+
+   private void handleFileRequestFromPeer(String transferId, java.util.BitSet missingChunks) {
       if (transferId != null) {
          Message msg = EncryptedChatDatabase.getInstance(this.context).getMessageById(transferId);
          if (msg != null) {
@@ -2319,7 +2332,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
             if (file != null && file.exists()) {
                String peerId = msg.getReceiverId();
-               DataChannel dc = peerId != null ? (DataChannel)this.dataChannels.get(peerId) : null;
+               DataChannel dc = peerId != null ? this.getChannelForLane(peerId, VeilPacket.LANE_MEDIA) : null;
                if (dc == null || dc.state() != State.OPEN) {
                   for(DataChannel chan : this.dataChannels.values()) {
                      if (chan != null && chan.state() == State.OPEN) {
@@ -2330,7 +2343,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                }
 
                if (dc != null && dc.state() == State.OPEN) {
-                  P2PFileTransferHelper.sendFileOverDataChannel(dc, transferId, file, msg.getType(), msg.getText(), msg.isBlink(), msg.getThumbnail(), msg.getVoiceFilter(), (P2PFileTransferHelper.FileTransferCallback)null);
+                  P2PFileTransferHelper.sendFileOverDataChannelResumable(
+                          dc, transferId, file, msg.getType(), msg.getText(),
+                          msg.isBlink(), msg.getThumbnail(), msg.getVoiceFilter(),
+                          missingChunks, (P2PFileTransferHelper.FileTransferCallback)null);
                }
             }
 
