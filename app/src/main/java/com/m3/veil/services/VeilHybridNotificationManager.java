@@ -804,8 +804,14 @@ public class VeilHybridNotificationManager {
     }
 
     /**
-     * Plays a crisp, high-volume WhatsApp/Telegram-inspired outbound message sent pop/whoosh sound
+     * Plays a psychoacoustically satisfying, organic tactile "bubble-droplet pop"
      * when the user sends a message in ChatActivity.
+     *
+     * Acoustic architecture (58 ms total, zero distortion):
+     *  1. 0–4 ms: Subtle warm wooden tactile transient (1050 Hz damped impulse) for instant touch feedback.
+     *  2. 0–58 ms: Organic air-bubble pop whose pitch snaps rapidly from 260 Hz -> 680 Hz in the first 22 ms
+     *     (natural bubble cavity resonance curve) using a pure sine wave + 5% warm 2nd harmonic,
+     *     peaking cleanly at 30,000 PCM amplitude without square-wave clipping.
      */
     public void playMessageSentSound() {
         try {
@@ -816,26 +822,38 @@ public class VeilHybridNotificationManager {
             new Thread(() -> {
                 try {
                     final int sampleRate = 44100;
-                    final int durationMs = 110;
+                    final int durationMs = 58;
                     final int numSamples = (sampleRate * durationMs) / 1000;
                     final short[] pcm = new short[numSamples];
                     double phase = 0.0;
+                    double clickPhase = 0.0;
                     for (int i = 0; i < numSamples; i++) {
+                        double t = (double) i / sampleRate; // time in seconds
                         double progress = (double) i / numSamples;
-                        // Fast upward pitch sweep (440 Hz -> 960 Hz) like WhatsApp/Telegram send pop
-                        double freq = 440.0 + 520.0 * Math.pow(progress, 1.25);
+
+                        // Natural bubble/droplet pitch curve: fast initial upward snap (265 Hz -> 685 Hz)
+                        // that locks into the resonant sweet spot within ~22ms
+                        double pitchCurve = 1.0 - Math.exp(-t / 0.011);
+                        double freq = 265.0 + 420.0 * pitchCurve;
                         phase += (2.0 * Math.PI * freq) / sampleRate;
-                        // Punchy attack (first 8%) + full-bodied sustain/decay for higher perceived loudness
-                        double env = (progress < 0.08)
-                                ? (progress / 0.08)
-                                : Math.exp(-2.65 * (progress - 0.08));
-                        // Rich fundamental + 2nd & 3rd harmonics so phone micro-speakers project loudly
-                        double rawWave = Math.sin(phase) * 0.78
-                                + Math.sin(phase * 2.0) * 0.28
-                                + Math.sin(phase * 3.0) * 0.12;
-                        // Soft-saturating limiter (tanh) driven at 1.45x into 97% full-scale 16-bit PCM (31800)
-                        double boosted = Math.tanh(rawWave * 1.45) * env * 31800.0;
-                        pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(boosted)));
+
+                        // Smooth 2.5ms raised-cosine attack + clean natural acoustic decay
+                        double attack = (t < 0.0025)
+                                ? 0.5 * (1.0 - Math.cos(Math.PI * (t / 0.0025)))
+                                : 1.0;
+                        double decay = Math.exp(-t / 0.0165) * (1.0 - Math.pow(progress, 3.0));
+                        double env = attack * decay;
+
+                        // Pure, warm fundamental (94%) + subtle 2nd harmonic (6%) — zero harshness
+                        double body = Math.sin(phase) * 0.94 + Math.sin(phase * 2.0) * 0.06;
+
+                        // Micro tactile knock in the first 4ms so the send button feels physically responsive
+                        clickPhase += (2.0 * Math.PI * 1080.0) / sampleRate;
+                        double clickEnv = Math.exp(-t / 0.0016);
+                        double tactileClick = Math.sin(clickPhase) * clickEnv * 0.18;
+
+                        double sample = (body * env + tactileClick) * 30200.0;
+                        pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
                     }
                     playSynthesizedPcm(pcm, sampleRate);
                 } catch (Throwable ignored) {}
@@ -844,8 +862,13 @@ public class VeilHybridNotificationManager {
     }
 
     /**
-     * Plays a warm, high-volume WhatsApp/Telegram-inspired inbound message received two-tone
-     * chime when a message arrives in the active foreground chat.
+     * Plays a warm, dopamine-rewarding acoustic marimba/kalimba double-pop (C5 -> G5 perfect fifth)
+     * when a message arrives in the active foreground chat.
+     *
+     * Acoustic architecture (96 ms total, zero distortion):
+     *  - Note 1 (0–34 ms): Soft wooden mallet tap at 523.25 Hz (C5) with fast natural damping.
+     *  - Note 2 (32–96 ms): Bright, consonant perfect-fifth bloom at 783.99 Hz (G5) with a delicate
+     *    transient sparkle (1568 Hz octave harmonic that decays in 8 ms) for a crisp "water-drop / kalimba" finish.
      */
     public void playMessageReceivedInChatSound() {
         try {
@@ -856,28 +879,40 @@ public class VeilHybridNotificationManager {
             new Thread(() -> {
                 try {
                     final int sampleRate = 44100;
-                    final int durationMs = 185;
+                    final int durationMs = 96;
                     final int numSamples = (sampleRate * durationMs) / 1000;
                     final short[] pcm = new short[numSamples];
-                    final int splitSample = (int) (numSamples * 0.40);
-                    double phase = 0.0;
+                    final double note2StartSec = 0.032; // Second note starts at 32ms
+                    double phase1 = 0.0;
+                    double phase2 = 0.0;
+
                     for (int i = 0; i < numSamples; i++) {
-                        boolean secondNote = i >= splitSample;
-                        double localProgress = secondNote
-                                ? (double) (i - splitSample) / (numSamples - splitSample)
-                                : (double) i / splitSample;
-                        // Note 1: E5 (659.25 Hz) -> Note 2: B5 (987.77 Hz) bright, resonant fifth interval
-                        double freq = secondNote ? 987.77 : 659.25;
-                        phase += (2.0 * Math.PI * freq) / sampleRate;
-                        double env = (localProgress < 0.06)
-                                ? (localProgress / 0.06)
-                                : Math.exp(-2.35 * (localProgress - 0.06));
-                        double rawWave = Math.sin(phase) * 0.76
-                                + Math.sin(phase * 2.0) * 0.30
-                                + Math.sin(phase * 3.0) * 0.14;
-                        // Soft-saturating limiter driven at 1.5x into 98% full-scale 16-bit PCM (32100)
-                        double boosted = Math.tanh(rawWave * 1.50) * env * 32100.0;
-                        pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(boosted)));
+                        double t = (double) i / sampleRate;
+                        double out = 0.0;
+
+                        // Note 1: Warm C5 (523.25 Hz) wooden tap
+                        double freq1 = 523.25;
+                        phase1 += (2.0 * Math.PI * freq1) / sampleRate;
+                        double attack1 = (t < 0.002) ? 0.5 * (1.0 - Math.cos(Math.PI * (t / 0.002))) : 1.0;
+                        double decay1 = Math.exp(-t / 0.013);
+                        double sparkle1 = Math.sin(phase1 * 2.0) * 0.10 * Math.exp(-t / 0.005);
+                        out += (Math.sin(phase1) * 0.90 + sparkle1) * attack1 * decay1 * 0.78;
+
+                        // Note 2: Consonant G5 (783.99 Hz) perfect-fifth bloom overlapping naturally at 32ms
+                        if (t >= note2StartSec) {
+                            double t2 = t - note2StartSec;
+                            double tailProgress = t2 / ((durationMs / 1000.0) - note2StartSec);
+                            double freq2 = 783.99;
+                            phase2 += (2.0 * Math.PI * freq2) / sampleRate;
+                            double attack2 = (t2 < 0.0022) ? 0.5 * (1.0 - Math.cos(Math.PI * (t2 / 0.0022))) : 1.0;
+                            double decay2 = Math.exp(-t2 / 0.019) * (1.0 - Math.pow(Math.min(1.0, tailProgress), 3.0));
+                            // Delicate crystal-droplet octave harmonic on the initial mallet strike
+                            double sparkle2 = Math.sin(phase2 * 2.0) * 0.12 * Math.exp(-t2 / 0.006);
+                            out += (Math.sin(phase2) * 0.92 + sparkle2) * attack2 * decay2 * 0.96;
+                        }
+
+                        double sample = out * 30500.0;
+                        pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample)));
                     }
                     playSynthesizedPcm(pcm, sampleRate);
                 } catch (Throwable ignored) {}
@@ -887,11 +922,10 @@ public class VeilHybridNotificationManager {
 
     private void playSynthesizedPcm(@NonNull short[] pcm, int sampleRate) {
         AudioTrack track = null;
-        android.media.audiofx.LoudnessEnhancer enhancer = null;
         try {
             int byteCount = pcm.length * 2;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                // Route through USAGE_MEDIA so OEM system-sound attenuators do not muffle the chime
+                // Route through USAGE_MEDIA at full clean headroom so OEM system-sound attenuators do not muffle it
                 AudioAttributes attrs = new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -909,26 +943,12 @@ public class VeilHybridNotificationManager {
                         byteCount, AudioTrack.MODE_STATIC);
                 track.setStereoVolume(AudioTrack.getMaxVolume(), AudioTrack.getMaxVolume());
             }
-            try {
-                int sessionId = track.getAudioSessionId();
-                if (sessionId != AudioManager.ERROR && sessionId != 0) {
-                    enhancer = new android.media.audiofx.LoudnessEnhancer(sessionId);
-                    enhancer.setTargetGain(600); // +6.0 dB hardware loudness boost
-                    enhancer.setEnabled(true);
-                }
-            } catch (Throwable ignored) {}
             track.write(pcm, 0, pcm.length);
             track.play();
-            long sleepMs = Math.max(200L, (pcm.length * 1000L) / sampleRate + 45L);
+            long sleepMs = Math.max(140L, (pcm.length * 1000L) / sampleRate + 35L);
             Thread.sleep(sleepMs);
         } catch (Throwable ignored) {
         } finally {
-            if (enhancer != null) {
-                try {
-                    enhancer.setEnabled(false);
-                    enhancer.release();
-                } catch (Throwable ignored) {}
-            }
             if (track != null) {
                 try {
                     track.stop();
