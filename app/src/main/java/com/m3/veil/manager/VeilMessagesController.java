@@ -576,33 +576,41 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
      * Reload active user credentials from Veil preferences.
      */
     public void reloadCurrentIdentity() {
-        android.content.SharedPreferences prefs = mContext.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE);
-        this.mCurrentUserId = prefs.getString("user_id", null);
-        if (this.mCurrentUserId == null) {
-            this.mCurrentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(mContext);
+        VeilFeatureManager fm = VeilFeatureManager.getInstance(mContext);
+        String effectiveUid = fm.getActiveEffectiveUserId();
+        if (effectiveUid == null || effectiveUid.trim().isEmpty()) {
+            effectiveUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(mContext);
         }
-        if (this.mCurrentUserId == null) {
-            this.mCurrentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(mContext).getCurrentUserId();
+        if (effectiveUid == null || effectiveUid.trim().isEmpty()) {
+            effectiveUid = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(mContext).getCurrentUserId();
         }
-        String candidate = prefs.getString("username", null);
-        if (VeilFeatureManager.isShadowVeilOrGeneric(candidate)) {
-            candidate = VeilFeatureManager.getInstance(mContext).getActivePersona().getDisplayName();
+        this.mCurrentUserId = effectiveUid;
+
+        com.m3.veil.model.Persona activePersona = fm.getActivePersona();
+        String activePersonaId = fm.getActivePersonaId();
+        boolean isSecondaryPersona = activePersonaId != null && !"persona_primary".equals(activePersonaId);
+        if (isSecondaryPersona && activePersona != null && !VeilFeatureManager.isShadowVeilOrGeneric(activePersona.getDisplayName())) {
+            this.mCurrentUserName = activePersona.getDisplayName();
+        } else {
+            android.content.SharedPreferences prefs = mContext.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE);
+            String candidate = prefs.getString("display_name", null);
+            if (VeilFeatureManager.isShadowVeilOrGeneric(candidate)) {
+                candidate = prefs.getString("username", null);
+            }
+            if (VeilFeatureManager.isShadowVeilOrGeneric(candidate) && activePersona != null) {
+                candidate = activePersona.getDisplayName();
+            }
+            this.mCurrentUserName = !VeilFeatureManager.isShadowVeilOrGeneric(candidate) ? candidate : "User";
         }
-        this.mCurrentUserName = !VeilFeatureManager.isShadowVeilOrGeneric(candidate) ? candidate : "User";
     }
 
     public String getCurrentUserId() {
-        if (mCurrentUserId == null) reloadCurrentIdentity();
+        reloadCurrentIdentity();
         return mCurrentUserId;
     }
 
     public String getCurrentUserName() {
-        if (VeilFeatureManager.isShadowVeilOrGeneric(mCurrentUserName)) {
-            String activeName = VeilFeatureManager.getInstance(mContext).getActivePersona().getDisplayName();
-            if (!VeilFeatureManager.isShadowVeilOrGeneric(activeName)) {
-                mCurrentUserName = activeName;
-            }
-        }
+        reloadCurrentIdentity();
         return mCurrentUserName;
     }
 
@@ -621,9 +629,16 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     public synchronized void switchActivePersonaVault() {
         this.mDatabase = EncryptedChatDatabase.getInstance(mContext);
         reloadCurrentIdentity();
+        try {
+            if (this.mCurrentUserId != null && !this.mCurrentUserId.isEmpty()) {
+                WebRtcManager.getInstance(mContext).init(this.mCurrentUserId);
+            }
+        } catch (Throwable ignored) {}
         clearStaticLayoutCache();
         mDialogMessages.clear();
         mMessagesById.clear();
+        mDialogsDict.clear();
+        mSortedDialogsList.clear();
         preloadDialogsCache();
     }
 
@@ -4593,6 +4608,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
      */
     public void deleteConversation(String dialogId, String recipientId, boolean deleteForBoth) {
         if (dialogId == null) return;
+        mDatabase.recordChatDeletedWatermark(dialogId);
+        mDatabase.purgeRemoteChatMessagesAsync(dialogId);
         mStageQueue.post(() -> {
             List<String> targetPeers = resolveTargetPeers(dialogId, recipientId, null);
             if (deleteForBoth && !targetPeers.isEmpty()) {
@@ -4613,6 +4630,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
      */
     public void clearConversationHistory(String dialogId, String recipientId, boolean clearForBoth) {
         if (dialogId == null) return;
+        mDatabase.recordChatDeletedWatermark(dialogId);
+        mDatabase.purgeRemoteChatMessagesAsync(dialogId);
         mStageQueue.post(() -> {
             List<String> targetPeers = resolveTargetPeers(dialogId, recipientId, null);
             if (clearForBoth && !targetPeers.isEmpty()) {
@@ -4640,6 +4659,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
      */
     public void wipeDialog(String dialogId) {
         if (dialogId == null) return;
+        mDatabase.recordChatDeletedWatermark(dialogId);
         mStageQueue.post(() -> {
             List<Message> msgs = getLoadedMessages(dialogId);
             for (Message m : msgs) {

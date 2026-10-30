@@ -1561,9 +1561,97 @@ public class ChatActivity extends AppCompatActivity {
                 }
             }
 
+            private boolean isFormattingMarkdown = false;
+
             @Override
-            public void afterTextChanged(Editable s) {}
+            public void afterTextChanged(Editable s) {
+                if (isFormattingMarkdown || s == null) return;
+                isFormattingMarkdown = true;
+                try {
+                    applyLiveInlineMarkdownFormatting(s);
+                } catch (Throwable ignored) {
+                } finally {
+                    isFormattingMarkdown = false;
+                }
+            }
         });
+    }
+
+    private static final class LiveMarkdownMarkerSpan {}
+
+    private void applyLiveInlineMarkdownFormatting(Editable s) {
+        if (s == null) return;
+        LiveMarkdownMarkerSpan[] markers = s.getSpans(0, s.length(), LiveMarkdownMarkerSpan.class);
+        for (LiveMarkdownMarkerSpan marker : markers) {
+            s.removeSpan(marker);
+        }
+        android.text.style.CharacterStyle[] oldSpans = s.getSpans(0, s.length(), android.text.style.CharacterStyle.class);
+        for (android.text.style.CharacterStyle span : oldSpans) {
+            if (span instanceof android.text.style.StyleSpan
+                    || span instanceof android.text.style.StrikethroughSpan
+                    || span instanceof android.text.style.TypefaceSpan
+                    || span instanceof android.text.style.ScaleXSpan
+                    || span instanceof android.text.style.ForegroundColorSpan
+                    || span instanceof android.text.style.BackgroundColorSpan) {
+                s.removeSpan(span);
+            }
+        }
+        String text = s.toString();
+        if (text.length() < 3) return;
+
+        // Bold: *text*
+        applyDelimitedMarkdownRule(s, text, '*', 1);
+        // Italic: _text_
+        applyDelimitedMarkdownRule(s, text, '_', 2);
+        // Strikethrough: ~text~
+        applyDelimitedMarkdownRule(s, text, '~', 3);
+        // Monospace: `text`
+        applyDelimitedMarkdownRule(s, text, '`', 4);
+    }
+
+    private void applyDelimitedMarkdownRule(Editable s, String text, char delim, int styleMode) {
+        int len = text.length();
+        int i = 0;
+        while (i < len - 2) {
+            if (text.charAt(i) == delim) {
+                // Ensure opening delimiter is not followed immediately by whitespace or another same delimiter
+                if (i + 1 < len && text.charAt(i + 1) != delim && !Character.isWhitespace(text.charAt(i + 1))) {
+                    int closeIdx = -1;
+                    for (int j = i + 2; j < len; j++) {
+                        char c = text.charAt(j);
+                        if (c == '\n') break;
+                        if (c == delim && !Character.isWhitespace(text.charAt(j - 1))) {
+                            closeIdx = j;
+                            break;
+                        }
+                    }
+                    if (closeIdx > i + 1) {
+                        int innerStart = i + 1;
+                        int innerEnd = closeIdx;
+                        int flags = android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE;
+                        // Visually collapse opening and closing delimiter characters so *text* shows as bold text without *
+                        s.setSpan(new android.text.style.ScaleXSpan(0.0f), i, i + 1, flags);
+                        s.setSpan(new android.text.style.ForegroundColorSpan(Color.TRANSPARENT), i, i + 1, flags);
+                        s.setSpan(new android.text.style.ScaleXSpan(0.0f), closeIdx, closeIdx + 1, flags);
+                        s.setSpan(new android.text.style.ForegroundColorSpan(Color.TRANSPARENT), closeIdx, closeIdx + 1, flags);
+
+                        if (styleMode == 1) {
+                            s.setSpan(new android.text.style.StyleSpan(Typeface.BOLD), innerStart, innerEnd, flags);
+                        } else if (styleMode == 2) {
+                            s.setSpan(new android.text.style.StyleSpan(Typeface.ITALIC), innerStart, innerEnd, flags);
+                        } else if (styleMode == 3) {
+                            s.setSpan(new android.text.style.StrikethroughSpan(), innerStart, innerEnd, flags);
+                        } else if (styleMode == 4) {
+                            s.setSpan(new android.text.style.TypefaceSpan("monospace"), innerStart, innerEnd, flags);
+                            s.setSpan(new android.text.style.BackgroundColorSpan(0x2200E5FF), innerStart, innerEnd, flags);
+                        }
+                        i = closeIdx + 1;
+                        continue;
+                    }
+                }
+            }
+            i++;
+        }
     }
 
     private void showAttachmentBottomSheet() {
@@ -1820,20 +1908,22 @@ public class ChatActivity extends AppCompatActivity {
                         || mimeLower.contains("gif")
                         || uriLower.endsWith(".gif")
                         || "gif".equalsIgnoreCase(mediaType);
-                boolean isExplicitStickerPath = mimeLower.contains("webp")
+                boolean isKeyboardOrExplicitSticker = "sticker".equalsIgnoreCase(mediaType)
+                        || mimeLower.contains("webp")
                         || uriLower.endsWith(".webp")
                         || uriLower.contains("sticker")
                         || uriLower.contains("emoji_kitchen")
-                        || uriLower.contains("bitmoji");
-                boolean isGifChoice = isGifBinary && !isExplicitStickerPath;
-                boolean isSticker = !isGifChoice && ("sticker".equalsIgnoreCase(mediaType) || isExplicitStickerPath);
-                String effectiveType = isGifChoice ? "gif" : (isSticker ? "sticker" : mediaType);
+                        || uriLower.contains("bitmoji")
+                        || com.m3.veil.utils.VeilStickerGifEngine.isLikelyKeyboardStickerFile(tempRaw, mimeLower, uriLower);
+                boolean isGifChoice = isGifBinary && !isKeyboardOrExplicitSticker;
+                boolean isSticker = isKeyboardOrExplicitSticker;
+                String effectiveType = isSticker ? "sticker" : (isGifChoice ? "gif" : mediaType);
 
                 String ext;
-                if (isGifChoice) {
-                    ext = ".gif";
-                } else if ("sticker".equals(effectiveType)) {
+                if ("sticker".equals(effectiveType)) {
                     ext = com.m3.veil.utils.VeilStickerGifEngine.detectStickerFileExtension(tempRaw);
+                } else if (isGifChoice) {
+                    ext = ".gif";
                 } else if ("video".equals(effectiveType)) {
                     ext = ".mp4";
                 } else {
@@ -1848,7 +1938,9 @@ public class ChatActivity extends AppCompatActivity {
                     runOnUiThread(() -> showGifStickerChoiceBottomSheet(dest, null));
                 } else {
                     final String finalType = effectiveType;
-                    runOnUiThread(() -> uploadAndSendMedia(dest, finalType, caption));
+                    final String finalCaption = "sticker".equals(effectiveType) && (caption == null || caption.isEmpty())
+                            ? "[sticker]" : caption;
+                    runOnUiThread(() -> uploadAndSendMedia(dest, finalType, finalCaption));
                 }
             } catch (Exception e) {
                 runOnUiThread(() -> Toast.makeText(this, "Failed to load media: " + e.getMessage(), Toast.LENGTH_SHORT).show());
@@ -6355,6 +6447,11 @@ public class ChatActivity extends AppCompatActivity {
                                 String thumbnail = mDoc.getString("thumbnail");
                                 boolean isEdited = VeilFirestoreUtils.getSafeBoolean(mDoc, "edited", false);
                                 Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", Timestamp.now());
+                                long deletedWatermark = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this)
+                                        .getChatDeletedWatermark(chatId);
+                                if (deletedWatermark > 0L && mTs != null && mTs.toDate().getTime() <= deletedWatermark) {
+                                    continue;
+                                }
                                 boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
                                 boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
 
@@ -6590,6 +6687,11 @@ public class ChatActivity extends AppCompatActivity {
                     String thumbnail = mDoc.getString("thumbnail");
                     boolean isEdited = VeilFirestoreUtils.getSafeBoolean(mDoc, "edited", false);
                     Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", Timestamp.now());
+                    long deletedWatermark = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this)
+                            .getChatDeletedWatermark(chatId);
+                    if (deletedWatermark > 0L && mTs != null && mTs.toDate().getTime() <= deletedWatermark) {
+                        continue;
+                    }
                     boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
                     boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
 

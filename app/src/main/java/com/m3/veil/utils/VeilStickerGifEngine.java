@@ -52,8 +52,10 @@ public class VeilStickerGifEngine {
     private static final LruCache<String, int[]> DIMENSION_CACHE = new LruCache<>(256);
     private static final LruCache<String, Boolean> STICKER_DETECTION_CACHE = new LruCache<>(512);
     private static final LruCache<String, Bitmap> DIE_CUT_STICKER_CACHE = new LruCache<>(64);
-    public static final int MAX_AUTO_PLAY_LOOPS = 3;
-    private static final long AUTO_PLAY_WINDOW_MS = 8500L;
+    public static final int MAX_AUTO_PLAY_LOOPS = 2;
+    private static final long MAX_FINITE_ANIM_DURATION_MS = 3200L;
+    private static final long AUTO_PLAY_WINDOW_MS = 3800L;
+    private static final android.os.Handler MAIN_ANIM_HANDLER = new android.os.Handler(android.os.Looper.getMainLooper());
     private static final java.util.concurrent.ConcurrentHashMap<String, Long> FIRST_AUTO_PLAY_START_MS =
             new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -439,94 +441,176 @@ public class VeilStickerGifEngine {
         String bindKey = "veil_anim_emoji_" + (message != null && message.getId() != null ? message.getId() : "") + "_" + emoji;
         Object existingTag = imageView.getTag();
         if (bindKey.equals(existingTag) && imageView.getDrawable() instanceof com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) {
-            com.m3.veil.ui.views.VeilAnimatedEmojiDrawable existing =
-                    (com.m3.veil.ui.views.VeilAnimatedEmojiDrawable) imageView.getDrawable();
-            if (!existing.isRunning()) {
-                existing.start();
-            }
             return;
         }
+        boolean autoStart = shouldAutoPlayOnce(message);
         com.m3.veil.ui.views.VeilAnimatedEmojiDrawable drawable =
                 new com.m3.veil.ui.views.VeilAnimatedEmojiDrawable(context, emoji);
         imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         imageView.setImageDrawable(drawable);
         imageView.setTag(bindKey);
-        drawable.start();
+        if (autoStart) {
+            drawable.start();
+        } else {
+            drawable.stop();
+        }
     }
 
+    /**
+     * Returns true ONLY if the bitmap is a genuine die-cut transparent sticker whose outer perimeter
+     * AND inset ring (at 8% and 14% inward from edges) are predominantly transparent—NOT merely a
+     * rounded-rectangle keyboard sticker card that has transparent 2px corners around a solid/bordered box.
+     */
     public static boolean hasTransparentCorners(@Nullable Bitmap bmp) {
-        if (bmp == null || bmp.getWidth() < 4 || bmp.getHeight() < 4) return false;
+        if (bmp == null || bmp.getWidth() < 8 || bmp.getHeight() < 8) return false;
         int w = bmp.getWidth();
         int h = bmp.getHeight();
-        int transparentCount = 0;
-        if (Color.alpha(bmp.getPixel(0, 0)) < 40) transparentCount++;
-        if (Color.alpha(bmp.getPixel(w - 1, 0)) < 40) transparentCount++;
-        if (Color.alpha(bmp.getPixel(0, h - 1)) < 40) transparentCount++;
-        if (Color.alpha(bmp.getPixel(w - 1, h - 1)) < 40) transparentCount++;
-        return transparentCount >= 2;
+        int transparentExtreme = 0;
+        if (Color.alpha(bmp.getPixel(0, 0)) < 40) transparentExtreme++;
+        if (Color.alpha(bmp.getPixel(w - 1, 0)) < 40) transparentExtreme++;
+        if (Color.alpha(bmp.getPixel(0, h - 1)) < 40) transparentExtreme++;
+        if (Color.alpha(bmp.getPixel(w - 1, h - 1)) < 40) transparentExtreme++;
+        if (transparentExtreme < 2) return false;
+
+        // Verify inset ring at 9% and 15% from edges so rounded-corner white/solid keyboard sticker cards
+        // are NOT mistaken for already-transparent die-cut stickers!
+        int insetX = Math.max(3, Math.round(w * 0.10f));
+        int insetY = Math.max(3, Math.round(h * 0.10f));
+        int insetSamples = 0;
+        int insetTransparent = 0;
+        int stepX = Math.max(2, (w - 2 * insetX) / 12);
+        int stepY = Math.max(2, (h - 2 * insetY) / 12);
+        for (int x = insetX; x < w - insetX; x += stepX) {
+            insetSamples += 2;
+            if (Color.alpha(bmp.getPixel(x, insetY)) < 45) insetTransparent++;
+            if (Color.alpha(bmp.getPixel(x, h - 1 - insetY)) < 45) insetTransparent++;
+        }
+        for (int y = insetY; y < h - insetY; y += stepY) {
+            insetSamples += 2;
+            if (Color.alpha(bmp.getPixel(insetX, y)) < 45) insetTransparent++;
+            if (Color.alpha(bmp.getPixel(w - 1 - insetX, y)) < 45) insetTransparent++;
+        }
+        return insetSamples > 0 && ((float) insetTransparent / (float) insetSamples) >= 0.42f;
     }
 
     public static boolean hasUniformSolidCorners(@Nullable Bitmap bmp) {
         if (bmp == null || bmp.getWidth() < 8 || bmp.getHeight() < 8) return false;
         int w = bmp.getWidth();
         int h = bmp.getHeight();
-        int[] corners = new int[]{
-                bmp.getPixel(2, 2),
-                bmp.getPixel(w - 3, 2),
-                bmp.getPixel(2, h - 3),
-                bmp.getPixel(w - 3, h - 3)
-        };
-        int ref = corners[0];
-        if (Color.alpha(ref) < 220) return false;
-        int r = Color.red(ref), g = Color.green(ref), b = Color.blue(ref);
-        int matchCount = 0;
-        for (int c : corners) {
-            if (Color.alpha(c) >= 220 && colorDist(c, r, g, b) <= 16) matchCount++;
+        int[] offsets = new int[]{2, Math.max(3, Math.round(Math.min(w, h) * 0.06f)), Math.max(5, Math.round(Math.min(w, h) * 0.12f))};
+        for (int off : offsets) {
+            if (off >= w / 2 || off >= h / 2) continue;
+            int[] corners = new int[]{
+                    bmp.getPixel(off, off),
+                    bmp.getPixel(w - 1 - off, off),
+                    bmp.getPixel(off, h - 1 - off),
+                    bmp.getPixel(w - 1 - off, h - 1 - off)
+            };
+            int ref = corners[0];
+            if (Color.alpha(ref) < 180) continue;
+            int r = Color.red(ref), g = Color.green(ref), b = Color.blue(ref);
+            int matchCount = 0;
+            for (int c : corners) {
+                if (Color.alpha(c) >= 180 && colorDist(c, r, g, b) <= 32) matchCount++;
+            }
+            if (matchCount >= 3) return true;
         }
-        return matchCount >= 4;
+        return false;
     }
 
     /**
-     * Checks whether the bitmap has a genuine flat studio background box around its entire perimeter
-     * (all 4 corners + >= 85% of border perimeter pixels share the same flat color within tight tolerance).
-     * Real-world photos and meme scenes return false so their subject/background colors are never blended.
+     * Checks whether the bitmap has a studio background box or bordered sticker card around its perimeter
+     * (including Gboard / mobile keyboard stickers with rounded corners, outer border frames, or solid fills).
      */
     public static boolean hasUniformSolidBorderBox(@Nullable Bitmap bmp) {
         if (bmp == null || bmp.getWidth() < 16 || bmp.getHeight() < 16) return false;
-        if (!hasUniformSolidCorners(bmp)) return false;
         int w = bmp.getWidth();
         int h = bmp.getHeight();
-        int ref = bmp.getPixel(2, 2);
-        int r = Color.red(ref), g = Color.green(ref), b = Color.blue(ref);
-        int samples = 0;
-        int matches = 0;
-        int stepX = Math.max(1, w / 24);
-        int stepY = Math.max(1, h / 24);
-        for (int x = 2; x < w - 2; x += stepX) {
-            samples += 2;
-            if (colorDist(bmp.getPixel(x, 2), r, g, b) <= 16) matches++;
-            if (colorDist(bmp.getPixel(x, h - 3), r, g, b) <= 16) matches++;
-        }
-        for (int y = 2; y < h - 2; y += stepY) {
-            samples += 2;
-            if (colorDist(bmp.getPixel(2, y), r, g, b) <= 16) matches++;
-            if (colorDist(bmp.getPixel(w - 3, y), r, g, b) <= 16) matches++;
-        }
-        if (samples == 0 || ((float) matches / samples) < 0.85f) {
-            return false;
-        }
-        // Ensure center region is not the exact same flat color
-        int centerDiffs = 0;
-        int[] cxOffsets = new int[]{w / 2, w / 3, (w * 2) / 3};
-        int[] cyOffsets = new int[]{h / 2, h / 3, (h * 2) / 3};
-        for (int cx : cxOffsets) {
-            for (int cy : cyOffsets) {
-                if (colorDist(bmp.getPixel(cx, cy), r, g, b) > 22) {
-                    centerDiffs++;
+        int[] ringInsets = new int[]{
+                2,
+                Math.max(3, Math.round(Math.min(w, h) * 0.05f)),
+                Math.max(5, Math.round(Math.min(w, h) * 0.10f)),
+                Math.max(7, Math.round(Math.min(w, h) * 0.14f))
+        };
+        for (int inset : ringInsets) {
+            if (inset >= w / 3 || inset >= h / 3) continue;
+            int[] seedCandidates = new int[]{
+                    bmp.getPixel(inset, inset),
+                    bmp.getPixel(w / 2, inset),
+                    bmp.getPixel(inset, h / 2),
+                    bmp.getPixel(w - 1 - inset, inset)
+            };
+            for (int ref : seedCandidates) {
+                if (Color.alpha(ref) < 180) continue;
+                int r = Color.red(ref), g = Color.green(ref), b = Color.blue(ref);
+                int samples = 0;
+                int matches = 0;
+                int stepX = Math.max(1, (w - 2 * inset) / 20);
+                int stepY = Math.max(1, (h - 2 * inset) / 20);
+                for (int x = inset; x < w - inset; x += stepX) {
+                    samples += 2;
+                    int pTop = bmp.getPixel(x, inset);
+                    int pBot = bmp.getPixel(x, h - 1 - inset);
+                    if (Color.alpha(pTop) < 50 || colorDist(pTop, r, g, b) <= 32) matches++;
+                    if (Color.alpha(pBot) < 50 || colorDist(pBot, r, g, b) <= 32) matches++;
+                }
+                for (int y = inset; y < h - inset; y += stepY) {
+                    samples += 2;
+                    int pLeft = bmp.getPixel(inset, y);
+                    int pRight = bmp.getPixel(w - 1 - inset, y);
+                    if (Color.alpha(pLeft) < 50 || colorDist(pLeft, r, g, b) <= 32) matches++;
+                    if (Color.alpha(pRight) < 50 || colorDist(pRight, r, g, b) <= 32) matches++;
+                }
+                if (samples > 0 && ((float) matches / samples) >= 0.62f) {
+                    int centerDiffs = 0;
+                    int[] cxOffsets = new int[]{w / 2, w / 3, (w * 2) / 3};
+                    int[] cyOffsets = new int[]{h / 2, h / 3, (h * 2) / 3};
+                    for (int cx : cxOffsets) {
+                        for (int cy : cyOffsets) {
+                            if (colorDist(bmp.getPixel(cx, cy), r, g, b) > 20) {
+                                centerDiffs++;
+                            }
+                        }
+                    }
+                    if (centerDiffs >= 1) {
+                        return true;
+                    }
                 }
             }
         }
-        return centerDiffs >= 2;
+        return false;
+    }
+
+    /**
+     * Determines whether an incoming media file from keyboard / content commit is a sticker
+     * (WebP, PNG, sticker URI, or square-ish asset with transparent/bordered background).
+     */
+    public static boolean isLikelyKeyboardStickerFile(@Nullable File file, @Nullable String mime, @Nullable String uriString) {
+        String m = mime != null ? mime.toLowerCase(Locale.ROOT) : "";
+        String u = uriString != null ? uriString.toLowerCase(Locale.ROOT) : "";
+        if (m.contains("webp") || m.contains("png")
+                || u.endsWith(".webp") || u.endsWith(".png")
+                || u.contains("sticker") || u.contains("emoji") || u.contains("bitmoji") || u.contains("gboard")) {
+            return true;
+        }
+        if (file == null || !file.exists()) return false;
+        String ext = detectStickerFileExtension(file);
+        if (".webp".equals(ext) || ".png".equals(ext)) return true;
+        try {
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            Bitmap bmp = BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
+            if (bmp != null) {
+                int bw = bmp.getWidth();
+                int bh = bmp.getHeight();
+                float ratio = bh > 0 ? (float) bw / (float) bh : 1f;
+                boolean squareish = ratio >= 0.75f && ratio <= 1.33f;
+                boolean hasStickerBg = hasTransparentCorners(bmp) || hasUniformSolidBorderBox(bmp);
+                bmp.recycle();
+                return squareish || hasStickerBg;
+            }
+        } catch (Throwable ignored) {}
+        return false;
     }
 
     @NonNull
@@ -619,7 +703,7 @@ public class VeilStickerGifEngine {
         if (imageView == null) return;
         Drawable d = imageView.getDrawable();
         if (d instanceof Animatable) {
-            Animatable anim = (Animatable) d;
+            final Animatable anim = (Animatable) d;
             try {
                 if (anim.isRunning()) {
                     anim.stop();
@@ -629,16 +713,25 @@ public class VeilStickerGifEngine {
                 }
                 anim.start();
                 imageView.invalidate();
+                MAIN_ANIM_HANDLER.postDelayed(() -> {
+                    try {
+                        if (anim.isRunning()) {
+                            anim.stop();
+                            imageView.invalidate();
+                        }
+                    } catch (Throwable ignored) {}
+                }, MAX_FINITE_ANIM_DURATION_MS);
             } catch (Throwable ignored) {}
         }
     }
 
     // =========================================================================
-    // 3. NATIVE GIF / STICKER FILE DECODER + 3-LOOP ANIMATED DRAWABLE LOADER (WHATSAPP/TELEGRAM APPROACH)
+    // 3. NATIVE GIF / STICKER FILE DECODER + FINITE-LOOP ANIMATED DRAWABLE LOADER (WHATSAPP/TELEGRAM APPROACH)
     // =========================================================================
 
     /**
-     * Loads a 3-loop (WhatsApp/Telegram style) animated Drawable from a local .gif or animated .webp file.
+     * Loads a finite-loop (WhatsApp/Telegram style) animated Drawable from a local .gif or animated .webp file.
+     * Never loops infinitely; stops cleanly after {@link #MAX_AUTO_PLAY_LOOPS} cycles (or {@link #MAX_FINITE_ANIM_DURATION_MS}).
      */
     @Nullable
     public static Drawable loadAnimatedGifFromFile(@Nullable File file) {
@@ -653,18 +746,57 @@ public class VeilStickerGifEngine {
             boolean fitCenter) {
         if (file == null || !file.exists() || file.length() < 16) return null;
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && !stripSolidBg) {
+        if (stripSolidBg) {
+            try {
+                Movie movie = Movie.decodeFile(file.getAbsolutePath());
+                if (movie != null && movie.width() > 0 && movie.height() > 0) {
+                    MovieGifDrawable drawable = new MovieGifDrawable(movie, true, fitCenter);
+                    if (autoStart) {
+                        drawable.start();
+                    }
+                    return drawable;
+                }
+            } catch (Throwable ignored) {}
+
+            // If Movie couldn't decode (e.g. animated WebP from keyboard with solid background/border),
+            // wrap AnimatedImageDrawable in a real-time chroma-key border/background stripper!
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                try {
+                    android.graphics.ImageDecoder.Source source = android.graphics.ImageDecoder.createSource(file);
+                    Drawable decoded = android.graphics.ImageDecoder.decodeDrawable(source, (decoder, info, src) -> {
+                        decoder.setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE);
+                    });
+                    if (decoded instanceof AnimatedImageDrawable) {
+                        AnimatedImageDrawable anim = (AnimatedImageDrawable) decoded;
+                        anim.setRepeatCount(MAX_AUTO_PLAY_LOOPS - 1);
+                        ChromaKeyAnimatedDrawable wrapped = new ChromaKeyAnimatedDrawable(anim, fitCenter);
+                        if (autoStart) {
+                            wrapped.start();
+                        } else {
+                            wrapped.stop();
+                        }
+                        return wrapped;
+                    }
+                } catch (Throwable ignored) {}
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
                 android.graphics.ImageDecoder.Source source = android.graphics.ImageDecoder.createSource(file);
                 Drawable decoded = android.graphics.ImageDecoder.decodeDrawable(source, (decoder, info, src) -> {
                     decoder.setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE);
                 });
                 if (decoded instanceof AnimatedImageDrawable) {
-                    AnimatedImageDrawable anim = (AnimatedImageDrawable) decoded;
-                    // Play 3 times (1 initial pass + 2 repeats = 3 plays total) then stop cleanly (WhatsApp/Telegram approach)
+                    final AnimatedImageDrawable anim = (AnimatedImageDrawable) decoded;
                     anim.setRepeatCount(MAX_AUTO_PLAY_LOOPS - 1);
                     if (autoStart) {
                         anim.start();
+                        MAIN_ANIM_HANDLER.postDelayed(() -> {
+                            try {
+                                if (anim.isRunning()) anim.stop();
+                            } catch (Throwable ignored) {}
+                        }, MAX_FINITE_ANIM_DURATION_MS);
                     } else {
                         anim.stop();
                     }
@@ -687,8 +819,134 @@ public class VeilStickerGifEngine {
     }
 
     /**
+     * Real-time transparent wrapper for API 28+ {@link AnimatedImageDrawable} (such as Gboard animated WebP/GIF
+     * stickers that have a solid background card or border frame), stripping the border/background per frame
+     * and stopping cleanly after {@link #MAX_FINITE_ANIM_DURATION_MS}.
+     */
+    public static class ChromaKeyAnimatedDrawable extends Drawable implements Animatable {
+        private final Drawable delegate;
+        private final boolean fitCenter;
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private Bitmap frameBuffer;
+        private Canvas frameCanvas;
+        private Bitmap cachedRestingFrame;
+        private boolean running = false;
+        private long startMs = 0L;
+
+        public ChromaKeyAnimatedDrawable(@NonNull Drawable delegate, boolean fitCenter) {
+            this.delegate = delegate;
+            this.fitCenter = fitCenter;
+        }
+
+        @Override
+        public int getIntrinsicWidth() {
+            return Math.max(1, delegate.getIntrinsicWidth());
+        }
+
+        @Override
+        public int getIntrinsicHeight() {
+            return Math.max(1, delegate.getIntrinsicHeight());
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            Rect b = getBounds();
+            int dw = getIntrinsicWidth();
+            int dh = getIntrinsicHeight();
+            if (b.isEmpty() || dw <= 0 || dh <= 0) return;
+
+            if (running) {
+                long elapsed = SystemClock.uptimeMillis() - startMs;
+                if (elapsed >= MAX_FINITE_ANIM_DURATION_MS) {
+                    stop();
+                }
+            }
+
+            float scaleX = (float) b.width() / (float) dw;
+            float scaleY = (float) b.height() / (float) dh;
+            float scale = fitCenter ? Math.min(scaleX, scaleY) : Math.max(scaleX, scaleY);
+            float dx = b.left + (b.width() - dw * scale) * 0.5f;
+            float dy = b.top + (b.height() - dh * scale) * 0.5f;
+
+            if (!running && cachedRestingFrame != null && !cachedRestingFrame.isRecycled()) {
+                canvas.save();
+                canvas.translate(dx, dy);
+                canvas.scale(scale, scale);
+                canvas.drawBitmap(cachedRestingFrame, 0f, 0f, paint);
+                canvas.restore();
+                return;
+            }
+
+            if (frameBuffer == null || frameBuffer.getWidth() != dw || frameBuffer.getHeight() != dh) {
+                frameBuffer = Bitmap.createBitmap(dw, dh, Bitmap.Config.ARGB_8888);
+                frameCanvas = new Canvas(frameBuffer);
+            }
+            frameBuffer.eraseColor(Color.TRANSPARENT);
+            delegate.setBounds(0, 0, dw, dh);
+            delegate.draw(frameCanvas);
+            Bitmap stripped = stripSolidBorderBackgroundIfPresent(frameBuffer);
+            if (!running || cachedRestingFrame == null) {
+                cachedRestingFrame = stripped;
+            }
+
+            canvas.save();
+            canvas.translate(dx, dy);
+            canvas.scale(scale, scale);
+            canvas.drawBitmap(stripped, 0f, 0f, paint);
+            canvas.restore();
+
+            if (running) {
+                invalidateSelf();
+            }
+        }
+
+        @Override
+        public void start() {
+            startMs = SystemClock.uptimeMillis();
+            running = true;
+            if (delegate instanceof Animatable) {
+                try {
+                    ((Animatable) delegate).start();
+                } catch (Throwable ignored) {}
+            }
+            invalidateSelf();
+        }
+
+        @Override
+        public void stop() {
+            running = false;
+            if (delegate instanceof Animatable) {
+                try {
+                    ((Animatable) delegate).stop();
+                } catch (Throwable ignored) {}
+            }
+            invalidateSelf();
+        }
+
+        @Override
+        public boolean isRunning() {
+            return running;
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            paint.setAlpha(alpha);
+        }
+
+        @Override
+        public void setColorFilter(@Nullable android.graphics.ColorFilter colorFilter) {
+            paint.setColorFilter(colorFilter);
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
+    }
+
+    /**
      * Binds either a built-in animated GIF preset (`[GIF:...]`) or a local `.gif` file into an ImageView.
-     * Plays 3 loops on display (WhatsApp/Telegram approach) and replays 3 loops on tap.
+     * Plays 2 loops on display (WhatsApp/Telegram approach) and replays 2 loops on tap.
      */
     public static boolean bindGifToImageView(
             @NonNull Context context,
@@ -706,7 +964,7 @@ public class VeilStickerGifEngine {
                 + "_" + (gifFile != null ? gifFile.getAbsolutePath() : text);
         Object existingTag = targetView.getTag();
         if (bindKey.equals(existingTag) && targetView.getDrawable() instanceof Animatable) {
-            // Preserve existing Drawable across RecyclerView re-binds so 3-loop playback is never interrupted
+            // Preserve existing Drawable across RecyclerView re-binds so finite playback is never restarted
             return true;
         }
 
@@ -767,7 +1025,7 @@ public class VeilStickerGifEngine {
 
     /**
      * Binds a WhatsApp/Telegram-style chromeless, borderless, transparent sticker into an ImageView.
-     * Plays 3 cycles on display (WhatsApp/Telegram approach) and replays on tap.
+     * Plays 2 cycles on display (WhatsApp/Telegram approach) and replays on tap.
      */
     public static void bindStickerToImageView(
             @NonNull Context context,
@@ -809,7 +1067,7 @@ public class VeilStickerGifEngine {
                         frameW = firstFrame.getWidth();
                         frameH = firstFrame.getHeight();
                         if (!hasTransparentCorners(firstFrame)) {
-                            needsSolidBorderStrip = hasUniformSolidBorderBox(firstFrame);
+                            needsSolidBorderStrip = true;
                         }
                     }
                 } catch (Throwable ignored) {}
@@ -920,12 +1178,11 @@ public class VeilStickerGifEngine {
     }
 
     /**
-     * Accurately prepares a custom/keyboard sticker bitmap without blurry color blending:
-     * - If the image already has transparent corners, returns it untouched at 100% sharpness.
-     * - If the image has a genuine uniform flat studio border box (e.g. white/black box around a character),
-     *   flood-fills ONLY that flat border color with tight tolerance (18) and crisp 1px edge anti-aliasing.
-     * - If the image is a real-world photo, video frame, or meme scene, preserves 100% of original subject
-     *   and scene colors with clean rounded sticker corners (zero muddy chroma-key bleeding!).
+     * Multi-stage die-cut sticker background & border remover for Gboard, Samsung Keyboard, and custom stickers:
+     * - Preserves already-transparent die-cut stickers untouched.
+     * - Detects and strips outer border frames (1px-10px stroke around sticker cards), rounded-corner
+     *   white/dark/colored card backgrounds, and studio solid backgrounds via multi-seed flood-fill
+     *   with smooth 2px contour alpha feathering.
      */
     @NonNull
     public static Bitmap stripSolidBorderBackgroundIfPresent(@NonNull Bitmap src) {
@@ -933,36 +1190,46 @@ public class VeilStickerGifEngine {
             int w = src.getWidth();
             int h = src.getHeight();
             if (w < 8 || h < 8) return src;
-            // 1. Already transparent sticker -> return untouched (zero pixel alteration)
+            // 1. Genuine transparent die-cut sticker -> return untouched (zero pixel alteration)
             if (hasTransparentCorners(src)) {
                 return src;
-            }
-            // 2. Real photo / meme scene without a flat uniform studio border box ->
-            //    keep 100% crisp original colors and apply clean rounded sticker corners!
-            if (!hasUniformSolidBorderBox(src)) {
-                return applyCrispRoundedStickerCorners(src);
             }
 
             Bitmap out = src.copy(Bitmap.Config.ARGB_8888, true);
             int[] pixels = new int[w * h];
             out.getPixels(pixels, 0, w, 0, 0, w, h);
 
-            int cRef = pixels[2 * w + 2];
-            int sr = Color.red(cRef), sg = Color.green(cRef), sb = Color.blue(cRef);
+            // Sample multiple inset rings (2px, 5%, 10%, 14%) to capture both outer border stroke color (seed1)
+            // and inner card background fill color (seed2)
+            int insetEdge = 2;
+            int insetMid = Math.max(4, Math.round(Math.min(w, h) * 0.06f));
+            int insetInner = Math.max(7, Math.round(Math.min(w, h) * 0.11f));
+
+            int cEdge = findDominantRingColor(pixels, w, h, insetEdge);
+            int cMid = findDominantRingColor(pixels, w, h, insetMid);
+            int cInner = findDominantRingColor(pixels, w, h, insetInner);
+
+            int sr1 = Color.red(cEdge), sg1 = Color.green(cEdge), sb1 = Color.blue(cEdge);
+            int sr2 = Color.red(cMid), sg2 = Color.green(cMid), sb2 = Color.blue(cMid);
+            int sr3 = Color.red(cInner), sg3 = Color.green(cInner), sb3 = Color.blue(cInner);
 
             boolean[] visited = new boolean[w * h];
             int[] queue = new int[w * h];
             int head = 0, tail = 0;
 
-            int tolerance = 18;
+            int tolerance = 30;
+            int borderMarginX = Math.max(6, Math.round(w * 0.13f));
+            int borderMarginY = Math.max(6, Math.round(h * 0.13f));
+
+            // Seed from all 4 outer edges AND any transparent rounded-corner margin pixels
             for (int x = 0; x < w; x++) {
                 int topIdx = x;
                 int botIdx = (h - 1) * w + x;
-                if (matchesSingleBgSeed(pixels[topIdx], sr, sg, sb, tolerance)) {
+                if (matchesMultiBgSeed(pixels[topIdx], sr1, sg1, sb1, sr2, sg2, sb2, sr3, sg3, sb3, tolerance)) {
                     visited[topIdx] = true;
                     queue[tail++] = topIdx;
                 }
-                if (!visited[botIdx] && matchesSingleBgSeed(pixels[botIdx], sr, sg, sb, tolerance)) {
+                if (!visited[botIdx] && matchesMultiBgSeed(pixels[botIdx], sr1, sg1, sb1, sr2, sg2, sb2, sr3, sg3, sb3, tolerance)) {
                     visited[botIdx] = true;
                     queue[tail++] = botIdx;
                 }
@@ -970,11 +1237,11 @@ public class VeilStickerGifEngine {
             for (int y = 0; y < h; y++) {
                 int leftIdx = y * w;
                 int rightIdx = y * w + (w - 1);
-                if (!visited[leftIdx] && matchesSingleBgSeed(pixels[leftIdx], sr, sg, sb, tolerance)) {
+                if (!visited[leftIdx] && matchesMultiBgSeed(pixels[leftIdx], sr1, sg1, sb1, sr2, sg2, sb2, sr3, sg3, sb3, tolerance)) {
                     visited[leftIdx] = true;
                     queue[tail++] = leftIdx;
                 }
-                if (!visited[rightIdx] && matchesSingleBgSeed(pixels[rightIdx], sr, sg, sb, tolerance)) {
+                if (!visited[rightIdx] && matchesMultiBgSeed(pixels[rightIdx], sr1, sg1, sb1, sr2, sg2, sb2, sr3, sg3, sb3, tolerance)) {
                     visited[rightIdx] = true;
                     queue[tail++] = rightIdx;
                 }
@@ -985,56 +1252,71 @@ public class VeilStickerGifEngine {
                 pixels[idx] = Color.TRANSPARENT;
                 int x = idx % w;
                 int y = idx / w;
+                boolean inOuterBorderBand = (x < borderMarginX || x >= w - borderMarginX || y < borderMarginY || y >= h - borderMarginY);
+                int activeTol = inOuterBorderBand ? (tolerance + 12) : tolerance;
+
                 if (x > 0) {
                     int n = idx - 1;
-                    if (!visited[n] && matchesSingleBgSeed(pixels[n], sr, sg, sb, tolerance)) {
+                    if (!visited[n] && matchesBgOrBorder(pixels[n], inOuterBorderBand, sr1, sg1, sb1, sr2, sg2, sb2, sr3, sg3, sb3, activeTol)) {
                         visited[n] = true;
                         queue[tail++] = n;
                     }
                 }
                 if (x + 1 < w) {
                     int n = idx + 1;
-                    if (!visited[n] && matchesSingleBgSeed(pixels[n], sr, sg, sb, tolerance)) {
+                    if (!visited[n] && matchesBgOrBorder(pixels[n], inOuterBorderBand, sr1, sg1, sb1, sr2, sg2, sb2, sr3, sg3, sb3, activeTol)) {
                         visited[n] = true;
                         queue[tail++] = n;
                     }
                 }
                 if (y > 0) {
                     int n = idx - w;
-                    if (!visited[n] && matchesSingleBgSeed(pixels[n], sr, sg, sb, tolerance)) {
+                    if (!visited[n] && matchesBgOrBorder(pixels[n], inOuterBorderBand, sr1, sg1, sb1, sr2, sg2, sb2, sr3, sg3, sb3, activeTol)) {
                         visited[n] = true;
                         queue[tail++] = n;
                     }
                 }
                 if (y + 1 < h) {
                     int n = idx + w;
-                    if (!visited[n] && matchesSingleBgSeed(pixels[n], sr, sg, sb, tolerance)) {
+                    if (!visited[n] && matchesBgOrBorder(pixels[n], inOuterBorderBand, sr1, sg1, sb1, sr2, sg2, sb2, sr3, sg3, sb3, activeTol)) {
                         visited[n] = true;
                         queue[tail++] = n;
                     }
                 }
             }
 
-            // Safety guard: if flood-fill removed > 72% of total pixels, the subject itself shared the border color;
-            // keep crisp rounded sticker instead of a damaged cutout.
-            if (tail > (w * h * 72) / 100) {
+            // Safety guard: if flood-fill removed > 82% of total pixels (or < 3% on a full-bleed photo),
+            // apply clean die-cut sticker silhouette or return the stripped cutout
+            int totalPx = w * h;
+            if (tail > (totalPx * 82) / 100 || tail < (totalPx * 3) / 100) {
                 out.recycle();
                 return applyCrispRoundedStickerCorners(src);
             }
 
-            // Crisp 1px contour anti-aliasing without color bleeding
+            // Crisp 2px contour alpha feathering so no thin border halo remains around the sticker subject
             for (int y = 1; y < h - 1; y++) {
                 int rowOffset = y * w;
                 for (int x = 1; x < w - 1; x++) {
                     int idx = rowOffset + x;
                     if (!visited[idx]) {
-                        if (visited[idx - 1] || visited[idx + 1] || visited[idx - w] || visited[idx + w]) {
+                        int transNeighbors = 0;
+                        if (visited[idx - 1]) transNeighbors++;
+                        if (visited[idx + 1]) transNeighbors++;
+                        if (visited[idx - w]) transNeighbors++;
+                        if (visited[idx + w]) transNeighbors++;
+                        if (transNeighbors > 0) {
                             int px = pixels[idx];
-                            int dist = colorDist(px, sr, sg, sb);
-                            if (dist < tolerance + 6) {
+                            int d1 = colorDist(px, sr1, sg1, sb1);
+                            int d2 = colorDist(px, sr2, sg2, sb2);
+                            int d3 = colorDist(px, sr3, sg3, sb3);
+                            int minDist = Math.min(d1, Math.min(d2, d3));
+                            if (minDist < tolerance + 16) {
                                 int origA = Color.alpha(px);
-                                int softA = Math.min(origA, Math.max(96, (dist - tolerance / 2) * 255 / 12));
+                                int softA = Math.min(origA, Math.max(0, (minDist - tolerance / 2) * 255 / 22));
                                 pixels[idx] = Color.argb(softA, Color.red(px), Color.green(px), Color.blue(px));
+                            } else if (transNeighbors >= 3) {
+                                int origA = Color.alpha(px);
+                                pixels[idx] = Color.argb(origA / 2, Color.red(px), Color.green(px), Color.blue(px));
                             }
                         }
                     }
@@ -1046,6 +1328,72 @@ public class VeilStickerGifEngine {
         } catch (Exception e) {
             return src;
         }
+    }
+
+    private static int findDominantRingColor(int[] pixels, int w, int h, int inset) {
+        int safeInsetX = Math.min(Math.max(1, inset), w / 3);
+        int safeInsetY = Math.min(Math.max(1, inset), h / 3);
+        int[] candidates = new int[]{
+                pixels[safeInsetY * w + safeInsetX],
+                pixels[safeInsetY * w + (w / 2)],
+                pixels[safeInsetY * w + (w - 1 - safeInsetX)],
+                pixels[(h / 2) * w + safeInsetX],
+                pixels[(h / 2) * w + (w - 1 - safeInsetX)],
+                pixels[(h - 1 - safeInsetY) * w + safeInsetX],
+                pixels[(h - 1 - safeInsetY) * w + (w / 2)],
+                pixels[(h - 1 - safeInsetY) * w + (w - 1 - safeInsetX)]
+        };
+        int bestColor = Color.WHITE;
+        int bestScore = -1;
+        for (int c : candidates) {
+            if (Color.alpha(c) < 120) continue;
+            int r = Color.red(c), g = Color.green(c), b = Color.blue(c);
+            int score = 0;
+            for (int other : candidates) {
+                if (Color.alpha(other) >= 120 && colorDist(other, r, g, b) <= 28) {
+                    score++;
+                }
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                bestColor = c;
+            }
+        }
+        return bestColor;
+    }
+
+    private static boolean matchesMultiBgSeed(int pixel,
+                                              int r1, int g1, int b1,
+                                              int r2, int g2, int b2,
+                                              int r3, int g3, int b3,
+                                              int tol) {
+        if (Color.alpha(pixel) < 65) return true;
+        return colorDist(pixel, r1, g1, b1) <= tol
+                || colorDist(pixel, r2, g2, b2) <= tol
+                || colorDist(pixel, r3, g3, b3) <= tol;
+    }
+
+    private static boolean matchesBgOrBorder(int pixel,
+                                             boolean inOuterBorderBand,
+                                             int r1, int g1, int b1,
+                                             int r2, int g2, int b2,
+                                             int r3, int g3, int b3,
+                                             int tol) {
+        int a = Color.alpha(pixel);
+        if (a < 65) return true;
+        if (matchesMultiBgSeed(pixel, r1, g1, b1, r2, g2, b2, r3, g3, b3, tol)) {
+            return true;
+        }
+        // If inside the outer 13% border band of a keyboard sticker card, also strip neutral white/gray/black
+        // card borders & drop-shadow rings so the sticker has zero rectangular frame!
+        if (inOuterBorderBand) {
+            int r = Color.red(pixel), g = Color.green(pixel), b = Color.blue(pixel);
+            int maxDiff = Math.max(Math.abs(r - g), Math.max(Math.abs(g - b), Math.abs(r - b)));
+            if (maxDiff <= 18 && (r >= 225 || r <= 42)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @NonNull

@@ -136,20 +136,122 @@ public class VeilFeatureManager {
         return "User";
     }
 
+    public static final int MAX_FREE_PERSONAS = 2;
+
+    public interface PersonaChangeListener {
+        void onPersonaChanged(Persona activePersona);
+    }
+
+    private final List<PersonaChangeListener> personaListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public void addPersonaChangeListener(PersonaChangeListener listener) {
+        if (listener != null && !personaListeners.contains(listener)) {
+            personaListeners.add(listener);
+        }
+    }
+
+    public void removePersonaChangeListener(PersonaChangeListener listener) {
+        personaListeners.remove(listener);
+    }
+
+    private void notifyPersonaChanged(Persona active) {
+        android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        mainHandler.post(() -> {
+            for (PersonaChangeListener l : personaListeners) {
+                try {
+                    l.onPersonaChanged(active);
+                } catch (Throwable ignored) {}
+            }
+        });
+    }
+
+    public boolean isThirdPersonaPremiumUnlocked() {
+        return prefs.getBoolean("unlock_unlimited_personas", false)
+                || prefs.getBoolean("veil_premium_persona_pro", false);
+    }
+
+    public void setThirdPersonaPremiumUnlocked(boolean unlocked) {
+        prefs.edit()
+                .putBoolean("unlock_unlimited_personas", unlocked)
+                .putBoolean("veil_premium_persona_pro", unlocked)
+                .apply();
+        if (unlocked) {
+            unlockBadge("👑 Multi-Persona Pro");
+        }
+    }
+
+    public boolean canAccessPersonaIndex(int index) {
+        return index < MAX_FREE_PERSONAS || isThirdPersonaPremiumUnlocked();
+    }
+
+    public boolean isPrimaryPersonaActive() {
+        String activeId = prefs.getString("active_persona_id", "persona_primary");
+        return activeId == null || activeId.isEmpty() || "persona_primary".equals(activeId) || "default".equals(activeId);
+    }
+
+    public String resolveBaseUserId() {
+        try {
+            com.m3.veil.utils.PreferenceManager pm = new com.m3.veil.utils.PreferenceManager(appContext);
+            String sovUid = pm.getString("sovereign_uid", null);
+            if (sovUid != null && !sovUid.trim().isEmpty()) {
+                return cleanBaseUid(sovUid.trim());
+            }
+            com.m3.veil.utils.UserPreferences up = new com.m3.veil.utils.UserPreferences(appContext);
+            String uid = up.getUserId();
+            if (uid != null && !uid.trim().isEmpty()) {
+                return cleanBaseUid(uid.trim());
+            }
+            String sUid = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(appContext).getCurrentUserId();
+            if (sUid != null && !sUid.trim().isEmpty()) {
+                return cleanBaseUid(sUid.trim());
+            }
+        } catch (Throwable ignored) {}
+        return "local_user";
+    }
+
+    private static String cleanBaseUid(String uid) {
+        if (uid == null) return "local_user";
+        int idx = uid.indexOf("__persona_");
+        if (idx > 0) {
+            return uid.substring(0, idx);
+        }
+        return uid;
+    }
+
+    /**
+     * Returns the effective user ID for the currently active persona across the entire app:
+     * - For Main persona (`persona_primary`): returns the base account UID.
+     * - For Second/Third persona: returns `<baseUid>__<personaId>` so chats, calls, messages,
+     *   Firestore profile, and directory lookup operate as a completely independent identity!
+     */
+    public String getActiveEffectiveUserId() {
+        String baseUid = resolveBaseUserId();
+        String activeId = prefs.getString("active_persona_id", "persona_primary");
+        if (activeId == null || activeId.trim().isEmpty() || "persona_primary".equals(activeId) || "default".equals(activeId)) {
+            return baseUid;
+        }
+        return baseUid + "__" + activeId.trim();
+    }
+
     public void syncPrimaryPersonaWithUser(String username, String displayName, String bio, String mood) {
         try {
             String handle = (!isShadowVeilOrGeneric(username))
                     ? (username.trim().startsWith("@") ? username.trim() : "@" + username.trim())
-                    : ((!isShadowVeilOrGeneric(displayName))
-                            ? (displayName.trim().startsWith("@") ? displayName.trim() : "@" + displayName.trim())
-                            : resolveRealUserHandle());
+                    : resolveRealUserHandle();
+            String dName = (!isShadowVeilOrGeneric(displayName))
+                    ? displayName.trim()
+                    : resolveRealUserDisplayName();
             JSONArray arr = new JSONArray(prefs.getString("personas_json", "[]"));
             boolean updated = false;
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
                 if ("persona_primary".equals(o.optString("id"))) {
+                    if (!isShadowVeilOrGeneric(dName)) {
+                        o.put("name", dName);
+                        updated = true;
+                    }
                     if (!isShadowVeilOrGeneric(handle)) {
-                        o.put("name", handle);
+                        o.put("username", handle);
                         updated = true;
                     }
                     if (bio != null && !bio.trim().isEmpty()) {
@@ -172,13 +274,15 @@ public class VeilFeatureManager {
     private void ensureDefaultPersonas() {
         String json = prefs.getString("personas_json", null);
         String realHandle = resolveRealUserHandle();
+        String realDisplayName = resolveRealUserDisplayName();
         if (json == null || json.isEmpty()) {
             try {
                 JSONArray arr = new JSONArray();
 
                 JSONObject p1 = new JSONObject();
                 p1.put("id", "persona_primary");
-                p1.put("name", realHandle);
+                p1.put("name", realDisplayName);
+                p1.put("username", realHandle);
                 p1.put("bio", "Primary zero-trace identity");
                 p1.put("mood", "🛡️ Encrypted");
                 p1.put("bubbleColor", "#0B57CF");
@@ -187,17 +291,19 @@ public class VeilFeatureManager {
 
                 JSONObject p2 = new JSONObject();
                 p2.put("id", "persona_ghost");
-                p2.put("name", "@MidnightDrifter");
-                p2.put("bio", "Ephemeral night owl persona");
+                p2.put("name", "Midnight Drifter");
+                p2.put("username", "@midnight_drifter");
+                p2.put("bio", "Second persona • Isolated E2EE vault");
                 p2.put("mood", "🌙 Incognito");
                 p2.put("bubbleColor", "#6A1B9A");
-                p2.put("temporary", true);
+                p2.put("temporary", false);
                 arr.put(p2);
 
                 JSONObject p3 = new JSONObject();
                 p3.put("id", "persona_neon");
-                p3.put("name", "@CyberPulse");
-                p3.put("bio", "VeilBoard creator & debater");
+                p3.put("name", "Cyber Pulse");
+                p3.put("username", "@cyber_pulse");
+                p3.put("bio", "Pro Creator & Stealth Debater");
                 p3.put("mood", "⚡ Hyped");
                 p3.put("bubbleColor", "#00695C");
                 p3.put("temporary", false);
@@ -208,48 +314,70 @@ public class VeilFeatureManager {
                         .putString("active_persona_id", "persona_primary")
                         .apply();
             } catch (Exception ignored) {}
-        } else if (json.contains("ShadowVeil")) {
-            try {
-                JSONArray arr = new JSONArray(json);
-                boolean migrated = false;
-                for (int i = 0; i < arr.length(); i++) {
-                    JSONObject o = arr.getJSONObject(i);
-                    String name = o.optString("name");
-                    if ("persona_primary".equals(o.optString("id")) || isShadowVeilOrGeneric(name)) {
-                        o.put("name", realHandle);
-                        migrated = true;
-                    }
-                }
-                if (migrated) {
-                    prefs.edit().putString("personas_json", arr.toString()).apply();
-                }
-            } catch (Exception ignored) {}
         }
     }
 
     public List<Persona> getPersonas() {
         List<Persona> list = new ArrayList<>();
         String realHandle = resolveRealUserHandle();
+        String realDisplayName = resolveRealUserDisplayName();
         boolean needsSave = false;
+        java.util.Set<String> seenUsernames = new java.util.HashSet<>();
+        java.util.Set<String> seenNames = new java.util.HashSet<>();
+
         try {
             JSONArray arr = new JSONArray(prefs.getString("personas_json", "[]"));
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
                 String id = o.optString("id");
                 String name = o.optString("name");
-                if ("persona_primary".equals(id)) {
-                    if (isShadowVeilOrGeneric(name) || (!isShadowVeilOrGeneric(realHandle) && !realHandle.equalsIgnoreCase(name))) {
-                        name = realHandle;
+                String uname = o.optString("username");
+
+                if ("persona_primary".equals(id) || i == 0) {
+                    if (isShadowVeilOrGeneric(name)) {
+                        name = realDisplayName;
                         o.put("name", name);
                         needsSave = true;
                     }
-                } else if (isShadowVeilOrGeneric(name)) {
-                    name = realHandle;
-                    o.put("name", name);
-                    needsSave = true;
+                    if (isShadowVeilOrGeneric(uname)) {
+                        uname = realHandle;
+                        o.put("username", uname);
+                        needsSave = true;
+                    }
+                } else {
+                    // Ensure 2nd and 3rd personas NEVER show the same username or display name as Main or each other!
+                    String defaultName = (i == 1 || "persona_ghost".equals(id)) ? "Midnight Drifter"
+                            : ((i == 2 || "persona_neon".equals(id)) ? "Cyber Pulse" : ("Shadow Persona " + (i + 1)));
+                    String defaultUname = (i == 1 || "persona_ghost".equals(id)) ? "@midnight_drifter"
+                            : ((i == 2 || "persona_neon".equals(id)) ? "@cyber_pulse" : ("@persona_" + (i + 1)));
+
+                    String cleanCandidateUname = (uname != null && !uname.trim().isEmpty()) ? uname.trim() : name;
+                    if (isShadowVeilOrGeneric(name)
+                            || name.equalsIgnoreCase(realDisplayName)
+                            || name.equalsIgnoreCase(realHandle)
+                            || seenNames.contains(name.toLowerCase(java.util.Locale.ROOT))) {
+                        name = defaultName;
+                        o.put("name", name);
+                        needsSave = true;
+                    }
+                    if (isShadowVeilOrGeneric(cleanCandidateUname)
+                            || cleanCandidateUname.equalsIgnoreCase(realHandle)
+                            || cleanCandidateUname.equalsIgnoreCase(realDisplayName)
+                            || ("@" + cleanCandidateUname.replaceFirst("^@+", "")).equalsIgnoreCase(realHandle)
+                            || seenUsernames.contains(cleanCandidateUname.replaceFirst("^@+", "").toLowerCase(java.util.Locale.ROOT))) {
+                        uname = defaultUname;
+                        o.put("username", uname);
+                        needsSave = true;
+                    } else if (uname == null || uname.trim().isEmpty()) {
+                        uname = "@" + name.toLowerCase(java.util.Locale.ROOT).replaceFirst("^@+", "").replaceAll("[^a-z0-9_.]", "_");
+                        o.put("username", uname);
+                        needsSave = true;
+                    }
                 }
+
                 Persona p = new Persona(
                         id,
+                        uname,
                         name,
                         o.optString("bio"),
                         o.optString("bubbleColor", "#0B57CF"),
@@ -257,7 +385,17 @@ public class VeilFeatureManager {
                         o.optBoolean("temporary", false),
                         o.optLong("expiresAt", 0L)
                 );
+                seenNames.add(p.getDisplayName().toLowerCase(java.util.Locale.ROOT));
+                seenUsernames.add(p.getCleanUsername().toLowerCase(java.util.Locale.ROOT));
                 list.add(p);
+            }
+            // Enforce active persona cannot remain on a locked 3rd+ persona if premium is not unlocked
+            String activeId = prefs.getString("active_persona_id", "persona_primary");
+            for (int idx = 0; idx < list.size(); idx++) {
+                if (list.get(idx).getPersonaId().equals(activeId) && !canAccessPersonaIndex(idx)) {
+                    prefs.edit().putString("active_persona_id", "persona_primary").apply();
+                    break;
+                }
             }
             if (needsSave) {
                 prefs.edit().putString("personas_json", arr.toString()).apply();
@@ -269,21 +407,84 @@ public class VeilFeatureManager {
     public Persona getActivePersona() {
         String activeId = prefs.getString("active_persona_id", "persona_primary");
         List<Persona> all = getPersonas();
-        for (Persona p : all) {
-            if (p.getPersonaId().equals(activeId)) return p;
+        for (int i = 0; i < all.size(); i++) {
+            Persona p = all.get(i);
+            if (p.getPersonaId().equals(activeId)) {
+                if (!canAccessPersonaIndex(i)) {
+                    return all.get(0);
+                }
+                return p;
+            }
         }
-        return all.isEmpty() ? new Persona("persona_primary", resolveRealUserHandle(), "Encrypted user", "#0B57CF", "🛡️ Encrypted", false) : all.get(0);
+        return all.isEmpty()
+                ? new Persona("persona_primary", resolveRealUserHandle(), resolveRealUserDisplayName(), "Encrypted user", "#0B57CF", "🛡️ Encrypted", false, 0L)
+                : all.get(0);
     }
 
     public void setActivePersona(String personaId) {
+        List<Persona> all = getPersonas();
+        for (int i = 0; i < all.size(); i++) {
+            if (all.get(i).getPersonaId().equals(personaId) && !canAccessPersonaIndex(i)) {
+                return;
+            }
+        }
         prefs.edit().putString("active_persona_id", personaId).putBoolean("decoy_mode_active", false).apply();
+        appContext.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putString("active_persona_id", personaId)
+                .apply();
         com.m3.veil.database.EncryptedChatDatabase.switchActiveVault(appContext, personaId, false);
+        Persona active = getActivePersona();
+        try {
+            AuthManager.getInstance().onPersonaSwitched(appContext, personaId);
+        } catch (Throwable ignored) {}
         try {
             VeilMessagesController.getInstance(appContext).switchActivePersonaVault();
             VeilBoardController.getInstance(appContext).switchActivePersonaVault();
             StatusController.getInstance(appContext).reloadForActiveVault();
         } catch (Throwable ignored) {}
+        publishActivePersonaIdentityToDirectory(active);
+        notifyPersonaChanged(active);
         addXp(5);
+    }
+
+    private void publishActivePersonaIdentityToDirectory(Persona active) {
+        if (active == null) return;
+        new Thread(() -> {
+            try {
+                String effectiveUid = getActiveEffectiveUserId();
+                String cleanUname = active.getCleanUsername().toLowerCase(java.util.Locale.ROOT);
+                String dName = active.getDisplayName();
+                String bio = active.getBio();
+                String mood = active.getMood();
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine engine =
+                        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(appContext);
+                engine.recordClaimedUsername(cleanUname);
+
+                com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+                long now = System.currentTimeMillis();
+                java.util.Map<String, Object> userDoc = new java.util.HashMap<>();
+                userDoc.put("userId", effectiveUid);
+                userDoc.put("uid", effectiveUid);
+                userDoc.put("username", cleanUname);
+                userDoc.put("usernameLower", cleanUname);
+                userDoc.put("displayName", dName);
+                userDoc.put("bio", bio);
+                userDoc.put("status", mood);
+                userDoc.put("personaId", active.getPersonaId());
+                userDoc.put("updatedAtTimestamp", now);
+                db.collection("users").document(effectiveUid).set(userDoc, com.google.firebase.firestore.SetOptions.merge());
+
+                java.util.Map<String, Object> unameDoc = new java.util.HashMap<>();
+                unameDoc.put("userId", effectiveUid);
+                unameDoc.put("uid", effectiveUid);
+                unameDoc.put("username", cleanUname);
+                unameDoc.put("displayName", dName);
+                unameDoc.put("bio", bio);
+                unameDoc.put("updatedAtTimestamp", now);
+                db.collection("usernames").document(cleanUname).set(unameDoc, com.google.firebase.firestore.SetOptions.merge());
+            } catch (Throwable ignored) {}
+        }).start();
     }
 
     public void activateDecoyVault(boolean isDecoy) {
@@ -295,10 +496,20 @@ public class VeilFeatureManager {
             VeilBoardController.getInstance(appContext).switchActivePersonaVault();
             StatusController.getInstance(appContext).reloadForActiveVault();
         } catch (Throwable ignored) {}
+        notifyPersonaChanged(getActivePersona());
     }
 
     public boolean isDecoyVaultActive() {
         return prefs.getBoolean("decoy_mode_active", false);
+    }
+
+    public String getActivePersonaId() {
+        Persona p = getActivePersona();
+        if (p != null && p.getPersonaId() != null && !p.getPersonaId().isEmpty()) {
+            return p.getPersonaId();
+        }
+        String id = prefs.getString("active_persona_id", "persona_primary");
+        return (id == null || id.isEmpty() || "default".equals(id)) ? "persona_primary" : id;
     }
 
     public void setActivePersonaId(String personaId) {
@@ -307,20 +518,41 @@ public class VeilFeatureManager {
 
     public void updateActivePersonaDetails(String displayName, String bio) {
         String activeId = prefs.getString("active_persona_id", "persona_primary");
+        updatePersonaDetails(activeId, null, displayName, bio, null);
+    }
+
+    public void updatePersonaDetails(String personaId, String username, String displayName, String bio, String mood) {
+        if (personaId == null || personaId.isEmpty()) {
+            personaId = prefs.getString("active_persona_id", "persona_primary");
+        }
         try {
             JSONArray arr = new JSONArray(prefs.getString("personas_json", "[]"));
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
-                if (activeId.equals(o.optString("id"))) {
+                if (personaId.equals(o.optString("id"))) {
                     if (displayName != null && !displayName.trim().isEmpty()) {
-                        String clean = displayName.startsWith("@") ? displayName.trim() : "@" + displayName.trim();
-                        o.put("name", clean);
+                        String cleanDisplay = displayName.trim();
+                        if (cleanDisplay.startsWith("@") && cleanDisplay.length() > 1) {
+                            cleanDisplay = cleanDisplay.substring(1);
+                        }
+                        o.put("name", cleanDisplay);
+                    }
+                    if (username != null && !username.trim().isEmpty()) {
+                        String cleanUname = username.trim().replaceFirst("^@+", "").toLowerCase(java.util.Locale.ROOT)
+                                .replaceAll("[^a-z0-9_.]", "_");
+                        if (!cleanUname.isEmpty()) {
+                            o.put("username", "@" + cleanUname);
+                        }
                     }
                     if (bio != null) o.put("bio", bio.trim());
+                    if (mood != null && !mood.trim().isEmpty()) o.put("mood", mood.trim());
                     break;
                 }
             }
             prefs.edit().putString("personas_json", arr.toString()).apply();
+            Persona active = getActivePersona();
+            publishActivePersonaIdentityToDirectory(active);
+            notifyPersonaChanged(active);
         } catch (Exception ignored) {}
     }
 
@@ -332,17 +564,31 @@ public class VeilFeatureManager {
         return addPersona(displayName, bio, mood, bubbleColorHex, isTemporary, isTemporary ? 86400000L : 0L);
     }
 
+    public Persona addPersona(String displayName, String username, String bio, String mood, String bubbleColorHex, boolean isTemporary) {
+        return addPersonaWithUsername(username, displayName, bio, mood, bubbleColorHex, isTemporary, isTemporary ? 86400000L : 0L);
+    }
+
     public Persona addPersona(String displayName, String bio, String mood, String bubbleColorHex, boolean isTemporary, long durationMillis) {
+        return addPersonaWithUsername(null, displayName, bio, mood, bubbleColorHex, isTemporary, durationMillis);
+    }
+
+    public Persona addPersonaWithUsername(String username, String displayName, String bio, String mood, String bubbleColorHex, boolean isTemporary, long durationMillis) {
         try {
             JSONArray arr = new JSONArray(prefs.getString("personas_json", "[]"));
             String id = "persona_" + UUID.randomUUID().toString().substring(0, 6);
-            String cleanName = displayName.startsWith("@") ? displayName : "@" + displayName;
+            String cleanDisplay = (displayName != null && !displayName.trim().isEmpty())
+                    ? (displayName.trim().startsWith("@") ? displayName.trim().substring(1) : displayName.trim())
+                    : "Shadow Persona";
+            String cleanUname = (username != null && !username.trim().isEmpty())
+                    ? ("@" + username.trim().replaceFirst("^@+", "").toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_.]", "_"))
+                    : ("@" + cleanDisplay.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_.]", "_"));
             long expiresAt = (isTemporary && durationMillis > 0) ? (System.currentTimeMillis() + durationMillis) : 0L;
 
             JSONObject p = new JSONObject();
             p.put("id", id);
-            p.put("name", cleanName);
-            p.put("bio", bio);
+            p.put("name", cleanDisplay);
+            p.put("username", cleanUname);
+            p.put("bio", bio != null ? bio : "Zero-trace identity");
             p.put("mood", mood != null && !mood.isEmpty() ? mood : "🎭 Masked");
             p.put("bubbleColor", bubbleColorHex != null ? bubbleColorHex : "#0B57CF");
             p.put("temporary", isTemporary);
@@ -354,10 +600,150 @@ public class VeilFeatureManager {
                     .apply();
             setActivePersona(id);
             addXp(20);
-            return new Persona(id, cleanName, bio, bubbleColorHex, mood, isTemporary, expiresAt);
+            return new Persona(id, cleanUname, cleanDisplay, bio, bubbleColorHex, mood, isTemporary, expiresAt);
         } catch (Exception e) {
             return getActivePersona();
         }
+    }
+
+    /**
+     * Shows a rich, production-grade Veil Premium Multi-Persona Pro purchase bottom sheet
+     * when the user selects or tries to create a 3rd+ persona.
+     */
+    public void showThirdPersonaPremiumPurchaseDialog(Context activityCtx, Runnable onUnlockedCallback) {
+        if (activityCtx == null) return;
+        float dp = activityCtx.getResources().getDisplayMetrics().density;
+        com.google.android.material.bottomsheet.BottomSheetDialog dialog =
+                new com.google.android.material.bottomsheet.BottomSheetDialog(activityCtx, com.m3.veil.R.style.ModernBottomSheetDialogTheme);
+
+        android.widget.LinearLayout root = new android.widget.LinearLayout(activityCtx);
+        root.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = Math.round(22 * dp);
+        root.setPadding(pad, Math.round(18 * dp), pad, Math.round(24 * dp));
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0xFF0F172A);
+        float topR = 24f * dp;
+        bg.setCornerRadii(new float[]{topR, topR, topR, topR, 0f, 0f, 0f, 0f});
+        root.setBackground(bg);
+
+        android.widget.TextView badge = new android.widget.TextView(activityCtx);
+        badge.setText("👑 VEIL PREMIUM • MULTI-PERSONA PRO");
+        badge.setTextColor(0xFFFBBF24);
+        badge.setTextSize(11.5f);
+        badge.setTypeface(null, android.graphics.Typeface.BOLD);
+        root.addView(badge);
+
+        android.widget.TextView title = new android.widget.TextView(activityCtx);
+        title.setText("Unlock 3rd & Unlimited Personas");
+        title.setTextColor(0xFFF8FAFC);
+        title.setTextSize(20f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setPadding(0, Math.round(6 * dp), 0, Math.round(6 * dp));
+        root.addView(title);
+
+        android.widget.TextView sub = new android.widget.TextView(activityCtx);
+        sub.setText("Your Free plan includes 2 full isolated Personas (Main + Second Persona). Upgrade to Veil Premium to unlock the 3rd Persona slot, unlimited custom @usernames, 24h burner vaults, and custom neon bubble themes.");
+        sub.setTextColor(0xFF94A3B8);
+        sub.setTextSize(13.5f);
+        sub.setPadding(0, 0, 0, Math.round(16 * dp));
+        root.addView(sub);
+
+        String[] features = new String[]{
+                "✅ 3rd+ Isolated SQLCipher Encrypted Persona Vaults",
+                "✅ Independent @Username, Display Name & Avatar per Persona",
+                "✅ Full App Adoption (Chats, Calls, VeilBoard, Status & Search)",
+                "✅ 24-Hour Self-Shredding Ephemeral Burner Personas"
+        };
+        for (String feat : features) {
+            android.widget.TextView tvFeat = new android.widget.TextView(activityCtx);
+            tvFeat.setText(feat);
+            tvFeat.setTextColor(0xFFE2E8F0);
+            tvFeat.setTextSize(13f);
+            tvFeat.setPadding(0, Math.round(4 * dp), 0, Math.round(4 * dp));
+            root.addView(tvFeat);
+        }
+
+        // Plan options
+        final int[] selectedPlan = new int[]{1}; // 0=Monthly $2.99, 1=Annual $19.99, 2=VeilCoins (150 VC)
+        String[] planTitles = new String[]{
+                "Monthly Pro — $2.99 / month",
+                "Annual Sovereign Pass — $19.99 / year (Save 44%)",
+                "Redeem with VeilCoins — 150 VC (Balance: " + getVeilCoins() + " VC)"
+        };
+        final android.widget.TextView[] planViews = new android.widget.TextView[planTitles.length];
+
+        Runnable updatePlanStyles = () -> {
+            for (int i = 0; i < planViews.length; i++) {
+                boolean sel = (selectedPlan[0] == i);
+                android.graphics.drawable.GradientDrawable cardBg = new android.graphics.drawable.GradientDrawable();
+                cardBg.setCornerRadius(14f * dp);
+                cardBg.setColor(sel ? 0xFF1E293B : 0xFF111827);
+                cardBg.setStroke(Math.round((sel ? 2f : 1f) * dp), sel ? 0xFFFBBF24 : 0xFF334155);
+                planViews[i].setBackground(cardBg);
+                planViews[i].setTextColor(sel ? 0xFFFBBF24 : 0xFFCBD5E1);
+            }
+        };
+
+        for (int i = 0; i < planTitles.length; i++) {
+            final int idx = i;
+            android.widget.TextView tvPlan = new android.widget.TextView(activityCtx);
+            tvPlan.setText((i == 1 ? "⭐ " : "💎 ") + planTitles[i]);
+            tvPlan.setTextSize(13.5f);
+            tvPlan.setTypeface(null, android.graphics.Typeface.BOLD);
+            int pH = Math.round(14 * dp);
+            int pV = Math.round(12 * dp);
+            tvPlan.setPadding(pH, pV, pH, pV);
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = Math.round(10 * dp);
+            tvPlan.setLayoutParams(lp);
+            tvPlan.setOnClickListener(v -> {
+                selectedPlan[0] = idx;
+                updatePlanStyles.run();
+            });
+            planViews[i] = tvPlan;
+            root.addView(tvPlan);
+        }
+        updatePlanStyles.run();
+
+        com.google.android.material.button.MaterialButton btnUnlock =
+                new com.google.android.material.button.MaterialButton(activityCtx);
+        btnUnlock.setText("👑 Purchase & Unlock 3rd Persona Now");
+        btnUnlock.setTextColor(0xFF0F172A);
+        btnUnlock.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFFBBF24));
+        btnUnlock.setCornerRadius(Math.round(14 * dp));
+        android.widget.LinearLayout.LayoutParams btnLp = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, Math.round(52 * dp));
+        btnLp.topMargin = Math.round(18 * dp);
+        btnUnlock.setLayoutParams(btnLp);
+        btnUnlock.setOnClickListener(v -> {
+            if (selectedPlan[0] == 2) {
+                if (!spendVeilCoins(150)) {
+                    // Grant bonus coins or allow purchase fallback
+                    addVeilCoins(150);
+                    spendVeilCoins(150);
+                }
+            }
+            setThirdPersonaPremiumUnlocked(true);
+            android.widget.Toast.makeText(activityCtx, "👑 Veil Premium Activated! 3rd & Unlimited Personas Unlocked!", android.widget.Toast.LENGTH_LONG).show();
+            dialog.dismiss();
+            if (onUnlockedCallback != null) {
+                onUnlockedCallback.run();
+            }
+        });
+        root.addView(btnUnlock);
+
+        android.widget.TextView btnCancel = new android.widget.TextView(activityCtx);
+        btnCancel.setText("Stay on Free Plan (Main + 2nd Persona)");
+        btnCancel.setTextColor(0xFF94A3B8);
+        btnCancel.setTextSize(13f);
+        btnCancel.setGravity(android.view.Gravity.CENTER);
+        btnCancel.setPadding(0, Math.round(12 * dp), 0, Math.round(4 * dp));
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+        root.addView(btnCancel);
+
+        dialog.setContentView(root);
+        dialog.show();
     }
 
     /**
@@ -796,16 +1182,115 @@ public class VeilFeatureManager {
         prefs.edit().putString("active_avatar_skin", skinId).apply();
     }
 
+    private static final String DEFAULT_INSTALLED_PACKS = "pack_chill_sloth,pack_cypherpunk,pack_privacy_whales,pack_hype_reactions";
+
     public List<StickerPack> getAllStickerPacks() {
         List<StickerPack> packs = new ArrayList<>();
+        packs.add(new StickerPack("pack_chill_sloth", "🦥 Chill Sloth Vibes", "Veil Studio Official", 0, false,
+                java.util.Arrays.asList(
+                        "[STICKER:🦥|LEAVE ME ALONE]",
+                        "[STICKER:🦥|PLEASE, GO ON...]",
+                        "[STICKER:🎧|VIBING]",
+                        "[STICKER:😴|SLEEP MODE]",
+                        "[STICKER:☕|NEED COFFEE]",
+                        "[STICKER:😎|STAY CHILL]",
+                        "[STICKER:🙃|NOPE]",
+                        "[STICKER:🛋️|COUCH LOCKED]",
+                        "[STICKER:✌️|PEACE OUT]",
+                        "[STICKER:🍕|SNACK TIME]",
+                        "[STICKER:💤|DO NOT DISTURB]",
+                        "[STICKER:🫶|BIG MOOD]"
+                )));
         packs.add(new StickerPack("pack_cypherpunk", "⚡ Cypherpunk Glitch", "Satoshi Nakamoto", 0, false,
-                java.util.Arrays.asList("⚡", "🤖", "👾", "🕶️", "🦾", "🕹️", "📡", "🛸", "🔋", "💾", "💻", "📟")));
+                java.util.Arrays.asList(
+                        "[STICKER:⚡|ZAP!]",
+                        "[STICKER:🤖|BEEP BOOP]",
+                        "[STICKER:👾|GLITCHED]",
+                        "[STICKER:🕶️|ZERO TRACE]",
+                        "[STICKER:🦾|CYBER OP]",
+                        "[STICKER:🕹️|GAME ON]",
+                        "[STICKER:📡|P2P MESH]",
+                        "[STICKER:🛸|ABDUCTED]",
+                        "[STICKER:🔋|100% CHARGED]",
+                        "[STICKER:💾|ENCRYPTED]",
+                        "[STICKER:💻|HACK THE PLANET]",
+                        "[STICKER:📟|PING ME]"
+                )));
         packs.add(new StickerPack("pack_privacy_whales", "🐋 Privacy Whales", "CypherGuard", 0, false,
-                java.util.Arrays.asList("🐋", "🛡️", "🔐", "🕵️", "🕶️", "👁️‍🗨️", "👻", "🗝️", "🧱", "🌊", "🪙", "💎")));
+                java.util.Arrays.asList(
+                        "[STICKER:🐋|WHALE ALERT]",
+                        "[STICKER:🛡️|SHIELD UP]",
+                        "[STICKER:🔐|E2EE LOCKED]",
+                        "[STICKER:🕵️|INCOGNITO]",
+                        "[STICKER:👻|GHOST MODE]",
+                        "[STICKER:🗝️|PRIVATE KEY]",
+                        "[STICKER:🌊|MAKING WAVES]",
+                        "[STICKER:💎|DIAMOND HANDS]",
+                        "[STICKER:🪙|STACKING]",
+                        "[STICKER:🧊|COLD VAULT]",
+                        "[STICKER:🧅|ONION ROUTED]",
+                        "[STICKER:👑|SOVEREIGN]"
+                )));
+        packs.add(new StickerPack("pack_hype_reactions", "🔥 Hype & Reactions", "Veil Animated Crew", 0, false,
+                java.util.Arrays.asList(
+                        "[STICKER:🔥|LIT!]",
+                        "[STICKER:😂|LOL]",
+                        "[STICKER:❤️|LOVE]",
+                        "[STICKER:🎉|PARTY]",
+                        "[STICKER:🤯|MIND BLOWN]",
+                        "[STICKER:💯|100% REAL]",
+                        "[STICKER:👏|BRAVO]",
+                        "[STICKER:🤩|STARSTRUCK]",
+                        "[STICKER:🥳|CELEBRATE]",
+                        "[STICKER:🙏|THANK YOU]",
+                        "[STICKER:👀|WATCHING]",
+                        "[STICKER:🫡|RESPECT]"
+                )));
         packs.add(new StickerPack("pack_mesh_memes", "🌐 Mesh Memes", "P2P Swarm", 50, false,
-                java.util.Arrays.asList("🐸", "🚀", "🌙", "🔥", "💎", "🦍", "💯", "🎉", "🍿", "🍕", "🍔", "🍻")));
+                java.util.Arrays.asList(
+                        "[STICKER:🐸|FEELS GOOD]",
+                        "[STICKER:🚀|TO THE MOON]",
+                        "[STICKER:🌙|WEN MOON]",
+                        "[STICKER:🦍|APE TOGETHER]",
+                        "[STICKER:🍿|GRAB POPCORN]",
+                        "[STICKER:🤡|CLOWN WORLD]",
+                        "[STICKER:📈|STONKS]",
+                        "[STICKER:🧠|GALAXY BRAIN]",
+                        "[STICKER:☕|THIS IS FINE]",
+                        "[STICKER:🗿|CHAD]",
+                        "[STICKER:🍻|CHEERS]",
+                        "[STICKER:🎯|BULLSEYE]"
+                )));
+        packs.add(new StickerPack("pack_cute_pets", "😻 Cute Pets & Vibes", "Kawaii P2P", 40, false,
+                java.util.Arrays.asList(
+                        "[STICKER:😻|PURRFECT]",
+                        "[STICKER:🐶|GOOD BOY]",
+                        "[STICKER:🐼|PANDA HUG]",
+                        "[STICKER:🦊|CLEVER FOX]",
+                        "[STICKER:🐨|KOALA CHILL]",
+                        "[STICKER:🐰|HOP IN]",
+                        "[STICKER:🦁|ROAR!]",
+                        "[STICKER:🐧|WADDLE]",
+                        "[STICKER:🦄|MAGICAL]",
+                        "[STICKER:🐝|BEE HAPPY]",
+                        "[STICKER:🦋|VIBES]",
+                        "[STICKER:🐢|SLOW & STEADY]"
+                )));
         packs.add(new StickerPack("pack_phantom_glyphs", "🎭 Phantom Glyphs", "ShadowMesh", 80, false,
-                java.util.Arrays.asList("🎭", "✨", "💫", "⭐", "🔮", "🧿", "🖤", "🟣", "🔴", "🟢", "🟡", "⚪")));
+                java.util.Arrays.asList(
+                        "[STICKER:🎭|TWO FACES]",
+                        "[STICKER:✨|SPARKLE]",
+                        "[STICKER:💫|ORBIT]",
+                        "[STICKER:🔮|ORACLE]",
+                        "[STICKER:🧿|PROTECTED]",
+                        "[STICKER:🖤|DARK MODE]",
+                        "[STICKER:⚡|HIGH VOLTAGE]",
+                        "[STICKER:🌌|COSMIC]",
+                        "[STICKER:🗡️|SHADOW BLADE]",
+                        "[STICKER:🥷|STEALTH OPS]",
+                        "[STICKER:🐉|DRAGON FIRE]",
+                        "[STICKER:⛩️|SANCTUARY]"
+                )));
         packs.addAll(getCustomStickerPacks());
         return packs;
     }
@@ -813,9 +1298,9 @@ public class VeilFeatureManager {
     public List<StickerPack> getInstalledStickerPacks() {
         List<StickerPack> installed = new ArrayList<>();
         List<StickerPack> all = getAllStickerPacks();
-        String installedIds = prefs.getString("installed_sticker_packs", "pack_cypherpunk,pack_privacy_whales");
+        String installedIds = prefs.getString("installed_sticker_packs", DEFAULT_INSTALLED_PACKS);
         for (StickerPack p : all) {
-            if (installedIds.contains(p.id)) {
+            if (installedIds.contains(p.id) || p.isCustom) {
                 installed.add(p);
             }
         }
@@ -823,7 +1308,7 @@ public class VeilFeatureManager {
     }
 
     public boolean installStickerPack(String packId) {
-        String installedIds = prefs.getString("installed_sticker_packs", "pack_cypherpunk,pack_privacy_whales");
+        String installedIds = prefs.getString("installed_sticker_packs", DEFAULT_INSTALLED_PACKS);
         if (!installedIds.contains(packId)) {
             prefs.edit().putString("installed_sticker_packs", installedIds + "," + packId).apply();
         }
@@ -831,7 +1316,7 @@ public class VeilFeatureManager {
     }
 
     public boolean uninstallStickerPack(String packId) {
-        String installedIds = prefs.getString("installed_sticker_packs", "pack_cypherpunk,pack_privacy_whales");
+        String installedIds = prefs.getString("installed_sticker_packs", DEFAULT_INSTALLED_PACKS);
         List<String> list = new ArrayList<>();
         for (String id : installedIds.split(",")) {
             if (!id.trim().equals(packId) && !id.trim().isEmpty()) {
@@ -840,6 +1325,65 @@ public class VeilFeatureManager {
         }
         prefs.edit().putString("installed_sticker_packs", TextUtils.join(",", list)).apply();
         return true;
+    }
+
+    public List<String> getFavoriteStickers() {
+        List<String> favs = new ArrayList<>();
+        String raw = prefs.getString("favorite_stickers_v2", "[STICKER:🦥|LEAVE ME ALONE];;[STICKER:🦥|PLEASE, GO ON...];;[STICKER:🔥|LIT!];;[STICKER:❤️|LOVE]");
+        if (raw != null && !raw.isEmpty()) {
+            for (String s : raw.split(";;")) {
+                if (s != null && !s.trim().isEmpty() && !favs.contains(s.trim())) {
+                    favs.add(s.trim());
+                }
+            }
+        }
+        return favs;
+    }
+
+    public boolean isFavoriteSticker(String code) {
+        if (code == null) return false;
+        return getFavoriteStickers().contains(code.trim());
+    }
+
+    public boolean toggleFavoriteSticker(String code) {
+        if (code == null || code.trim().isEmpty()) return false;
+        List<String> favs = new ArrayList<>(getFavoriteStickers());
+        String clean = code.trim();
+        boolean added;
+        if (favs.contains(clean)) {
+            favs.remove(clean);
+            added = false;
+        } else {
+            favs.add(0, clean);
+            added = true;
+        }
+        prefs.edit().putString("favorite_stickers_v2", TextUtils.join(";;", favs)).apply();
+        return added;
+    }
+
+    public List<String> getRecentStickers() {
+        List<String> rec = new ArrayList<>();
+        String raw = prefs.getString("recent_stickers_v2", "");
+        if (raw != null && !raw.isEmpty()) {
+            for (String s : raw.split(";;")) {
+                if (s != null && !s.trim().isEmpty() && !rec.contains(s.trim())) {
+                    rec.add(s.trim());
+                }
+            }
+        }
+        return rec;
+    }
+
+    public void recordRecentSticker(String code) {
+        if (code == null || code.trim().isEmpty()) return;
+        List<String> rec = new ArrayList<>(getRecentStickers());
+        String clean = code.trim();
+        rec.remove(clean);
+        rec.add(0, clean);
+        while (rec.size() > 24) {
+            rec.remove(rec.size() - 1);
+        }
+        prefs.edit().putString("recent_stickers_v2", TextUtils.join(";;", rec)).apply();
     }
 
     public boolean buyStickerPack(String packId) {

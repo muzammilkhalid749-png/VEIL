@@ -82,6 +82,7 @@ public class CallActivity extends AppCompatActivity {
     public static final String EXTRA_IS_INCOMING = "extra_is_incoming";
     public static final String EXTRA_FROM_NOTIFICATION = "extra_from_notification";
     public static final String EXTRA_DECLINE_ON_START = "extra_decline_on_start";
+    public static final String EXTRA_ANSWER_ON_START = "extra_answer_on_start";
     public static final String EXTRA_GROUP_ID = "extra_group_id";
     public static final String EXTRA_GROUP_NAME = "extra_group_name";
     public static final String EXTRA_PARTICIPANT_IDS = "extra_participant_ids";
@@ -246,7 +247,9 @@ public class CallActivity extends AppCompatActivity {
 
         ensurePermissions();
 
-        if (getIntent().getBooleanExtra(EXTRA_DECLINE_ON_START, false)) {
+        if (getIntent().getBooleanExtra(EXTRA_DECLINE_ON_START, false)
+                || com.m3.veil.calling.CallNotificationHelper.ACTION_DECLINE.equals(getIntent().getAction())) {
+            com.m3.veil.calling.CallNotificationHelper.cancelAll(this);
             engine.decline(CallEndReason.DECLINED);
             finish();
             return;
@@ -254,11 +257,23 @@ public class CallActivity extends AppCompatActivity {
 
         startPulseAnimation();
 
+        boolean answerImmediately = getIntent().getBooleanExtra(EXTRA_ANSWER_ON_START, false)
+                || com.m3.veil.calling.CallNotificationHelper.ACTION_ANSWER.equals(getIntent().getAction());
+
         if (isIncoming) {
             if (engine.getState() == CallState.NONE && contactId != null) {
                 engine.onExternalInvite(contactId, callId, contactName, callType);
             }
-            showIncomingUi();
+            CallState curState = engine.getState();
+            if (answerImmediately
+                    || curState == CallState.ACCEPT_SENT
+                    || curState == CallState.ACCEPT_RECEIVED
+                    || curState == CallState.CONNECTED_LONELY
+                    || curState == CallState.ACTIVE) {
+                acceptCall();
+            } else {
+                showIncomingUi();
+            }
         } else {
             showOutgoingUi();
             startOutgoingCall();
@@ -467,15 +482,23 @@ public class CallActivity extends AppCompatActivity {
         accepted = true;
         if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
         if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
-        stopRingtone();
-        if (engine != null) engine.accept();
+        if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
+        stopRingtoneAndRingback();
+        com.m3.veil.calling.CallNotificationHelper.cancelIncoming(this);
+        if (engine != null) {
+            CallState st = engine.getState();
+            if (st == CallState.RECEIVED_CALL || st == CallState.PRE_ACCEPT_RECEIVED || st == CallState.NONE) {
+                engine.accept();
+            }
+        }
     }
 
     private void onEndClicked() {
         if (finishingCall) return;
         finishingCall = true;
         stopRingtoneAndRingback();
-        if (layoutAcceptCall != null && layoutAcceptCall.getVisibility() == View.VISIBLE) {
+        com.m3.veil.calling.CallNotificationHelper.cancelAll(this);
+        if (layoutAcceptCall != null && layoutAcceptCall.getVisibility() == View.VISIBLE && !accepted) {
             if (engine != null) engine.decline(CallEndReason.DECLINED);
         } else if (engine != null) {
             engine.hangup(CallEndReason.LOCAL_HANGUP);
@@ -489,9 +512,19 @@ public class CallActivity extends AppCompatActivity {
         @Override public void onStateChanged(CallState state, CallInfo info) {
             runOnUiThread(() -> {
                 lastState = state;
-                if (state == CallState.CONNECTED_LONELY || state == CallState.ACTIVE
+                if (state == CallState.ACCEPT_SENT || state == CallState.ACCEPT_RECEIVED) {
+                    accepted = true;
+                    stopRingtoneAndRingback();
+                    com.m3.veil.calling.CallNotificationHelper.cancelIncoming(CallActivity.this);
+                    if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
+                    if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
+                    if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
+                } else if (state == CallState.CONNECTED_LONELY || state == CallState.ACTIVE
                         || state == CallState.REJOINING) {
                     if (!isConnected) onConnected();
+                } else if (state != null && state.isEnded()) {
+                    stopRingtoneAndRingback();
+                    com.m3.veil.calling.CallNotificationHelper.cancelAll(CallActivity.this);
                 }
                 updateUiFromEngine(info);
             });
@@ -594,6 +627,7 @@ public class CallActivity extends AppCompatActivity {
                     attachedLocalTrack = null;
                 }
                 stopRingtoneAndRingback();
+                com.m3.veil.calling.CallNotificationHelper.cancelAll(CallActivity.this);
                 toast(reason != null ? reason.label : "Call ended");
                 saveCallRecord(info, reason);
                 finish();
@@ -1803,22 +1837,11 @@ public class CallActivity extends AppCompatActivity {
     }
 
     private void playRingtone() {
-        try {
-            Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-            ringtonePlayer = new MediaPlayer();
-            ringtonePlayer.setDataSource(this, uri);
-            ringtonePlayer.setAudioStreamType(AudioManager.STREAM_RING);
-            ringtonePlayer.setLooping(true);
-            ringtonePlayer.prepare();
-            ringtonePlayer.start();
-        } catch (Throwable t) {
-            try { android.os.Vibrator vibrator = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                if (vibrator != null) vibrator.vibrate(500);
-            } catch (Throwable ignored) { }
-        }
+        com.m3.veil.calling.CallNotificationHelper.startRinging(this);
     }
 
     private void stopRingtone() {
+        com.m3.veil.calling.CallNotificationHelper.stopRinging(this);
         try {
             if (ringtonePlayer != null) {
                 ringtonePlayer.stop();
@@ -1947,12 +1970,27 @@ public class CallActivity extends AppCompatActivity {
     protected void onNewIntent(@NonNull Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        if (intent.getBooleanExtra(EXTRA_DECLINE_ON_START, false)) {
+        if (intent.getBooleanExtra(EXTRA_DECLINE_ON_START, false)
+                || com.m3.veil.calling.CallNotificationHelper.ACTION_DECLINE.equals(intent.getAction())) {
+            stopRingtoneAndRingback();
+            com.m3.veil.calling.CallNotificationHelper.cancelAll(this);
             if (engine != null) engine.decline(CallEndReason.DECLINED);
             finish();
             return;
         }
         readExtras(intent);
+        boolean answerNow = intent.getBooleanExtra(EXTRA_ANSWER_ON_START, false)
+                || com.m3.veil.calling.CallNotificationHelper.ACTION_ANSWER.equals(intent.getAction());
+        CallState curState = engine != null ? engine.getState() : CallState.NONE;
+        if (answerNow || accepted || isConnected
+                || curState == CallState.ACCEPT_SENT
+                || curState == CallState.ACCEPT_RECEIVED
+                || curState == CallState.CONNECTED_LONELY
+                || curState == CallState.ACTIVE) {
+            acceptCall();
+            if (engine != null) updateUiFromEngine(engine.getCallInfo());
+            return;
+        }
         if (isIncoming) showIncomingUi();
     }
 
@@ -1967,11 +2005,14 @@ public class CallActivity extends AppCompatActivity {
         if (pulseAnimator != null) pulseAnimator.cancel();
         if (engine != null) {
             if (isFinishing() && engine.isInCall()) {
+                com.m3.veil.calling.CallNotificationHelper.cancelAll(this);
                 if (isIncoming && !accepted) {
                     engine.decline(CallEndReason.DECLINED);
                 } else {
                     engine.hangup(CallEndReason.LOCAL_HANGUP);
                 }
+            } else if (!engine.isInCall()) {
+                com.m3.veil.calling.CallNotificationHelper.cancelAll(this);
             }
             engine.removeListener(engineListener);
         }

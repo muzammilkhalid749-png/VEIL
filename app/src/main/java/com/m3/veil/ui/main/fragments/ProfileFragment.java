@@ -151,33 +151,38 @@ public class ProfileFragment extends Fragment {
 
 
         initializeViews(view);
-
         setupClickListeners(view);
-
         loadUserData();
-
         loadSettings();
-
         refreshGamificationAndVaultStats();
-
         setAppVersion();
 
-
+        VeilFeatureManager.getInstance(requireContext()).addPersonaChangeListener(personaChangeListener);
 
         return view;
-
     }
 
-
+    private final VeilFeatureManager.PersonaChangeListener personaChangeListener = activePersona -> {
+        if (!isAdded() || getContext() == null) return;
+        requireActivity().runOnUiThread(() -> {
+            loadUserData();
+            refreshGamificationAndVaultStats();
+        });
+    };
 
     @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (getContext() != null) {
+            VeilFeatureManager.getInstance(requireContext()).removePersonaChangeListener(personaChangeListener);
+        }
+    }
 
+    @Override
     public void onResume() {
-
         super.onResume();
-
+        loadUserData();
         refreshGamificationAndVaultStats();
-
     }
 
 
@@ -620,273 +625,179 @@ public class ProfileFragment extends Fragment {
      */
 
     public void openPersonaManager() {
-
         if (getContext() == null) return;
-
         VeilFeatureManager fm = VeilFeatureManager.getInstance(requireContext());
-
         List<Persona> personas = fm.getPersonas();
-
         Persona current = fm.getActivePersona();
 
-
-
         com.google.android.material.bottomsheet.BottomSheetDialog dialog =
-
                 new com.google.android.material.bottomsheet.BottomSheetDialog(requireContext(), R.style.ModernBottomSheetDialogTheme);
-
         View view = getLayoutInflater().inflate(R.layout.dialog_persona_switcher_sheet, null);
-
         dialog.setContentView(view);
 
-
-
         ViewGroup container = view.findViewById(R.id.personaListContainer);
-
         View btnAddNew = view.findViewById(R.id.btnAddNewPersona);
-
         float density = getResources().getDisplayMetrics().density;
 
-
-
-        for (Persona p : personas) {
-
+        for (int idx = 0; idx < personas.size(); idx++) {
+            final int personaIndex = idx;
+            final Persona p = personas.get(idx);
             boolean isSelected = current != null && p.getPersonaId().equals(current.getPersonaId());
+            boolean isLockedPremium = !fm.canAccessPersonaIndex(personaIndex);
 
             com.google.android.material.card.MaterialCardView card =
-
                     new com.google.android.material.card.MaterialCardView(requireContext());
-
             card.setCardElevation(0);
-
             card.setStrokeWidth((int) (1.2f * density));
-
             card.setStrokeColor(androidx.core.content.ContextCompat.getColor(requireContext(),
-
                     isSelected ? R.color.colorPrimary : R.color.colorOutline));
-
             card.setRadius(14 * density);
-
             card.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(),
-
                     isSelected ? R.color.colorSurfaceVariant : R.color.colorSurface));
 
-
-
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-
             lp.bottomMargin = (int) (10 * density);
-
             card.setLayoutParams(lp);
 
-
-
             LinearLayout itemLayout = new LinearLayout(requireContext());
-
             itemLayout.setOrientation(LinearLayout.HORIZONTAL);
-
             itemLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
-
             itemLayout.setPadding((int) (16 * density), (int) (14 * density), (int) (16 * density), (int) (14 * density));
 
-
-
             LinearLayout textCol = new LinearLayout(requireContext());
-
             textCol.setOrientation(LinearLayout.VERTICAL);
-
             textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-
+            String tierBadge;
+            if (personaIndex == 0) {
+                tierBadge = " [MAIN]";
+            } else if (personaIndex == 1) {
+                tierBadge = " [2ND • FREE]";
+            } else {
+                tierBadge = isLockedPremium ? " [👑 PREMIUM LOCKED]" : " [👑 PREMIUM]";
+            }
 
             TextView tvName = new TextView(requireContext());
-
-            tvName.setText((isSelected ? "✅ " : "🎭 ") + p.getDisplayName() + (p.isTemporary() ? " [Temp 24h]" : ""));
-
+            tvName.setText((isSelected ? "✅ " : (isLockedPremium ? "🔒 " : "🎭 "))
+                    + p.getDisplayName() + tierBadge + (p.isTemporary() ? " [Temp 24h]" : ""));
             tvName.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
-
             tvName.setTextSize(15);
-
             tvName.setTypeface(null, android.graphics.Typeface.BOLD);
 
-
-
             TextView tvMood = new TextView(requireContext());
-
-            tvMood.setText(p.getMood() + " • " + p.getBio());
-
+            tvMood.setText(p.getUsername() + " • " + p.getMood() + " • " + p.getBio());
             tvMood.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
-
             tvMood.setTextSize(12);
 
-
-
             textCol.addView(tvName);
-
             textCol.addView(tvMood);
-
             itemLayout.addView(textCol);
-
             card.addView(itemLayout);
 
-
-
             card.setOnClickListener(vCard -> {
-
+                if (!fm.canAccessPersonaIndex(personaIndex)) {
+                    dialog.dismiss();
+                    fm.showThirdPersonaPremiumPurchaseDialog(requireContext(), () -> {
+                        fm.setActivePersona(p.getPersonaId());
+                        loadUserData();
+                        refreshGamificationAndVaultStats();
+                        showToast("Switched persona to " + p.getDisplayName() + " (" + p.getUsername() + ")");
+                    });
+                    return;
+                }
                 fm.setActivePersona(p.getPersonaId());
-
-                profileName.setText(p.getDisplayName());
-
+                loadUserData();
                 refreshGamificationAndVaultStats();
-
-                showToast("Switched persona to " + p.getDisplayName());
-
+                showToast("Switched persona to " + p.getDisplayName() + " (" + p.getUsername() + ")");
                 dialog.dismiss();
-
             });
 
-
-
             container.addView(card);
-
         }
 
-
+        if (btnAddNew instanceof TextView) {
+            boolean needsPro = personas.size() >= VeilFeatureManager.MAX_FREE_PERSONAS && !fm.isThirdPersonaPremiumUnlocked();
+            ((TextView) btnAddNew).setText(needsPro ? "👑 Unlock 3rd+ Persona (Veil Pro)" : "➕ Create New Persona");
+        }
 
         btnAddNew.setOnClickListener(v -> {
-
             dialog.dismiss();
-
-            showCreatePersonaDialog(false);
-
+            if (personas.size() >= VeilFeatureManager.MAX_FREE_PERSONAS && !fm.isThirdPersonaPremiumUnlocked()) {
+                fm.showThirdPersonaPremiumPurchaseDialog(requireContext(), () -> showCreatePersonaDialog(false));
+            } else {
+                showCreatePersonaDialog(false);
+            }
         });
 
-
-
         dialog.show();
-
     }
 
-
-
     private void showCreatePersonaDialog(boolean autoExpire24h) {
-
         if (getContext() == null) return;
-
         com.google.android.material.bottomsheet.BottomSheetDialog dialog =
-
                 new com.google.android.material.bottomsheet.BottomSheetDialog(requireContext(), R.style.ModernBottomSheetDialogTheme);
-
         LinearLayout layout = new LinearLayout(getContext());
-
         layout.setOrientation(LinearLayout.VERTICAL);
-
         int pad = (int) (24 * getResources().getDisplayMetrics().density);
-
         layout.setPadding(pad, pad, pad, pad);
-
         layout.setBackgroundResource(R.drawable.bottom_sheet_background);
 
-
-
         TextView tvTitle = new TextView(getContext());
-
         tvTitle.setText(autoExpire24h ? "⏳ Create 24h Temporary Persona" : "🎭 Create New Anonymous Persona");
-
         tvTitle.setTextSize(18);
-
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-
         tvTitle.setTextColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.textPrimary));
-
         layout.addView(tvTitle);
 
-
-
         TextView tvSub = new TextView(getContext());
-
-        tvSub.setText("Zero-trace identity for chatting and posting anonymously");
-
+        tvSub.setText("Isolated identity with its own unique @username, display name & encrypted vault");
         tvSub.setTextSize(13);
-
         tvSub.setTextColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.textSecondary));
-
         tvSub.setPadding(0, 4, 0, (int) (16 * getResources().getDisplayMetrics().density));
-
         layout.addView(tvSub);
 
-
-
         EditText etName = new EditText(getContext());
-
-        etName.setHint("Persona Handle (e.g. @ZeroCool)");
-
+        etName.setHint("Profile Display Name (e.g. ZeroCool)");
         etName.setTextColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.textPrimary));
-
         layout.addView(etName);
 
-
+        EditText etUsername = new EditText(getContext());
+        etUsername.setHint("Unique @Username (e.g. @zerocool)");
+        etUsername.setTextColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.textPrimary));
+        layout.addView(etUsername);
 
         EditText etMood = new EditText(getContext());
-
         etMood.setHint("Mood (e.g. Cypherpunk / Ghost / Chill)");
-
         etMood.setTextColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.textPrimary));
-
         layout.addView(etMood);
 
-
-
         com.google.android.material.button.MaterialButton btnCreate =
-
                 new com.google.android.material.button.MaterialButton(getContext());
-
         btnCreate.setText("Create & Activate");
-
         btnCreate.setCornerRadius((int) (12 * getResources().getDisplayMetrics().density));
-
         LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-
         btnLp.topMargin = (int) (16 * getResources().getDisplayMetrics().density);
-
         btnCreate.setLayoutParams(btnLp);
-
         btnCreate.setOnClickListener(v -> {
-
             String name = etName.getText().toString().trim();
-
+            String uname = etUsername.getText().toString().trim();
             String mood = etMood.getText().toString().trim();
-
             if (!name.isEmpty()) {
-
                 String[] colors = {"#5C6BC0", "#26A69A", "#EC407A", "#7E57C2", "#FFA726"};
-
                 String color = colors[Math.abs(name.hashCode()) % colors.length];
-
                 VeilFeatureManager.getInstance(requireContext()).addPersona(
-
                         name,
-
+                        uname.isEmpty() ? name : uname,
                         "Zero-trace identity",
-
                         mood.isEmpty() ? "Mysterious" : mood,
-
                         color,
-
                         autoExpire24h
-
                 );
-
-                profileName.setText(name);
-
+                loadUserData();
                 refreshGamificationAndVaultStats();
-
                 showToast("Persona '" + name + "' activated!");
-
                 dialog.dismiss();
-
             } else {
 
                 Toast.makeText(getContext(), "Please enter a handle", Toast.LENGTH_SHORT).show();
@@ -2274,37 +2185,57 @@ public class ProfileFragment extends Fragment {
 
 
     private void loadUserData() {
+        if (getContext() == null) return;
+        VeilFeatureManager fm = VeilFeatureManager.getInstance(requireContext());
+        String activePersonaId = fm.getActivePersonaId();
+        boolean isSecondaryPersona = activePersonaId != null && !"persona_primary".equals(activePersonaId);
+        Persona activePersona = fm.getActivePersona();
 
         String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
         if (currentUserId == null && mAuth != null && mAuth.getCurrentUser() != null) {
             currentUserId = mAuth.getCurrentUser().getUid();
         }
 
-
-
         com.m3.veil.utils.UserPreferences up = new com.m3.veil.utils.UserPreferences(requireContext());
-
         User localUser = up.getCurrentUser();
 
-
-
         if (currentUserId == null && localUser == null) {
-
             emptyState.setVisibility(View.VISIBLE);
-
             return;
-
         }
 
-
-
         emptyState.setVisibility(View.GONE);
-
         loadingBar.setVisibility(View.GONE);
-
         profileContent.setVisibility(View.VISIBLE);
 
-
+        if (isSecondaryPersona && activePersona != null) {
+            if (profileName != null) {
+                profileName.setText(activePersona.getDisplayName());
+            }
+            if (profileUsername != null) {
+                profileUsername.setText(activePersona.getUsername());
+            }
+            if (profileStatus != null) {
+                profileStatus.setText("🎭 " + activePersona.getDisplayName() + " • " + activePersona.getMood());
+            }
+            if (profileImage != null) {
+                java.io.File avatarFile = currentUserId != null
+                        ? com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(requireContext()).getAvatarWebpFile(currentUserId)
+                        : null;
+                if (avatarFile != null && avatarFile.exists()) {
+                    android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeFile(avatarFile.getAbsolutePath());
+                    if (bmp != null) {
+                        profileImage.setImageBitmap(bmp);
+                    } else {
+                        com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileImage, null, activePersona.getDisplayName(), false);
+                    }
+                } else {
+                    com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileImage, null, activePersona.getDisplayName(), false);
+                }
+            }
+            refreshGamificationAndVaultStats();
+            return;
+        }
 
         if (localUser != null) {
             updateUIWithUserData(localUser);
@@ -2329,6 +2260,10 @@ public class ProfileFragment extends Fragment {
                         .get()
                         .addOnCompleteListener(task -> {
                             if (isAdded() && getContext() != null) {
+                                String latestPersonaId = VeilFeatureManager.getInstance(requireContext()).getActivePersonaId();
+                                if (latestPersonaId != null && !"persona_primary".equals(latestPersonaId)) {
+                                    return;
+                                }
                                 if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
                                     User user = task.getResult().toObject(User.class);
                                     if (user != null) {
@@ -2353,6 +2288,10 @@ public class ProfileFragment extends Fragment {
 
     private void updateUIWithUserData(User user) {
         if (getContext() == null || user == null) return;
+        VeilFeatureManager fm = VeilFeatureManager.getInstance(requireContext());
+        if (!"persona_primary".equals(fm.getActivePersonaId())) {
+            return;
+        }
 
         com.m3.veil.utils.UserPreferences up = new com.m3.veil.utils.UserPreferences(requireContext());
         String displayName = user.getDisplayName();
@@ -2376,7 +2315,7 @@ public class ProfileFragment extends Fragment {
             profileUsername.setText("@username");
         }
 
-        VeilFeatureManager.getInstance(requireContext()).syncPrimaryPersonaWithUser(
+        fm.syncPrimaryPersonaWithUser(
                 username, displayName, user.getBio(), null);
         refreshGamificationAndVaultStats();
 

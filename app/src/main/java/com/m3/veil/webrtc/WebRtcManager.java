@@ -3407,45 +3407,28 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
    public void showIncomingCallNotification(String peerId, String peerName, String callType, String callId) {
       try {
-         NotificationManager nm = (NotificationManager)this.context.getSystemService("notification");
-         if (nm == null) {
-            return;
-         }
-
-         if (VERSION.SDK_INT >= 26) {
-            NotificationChannel channel = new NotificationChannel("veil_call_channel", "Incoming Calls", 4);
-            channel.setDescription("Incoming E2EE voice and video calls");
-            channel.enableVibration(true);
-            channel.setVibrationPattern(new long[]{0L, 1000L, 1000L});
-            channel.setLockscreenVisibility(1);
-            nm.createNotificationChannel(channel);
-         }
-
-         Intent fullScreenIntent = new Intent(this.context, CallActivity.class);
-         fullScreenIntent.addFlags(805306368);
-         fullScreenIntent.putExtra("extra_contact_id", peerId);
-         fullScreenIntent.putExtra("extra_contact_name", peerName);
-         fullScreenIntent.putExtra("extra_call_type", callType);
-         fullScreenIntent.putExtra("extra_call_id", callId);
-         fullScreenIntent.putExtra("extra_is_incoming", true);
-         PendingIntent pendingIntent = PendingIntent.getActivity(this.context, callId != null ? callId.hashCode() : 1, fullScreenIntent, 134217728 | (VERSION.SDK_INT >= 23 ? 67108864 : 0));
-         NotificationCompat.Builder builder = (new NotificationCompat.Builder(this.context, "veil_call_channel")).setSmallIcon(drawable.ic_call).setContentTitle(peerName != null ? peerName : "Unknown Caller").setContentText("Incoming " + ("video".equalsIgnoreCase(callType) ? "video" : "voice") + " call...").setPriority(2).setCategory("call").setFullScreenIntent(pendingIntent, true).setContentIntent(pendingIntent).setAutoCancel(true).setOngoing(true);
-         nm.notify(9991, builder.build());
+         com.m3.veil.calling.CallType ct = "video".equalsIgnoreCase(callType)
+                 ? com.m3.veil.calling.CallType.VIDEO : com.m3.veil.calling.CallType.AUDIO;
+         com.m3.veil.calling.CallInfo info = com.m3.veil.calling.CallInfo.builder()
+                 .callId(callId != null ? callId : "")
+                 .peerId(peerId != null ? peerId : "")
+                 .peerName(peerName != null ? peerName : "Unknown Caller")
+                 .caller(false)
+                 .group(false)
+                 .type(ct)
+                 .state(com.m3.veil.calling.CallState.RECEIVED_CALL)
+                 .build();
+         com.m3.veil.calling.CallNotificationHelper.showIncomingCall(this.context, info);
       } catch (Exception e) {
          Log.e("WebRtcManager", "Failed to show incoming call notification", e);
       }
-
    }
 
    public void dismissIncomingCallNotification() {
       try {
-         NotificationManager nm = (NotificationManager)this.context.getSystemService("notification");
-         if (nm != null) {
-            nm.cancel(9991);
-         }
+         com.m3.veil.calling.CallNotificationHelper.cancelIncoming(this.context);
       } catch (Exception var2) {
       }
-
    }
 
    public void onCallInviteReceived(String fromUserId, String callId, String callerName, String callType) {
@@ -3462,15 +3445,6 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                         this.processedCallInvites.add(callId);
                         this.activeCallId = callId;
                         this.activeCallPeerId = fromUserId;
-                        try {
-                           com.m3.veil.calling.CallEngine engine = com.m3.veil.calling.CallEngine.getInstance(this.context);
-                           if (this.currentUserId != null) {
-                              engine.init(this.currentUserId);
-                           }
-                           engine.onExternalInvite(fromUserId, callId, callerName, callType);
-                        } catch (Throwable t) {
-                           Log.w("WebRtcManager", "CallEngine external invite sync warning: " + t.getMessage());
-                        }
                         SignalingClient.getInstance().sendCallRinging(fromUserId, callId);
                         this.getOrCreatePeerConnection(fromUserId, false);
 
@@ -3479,23 +3453,16 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                               l.onIncomingCall(fromUserId, callerName, callType, callId);
                            }
 
-                           if (!CallActivity.isCallActive) {
-                              Intent callIntent = new Intent(this.context, CallActivity.class);
-                              callIntent.addFlags(805306368);
-                              callIntent.putExtra("extra_contact_id", fromUserId);
-                              callIntent.putExtra("extra_contact_name", callerName);
-                              callIntent.putExtra("extra_call_type", callType);
-                              callIntent.putExtra("extra_call_id", callId);
-                              callIntent.putExtra("extra_is_incoming", true);
-
-                              try {
-                                 this.context.startActivity(callIntent);
-                              } catch (Exception e) {
-                                 Log.e("WebRtcManager", "Failed to launch incoming CallActivity", e);
+                           try {
+                              com.m3.veil.calling.CallEngine engine = com.m3.veil.calling.CallEngine.getInstance(this.context);
+                              if (this.currentUserId != null) {
+                                 engine.init(this.currentUserId);
                               }
+                              engine.onExternalInvite(fromUserId, callId, callerName, callType);
+                           } catch (Throwable t) {
+                              Log.w("WebRtcManager", "CallEngine external invite sync warning: " + t.getMessage());
+                              this.showIncomingCallNotification(fromUserId, callerName, callType, callId);
                            }
-
-                           this.showIncomingCallNotification(fromUserId, callerName, callType, callId);
                         });
                      } else {
                         SignalingClient.getInstance().sendCallReject(fromUserId, callId, "busy");
@@ -3542,6 +3509,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       this.rtcExecutor.execute(() -> this.stopCallAudioHardware(fromUserId));
       this.mainHandler.post(() -> {
          this.dismissIncomingCallNotification();
+         try {
+            com.m3.veil.calling.CallEngine.getInstance(this.context)
+                    .onExternalCallEnded(fromUserId, callId, com.m3.veil.calling.CallEndReason.DECLINED);
+         } catch (Throwable ignored) {}
 
          for(P2PEventListener l : WebRtcManager.this.listeners) {
             l.onCallRejected(fromUserId, callId, reason);
@@ -3562,6 +3533,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       this.rtcExecutor.execute(() -> this.stopCallAudioHardware(fromUserId));
       this.mainHandler.post(() -> {
          this.dismissIncomingCallNotification();
+         try {
+            com.m3.veil.calling.CallEngine.getInstance(this.context)
+                    .onExternalCallEnded(fromUserId, callId, com.m3.veil.calling.CallEndReason.REMOTE_HANGUP);
+         } catch (Throwable ignored) {}
 
          for(P2PEventListener l : WebRtcManager.this.listeners) {
             l.onCallEnded(fromUserId, callId);

@@ -142,7 +142,8 @@ public class AuthManager {
     }
 
     /**
-     * Returns the deterministic user ID ("veil_<28_hex>" or "phone_<24_hex>").
+     * Returns the deterministic user ID ("veil_<28_hex>" or "phone_<24_hex>"), scoped to the
+     * currently active Persona when a secondary persona is active.
      */
     @Nullable
     public String getCurrentUserId(@NonNull Context context) {
@@ -151,14 +152,56 @@ public class AuthManager {
             return fastUid;
         }
         Context appCtx = context.getApplicationContext();
+        String baseUid = resolveBaseAccountUid(appCtx);
+        if (baseUid == null || baseUid.isEmpty()) {
+            return null;
+        }
+        String effectiveUid = applyActivePersonaScope(appCtx, baseUid);
+        cachedCurrentUserId = effectiveUid;
+        cachedMyUserIds.add(baseUid);
+        cachedMyUserIds.add(effectiveUid);
+        FirebaseAuth.getInstance().setCurrentUserUid(effectiveUid);
+        return effectiveUid;
+    }
 
+    public void onPersonaSwitched(@NonNull Context context, @Nullable String personaId) {
+        Context appCtx = context.getApplicationContext();
+        cachedCurrentUserId = null;
+        String updated = getCurrentUserId(appCtx);
+        if (updated != null) {
+            cachedMyUserIds.add(updated);
+            try {
+                WebRtcManager.getInstance(appCtx).init(updated);
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    @NonNull
+    private String applyActivePersonaScope(@NonNull Context appCtx, @NonNull String rawUid) {
+        String base = rawUid;
+        int sepIdx = base.indexOf("__persona_");
+        if (sepIdx > 0) {
+            base = base.substring(0, sepIdx);
+        }
+        try {
+            android.content.SharedPreferences fsp = appCtx.getSharedPreferences("VeilFeaturesPrefs", Context.MODE_PRIVATE);
+            String activePersonaId = fsp.getString("active_persona_id", "persona_primary");
+            if (activePersonaId != null && !activePersonaId.trim().isEmpty()
+                    && !"persona_primary".equals(activePersonaId) && !"default".equals(activePersonaId)) {
+                return base + "__" + activePersonaId.trim();
+            }
+        } catch (Throwable ignored) {}
+        return base;
+    }
+
+    @Nullable
+    public String resolveBaseAccountUid(@NonNull Context appCtx) {
         PreferenceManager pm = new PreferenceManager(appCtx);
         String sovUid = pm.getString(KEY_SOVEREIGN_UID, null);
         if (sovUid != null && !sovUid.trim().isEmpty()) {
             String clean = sovUid.trim();
-            cachedCurrentUserId = clean;
-            cachedMyUserIds.add(clean);
-            FirebaseAuth.getInstance().setCurrentUserUid(clean);
+            int idx = clean.indexOf("__persona_");
+            if (idx > 0) clean = clean.substring(0, idx);
             return clean;
         }
 
@@ -166,11 +209,10 @@ public class AuthManager {
         String upUid = up.getUserId();
         if (upUid != null && !upUid.trim().isEmpty()) {
             String clean = upUid.trim();
-            cachedCurrentUserId = clean;
-            cachedMyUserIds.add(clean);
+            int idx = clean.indexOf("__persona_");
+            if (idx > 0) clean = clean.substring(0, idx);
             pm.putString(KEY_SOVEREIGN_UID, clean);
             pm.putBoolean(KEY_SOVEREIGN_LOGGED_IN, true);
-            FirebaseAuth.getInstance().setCurrentUserUid(clean);
             return clean;
         }
 
@@ -180,12 +222,11 @@ public class AuthManager {
                 String engineUid = engine.getCurrentUid();
                 if (engineUid != null && !engineUid.trim().isEmpty()) {
                     String clean = engineUid.trim();
-                    cachedCurrentUserId = clean;
-                    cachedMyUserIds.add(clean);
+                    int idx = clean.indexOf("__persona_");
+                    if (idx > 0) clean = clean.substring(0, idx);
                     pm.putString(KEY_SOVEREIGN_UID, clean);
                     pm.putBoolean(KEY_SOVEREIGN_LOGGED_IN, true);
                     up.updateUserField("userId", clean);
-                    FirebaseAuth.getInstance().setCurrentUserUid(clean);
                     return clean;
                 }
             }
