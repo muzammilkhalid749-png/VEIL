@@ -254,6 +254,29 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void populateCurrentProfileData() {
+        com.m3.veil.model.Persona activePersona = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersona();
+        if (activePersona != null && !com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID.equals(activePersona.getPersonaId())) {
+            selectedMood = activePersona.getMood() != null ? activePersona.getMood() : MOODS[0];
+            String displayName = activePersona.getDisplayName();
+            String username = activePersona.getUsername();
+            String bio = activePersona.getBio();
+            String avatar = activePersona.getAvatarUri();
+            originalUsername = username != null ? username.trim().replaceFirst("^@", "").toLowerCase(Locale.ROOT) : "";
+
+            if (editDisplayNameInput != null) {
+                editDisplayNameInput.setText(displayName != null && !displayName.isEmpty() ? displayName : originalUsername);
+            }
+            if (editUsernameInput != null) {
+                editUsernameInput.setText(originalUsername);
+            }
+            if (editBioInput != null) {
+                editBioInput.setText(bio != null ? bio : "");
+            }
+            renderAvatarPreview(avatar, displayName != null ? displayName : originalUsername);
+            renderMoodPills();
+            return;
+        }
+
         selectedMood = preferenceManager.getString("user_mood", MOODS[0]);
 
         String displayName = userPreferences.getDisplayName();
@@ -543,6 +566,14 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
             Toast.makeText(getContext(), "Username must be 3-20 alphanumeric/underscore characters", Toast.LENGTH_SHORT).show();
             return;
         }
+        com.m3.veil.manager.PersonaManager personaManager = com.m3.veil.manager.PersonaManager.getInstance(requireContext());
+        com.m3.veil.model.Persona activePersona = personaManager.getActivePersona();
+        String activePersonaId = activePersona != null ? activePersona.getPersonaId() : com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID;
+
+        if (personaManager.isUsernameTaken(newUsername, activePersonaId)) {
+            Toast.makeText(getContext(), "Username @" + newUsername + " is already used by another Persona", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (!isUsernameValidAndAvailable && !newUsername.equals(originalUsername)) {
             Toast.makeText(getContext(), "Please choose an available @username", Toast.LENGTH_SHORT).show();
             return;
@@ -561,6 +592,24 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
         final String finalUsername = newUsername;
         final String finalDisplayName = newDisplayName;
         final String finalBio = newBio;
+
+        if (activePersona != null && !com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID.equals(activePersonaId)) {
+            String personaAvatarRef = activePersona.getAvatarUri();
+            if (avatarRemoved) {
+                personaAvatarRef = "";
+            } else if (pendingAvatarBase64 != null && !pendingAvatarBase64.isEmpty()) {
+                File savedFile = sovereignEngine.saveAvatarBase64ToLocalFile(activePersona.getKeyPairId(), pendingAvatarBase64);
+                personaAvatarRef = savedFile != null ? savedFile.getAbsolutePath() : pendingAvatarBase64;
+            }
+            activePersona.setDisplayName(finalDisplayName);
+            activePersona.setUsername(finalUsername);
+            activePersona.setBio(finalBio);
+            activePersona.setMood(selectedMood);
+            activePersona.setAvatarUri(personaAvatarRef);
+            personaManager.saveOrUpdatePersona(activePersona);
+            finishSaveOnUiThread();
+            return;
+        }
 
         if (currentUid == null || currentUid.isEmpty()) {
             currentUid = sovereignEngine.getCurrentUid();

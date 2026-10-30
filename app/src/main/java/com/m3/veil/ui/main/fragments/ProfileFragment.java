@@ -170,14 +170,27 @@ public class ProfileFragment extends Fragment {
 
 
 
+    private final com.m3.veil.manager.PersonaManager.PersonaSwitchListener personaSwitchListener = newActivePersona -> {
+        if (isAdded() && getContext() != null) {
+            loadUserData();
+            refreshGamificationAndVaultStats();
+        }
+    };
+
     @Override
-
     public void onResume() {
-
         super.onResume();
-
+        com.m3.veil.manager.PersonaManager.getInstance(requireContext()).addPersonaSwitchListener(personaSwitchListener);
+        loadUserData();
         refreshGamificationAndVaultStats();
+    }
 
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (getContext() != null) {
+            com.m3.veil.manager.PersonaManager.getInstance(requireContext()).removePersonaSwitchListener(personaSwitchListener);
+        }
     }
 
 
@@ -649,124 +662,95 @@ public class ProfileFragment extends Fragment {
 
 
 
-        for (Persona p : personas) {
+        com.m3.veil.manager.BillingManager billingManager = com.m3.veil.manager.BillingManager.getInstance(requireContext());
 
-            boolean isSelected = current != null && p.getPersonaId().equals(current.getPersonaId());
+        for (int i = 0; i < personas.size(); i++) {
+            Persona p = personas.get(i);
+            final int slotIndex = i;
+            boolean isLocked = !billingManager.canAccessPersonaSlot(slotIndex);
+            boolean isSelected = !isLocked && current != null && p.getPersonaId().equals(current.getPersonaId());
 
             com.google.android.material.card.MaterialCardView card =
-
                     new com.google.android.material.card.MaterialCardView(requireContext());
-
             card.setCardElevation(0);
-
             card.setStrokeWidth((int) (1.2f * density));
-
             card.setStrokeColor(androidx.core.content.ContextCompat.getColor(requireContext(),
-
                     isSelected ? R.color.colorPrimary : R.color.colorOutline));
-
             card.setRadius(14 * density);
-
             card.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(),
-
                     isSelected ? R.color.colorSurfaceVariant : R.color.colorSurface));
 
-
-
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-
             lp.bottomMargin = (int) (10 * density);
-
             card.setLayoutParams(lp);
 
-
-
             LinearLayout itemLayout = new LinearLayout(requireContext());
-
             itemLayout.setOrientation(LinearLayout.HORIZONTAL);
-
             itemLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
-
             itemLayout.setPadding((int) (16 * density), (int) (14 * density), (int) (16 * density), (int) (14 * density));
 
-
-
             LinearLayout textCol = new LinearLayout(requireContext());
-
             textCol.setOrientation(LinearLayout.VERTICAL);
-
             textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-
-
             TextView tvName = new TextView(requireContext());
-
-            tvName.setText((isSelected ? "✅ " : "🎭 ") + p.getDisplayName() + (p.isTemporary() ? " [Temp 24h]" : ""));
-
+            String prefix = isLocked ? "🔒 " : (isSelected ? "✅ " : "🎭 ");
+            String proSuffix = isLocked ? "  [PRO]" : (p.isTemporary() ? " [Temp 24h]" : "");
+            tvName.setText(prefix + p.getDisplayName() + " (" + p.getFormattedUsername() + ")" + proSuffix);
             tvName.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
-
             tvName.setTextSize(15);
-
             tvName.setTypeface(null, android.graphics.Typeface.BOLD);
 
-
-
             TextView tvMood = new TextView(requireContext());
-
             tvMood.setText(p.getMood() + " • " + p.getBio());
-
             tvMood.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
-
             tvMood.setTextSize(12);
 
-
-
             textCol.addView(tvName);
-
             textCol.addView(tvMood);
-
             itemLayout.addView(textCol);
-
             card.addView(itemLayout);
 
-
-
             card.setOnClickListener(vCard -> {
-
+                if (!billingManager.canAccessPersonaSlot(slotIndex)) {
+                    dialog.dismiss();
+                    PremiumUpgradeBottomSheetDialog.showPaywall(
+                            getParentFragmentManager(),
+                            "Unlock Persona " + (slotIndex + 1) + " (" + p.getDisplayName() + ")",
+                            () -> {
+                                fm.setActivePersona(p.getPersonaId());
+                                loadUserData();
+                                refreshGamificationAndVaultStats();
+                                showToast("Switched persona to " + p.getDisplayName());
+                            }
+                    );
+                    return;
+                }
                 fm.setActivePersona(p.getPersonaId());
-
-                profileName.setText(p.getDisplayName());
-
+                loadUserData();
                 refreshGamificationAndVaultStats();
-
                 showToast("Switched persona to " + p.getDisplayName());
-
                 dialog.dismiss();
-
             });
 
-
-
             container.addView(card);
-
         }
 
-
-
         btnAddNew.setOnClickListener(v -> {
-
             dialog.dismiss();
-
+            if (!billingManager.canCreateNewPersona(personas.size())) {
+                PremiumUpgradeBottomSheetDialog.showPaywall(
+                        getParentFragmentManager(),
+                        "Create Unlimited Anonymous Personas",
+                        () -> showCreatePersonaDialog(false)
+                );
+                return;
+            }
             showCreatePersonaDialog(false);
-
         });
 
-
-
         dialog.show();
-
     }
 
 
@@ -2274,37 +2258,46 @@ public class ProfileFragment extends Fragment {
 
 
     private void loadUserData() {
+        if (getContext() == null) return;
+
+        Persona activePersona = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersona();
+        boolean isPrimaryPersona = activePersona == null
+                || com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID.equals(activePersona.getPersonaId());
+
+        if (!isPrimaryPersona) {
+            emptyState.setVisibility(View.GONE);
+            loadingBar.setVisibility(View.GONE);
+            profileContent.setVisibility(View.VISIBLE);
+            profileName.setText(activePersona.getDisplayName());
+            profileUsername.setText(activePersona.getFormattedUsername());
+            if (profileImage != null) {
+                String pAvatar = activePersona.getAvatarUri();
+                if (pAvatar != null && !pAvatar.isEmpty() && !pAvatar.startsWith("default_")) {
+                    com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileImage, pAvatar, activePersona.getDisplayName(), false);
+                } else {
+                    com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileImage, null, activePersona.getDisplayName(), false);
+                }
+            }
+            refreshGamificationAndVaultStats();
+            return;
+        }
 
         String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
         if (currentUserId == null && mAuth != null && mAuth.getCurrentUser() != null) {
             currentUserId = mAuth.getCurrentUser().getUid();
         }
 
-
-
         com.m3.veil.utils.UserPreferences up = new com.m3.veil.utils.UserPreferences(requireContext());
-
         User localUser = up.getCurrentUser();
 
-
-
         if (currentUserId == null && localUser == null) {
-
             emptyState.setVisibility(View.VISIBLE);
-
             return;
-
         }
 
-
-
         emptyState.setVisibility(View.GONE);
-
         loadingBar.setVisibility(View.GONE);
-
         profileContent.setVisibility(View.VISIBLE);
-
-
 
         if (localUser != null) {
             updateUIWithUserData(localUser);
@@ -2341,7 +2334,10 @@ public class ProfileFragment extends Fragment {
                                                     .recordClaimedUsername(user.getUsername());
                                         }
                                         up.saveUser(user);
-                                        updateUIWithUserData(user);
+                                        Persona nowActive = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersona();
+                                        if (nowActive == null || com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID.equals(nowActive.getPersonaId())) {
+                                            updateUIWithUserData(user);
+                                        }
                                     }
                                 }
                                 refreshGamificationAndVaultStats();
@@ -2353,6 +2349,13 @@ public class ProfileFragment extends Fragment {
 
     private void updateUIWithUserData(User user) {
         if (getContext() == null || user == null) return;
+
+        Persona activePersona = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersona();
+        if (activePersona != null && !com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID.equals(activePersona.getPersonaId())) {
+            profileName.setText(activePersona.getDisplayName());
+            profileUsername.setText(activePersona.getFormattedUsername());
+            return;
+        }
 
         com.m3.veil.utils.UserPreferences up = new com.m3.veil.utils.UserPreferences(requireContext());
         String displayName = user.getDisplayName();

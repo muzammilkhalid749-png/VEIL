@@ -64,12 +64,14 @@ public class CallVideoDevice {
     private volatile float trustRevealLevel = 1.0f; // 0.0f = full anonymization, 1.0f = clear
     private volatile int arMaskMode = com.m3.veil.utils.VeilArMaskRenderer.MASK_NONE;
 
-    // Reusable scratch buffers for zero-allocation real-time box blur on VeilCameraThread
+    // Reusable scratch buffers for zero-allocation real-time selective face blur on VeilCameraThread
     private byte[] yScratchSrc;
     private byte[] yScratchTmp;
+    private byte[] yScratchBlur;
     private byte[] yScratchDst;
     private byte[] uvScratchSrc;
     private byte[] uvScratchTmp;
+    private byte[] uvScratchBlur;
     private byte[] uvScratchDst;
 
     public CallVideoDevice(Context context, EglBase eglBase) {
@@ -485,6 +487,11 @@ public class CallVideoDevice {
 
                     int w = i420.getWidth();
                     int h = i420.getHeight();
+
+                    // Feed frame asynchronously into the ML Kit / MediaPipe Face Detection & Landmark Pipeline
+                    VeilFaceDetectionPipeline.getInstance().submitFrameAsync(
+                            i420, w, h, frame.getRotation(), frontCamera);
+
                     JavaI420Buffer outBuffer = JavaI420Buffer.allocate(w, h);
 
                     applyVideoAnonymization(i420, outBuffer, w, h, needBlur, effectiveTrust, needSilhouette, needArMask, arMaskMode);
@@ -504,6 +511,52 @@ public class CallVideoDevice {
         };
     }
 
+    /**
+     * Smooth Hermite interpolation for feathering the selective face oval edge
+     * so there are zero raw edge leaks while keeping the background 100% untouched.
+     */
+    private static float smoothstep(float edge0, float edge1, float x) {
+        float t = Math.max(0.0f, Math.min(1.0f, (x - edge0) / (edge1 - edge0)));
+        return t * t * (3.0f - 2.0f * t);
+    }
+
+    /**
+     * Computes the maximum feathered face-oval mask weight [0.0 = untouched background, 1.0 = inside face oval]
+     * across all tracked faces at pixel (px, py) in normalized coordinates.
+     */
+    private static float computeSelectiveFaceAlpha(
+            float normX, float normY,
+            java.util.List<VeilFaceDetectionPipeline.TrackedFace> faces) {
+        if (faces == null || faces.isEmpty()) return 0.0f;
+        float maxAlpha = 0.0f;
+        for (int i = 0, n = faces.size(); i < n; i++) {
+            VeilFaceDetectionPipeline.TrackedFace face = faces.get(i);
+            float dx = normX - face.centerX;
+            float dy = normY - face.centerY;
+
+            // Rotate coordinates into face-aligned local axes using head roll angle
+            double rad = -Math.toRadians(face.rollDeg);
+            float cosR = (float) Math.cos(rad);
+            float sinR = (float) Math.sin(rad);
+            float localX = dx * cosR - dy * sinR;
+            float localY = dx * sinR + dy * cosR;
+
+            // Expand slightly (+16% X, +18% Y) to guarantee complete facial contour coverage
+            float rx = Math.max(0.08f, face.radiusX * 1.16f);
+            float ry = Math.max(0.10f, face.radiusY * 1.18f);
+
+            float ellipDist = (float) Math.sqrt((localX * localX) / (rx * rx) + (localY * localY) / (ry * ry));
+            if (ellipDist < 1.15f) {
+                // Inner core [0..0.72] = 1.0f alpha; feathered border [0.72..1.15] smoothly drops to 0.0f
+                float alpha = 1.0f - smoothstep(0.72f, 1.15f, ellipDist);
+                if (alpha > maxAlpha) {
+                    maxAlpha = alpha;
+                }
+            }
+        }
+        return maxAlpha;
+    }
+
     private void applyVideoAnonymization(VideoFrame.I420Buffer src, JavaI420Buffer dst,
                                          int w, int h, boolean blur, float trust, boolean silhouette,
                                          boolean needArMask, int maskMode) {
@@ -512,6 +565,9 @@ public class CallVideoDevice {
         int uvH = (h + 1) / 2;
 
         ensureScratchBuffers(w, h);
+
+        java.util.List<VeilFaceDetectionPipeline.TrackedFace> faces =
+                VeilFaceDetectionPipeline.getInstance().getLatestFaces();
 
         ByteBuffer srcY = src.getDataY();
         int srcStrideY = src.getStrideY();
@@ -528,29 +584,69 @@ public class CallVideoDevice {
         ByteBuffer dstV = dst.getDataV();
         int dstStrideV = dst.getStrideV();
 
-        // 1. Copy Y plane from ByteBuffer with stride into yScratchSrc
+        // 1. Copy Y plane from ByteBuffer with stride into yScratchSrc & yScratchDst (background untouched)
         for (int row = 0; row < h; row++) {
             srcY.position(row * srcStrideY);
             srcY.get(yScratchSrc, row * w, w);
         }
+        System.arraycopy(yScratchSrc, 0, yScratchDst, 0, ySize);
 
-        // 2. Blur / Silhouette Y channel
+        // 2. Selective Face Blur / Silhouette on Y channel (strictly within the detected face oval)
+        float invW = 1.0f / (float) Math.max(1, w);
+        float invH = 1.0f / (float) Math.max(1, h);
+
         if (blur) {
             boolean blurHwOk = com.m3.veil.utils.VeilPerformanceController.getInstance().isBlurShaderEnabled();
-            int maxRadius = blurHwOk ? 22 : 8; // Adapt to CPU/thermal budget to prevent frame-drops on low-RAM devices
-            int radius = Math.max(1, Math.round((1.0f - trust) * (float) maxRadius));
-            boxBlur2D(yScratchSrc, yScratchTmp, yScratchDst, w, h, radius);
-        } else {
-            System.arraycopy(yScratchSrc, 0, yScratchDst, 0, ySize);
+            int maxRadius = blurHwOk ? 24 : 12;
+            int radius = Math.max(2, Math.round((1.0f - trust) * (float) maxRadius));
+            // Two-pass heavy Gaussian approximation via cascaded box blur + mosaic obfuscation
+            boxBlur2D(yScratchSrc, yScratchTmp, yScratchBlur, w, h, radius);
+            if (blurHwOk && radius >= 6) {
+                boxBlur2D(yScratchBlur, yScratchTmp, yScratchBlur, w, h, Math.max(2, radius / 2));
+            }
+
+            // Compute bounding ROI union across detected faces to skip untouched background rows/cols fast
+            for (int fIdx = 0, fCount = faces.size(); fIdx < fCount; fIdx++) {
+                VeilFaceDetectionPipeline.TrackedFace face = faces.get(fIdx);
+                float padX = face.radiusX * 1.35f;
+                float padY = face.radiusY * 1.38f;
+                int minX = Math.max(0, (int) ((face.centerX - padX) * w));
+                int maxX = Math.min(w - 1, (int) ((face.centerX + padX) * w));
+                int minY = Math.max(0, (int) ((face.centerY - padY) * h));
+                int maxY = Math.min(h - 1, (int) ((face.centerY + padY) * h));
+
+                for (int py = minY; py <= maxY; py++) {
+                    float normY = (py + 0.5f) * invH;
+                    int rowOffset = py * w;
+                    for (int px = minX; px <= maxX; px++) {
+                        float normX = (px + 0.5f) * invW;
+                        float featherAlpha = computeSelectiveFaceAlpha(normX, normY, faces);
+                        if (featherAlpha > 0.001f) {
+                            int idx = rowOffset + px;
+                            int origY = yScratchSrc[idx] & 0xFF;
+                            int blurY = yScratchBlur[idx] & 0xFF;
+                            int blendedY = Math.round(origY * (1.0f - featherAlpha) + blurY * featherAlpha);
+                            yScratchDst[idx] = (byte) Math.max(0, Math.min(255, blendedY));
+                        }
+                    }
+                }
+            }
         }
 
         if (silhouette) {
-            for (int i = 0; i < ySize; i++) {
-                int val = yScratchDst[i] & 0xFF;
-                if (val < 135) {
-                    yScratchDst[i] = (byte) 16; // Deep silhouette black
-                } else {
-                    yScratchDst[i] = (byte) Math.min(235, val + 35); // Accent silhouette outline
+            for (int py = 0; py < h; py++) {
+                float normY = (py + 0.5f) * invH;
+                int rowOffset = py * w;
+                for (int px = 0; px < w; px++) {
+                    float normX = (px + 0.5f) * invW;
+                    float featherAlpha = computeSelectiveFaceAlpha(normX, normY, faces);
+                    if (featherAlpha > 0.01f) {
+                        int idx = rowOffset + px;
+                        int val = yScratchDst[idx] & 0xFF;
+                        int silVal = (val < 135) ? 16 : Math.min(235, val + 35);
+                        int blended = Math.round(val * (1.0f - featherAlpha) + silVal * featherAlpha);
+                        yScratchDst[idx] = (byte) blended;
+                    }
                 }
             }
         }
@@ -561,37 +657,92 @@ public class CallVideoDevice {
             dstY.put(yScratchDst, row * w, w);
         }
 
-        // 3. Process U and V channels
+        // 3. Process U and V channels selectively inside the face oval (background colors untouched)
+        float invUvW = 1.0f / (float) Math.max(1, uvW);
+        float invUvH = 1.0f / (float) Math.max(1, uvH);
+
         if (silhouette) {
-            // Neutralize chroma for cyberpunk silhouette
-            Arrays.fill(uvScratchDst, (byte) 128);
+            for (int row = 0; row < uvH; row++) {
+                srcU.position(row * srcStrideU);
+                srcU.get(uvScratchSrc, row * uvW, uvW);
+                srcV.position(row * srcStrideV);
+                srcV.get(uvScratchTmp, row * uvW, uvW);
+            }
+            for (int py = 0; py < uvH; py++) {
+                float normY = (py + 0.5f) * invUvH;
+                int rowOffset = py * uvW;
+                for (int px = 0; px < uvW; px++) {
+                    float normX = (px + 0.5f) * invUvW;
+                    float featherAlpha = computeSelectiveFaceAlpha(normX, normY, faces);
+                    if (featherAlpha > 0.01f) {
+                        int idx = rowOffset + px;
+                        int origU = uvScratchSrc[idx] & 0xFF;
+                        int origV = uvScratchTmp[idx] & 0xFF;
+                        uvScratchSrc[idx] = (byte) Math.round(origU * (1.0f - featherAlpha) + 128f * featherAlpha);
+                        uvScratchTmp[idx] = (byte) Math.round(origV * (1.0f - featherAlpha) + 128f * featherAlpha);
+                    }
+                }
+            }
             for (int row = 0; row < uvH; row++) {
                 dstU.position(row * dstStrideU);
-                dstU.put(uvScratchDst, row * uvW, uvW);
+                dstU.put(uvScratchSrc, row * uvW, uvW);
                 dstV.position(row * dstStrideV);
-                dstV.put(uvScratchDst, row * uvW, uvW);
+                dstV.put(uvScratchTmp, row * uvW, uvW);
             }
         } else if (blur) {
             boolean blurHwOk = com.m3.veil.utils.VeilPerformanceController.getInstance().isBlurShaderEnabled();
-            int maxRadiusUv = blurHwOk ? 11 : 4;
+            int maxRadiusUv = blurHwOk ? 12 : 6;
             int uvRadius = Math.max(1, Math.round((1.0f - trust) * (float) maxRadiusUv));
-            // Copy U
+
+            // Selective U channel blur within face oval
             for (int row = 0; row < uvH; row++) {
                 srcU.position(row * srcStrideU);
                 srcU.get(uvScratchSrc, row * uvW, uvW);
             }
-            boxBlur2D(uvScratchSrc, uvScratchTmp, uvScratchDst, uvW, uvH, uvRadius);
+            System.arraycopy(uvScratchSrc, 0, uvScratchDst, 0, uvW * uvH);
+            boxBlur2D(uvScratchSrc, uvScratchTmp, uvScratchBlur, uvW, uvH, uvRadius);
+
+            for (int py = 0; py < uvH; py++) {
+                float normY = (py + 0.5f) * invUvH;
+                int rowOffset = py * uvW;
+                for (int px = 0; px < uvW; px++) {
+                    float normX = (px + 0.5f) * invUvW;
+                    float featherAlpha = computeSelectiveFaceAlpha(normX, normY, faces);
+                    if (featherAlpha > 0.001f) {
+                        int idx = rowOffset + px;
+                        int origU = uvScratchSrc[idx] & 0xFF;
+                        int blurU = uvScratchBlur[idx] & 0xFF;
+                        uvScratchDst[idx] = (byte) Math.round(origU * (1.0f - featherAlpha) + blurU * featherAlpha);
+                    }
+                }
+            }
             for (int row = 0; row < uvH; row++) {
                 dstU.position(row * dstStrideU);
                 dstU.put(uvScratchDst, row * uvW, uvW);
             }
 
-            // Copy V
+            // Selective V channel blur within face oval
             for (int row = 0; row < uvH; row++) {
                 srcV.position(row * srcStrideV);
                 srcV.get(uvScratchSrc, row * uvW, uvW);
             }
-            boxBlur2D(uvScratchSrc, uvScratchTmp, uvScratchDst, uvW, uvH, uvRadius);
+            System.arraycopy(uvScratchSrc, 0, uvScratchDst, 0, uvW * uvH);
+            boxBlur2D(uvScratchSrc, uvScratchTmp, uvScratchBlur, uvW, uvH, uvRadius);
+
+            for (int py = 0; py < uvH; py++) {
+                float normY = (py + 0.5f) * invUvH;
+                int rowOffset = py * uvW;
+                for (int px = 0; px < uvW; px++) {
+                    float normX = (px + 0.5f) * invUvW;
+                    float featherAlpha = computeSelectiveFaceAlpha(normX, normY, faces);
+                    if (featherAlpha > 0.001f) {
+                        int idx = rowOffset + px;
+                        int origV = uvScratchSrc[idx] & 0xFF;
+                        int blurV = uvScratchBlur[idx] & 0xFF;
+                        uvScratchDst[idx] = (byte) Math.round(origV * (1.0f - featherAlpha) + blurV * featherAlpha);
+                    }
+                }
+            }
             for (int row = 0; row < uvH; row++) {
                 dstV.position(row * dstStrideV);
                 dstV.put(uvScratchDst, row * uvW, uvW);
@@ -611,7 +762,7 @@ public class CallVideoDevice {
             }
         }
 
-        // 4. AR Anonymous Procedural Camera Masks (#211)
+        // 4. AR Anonymous Procedural Camera Masks (#211) pinned to live landmarks & head rotation
         if (needArMask) {
             com.m3.veil.utils.VeilArMaskRenderer.getInstance().applyMaskToI420Yuv(
                     dst, dst, w, h, maskMode, trust, android.os.SystemClock.uptimeMillis()
@@ -664,12 +815,14 @@ public class CallVideoDevice {
         if (yScratchSrc == null || yScratchSrc.length < ySize) {
             yScratchSrc = new byte[ySize];
             yScratchTmp = new byte[ySize];
+            yScratchBlur = new byte[ySize];
             yScratchDst = new byte[ySize];
         }
         int uvSize = ((w + 1) / 2) * ((h + 1) / 2);
         if (uvScratchSrc == null || uvScratchSrc.length < uvSize) {
             uvScratchSrc = new byte[uvSize];
             uvScratchTmp = new byte[uvSize];
+            uvScratchBlur = new byte[uvSize];
             uvScratchDst = new byte[uvSize];
         }
     }

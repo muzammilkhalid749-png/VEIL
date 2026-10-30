@@ -3406,6 +3406,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     boolean stickerHasReply = message.getReplyToMessageId() != null && !message.getReplyToMessageId().isEmpty();
                     if (messageBubble != null && !stickerHasReply) {
                         messageBubble.setPadding(0, 0, 0, 0);
+                        messageBubble.setBackground(null);
                     }
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);
@@ -4911,6 +4912,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     boolean stickerHasReply = message.getReplyToMessageId() != null && !message.getReplyToMessageId().isEmpty();
                     if (messageBubble != null && !stickerHasReply) {
                         messageBubble.setPadding(0, 0, 0, 0);
+                        messageBubble.setBackground(null);
                     }
                     if (imageMessageContainer != null) {
                         imageMessageContainer.setVisibility(View.VISIBLE);

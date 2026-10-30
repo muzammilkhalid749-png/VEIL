@@ -32,6 +32,11 @@ import java.util.concurrent.Executors;
 
 public class FullGalleryGridAdapter extends RecyclerView.Adapter<FullGalleryGridAdapter.MediaGridViewHolder> {
 
+    public enum SelectionMode {
+        SINGLE_SELECT,
+        MULTI_SELECT
+    }
+
     public interface OnGalleryInteractionListener {
         void onMediaItemClicked(GalleryMediaItem item);
         void onSelectionChanged(List<GalleryMediaItem> selectedItems);
@@ -40,6 +45,7 @@ public class FullGalleryGridAdapter extends RecyclerView.Adapter<FullGalleryGrid
     private final List<GalleryMediaItem> items;
     private final List<GalleryMediaItem> selectedItems = new ArrayList<>();
     private final OnGalleryInteractionListener listener;
+    private SelectionMode selectionMode = SelectionMode.SINGLE_SELECT;
     private static final ExecutorService executor = Executors.newFixedThreadPool(4, r -> {
         Thread t = new Thread(r, "VeilFullGalleryThumb");
         t.setDaemon(true);
@@ -51,6 +57,10 @@ public class FullGalleryGridAdapter extends RecyclerView.Adapter<FullGalleryGrid
     public FullGalleryGridAdapter(List<GalleryMediaItem> items, OnGalleryInteractionListener listener) {
         this.items = items;
         this.listener = listener;
+    }
+
+    public SelectionMode getSelectionMode() {
+        return selectionMode;
     }
 
     @NonNull
@@ -78,37 +88,47 @@ public class FullGalleryGridAdapter extends RecyclerView.Adapter<FullGalleryGrid
             holder.layoutVideoDuration.setVisibility(View.GONE);
         }
 
-        // Multi-select state
+        // Multi-select state vs Single-select default state
         boolean isSelected = item.isSelected();
         holder.viewSelectionOverlay.setVisibility(isSelected ? View.VISIBLE : View.GONE);
-        holder.layoutSelectionBadge.setBackgroundResource(
-                isSelected ? R.drawable.bg_voice_circle_received : R.drawable.bg_circle_translucent
-        );
 
-        if (isSelected && item.getSelectionIndex() > 0) {
-            holder.tvSelectionNumber.setText(String.valueOf(item.getSelectionIndex()));
-            holder.tvSelectionNumber.setVisibility(View.VISIBLE);
+        if (selectionMode == SelectionMode.MULTI_SELECT) {
+            holder.layoutSelectionBadge.setVisibility(View.VISIBLE);
+            holder.layoutSelectionBadge.setBackgroundResource(
+                    isSelected ? R.drawable.bg_voice_circle_received : R.drawable.bg_circle_translucent
+            );
+            if (isSelected && item.getSelectionIndex() > 0) {
+                holder.tvSelectionNumber.setText(String.valueOf(item.getSelectionIndex()));
+                holder.tvSelectionNumber.setVisibility(View.VISIBLE);
+            } else {
+                holder.tvSelectionNumber.setVisibility(View.GONE);
+            }
         } else {
+            holder.layoutSelectionBadge.setVisibility(View.GONE);
             holder.tvSelectionNumber.setVisibility(View.GONE);
         }
 
-        // Tap cell
+        // Single Tap: In SINGLE_SELECT mode, immediately open preview; in MULTI_SELECT mode, toggle selection
         holder.itemView.setOnClickListener(v -> {
-            if (!selectedItems.isEmpty()) {
-                // If in multi-select mode, cell tap toggles selection
+            if (selectionMode == SelectionMode.MULTI_SELECT || !selectedItems.isEmpty()) {
                 toggleSelection(item, holder.getAdapterPosition());
             } else {
                 if (listener != null) listener.onMediaItemClicked(item);
             }
         });
 
-        // Tap badge directly toggles multi-select
+        // Badge tap when in MULTI_SELECT mode
         holder.layoutSelectionBadge.setOnClickListener(v -> {
-            toggleSelection(item, holder.getAdapterPosition());
+            if (selectionMode == SelectionMode.MULTI_SELECT) {
+                toggleSelection(item, holder.getAdapterPosition());
+            }
         });
 
-        // Long press starts multi-select
+        // Long Press: Transition from SINGLE_SELECT to MULTI_SELECT and select the item
         holder.itemView.setOnLongClickListener(v -> {
+            if (selectionMode == SelectionMode.SINGLE_SELECT) {
+                selectionMode = SelectionMode.MULTI_SELECT;
+            }
             toggleSelection(item, holder.getAdapterPosition());
             return true;
         });
@@ -119,16 +139,19 @@ public class FullGalleryGridAdapter extends RecyclerView.Adapter<FullGalleryGrid
             item.setSelected(false);
             item.setSelectionIndex(-1);
             selectedItems.remove(item);
-            // Re-index remaining selected items (1, 2, 3...) like WhatsApp
             for (int i = 0; i < selectedItems.size(); i++) {
                 selectedItems.get(i).setSelectionIndex(i + 1);
             }
+            if (selectedItems.isEmpty()) {
+                selectionMode = SelectionMode.SINGLE_SELECT;
+            }
             notifyDataSetChanged();
         } else {
+            selectionMode = SelectionMode.MULTI_SELECT;
             item.setSelected(true);
             selectedItems.add(item);
             item.setSelectionIndex(selectedItems.size());
-            notifyItemChanged(position);
+            notifyDataSetChanged();
         }
 
         if (listener != null) {
@@ -142,6 +165,7 @@ public class FullGalleryGridAdapter extends RecyclerView.Adapter<FullGalleryGrid
             it.setSelectionIndex(-1);
         }
         selectedItems.clear();
+        selectionMode = SelectionMode.SINGLE_SELECT;
         notifyDataSetChanged();
         if (listener != null) {
             listener.onSelectionChanged(selectedItems);

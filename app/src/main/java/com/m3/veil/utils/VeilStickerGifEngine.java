@@ -1081,19 +1081,19 @@ public class VeilStickerGifEngine {
     }
 
     /**
-     * Computes WhatsApp/Telegram-standard 1:1 Square sticker display [widthPx, heightPx] (174dp x 174dp).
-     * Stickers always render in a 1:1 square box in chat regardless of source media orientation.
+     * Computes 1:1 Square sticker display [widthPx, heightPx] (140dp x 140dp) per Phase 8 specification.
+     * Stickers always render at 140dp x 140dp with a transparent background and floating timestamp badge.
      */
     @NonNull
     public static int[] computeStickerSizePx(@NonNull Context context, @Nullable Message message) {
         float dp = context.getResources().getDisplayMetrics().density;
-        int sq = Math.round(174f * dp);
+        int sq = Math.round(140f * dp);
         return new int[]{sq, sq};
     }
 
     @NonNull
     public static int[] computeStickerSizeFromIntrinsic(float dp, int intrinsicW, int intrinsicH) {
-        int sq = Math.round(174f * dp);
+        int sq = Math.round(140f * dp);
         return new int[]{sq, sq};
     }
 
@@ -1327,6 +1327,19 @@ public class VeilStickerGifEngine {
                 return p;
             }
         }
+        try {
+            com.m3.veil.VeilApplication app = com.m3.veil.VeilApplication.getInstance();
+            if (app != null) {
+                com.m3.veil.manager.StickerRepository repo = com.m3.veil.manager.StickerRepository.getInstance(app);
+                for (com.m3.veil.manager.StickerRepository.StickerPackMeta pack : repo.getAllStorePacks()) {
+                    for (com.m3.veil.manager.StickerRepository.StickerItem item : pack.stickers) {
+                        if (item.code.equalsIgnoreCase(clean) || item.emoji.equals(clean)) {
+                            return item.toPreset();
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
         // Dynamic animated sticker for any custom pack emoji or custom text sticker with varied natural sizes!
         String inner = clean;
         if (inner.startsWith("[STICKER:") && inner.endsWith("]")) {

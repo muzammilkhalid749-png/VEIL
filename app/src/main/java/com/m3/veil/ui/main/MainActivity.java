@@ -155,9 +155,16 @@ public class MainActivity extends AppCompatActivity {
                 });
     }
 
+    private final com.m3.veil.manager.PersonaManager.PersonaSwitchListener personaSwitchListener = newActivePersona -> {
+        if (!isDestroyed() && viewPager != null) {
+            updateToolbarForTab(viewPager.getCurrentItem());
+        }
+    };
+
     @Override
     protected void onResume() {
         super.onResume();
+        com.m3.veil.manager.PersonaManager.getInstance(this).addPersonaSwitchListener(personaSwitchListener);
         if (viewPager != null) {
             updateToolbarForTab(viewPager.getCurrentItem());
         }
@@ -183,6 +190,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        com.m3.veil.manager.PersonaManager.getInstance(this).removePersonaSwitchListener(personaSwitchListener);
         WebRtcManager.getInstance(this).removeEventListener(globalCallListener);
     }
 

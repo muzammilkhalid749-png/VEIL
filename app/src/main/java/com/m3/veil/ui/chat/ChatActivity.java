@@ -1492,6 +1492,9 @@ public class ChatActivity extends AppCompatActivity {
             messageEditText.setImeOptions(messageEditText.getImeOptions() | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
         }
 
+        // Phase 4: Live WYSIWYG Markdown inline formatting (*bold*, _italic_, ~strikethrough~, `monospace`)
+        com.m3.veil.utils.MarkdownTextWatcher.attachTo(messageEditText);
+
         // Restore per-chat draft if available
         if (chatId != null) {
             String savedDraft = getSharedPreferences("VeilChatDrafts", Context.MODE_PRIVATE).getString("draft_" + chatId, "");

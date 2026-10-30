@@ -379,7 +379,17 @@ public class UserProfileActivity extends AppCompatActivity {
         if (tvParticipantsHeader != null) {
             tvParticipantsHeader.setText((isChan ? "Subscribers (" : "Participants (") + participants.size() + ")");
         }
-        boolean amIAdmin = chat == null || currentUserId == null || chat.isAdmin(currentUserId);
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(this);
+        if (chat != null && participants != null && !participants.isEmpty()) {
+            String ownerId = chat.getAdminId() != null ? chat.getAdminId() : currentUserId;
+            db.saveGroupMembers(chatId, participants, ownerId);
+        }
+        String myRole = db.getGroupMemberRole(chatId, currentUserId);
+        boolean amIOwner = EncryptedChatDatabase.ROLE_OWNER.equals(myRole)
+                || (chat != null && currentUserId != null && currentUserId.equals(chat.getAdminId()));
+        boolean amIAdmin = amIOwner
+                || EncryptedChatDatabase.ROLE_ADMIN.equals(myRole)
+                || (chat != null && currentUserId != null && chat.isAdmin(currentUserId));
         float dp = getResources().getDisplayMetrics().density;
         for (String pId : participants) {
             LinearLayout row = new LinearLayout(this);
@@ -412,7 +422,7 @@ public class UserProfileActivity extends AppCompatActivity {
             tvName.setTypeface(null, Typeface.BOLD);
             tvName.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
             com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
-                    EncryptedChatDatabase.getInstance(this).getSovereignProfileManifest(pId);
+                    db.getSovereignProfileManifest(pId);
             if (pId.equals(currentUserId)) {
                 com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest myProfile =
                         com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(this);
@@ -446,18 +456,22 @@ public class UserProfileActivity extends AppCompatActivity {
 
             row.addView(info);
 
-            boolean isMemberAdmin = chat != null && chat.isAdmin(pId);
-            boolean isCreator = chat != null && pId.equals(chat.getAdminId());
-            if (isMemberAdmin) {
-                TextView badge = new TextView(this);
-                badge.setText(isCreator ? "👑 Owner" : "🛡️ Admin");
-                badge.setTextSize(11f);
-                badge.setTypeface(null, Typeface.BOLD);
-                badge.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
-                badge.setBackgroundResource(R.drawable.bg_filter_chip);
-                badge.setPadding((int) (8 * dp), (int) (3 * dp), (int) (8 * dp), (int) (3 * dp));
-                row.addView(badge);
-            }
+            String memberRole = db.getGroupMemberRole(chatId, pId);
+            boolean isCreator = EncryptedChatDatabase.ROLE_OWNER.equals(memberRole)
+                    || (chat != null && pId.equals(chat.getAdminId()));
+            boolean isMemberAdmin = isCreator
+                    || EncryptedChatDatabase.ROLE_ADMIN.equals(memberRole)
+                    || (chat != null && chat.isAdmin(pId));
+            TextView badge = new TextView(this);
+            badge.setText(isCreator ? "👑 Owner" : (isMemberAdmin ? "🛡️ Admin" : "👤 Member"));
+            badge.setTextSize(11f);
+            badge.setTypeface(null, Typeface.BOLD);
+            badge.setTextColor(isMemberAdmin
+                    ? ContextCompat.getColor(this, R.color.colorPrimary)
+                    : ContextCompat.getColor(this, R.color.colorTextSecondary));
+            badge.setBackgroundResource(R.drawable.bg_filter_chip);
+            badge.setPadding((int) (8 * dp), (int) (3 * dp), (int) (8 * dp), (int) (3 * dp));
+            row.addView(badge);
 
             final String[] resolvedDisplayName = {label};
             FirebaseFirestore.getInstance().collection("users").document(pId).get()
@@ -504,8 +518,23 @@ public class UserProfileActivity extends AppCompatActivity {
 
     private void showMemberAdminActionsSheet(String targetUserId, String displayName, boolean isCurrentlyAdmin) {
         if (chatId == null) return;
-        Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(this);
+        Chat chat = db.getChat(chatId);
         if (chat == null) return;
+
+        String myRole = db.getGroupMemberRole(chatId, currentUserId);
+        String targetRole = db.getGroupMemberRole(chatId, targetUserId);
+        boolean amIOwner = EncryptedChatDatabase.ROLE_OWNER.equals(myRole)
+                || (currentUserId != null && currentUserId.equals(chat.getAdminId()));
+        boolean isTargetOwner = EncryptedChatDatabase.ROLE_OWNER.equals(targetRole)
+                || targetUserId.equals(chat.getAdminId());
+
+        if (isTargetOwner && !amIOwner) {
+            Toast.makeText(this, "Admins cannot modify or remove the Group Owner", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        int currentPerms = db.getGroupMemberPermissions(chatId, targetUserId);
 
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         float dp = getResources().getDisplayMetrics().density;
@@ -519,17 +548,78 @@ public class UserProfileActivity extends AppCompatActivity {
         title.setTextSize(18f);
         title.setTypeface(null, Typeface.BOLD);
         title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
-        title.setPadding(0, 0, 0, (int) (16 * dp));
+        title.setPadding(0, 0, 0, (int) (4 * dp));
         root.addView(title);
 
+        TextView roleSub = new TextView(this);
+        roleSub.setText("Current Role: " + (isTargetOwner ? "👑 OWNER" : (isCurrentlyAdmin ? "🛡️ ADMIN" : "👤 MEMBER")));
+        roleSub.setTextSize(13f);
+        roleSub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+        roleSub.setPadding(0, 0, 0, (int) (14 * dp));
+        root.addView(roleSub);
+
+        // Granular Per-Member Permissions Checkboxes (permissions_bitmask)
+        android.widget.CheckBox cbCanSend = new android.widget.CheckBox(this);
+        cbCanSend.setText("💬 Can Send Messages");
+        cbCanSend.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        cbCanSend.setChecked((currentPerms & EncryptedChatDatabase.PERM_CAN_SEND_MESSAGES) != 0);
+        root.addView(cbCanSend);
+
+        android.widget.CheckBox cbCanAdd = new android.widget.CheckBox(this);
+        cbCanAdd.setText("➕ Can Add Members");
+        cbCanAdd.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        cbCanAdd.setChecked((currentPerms & EncryptedChatDatabase.PERM_CAN_ADD_MEMBERS) != 0);
+        root.addView(cbCanAdd);
+
+        android.widget.CheckBox cbCanPin = new android.widget.CheckBox(this);
+        cbCanPin.setText("📌 Can Pin Messages");
+        cbCanPin.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        cbCanPin.setChecked((currentPerms & EncryptedChatDatabase.PERM_CAN_PIN_MESSAGES) != 0);
+        root.addView(cbCanPin);
+
+        android.widget.CheckBox cbCanChangeInfo = new android.widget.CheckBox(this);
+        cbCanChangeInfo.setText("✏️ Can Change Group Info");
+        cbCanChangeInfo.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        cbCanChangeInfo.setChecked((currentPerms & EncryptedChatDatabase.PERM_CAN_CHANGE_INFO) != 0);
+        LinearLayout.LayoutParams cbLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cbLp.bottomMargin = (int) (12 * dp);
+        cbCanChangeInfo.setLayoutParams(cbLp);
+        root.addView(cbCanChangeInfo);
+
+        MaterialButton btnSavePerms = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnSavePerms.setText("💾 Save Member Permissions");
+        btnSavePerms.setCornerRadius((int) (12 * dp));
+        LinearLayout.LayoutParams lpPerms = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lpPerms.bottomMargin = (int) (10 * dp);
+        btnSavePerms.setLayoutParams(lpPerms);
+        btnSavePerms.setOnClickListener(v -> {
+            int newBitmask = 0;
+            if (cbCanSend.isChecked()) newBitmask |= EncryptedChatDatabase.PERM_CAN_SEND_MESSAGES;
+            if (cbCanAdd.isChecked()) newBitmask |= EncryptedChatDatabase.PERM_CAN_ADD_MEMBERS;
+            if (cbCanPin.isChecked()) newBitmask |= EncryptedChatDatabase.PERM_CAN_PIN_MESSAGES;
+            if (cbCanChangeInfo.isChecked()) newBitmask |= EncryptedChatDatabase.PERM_CAN_CHANGE_INFO;
+            String roleToKeep = isCurrentlyAdmin ? EncryptedChatDatabase.ROLE_ADMIN : EncryptedChatDatabase.ROLE_MEMBER;
+            com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                    .updateGroupMemberRoleAndPermissions(chatId, targetUserId, roleToKeep, newBitmask);
+            Toast.makeText(this, "Permissions updated for " + displayName, Toast.LENGTH_SHORT).show();
+            sheet.dismiss();
+            loadAndRenderGroupMembers();
+        });
+        root.addView(btnSavePerms);
+
+        // Promote / Dismiss as Admin (ROLE_UPDATE)
         MaterialButton btnToggleAdmin = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
-        btnToggleAdmin.setText(isCurrentlyAdmin ? "Dismiss as Admin" : "👑 Promote to Group Admin");
+        btnToggleAdmin.setText(isCurrentlyAdmin ? "Dismiss as Admin" : "👑 Make Group Admin");
         btnToggleAdmin.setCornerRadius((int) (12 * dp));
         LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         lp1.bottomMargin = (int) (10 * dp);
         btnToggleAdmin.setLayoutParams(lp1);
         btnToggleAdmin.setOnClickListener(v -> {
             sheet.dismiss();
+            String newRole = isCurrentlyAdmin ? EncryptedChatDatabase.ROLE_MEMBER : EncryptedChatDatabase.ROLE_ADMIN;
+            int newPerms = isCurrentlyAdmin ? EncryptedChatDatabase.PERM_DEFAULT_MEMBER : EncryptedChatDatabase.PERM_ALL_ADMIN;
             if (isCurrentlyAdmin) {
                 chat.removeAdmin(targetUserId);
                 FirebaseFirestore.getInstance().collection("groups").document(chatId)
@@ -539,8 +629,8 @@ public class UserProfileActivity extends AppCompatActivity {
                 FirebaseFirestore.getInstance().collection("groups").document(chatId)
                         .update("adminIds", FieldValue.arrayUnion(targetUserId));
             }
-            EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
-            WebRtcManager.getInstance(this).sendGroupInviteToPeers(chat);
+            com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                    .updateGroupMemberRoleAndPermissions(chatId, targetUserId, newRole, newPerms);
 
             String myName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
             String roleText = isCurrentlyAdmin
@@ -556,6 +646,43 @@ public class UserProfileActivity extends AppCompatActivity {
         });
         root.addView(btnToggleAdmin);
 
+        // Transfer Group Ownership (visible only to OWNER)
+        if (amIOwner && !isTargetOwner) {
+            MaterialButton btnTransferOwner = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+            btnTransferOwner.setText("👑 Transfer Group Ownership to " + displayName);
+            btnTransferOwner.setCornerRadius((int) (12 * dp));
+            LinearLayout.LayoutParams lpTransfer = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lpTransfer.bottomMargin = (int) (10 * dp);
+            btnTransferOwner.setLayoutParams(lpTransfer);
+            btnTransferOwner.setOnClickListener(v -> {
+                sheet.dismiss();
+                com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                        .transferGroupOwnership(chatId, targetUserId);
+                FirebaseFirestore.getInstance().collection("groups").document(chatId)
+                        .update(
+                                "adminId", targetUserId,
+                                "adminIds", FieldValue.arrayUnion(targetUserId)
+                        );
+                String myName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
+                Message transferNotice = new Message(
+                        UUID.randomUUID().toString(),
+                        currentUserId,
+                        chatId,
+                        "👑 " + (myName != null ? myName : "Owner") + " transferred Group Ownership to " + displayName,
+                        Timestamp.now(),
+                        "text"
+                );
+                transferNotice.setChatId(chatId);
+                transferNotice.setSenderName(myName);
+                com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(chat, null, transferNotice);
+                Toast.makeText(this, "Ownership transferred to " + displayName + " (you are now an Admin)", Toast.LENGTH_LONG).show();
+                loadAndRenderGroupMembers();
+            });
+            root.addView(btnTransferOwner);
+        }
+
+        // Remove Participant (GROUP_MEMBER_REMOVED + Sender-Key Ratchet Rotation)
         MaterialButton btnRemove = new MaterialButton(this);
         btnRemove.setText("🚫 Remove from Group");
         btnRemove.setCornerRadius((int) (12 * dp));
@@ -564,26 +691,22 @@ public class UserProfileActivity extends AppCompatActivity {
         btnRemove.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         btnRemove.setOnClickListener(v -> {
             sheet.dismiss();
-            if (chat.getParticipants() != null) {
-                chat.getParticipants().remove(targetUserId);
-            }
-            chat.removeAdmin(targetUserId);
-            EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
-            int rotatedEpoch = com.m3.veil.utils.EncryptionManager.rotateGroupSenderKeyEpoch(chatId);
+            com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                    .removeParticipantFromGroup(chatId, targetUserId);
+            int rotatedEpoch = com.m3.veil.utils.EncryptionManager.getGroupSenderKeyEpoch(chatId);
             FirebaseFirestore.getInstance().collection("groups").document(chatId)
                     .update(
                             "participants", FieldValue.arrayRemove(targetUserId),
                             "adminIds", FieldValue.arrayRemove(targetUserId),
                             "groupKeyEpoch", rotatedEpoch
                     );
-            WebRtcManager.getInstance(this).sendGroupInviteToPeers(chat);
 
             String myName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
             Message removeNotice = new Message(
                     UUID.randomUUID().toString(),
                     currentUserId,
                     chatId,
-                    "🚫 " + displayName + " was removed from the group (Sender-Key rotated to Epoch #" + rotatedEpoch + ")",
+                    "🚫 " + displayName + " was removed from the group (Sender-Key rotated)",
                     Timestamp.now(),
                     "text"
             );
@@ -591,7 +714,7 @@ public class UserProfileActivity extends AppCompatActivity {
             removeNotice.setSenderName(myName);
             com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(chat, null, removeNotice);
 
-            Toast.makeText(this, displayName + " removed & group keys rotated", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, displayName + " removed & group sender keys rotated", Toast.LENGTH_SHORT).show();
             loadAndRenderGroupMembers();
         });
         root.addView(btnRemove);
@@ -600,22 +723,48 @@ public class UserProfileActivity extends AppCompatActivity {
         sheet.show();
     }
 
+    /**
+     * Phase 6: Multi-select Add Participant BottomSheet that lists local P2P contacts & remote users,
+     * filters/disables existing group members ("Already in group"), and dispatches GROUP_MEMBER_JOINED.
+     */
     private void showAddParticipantDialog() {
-        FirebaseFirestore.getInstance().collection("users").limit(30).get()
-                .addOnSuccessListener(snapshots -> {
-                    List<User> candidates = new ArrayList<>();
-                    Chat chat = chatId != null ? EncryptedChatDatabase.getInstance(this).getChat(chatId) : null;
-                    List<String> existing = chat != null && chat.getParticipants() != null ? chat.getParticipants() : new ArrayList<>();
+        Chat chat = chatId != null ? EncryptedChatDatabase.getInstance(this).getChat(chatId) : null;
+        final List<String> existing = chat != null && chat.getParticipants() != null
+                ? new ArrayList<>(chat.getParticipants()) : new ArrayList<>();
 
-                    for (DocumentSnapshot doc : snapshots.getDocuments()) {
-                        User u = doc.toObject(User.class);
-                        if (u != null && u.getUserId() != null && !existing.contains(u.getUserId())) {
-                            candidates.add(u);
+        // Gather local P2P contacts from existing 1-on-1 dialogs + Sovereign manifests first
+        final java.util.Map<String, User> candidateMap = new java.util.LinkedHashMap<>();
+        List<Chat> allChats = EncryptedChatDatabase.getInstance(this).getAllChats();
+        for (Chat c : allChats) {
+            if (c != null && !c.isGroup() && c.getParticipants() != null) {
+                for (String pId : c.getParticipants()) {
+                    if (pId != null && !pId.equals(currentUserId) && !existing.contains(pId)) {
+                        User u = new User();
+                        u.setUserId(pId);
+                        u.setDisplayName(c.getName() != null ? c.getName() : "Peer #" + pId.substring(0, Math.min(4, pId.length())));
+                        u.setUsername(c.getHandle() != null ? c.getHandle() : pId.substring(0, Math.min(6, pId.length())));
+                        candidateMap.put(pId, u);
+                    }
+                }
+            }
+        }
+
+        FirebaseFirestore.getInstance().collection("users").limit(50).get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        for (DocumentSnapshot doc : task.getResult().getDocuments()) {
+                            User u = doc.toObject(User.class);
+                            if (u != null && u.getUserId() != null
+                                    && !u.getUserId().equals(currentUserId)
+                                    && !existing.contains(u.getUserId())) {
+                                candidateMap.put(u.getUserId(), u);
+                            }
                         }
                     }
 
+                    List<User> candidates = new ArrayList<>(candidateMap.values());
                     if (candidates.isEmpty()) {
-                        Toast.makeText(this, "No more users available to add", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "All known contacts are already in this group", Toast.LENGTH_SHORT).show();
                         return;
                     }
 
@@ -623,27 +772,50 @@ public class UserProfileActivity extends AppCompatActivity {
                     float dp = getResources().getDisplayMetrics().density;
                     LinearLayout root = new LinearLayout(this);
                     root.setOrientation(LinearLayout.VERTICAL);
+                    root.setBackgroundResource(R.drawable.bottom_sheet_background);
                     root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
 
                     TextView title = new TextView(this);
-                    title.setText("Add Participant to Group");
+                    title.setText("Add Participants to Group");
                     title.setTextSize(18f);
                     title.setTypeface(null, Typeface.BOLD);
                     title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
-                    title.setPadding(0, 0, 0, (int) (16 * dp));
+                    title.setPadding(0, 0, 0, (int) (4 * dp));
                     root.addView(title);
 
+                    TextView subtitle = new TextView(this);
+                    subtitle.setText("Select one or more contacts (existing members are filtered out)");
+                    subtitle.setTextSize(12.5f);
+                    subtitle.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+                    subtitle.setPadding(0, 0, 0, (int) (12 * dp));
+                    root.addView(subtitle);
+
+                    final java.util.Set<String> selectedIds = new java.util.LinkedHashSet<>();
+                    final java.util.Map<String, String> selectedNames = new java.util.HashMap<>();
+
+                    MaterialButton btnConfirmAdd = new MaterialButton(this);
+                    btnConfirmAdd.setText("Add Selected (0)");
+                    btnConfirmAdd.setEnabled(false);
+                    btnConfirmAdd.setCornerRadius((int) (12 * dp));
+
+                    android.widget.ScrollView listScroll = new android.widget.ScrollView(this);
+                    LinearLayout listContainer = new LinearLayout(this);
+                    listContainer.setOrientation(LinearLayout.VERTICAL);
+
                     for (User u : candidates) {
-                        String dn = u.getDisplayName() != null ? u.getDisplayName() : u.getUsername();
-                        String handle = u.getUsername() != null ? "@" + u.getUsername() : "";
+                        final String uid = u.getUserId();
+                        final String dn = u.getDisplayName() != null && !u.getDisplayName().isEmpty()
+                                ? u.getDisplayName()
+                                : (u.getUsername() != null ? u.getUsername() : "Peer");
+                        String handle = u.getUsername() != null ? "@" + u.getUsername().replace("@", "") : "";
 
                         LinearLayout row = new LinearLayout(this);
                         row.setOrientation(LinearLayout.HORIZONTAL);
                         row.setGravity(Gravity.CENTER_VERTICAL);
-                        row.setPadding((int) (12 * dp), (int) (10 * dp), (int) (12 * dp), (int) (10 * dp));
+                        row.setPadding((int) (10 * dp), (int) (10 * dp), (int) (10 * dp), (int) (10 * dp));
 
                         TextView avatar = new TextView(this);
-                        avatar.setText(dn != null && !dn.isEmpty() ? dn.substring(0, 1).toUpperCase() : "?");
+                        avatar.setText(!dn.isEmpty() ? dn.substring(0, 1).toUpperCase() : "?");
                         avatar.setTextColor(ContextCompat.getColor(this, android.R.color.white));
                         avatar.setTextSize(15f);
                         avatar.setTypeface(null, Typeface.BOLD);
@@ -656,6 +828,7 @@ public class UserProfileActivity extends AppCompatActivity {
 
                         LinearLayout col = new LinearLayout(this);
                         col.setOrientation(LinearLayout.VERTICAL);
+                        col.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
                         TextView tvName = new TextView(this);
                         tvName.setText(dn);
@@ -673,35 +846,60 @@ public class UserProfileActivity extends AppCompatActivity {
                         }
                         row.addView(col);
 
+                        android.widget.CheckBox cbSelect = new android.widget.CheckBox(this);
+                        cbSelect.setClickable(false);
+                        row.addView(cbSelect);
+
                         row.setOnClickListener(v -> {
-                            sheet.dismiss();
-                            addParticipantToGroup(u.getUserId(), u.getDisplayName());
+                            boolean nowSelected = !selectedIds.contains(uid);
+                            if (nowSelected) {
+                                selectedIds.add(uid);
+                                selectedNames.put(uid, dn);
+                            } else {
+                                selectedIds.remove(uid);
+                                selectedNames.remove(uid);
+                            }
+                            cbSelect.setChecked(nowSelected);
+                            btnConfirmAdd.setEnabled(!selectedIds.isEmpty());
+                            btnConfirmAdd.setText("Add Selected (" + selectedIds.size() + ")");
                         });
 
-                        root.addView(row);
+                        listContainer.addView(row);
                     }
+
+                    listScroll.addView(listContainer);
+                    LinearLayout.LayoutParams scrollLp = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, (int) (280 * dp));
+                    scrollLp.bottomMargin = (int) (14 * dp);
+                    listScroll.setLayoutParams(scrollLp);
+                    root.addView(listScroll);
+
+                    btnConfirmAdd.setOnClickListener(v -> {
+                        sheet.dismiss();
+                        for (String uid : selectedIds) {
+                            addParticipantToGroup(uid, selectedNames.get(uid));
+                        }
+                    });
+                    root.addView(btnConfirmAdd);
+
                     sheet.setContentView(root);
                     sheet.show();
-                })
-                .addOnFailureListener(e -> Toast.makeText(this, "Failed to load users", Toast.LENGTH_SHORT).show());
+                });
     }
 
     private void addParticipantToGroup(String newUserId, String name) {
-        if (chatId == null) return;
+        if (chatId == null || newUserId == null) return;
         Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
         if (chat == null) return;
         if (chat.getParticipants() == null) {
             chat.setParticipants(new ArrayList<>());
         }
         if (!chat.getParticipants().contains(newUserId)) {
-            chat.getParticipants().add(newUserId);
-            EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
+            List<String> added = new ArrayList<>();
+            added.add(newUserId);
+            com.m3.veil.manager.VeilMessagesController.getInstance(this).addParticipantsToGroup(chatId, added);
             FirebaseFirestore.getInstance().collection("groups").document(chatId)
                     .update("participants", FieldValue.arrayUnion(newUserId));
-
-            // Send full group invite & initiate WebRTC connection so new member receives the group immediately
-            WebRtcManager.getInstance(this).sendGroupInviteToPeers(chat);
-            WebRtcManager.getInstance(this).initiateConnection(newUserId);
 
             String myName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
             Message addNotice = new Message(

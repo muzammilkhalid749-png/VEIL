@@ -138,156 +138,54 @@ public class VeilFeatureManager {
 
     public void syncPrimaryPersonaWithUser(String username, String displayName, String bio, String mood) {
         try {
-            String handle = (!isShadowVeilOrGeneric(username))
-                    ? (username.trim().startsWith("@") ? username.trim() : "@" + username.trim())
-                    : ((!isShadowVeilOrGeneric(displayName))
-                            ? (displayName.trim().startsWith("@") ? displayName.trim() : "@" + displayName.trim())
-                            : resolveRealUserHandle());
-            JSONArray arr = new JSONArray(prefs.getString("personas_json", "[]"));
-            boolean updated = false;
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                if ("persona_primary".equals(o.optString("id"))) {
-                    if (!isShadowVeilOrGeneric(handle)) {
-                        o.put("name", handle);
-                        updated = true;
+            PersonaManager pm = PersonaManager.getInstance(appContext);
+            List<Persona> all = pm.getPersonas();
+            for (Persona p : all) {
+                if (PersonaManager.PRIMARY_PERSONA_ID.equals(p.getPersonaId())) {
+                    if (!isShadowVeilOrGeneric(displayName)) {
+                        p.setDisplayName(displayName.trim());
+                    } else if (!isShadowVeilOrGeneric(username)) {
+                        p.setDisplayName(username.trim().startsWith("@") ? username.trim().substring(1) : username.trim());
+                    }
+                    if (!isShadowVeilOrGeneric(username)) {
+                        p.setUsername(Persona.normalizeUsername(username));
                     }
                     if (bio != null && !bio.trim().isEmpty()) {
-                        o.put("bio", bio.trim());
-                        updated = true;
+                        p.setBio(bio.trim());
                     }
                     if (mood != null && !mood.trim().isEmpty()) {
-                        o.put("mood", mood.trim());
-                        updated = true;
+                        p.setMood(mood.trim());
                     }
+                    pm.saveOrUpdatePersona(p);
                     break;
                 }
-            }
-            if (updated) {
-                prefs.edit().putString("personas_json", arr.toString()).apply();
             }
         } catch (Exception ignored) {}
     }
 
     private void ensureDefaultPersonas() {
-        String json = prefs.getString("personas_json", null);
-        String realHandle = resolveRealUserHandle();
-        if (json == null || json.isEmpty()) {
-            try {
-                JSONArray arr = new JSONArray();
-
-                JSONObject p1 = new JSONObject();
-                p1.put("id", "persona_primary");
-                p1.put("name", realHandle);
-                p1.put("bio", "Primary zero-trace identity");
-                p1.put("mood", "🛡️ Encrypted");
-                p1.put("bubbleColor", "#0B57CF");
-                p1.put("temporary", false);
-                arr.put(p1);
-
-                JSONObject p2 = new JSONObject();
-                p2.put("id", "persona_ghost");
-                p2.put("name", "@MidnightDrifter");
-                p2.put("bio", "Ephemeral night owl persona");
-                p2.put("mood", "🌙 Incognito");
-                p2.put("bubbleColor", "#6A1B9A");
-                p2.put("temporary", true);
-                arr.put(p2);
-
-                JSONObject p3 = new JSONObject();
-                p3.put("id", "persona_neon");
-                p3.put("name", "@CyberPulse");
-                p3.put("bio", "VeilBoard creator & debater");
-                p3.put("mood", "⚡ Hyped");
-                p3.put("bubbleColor", "#00695C");
-                p3.put("temporary", false);
-                arr.put(p3);
-
-                prefs.edit()
-                        .putString("personas_json", arr.toString())
-                        .putString("active_persona_id", "persona_primary")
-                        .apply();
-            } catch (Exception ignored) {}
-        } else if (json.contains("ShadowVeil")) {
-            try {
-                JSONArray arr = new JSONArray(json);
-                boolean migrated = false;
-                for (int i = 0; i < arr.length(); i++) {
-                    JSONObject o = arr.getJSONObject(i);
-                    String name = o.optString("name");
-                    if ("persona_primary".equals(o.optString("id")) || isShadowVeilOrGeneric(name)) {
-                        o.put("name", realHandle);
-                        migrated = true;
-                    }
-                }
-                if (migrated) {
-                    prefs.edit().putString("personas_json", arr.toString()).apply();
-                }
-            } catch (Exception ignored) {}
-        }
+        try {
+            PersonaManager.getInstance(appContext).ensureInitializedAndRepaired();
+        } catch (Exception ignored) {}
     }
 
     public List<Persona> getPersonas() {
-        List<Persona> list = new ArrayList<>();
-        String realHandle = resolveRealUserHandle();
-        boolean needsSave = false;
-        try {
-            JSONArray arr = new JSONArray(prefs.getString("personas_json", "[]"));
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                String id = o.optString("id");
-                String name = o.optString("name");
-                if ("persona_primary".equals(id)) {
-                    if (isShadowVeilOrGeneric(name) || (!isShadowVeilOrGeneric(realHandle) && !realHandle.equalsIgnoreCase(name))) {
-                        name = realHandle;
-                        o.put("name", name);
-                        needsSave = true;
-                    }
-                } else if (isShadowVeilOrGeneric(name)) {
-                    name = realHandle;
-                    o.put("name", name);
-                    needsSave = true;
-                }
-                Persona p = new Persona(
-                        id,
-                        name,
-                        o.optString("bio"),
-                        o.optString("bubbleColor", "#0B57CF"),
-                        o.optString("mood", "✨ Active"),
-                        o.optBoolean("temporary", false),
-                        o.optLong("expiresAt", 0L)
-                );
-                list.add(p);
-            }
-            if (needsSave) {
-                prefs.edit().putString("personas_json", arr.toString()).apply();
-            }
-        } catch (Exception ignored) {}
-        return list;
+        return PersonaManager.getInstance(appContext).getPersonas();
     }
 
     public Persona getActivePersona() {
-        String activeId = prefs.getString("active_persona_id", "persona_primary");
-        List<Persona> all = getPersonas();
-        for (Persona p : all) {
-            if (p.getPersonaId().equals(activeId)) return p;
-        }
-        return all.isEmpty() ? new Persona("persona_primary", resolveRealUserHandle(), "Encrypted user", "#0B57CF", "🛡️ Encrypted", false) : all.get(0);
+        return PersonaManager.getInstance(appContext).getActivePersona();
     }
 
     public void setActivePersona(String personaId) {
-        prefs.edit().putString("active_persona_id", personaId).putBoolean("decoy_mode_active", false).apply();
-        com.m3.veil.database.EncryptedChatDatabase.switchActiveVault(appContext, personaId, false);
-        try {
-            VeilMessagesController.getInstance(appContext).switchActivePersonaVault();
-            VeilBoardController.getInstance(appContext).switchActivePersonaVault();
-            StatusController.getInstance(appContext).reloadForActiveVault();
-        } catch (Throwable ignored) {}
-        addXp(5);
+        prefs.edit().putBoolean("decoy_mode_active", false).apply();
+        if (PersonaManager.getInstance(appContext).switchPersona(personaId)) {
+            addXp(5);
+        }
     }
 
     public void activateDecoyVault(boolean isDecoy) {
-        String activeId = prefs.getString("active_persona_id", "persona_primary");
+        String activeId = PersonaManager.getInstance(appContext).getActivePersonaId();
         prefs.edit().putBoolean("decoy_mode_active", isDecoy).apply();
         com.m3.veil.database.EncryptedChatDatabase.switchActiveVault(appContext, activeId, isDecoy);
         try {
@@ -306,21 +204,18 @@ public class VeilFeatureManager {
     }
 
     public void updateActivePersonaDetails(String displayName, String bio) {
-        String activeId = prefs.getString("active_persona_id", "persona_primary");
         try {
-            JSONArray arr = new JSONArray(prefs.getString("personas_json", "[]"));
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                if (activeId.equals(o.optString("id"))) {
-                    if (displayName != null && !displayName.trim().isEmpty()) {
-                        String clean = displayName.startsWith("@") ? displayName.trim() : "@" + displayName.trim();
-                        o.put("name", clean);
-                    }
-                    if (bio != null) o.put("bio", bio.trim());
-                    break;
+            PersonaManager pm = PersonaManager.getInstance(appContext);
+            Persona active = pm.getActivePersona();
+            if (active != null) {
+                if (displayName != null && !displayName.trim().isEmpty()) {
+                    active.setDisplayName(displayName.trim());
                 }
+                if (bio != null) {
+                    active.setBio(bio.trim());
+                }
+                pm.saveOrUpdatePersona(active);
             }
-            prefs.edit().putString("personas_json", arr.toString()).apply();
         } catch (Exception ignored) {}
     }
 
@@ -334,27 +229,39 @@ public class VeilFeatureManager {
 
     public Persona addPersona(String displayName, String bio, String mood, String bubbleColorHex, boolean isTemporary, long durationMillis) {
         try {
-            JSONArray arr = new JSONArray(prefs.getString("personas_json", "[]"));
+            PersonaManager pm = PersonaManager.getInstance(appContext);
+            List<Persona> existing = pm.getPersonas();
+            if (!BillingManager.getInstance(appContext).canCreateNewPersona(existing.size())) {
+                return pm.getActivePersona();
+            }
             String id = "persona_" + UUID.randomUUID().toString().substring(0, 6);
-            String cleanName = displayName.startsWith("@") ? displayName : "@" + displayName;
+            String cleanDisplay = displayName != null ? displayName.trim().replaceFirst("^@", "") : "Masked Node";
+            String username = Persona.normalizeUsername(cleanDisplay);
+            if (pm.isUsernameTaken(username, id)) {
+                username = username + "_" + id.substring(Math.max(0, id.length() - 4));
+            }
             long expiresAt = (isTemporary && durationMillis > 0) ? (System.currentTimeMillis() + durationMillis) : 0L;
+            com.m3.veil.utils.UserPreferences up = new com.m3.veil.utils.UserPreferences(appContext);
+            String baseUid = up.getUserId();
+            String keyPairId = (!TextUtils.isEmpty(baseUid) ? baseUid : "node") + "_" + id;
 
-            JSONObject p = new JSONObject();
-            p.put("id", id);
-            p.put("name", cleanName);
-            p.put("bio", bio);
-            p.put("mood", mood != null && !mood.isEmpty() ? mood : "🎭 Masked");
-            p.put("bubbleColor", bubbleColorHex != null ? bubbleColorHex : "#0B57CF");
-            p.put("temporary", isTemporary);
-            p.put("expiresAt", expiresAt);
-            arr.put(p);
-
-            prefs.edit()
-                    .putString("personas_json", arr.toString())
-                    .apply();
-            setActivePersona(id);
+            Persona created = new Persona(
+                    id,
+                    cleanDisplay,
+                    username,
+                    "",
+                    bio != null ? bio : "Zero-trace persona",
+                    keyPairId,
+                    true,
+                    bubbleColorHex != null ? bubbleColorHex : "#0B57CF",
+                    mood != null && !mood.isEmpty() ? mood : "🎭 Masked",
+                    isTemporary,
+                    expiresAt
+            );
+            pm.saveOrUpdatePersona(created);
+            pm.switchPersona(id);
             addXp(20);
-            return new Persona(id, cleanName, bio, bubbleColorHex, mood, isTemporary, expiresAt);
+            return created;
         } catch (Exception e) {
             return getActivePersona();
         }
@@ -389,7 +296,6 @@ public class VeilFeatureManager {
                 }
                 dbFile.delete();
             }
-            // Also clean journal and WAL files
             java.io.File wal = new java.io.File(dbFile.getAbsolutePath() + "-wal");
             if (wal.exists()) wal.delete();
             java.io.File shm = new java.io.File(dbFile.getAbsolutePath() + "-shm");
@@ -400,27 +306,17 @@ public class VeilFeatureManager {
             android.util.Log.w("VeilFeatureManager", "Notice during persona vault shred: " + t.getMessage());
         }
 
-        // 2. Remove persona from JSON configuration
+        // 2. Remove persona from SQLite master table
         try {
-            JSONArray arr = new JSONArray(prefs.getString("personas_json", "[]"));
-            JSONArray newArr = new JSONArray();
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                if (!personaId.equals(o.optString("id"))) {
-                    newArr.put(o);
-                }
-            }
-            prefs.edit().putString("personas_json", newArr.toString()).apply();
+            com.m3.veil.database.EncryptedChatDatabase.getMasterDatabase(appContext).deletePersonaFromDb(personaId);
         } catch (Throwable t) {
-            android.util.Log.e("VeilFeatureManager", "Error updating personas JSON", t);
+            android.util.Log.e("VeilFeatureManager", "Error deleting persona from DB", t);
         }
 
         // 3. If active persona was deleted, fall back to persona_primary
-        String activeId = prefs.getString("active_persona_id", "persona_primary");
+        String activeId = PersonaManager.getInstance(appContext).getActivePersonaId();
         if (personaId.equals(activeId)) {
-            List<Persona> remaining = getPersonas();
-            String fallback = remaining.isEmpty() ? "persona_primary" : remaining.get(0).getPersonaId();
-            setActivePersona(fallback);
+            PersonaManager.getInstance(appContext).switchPersona(PersonaManager.PRIMARY_PERSONA_ID);
         }
 
         android.util.Log.i("VeilFeatureManager", "Ephemeral persona @" + personaId + " vault cryptographically shredded.");

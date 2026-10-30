@@ -34,15 +34,24 @@ import java.util.concurrent.Executors;
 
 public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
+    public enum SelectionMode {
+        SINGLE_SELECT,
+        MULTI_SELECT
+    }
+
     public interface OnGalleryItemClickListener {
         void onCameraTileClicked();
         void onMediaItemSelected(GalleryMediaItem item);
+        default void onSingleMediaItemClicked(GalleryMediaItem item) {
+            onMediaItemSelected(item);
+        }
         default void onMultiSelectionChanged(List<GalleryMediaItem> selectedItems) {}
     }
 
     private final List<GalleryMediaItem> items;
     private final List<GalleryMediaItem> selectedItems = new ArrayList<>();
     private final OnGalleryItemClickListener listener;
+    private SelectionMode selectionMode = SelectionMode.SINGLE_SELECT;
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -89,34 +98,62 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             vh.selectedOverlay.setVisibility(isSelected ? View.VISIBLE : View.GONE);
             vh.ivCheckmark.setVisibility(View.GONE);
 
-            if (isSelected) {
-                GradientDrawable greenCircle = new GradientDrawable();
-                greenCircle.setShape(GradientDrawable.OVAL);
-                greenCircle.setColor(Color.parseColor("#00A884"));
-                vh.selectionBadge.setBackground(greenCircle);
-                vh.tvSelectionNumber.setVisibility(View.VISIBLE);
-                vh.tvSelectionNumber.setText(String.valueOf(selIndex + 1));
+            if (selectionMode == SelectionMode.MULTI_SELECT) {
+                vh.selectionBadge.setVisibility(View.VISIBLE);
+                if (isSelected) {
+                    GradientDrawable greenCircle = new GradientDrawable();
+                    greenCircle.setShape(GradientDrawable.OVAL);
+                    greenCircle.setColor(Color.parseColor("#00A884"));
+                    vh.selectionBadge.setBackground(greenCircle);
+                    vh.tvSelectionNumber.setVisibility(View.VISIBLE);
+                    vh.tvSelectionNumber.setText(String.valueOf(selIndex + 1));
+                } else {
+                    vh.selectionBadge.setBackgroundResource(R.drawable.bg_circle_translucent);
+                    vh.tvSelectionNumber.setVisibility(View.GONE);
+                }
             } else {
-                vh.selectionBadge.setBackgroundResource(R.drawable.bg_circle_translucent);
+                vh.selectionBadge.setVisibility(View.GONE);
                 vh.tvSelectionNumber.setVisibility(View.GONE);
             }
 
+            // Single Tap: In SINGLE_SELECT, immediately pass URI to preview/editor; in MULTI_SELECT, toggle selection
             vh.cardMediaContainer.setOnClickListener(v -> {
-                int existingIdx = indexOfSelected(item);
-                if (existingIdx >= 0) {
-                    item.setSelected(false);
-                    selectedItems.remove(existingIdx);
-                } else {
-                    item.setSelected(true);
-                    selectedItems.add(item);
+                if (selectionMode == SelectionMode.SINGLE_SELECT && selectedItems.isEmpty()) {
+                    if (listener != null) {
+                        listener.onSingleMediaItemClicked(item);
+                    }
+                    return;
                 }
-                notifyDataSetChanged();
-                if (listener != null) {
-                    GalleryMediaItem latest = selectedItems.isEmpty() ? null : selectedItems.get(selectedItems.size() - 1);
-                    listener.onMediaItemSelected(latest);
-                    listener.onMultiSelectionChanged(new ArrayList<>(selectedItems));
-                }
+                toggleMultiSelectItem(item);
             });
+
+            // Long Press: Transition to MULTI_SELECT and select item
+            vh.cardMediaContainer.setOnLongClickListener(v -> {
+                selectionMode = SelectionMode.MULTI_SELECT;
+                toggleMultiSelectItem(item);
+                return true;
+            });
+        }
+    }
+
+    private void toggleMultiSelectItem(GalleryMediaItem item) {
+        int existingIdx = indexOfSelected(item);
+        if (existingIdx >= 0) {
+            item.setSelected(false);
+            selectedItems.remove(existingIdx);
+            if (selectedItems.isEmpty()) {
+                selectionMode = SelectionMode.SINGLE_SELECT;
+            }
+        } else {
+            selectionMode = SelectionMode.MULTI_SELECT;
+            item.setSelected(true);
+            selectedItems.add(item);
+        }
+        notifyDataSetChanged();
+        if (listener != null) {
+            GalleryMediaItem latest = selectedItems.isEmpty() ? null : selectedItems.get(selectedItems.size() - 1);
+            listener.onMediaItemSelected(latest);
+            listener.onMultiSelectionChanged(new ArrayList<>(selectedItems));
         }
     }
 

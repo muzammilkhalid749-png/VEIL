@@ -156,10 +156,10 @@ public final class CallConfig {
     public boolean enableCpuOveruseDetection = false; // Disabled to prevent aggressive throttling on mobile chipsets
     public boolean suspendBelowMinBitrate = true;
 
-    /** Ring timeout before an outgoing call is abandoned (Telegram standard 35s). */
-    public long ringingTimeoutMs = 35_000L;
-    /** How long we keep a pending incoming offer before rejecting it. */
-    public long offerExpiryMs = 35_000L;
+    /** Ring timeout before an outgoing call is abandoned (45s auto-timeout). */
+    public long ringingTimeoutMs = 45_000L;
+    /** How long we keep a pending incoming offer before rejecting it (45s auto-timeout). */
+    public long offerExpiryMs = 45_000L;
     /** Reconnect grace period after ICE disconnect before ending the call (Telegram parity). */
     public long reconnectGraceMs = 5_000L;
 

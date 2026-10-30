@@ -91,10 +91,11 @@ public class VeilArMaskRenderer {
     }
 
     /**
-     * Render the active procedural AR mask on a 2D Canvas.
+     * Render the active procedural AR mask on a 2D Canvas pinned to live facial landmarks
+     * and 3D head pose (yaw, pitch, roll, scale).
      *
      * @param canvas       Target Canvas (Viewfinder overlay or Bitmap canvas)
-     * @param faceBounds   Bounding box of the face (normalized or pixel coordinates)
+     * @param faceBounds   Fallback bounding box of the face if no live TrackedFace is explicitly passed
      * @param maskMode     MASK_NONE, MASK_CYBERPUNK, MASK_PHANTOM, MASK_GLITCH, MASK_SILHOUETTE
      * @param trustReveal  Trust level [0.0 = full obfuscation, 1.0 = fully revealed / transparent]
      * @param animTimeMs   System animation clock in milliseconds
@@ -105,38 +106,81 @@ public class VeilArMaskRenderer {
             return;
         }
 
+        com.m3.veil.calling.VeilFaceDetectionPipeline.TrackedFace trackedFace =
+                com.m3.veil.calling.VeilFaceDetectionPipeline.getInstance().getLatestPrimaryFace();
+
+        int canvasW = canvas.getWidth();
+        int canvasH = canvas.getHeight();
+        RectF activeBounds = new RectF(faceBounds);
+        float rollDeg = 0f;
+        float yawDeg = 0f;
+        float pitchDeg = 0f;
+
+        if (trackedFace != null && canvasW > 0 && canvasH > 0) {
+            float cx = trackedFace.centerX * canvasW;
+            float cy = trackedFace.centerY * canvasH;
+            float rx = trackedFace.radiusX * canvasW * 1.08f;
+            float ry = trackedFace.radiusY * canvasH * 1.10f;
+            activeBounds.set(cx - rx, cy - ry, cx + rx, cy + ry);
+            rollDeg = trackedFace.rollDeg;
+            yawDeg = trackedFace.yawDeg;
+            pitchDeg = trackedFace.pitchDeg;
+        }
+
         float maskAlpha = Math.max(0.0f, Math.min(1.0f, 1.0f - trustReveal));
         int alpha255 = Math.round(maskAlpha * 255f);
 
+        int saveCount = canvas.save();
+        float pivotX = activeBounds.centerX();
+        float pivotY = activeBounds.centerY();
+
+        // Apply 3D head rotation (roll around Z + perspective yaw/pitch foreshortening & translation)
+        if (Math.abs(rollDeg) > 0.2f) {
+            canvas.rotate(rollDeg, pivotX, pivotY);
+        }
+        float yawScaleX = Math.max(0.76f, (float) Math.cos(Math.toRadians(yawDeg * 0.85f)));
+        float pitchScaleY = Math.max(0.80f, (float) Math.cos(Math.toRadians(pitchDeg * 0.80f)));
+        float yawShiftX = (yawDeg / 45.0f) * activeBounds.width() * 0.08f;
+        float pitchShiftY = (pitchDeg / 45.0f) * activeBounds.height() * 0.06f;
+        canvas.translate(yawShiftX, pitchShiftY);
+        canvas.scale(yawScaleX, pitchScaleY, pivotX, pivotY);
+
         switch (maskMode) {
             case MASK_CYBERPUNK:
-                drawCyberpunkVisor(canvas, faceBounds, alpha255, animTimeMs);
+                drawCyberpunkVisor(canvas, activeBounds, trackedFace, canvasW, canvasH, alpha255, animTimeMs);
                 break;
             case MASK_PHANTOM:
-                drawPhantomGeometricMask(canvas, faceBounds, alpha255, animTimeMs);
+                drawPhantomGeometricMask(canvas, activeBounds, trackedFace, canvasW, canvasH, alpha255, animTimeMs);
                 break;
             case MASK_GLITCH:
-                drawPixelatedGlitch(canvas, faceBounds, alpha255, animTimeMs);
+                drawPixelatedGlitch(canvas, activeBounds, alpha255, animTimeMs);
                 break;
             case MASK_SILHOUETTE:
-                drawShadowSilhouette(canvas, faceBounds, alpha255, animTimeMs);
+                drawShadowSilhouette(canvas, activeBounds, trackedFace, canvasW, canvasH, alpha255, animTimeMs);
                 break;
         }
+
+        canvas.restoreToCount(saveCount);
     }
 
     // ---------------------------------------------------------------------------------------------
-    // MASK 1: CYBERPUNK NEON VISOR (#211)
+    // MASK 1: CYBERPUNK NEON VISOR (#211) - Pinned to Left/Right Eye & Nose Bridge Landmarks
     // ---------------------------------------------------------------------------------------------
-    private void drawCyberpunkVisor(Canvas canvas, RectF face, int alpha, long time) {
+    private void drawCyberpunkVisor(Canvas canvas, RectF face,
+                                    @Nullable com.m3.veil.calling.VeilFaceDetectionPipeline.TrackedFace trackedFace,
+                                    int canvasW, int canvasH, int alpha, long time) {
         float eyeCenterY = face.top + face.height() * 0.38f;
-        float visorHeight = face.height() * 0.22f;
+        if (trackedFace != null && canvasH > 0) {
+            eyeCenterY = ((trackedFace.leftEye.y + trackedFace.rightEye.y) * 0.5f) * canvasH;
+        }
+        float visorHeight = face.height() * 0.24f;
         float visorTop = eyeCenterY - visorHeight * 0.5f;
         float visorBottom = eyeCenterY + visorHeight * 0.5f;
-        float visorLeft = face.left - face.width() * 0.08f;
-        float visorRight = face.right + face.width() * 0.08f;
+        float visorLeft = face.left - face.width() * 0.06f;
+        float visorRight = face.right + face.width() * 0.06f;
 
         // Dark translucent glass base
-        paintFill.setColor(Color.argb((int) (alpha * 0.90f), 10, 14, 28));
+        paintFill.setColor(Color.argb((int) (alpha * 0.92f), 10, 14, 28));
         tempRect.set(visorLeft, visorTop, visorRight, visorBottom);
         canvas.drawRoundRect(tempRect, 18f, 18f, paintFill);
 
@@ -157,31 +201,40 @@ public class VeilArMaskRenderer {
         paintStroke.setColor(Color.argb((int) (alpha * 0.85f), 255, 255, 255));
         canvas.drawLine(visorLeft + 12f, scanY, visorRight - 12f, scanY, paintStroke);
 
-        // Cybernetic Telemetry / HUD details
+        // Cybernetic Telemetry / HUD details pinned to nose bridge & eye centers
         paintStroke.setStrokeWidth(2f);
-        paintStroke.setColor(Color.argb((int) (alpha * 0.60f), 0, 240, 255));
+        paintStroke.setColor(Color.argb((int) (alpha * 0.65f), 0, 240, 255));
         float cx = face.centerX();
         canvas.drawLine(cx, eyeCenterY - 10f, cx, eyeCenterY + 10f, paintStroke);
         canvas.drawLine(cx - 10f, eyeCenterY, cx + 10f, eyeCenterY, paintStroke);
 
-        paintText.setTextSize(Math.max(16f, visorHeight * 0.22f));
-        paintText.setColor(Color.argb((int) (alpha * 0.80f), 0, 255, 200));
-        canvas.drawText("VEIL::ANON", visorLeft + 24f, eyeCenterY + 5f, paintText);
+        paintText.setTextSize(Math.max(15f, visorHeight * 0.21f));
+        paintText.setColor(Color.argb((int) (alpha * 0.82f), 0, 255, 200));
+        canvas.drawText("VEIL::ANON", visorLeft + 22f, eyeCenterY + 5f, paintText);
 
         String hexCoord = "0x" + Integer.toHexString((int) (time & 0xFFFF)).toUpperCase();
-        canvas.drawText(hexCoord, visorRight - 100f, eyeCenterY + 5f, paintText);
+        canvas.drawText(hexCoord, visorRight - 96f, eyeCenterY + 5f, paintText);
     }
 
     // ---------------------------------------------------------------------------------------------
-    // MASK 2: PHANTOM GEOMETRIC MASK (#211)
+    // MASK 2: PHANTOM GEOMETRIC MASK (#211) - Pinned to Face Oval Contour, Eyes, Nose & Mouth
     // ---------------------------------------------------------------------------------------------
-    private void drawPhantomGeometricMask(Canvas canvas, RectF face, int alpha, long time) {
+    private void drawPhantomGeometricMask(Canvas canvas, RectF face,
+                                          @Nullable com.m3.veil.calling.VeilFaceDetectionPipeline.TrackedFace trackedFace,
+                                          int canvasW, int canvasH, int alpha, long time) {
         float cx = face.centerX();
-        float top = face.top + face.height() * 0.05f;
+        float top = face.top + face.height() * 0.04f;
         float bottom = face.bottom - face.height() * 0.02f;
-        float left = face.left + face.width() * 0.05f;
-        float right = face.right - face.width() * 0.05f;
+        float left = face.left + face.width() * 0.04f;
+        float right = face.right - face.width() * 0.04f;
         float midY = face.centerY();
+        float noseY = midY + face.height() * 0.04f;
+        float mouthY = face.top + face.height() * 0.74f;
+
+        if (trackedFace != null && canvasW > 0 && canvasH > 0) {
+            noseY = trackedFace.noseBase.y * canvasH;
+            mouthY = trackedFace.mouthCenter.y * canvasH;
+        }
 
         // Faceted Angular Shield Base (Low-poly obsidian faceplate)
         tempPath.reset();
@@ -199,28 +252,29 @@ public class VeilArMaskRenderer {
         paintFill.setColor(Color.argb((int) (alpha * 0.94f), 14, 18, 24));
         canvas.drawPath(tempPath, paintFill);
 
-        // Geometric Facet Crease Lines (Faceted Low-Poly Wireframe)
+        // Geometric Facet Crease Lines (Faceted Low-Poly Wireframe pinned to nose & mouth landmarks)
         paintStroke.setStrokeWidth(3.5f);
         paintStroke.setColor(Color.argb((int) (alpha * 0.85f), 220, 180, 80)); // Metallic Gold wireframe
         canvas.drawPath(tempPath, paintStroke);
 
         // Internal faceted chords
         canvas.drawLine(cx, top, cx, bottom, paintStroke); // Vertical symmetry crest
-        canvas.drawLine(left, midY, cx, bottom, paintStroke);
-        canvas.drawLine(right, midY, cx, bottom, paintStroke);
-        canvas.drawLine(left, top + face.height() * 0.25f, cx, midY, paintStroke);
-        canvas.drawLine(right, top + face.height() * 0.25f, cx, midY, paintStroke);
+        canvas.drawLine(left, midY, cx, mouthY, paintStroke);
+        canvas.drawLine(right, midY, cx, mouthY, paintStroke);
+        canvas.drawLine(left, top + face.height() * 0.25f, cx, noseY, paintStroke);
+        canvas.drawLine(right, top + face.height() * 0.25f, cx, noseY, paintStroke);
 
-        // Sharp Slit Eye Apertures
-        float eyeY = face.top + face.height() * 0.38f;
-        float eyeHalfW = face.width() * 0.14f;
+        // Sharp Slit Eye Apertures pinned to Left/Right Eye Landmarks
+        float eyeY = (trackedFace != null && canvasH > 0)
+                ? ((trackedFace.leftEye.y + trackedFace.rightEye.y) * 0.5f * canvasH)
+                : (face.top + face.height() * 0.38f);
         float eyeH = face.height() * 0.04f;
 
         paintFill.setColor(Color.argb(alpha, 255, 60, 60)); // Crimson inner slit glow
-        tempRect.set(cx - face.width() * 0.26f, eyeY - eyeH, cx - face.width() * 0.08f, eyeY + eyeH);
+        tempRect.set(cx - face.width() * 0.27f, eyeY - eyeH, cx - face.width() * 0.08f, eyeY + eyeH);
         canvas.drawRoundRect(tempRect, 6f, 6f, paintFill);
 
-        tempRect.set(cx + face.width() * 0.08f, eyeY - eyeH, cx + face.width() * 0.26f, eyeY + eyeH);
+        tempRect.set(cx + face.width() * 0.08f, eyeY - eyeH, cx + face.width() * 0.27f, eyeY + eyeH);
         canvas.drawRoundRect(tempRect, 6f, 6f, paintFill);
     }
 
@@ -235,15 +289,13 @@ public class VeilArMaskRenderer {
 
         // Glitch chromatic displacement pulse
         float jitterX = (float) Math.sin(time / 150.0) * (cellW * 0.35f);
-        float jitterY = (float) Math.cos(time / 180.0) * (cellH * 0.20f);
 
-        // Mosaic Blocks
+        // Mosaic Blocks strictly within face oval contour
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
-                // Approximate face oval inclusion
                 float normX = (c + 0.5f) / cols - 0.5f;
                 float normY = (r + 0.5f) / rows - 0.5f;
-                if ((normX * normX * 4f + normY * normY * 3f) > 1.0f) {
+                if ((normX * normX * 4f + normY * normY * 3.8f) > 1.0f) {
                     continue; // Skip outside face oval
                 }
 
@@ -256,7 +308,7 @@ public class VeilArMaskRenderer {
                 int baseB = Math.min(255, 50 + noise * 2);
 
                 // Main mosaic block
-                paintFill.setColor(Color.argb((int) (alpha * 0.88f), baseR, baseG, baseB));
+                paintFill.setColor(Color.argb((int) (alpha * 0.90f), baseR, baseG, baseB));
                 canvas.drawRect(left, top, left + cellW - 1f, top + cellH - 1f, paintFill);
 
                 // Chromatic Aberration fringe (Cyan & Magenta offset slivers)
@@ -274,16 +326,17 @@ public class VeilArMaskRenderer {
         if ((time / 300) % 2 == 0) {
             float sliceY = face.top + (face.height() * ((time % 1000) / 1000f));
             paintFill.setColor(Color.argb((int) (alpha * 0.70f), 0, 240, 255));
-            canvas.drawRect(face.left - cellW, sliceY, face.right + cellW, sliceY + cellH * 0.6f, paintFill);
+            canvas.drawRect(face.left - cellW * 0.5f, sliceY, face.right + cellW * 0.5f, sliceY + cellH * 0.6f, paintFill);
         }
     }
 
     // ---------------------------------------------------------------------------------------------
-    // MASK 4: SHADOW SILHOUETTE (#211)
+    // MASK 4: SHADOW SILHOUETTE (#211) - Pinned to Face Oval & Eye Landmarks
     // ---------------------------------------------------------------------------------------------
-    private void drawShadowSilhouette(Canvas canvas, RectF face, int alpha, long time) {
+    private void drawShadowSilhouette(Canvas canvas, RectF face,
+                                      @Nullable com.m3.veil.calling.VeilFaceDetectionPipeline.TrackedFace trackedFace,
+                                      int canvasW, int canvasH, int alpha, long time) {
         float cx = face.centerX();
-        float cy = face.centerY();
 
         // Deep void silhouette oval
         paintFill.setColor(Color.argb((int) (alpha * 0.96f), 5, 8, 14));
@@ -294,8 +347,10 @@ public class VeilArMaskRenderer {
         paintStroke.setColor(Color.argb((int) (alpha * 0.50f), 12, 18, 30));
         canvas.drawOval(face, paintStroke);
 
-        // Glowing Phantom Eyes
-        float eyeY = face.top + face.height() * 0.38f;
+        // Glowing Phantom Eyes pinned to detected eye landmarks
+        float eyeY = (trackedFace != null && canvasH > 0)
+                ? ((trackedFace.leftEye.y + trackedFace.rightEye.y) * 0.5f * canvasH)
+                : (face.top + face.height() * 0.38f);
         float eyeSpacing = face.width() * 0.20f;
         float eyeLeftX = cx - eyeSpacing;
         float eyeRightX = cx + eyeSpacing;
@@ -331,21 +386,30 @@ public class VeilArMaskRenderer {
         Bitmap output = source.copy(Bitmap.Config.ARGB_8888, true);
         Canvas canvas = new Canvas(output);
 
-        // Golden-ratio face box centered in top 2/3 of frame
         float w = output.getWidth();
         float h = output.getHeight();
-        float faceW = w * 0.52f;
-        float faceH = h * 0.42f;
-        float faceLeft = (w - faceW) * 0.5f;
-        float faceTop = h * 0.16f;
-
-        RectF bounds = new RectF(faceLeft, faceTop, faceLeft + faceW, faceTop + faceH);
+        com.m3.veil.calling.VeilFaceDetectionPipeline.TrackedFace face =
+                com.m3.veil.calling.VeilFaceDetectionPipeline.getInstance().getLatestPrimaryFace();
+        RectF bounds;
+        if (face != null) {
+            float cx = face.centerX * w;
+            float cy = face.centerY * h;
+            float rx = face.radiusX * w * 1.08f;
+            float ry = face.radiusY * h * 1.10f;
+            bounds = new RectF(cx - rx, cy - ry, cx + rx, cy + ry);
+        } else {
+            float faceW = w * 0.52f;
+            float faceH = h * 0.42f;
+            float faceLeft = (w - faceW) * 0.5f;
+            float faceTop = h * 0.16f;
+            bounds = new RectF(faceLeft, faceTop, faceLeft + faceW, faceTop + faceH);
+        }
         renderMaskOnCanvas(canvas, bounds, maskMode, trustReveal, SystemClock.uptimeMillis());
         return output;
     }
 
     // ---------------------------------------------------------------------------------------------
-    // WEBRTC YUV DSP: Real-Time Direct Frame Manipulation for Video Calls (#122, #211)
+    // WEBRTC YUV DSP: Real-Time Direct Frame Manipulation Pinned to Live Landmarks & 3D Head Pose
     // ---------------------------------------------------------------------------------------------
     public void applyMaskToI420Yuv(@NonNull JavaI420Buffer src, @NonNull JavaI420Buffer dst,
                                   int width, int height, int maskMode, float trustReveal, long timeMs) {
@@ -353,67 +417,114 @@ public class VeilArMaskRenderer {
             return;
         }
 
-        ByteBuffer ySrc = src.getDataY();
         ByteBuffer yDst = dst.getDataY();
-        int yStrideSrc = src.getStrideY();
         int yStrideDst = dst.getStrideY();
+        ByteBuffer uDst = dst.getDataU();
+        int uStrideDst = dst.getStrideU();
+        ByteBuffer vDst = dst.getDataV();
+        int vStrideDst = dst.getStrideV();
 
-        // Face region of interest (ROI) in frame
-        int roiLeft = (int) (width * 0.22f);
-        int roiRight = (int) (width * 0.78f);
-        int roiTop = (int) (height * 0.15f);
-        int roiBottom = (int) (height * 0.65f);
+        com.m3.veil.calling.VeilFaceDetectionPipeline.TrackedFace face =
+                com.m3.veil.calling.VeilFaceDetectionPipeline.getInstance().getLatestPrimaryFace();
+
+        float cx = face.centerX * width;
+        float cy = face.centerY * height;
+        float rx = Math.max(width * 0.14f, face.radiusX * width * 1.10f);
+        float ry = Math.max(height * 0.18f, face.radiusY * height * 1.14f);
+        double rad = -Math.toRadians(face.rollDeg);
+        float cosR = (float) Math.cos(rad);
+        float sinR = (float) Math.sin(rad);
+
+        int roiLeft = Math.max(0, (int) (cx - rx * 1.25f));
+        int roiRight = Math.min(width - 1, (int) (cx + rx * 1.25f));
+        int roiTop = Math.max(0, (int) (cy - ry * 1.25f));
+        int roiBottom = Math.min(height - 1, (int) (cy + ry * 1.25f));
 
         float maskStrength = Math.max(0.0f, Math.min(1.0f, 1.0f - trustReveal));
 
         switch (maskMode) {
             case MASK_CYBERPUNK: {
-                // Eye-band horizontal strip obfuscation with laser scanline in Y channel
-                int eyeYStart = (int) (height * 0.30f);
-                int eyeYEnd = (int) (height * 0.42f);
-                int scanY = eyeYStart + (int) ((eyeYEnd - eyeYStart) * ((timeMs % 800) / 800.0));
+                // Eye-visor band rotated with head roll and pinned to left/right eye landmarks
+                float scanPhase = (float) ((timeMs % 800) / 800.0) * 2.0f - 1.0f; // [-1..1] inside visor
+                for (int y = roiTop; y <= roiBottom; y++) {
+                    for (int x = roiLeft; x <= roiRight; x++) {
+                        float dx = x - cx;
+                        float dy = y - cy;
+                        float localX = (dx * cosR - dy * sinR) / rx;
+                        float localY = (dx * sinR + dy * cosR) / ry;
 
-                for (int y = eyeYStart; y < eyeYEnd; y++) {
-                    for (int x = roiLeft; x < roiRight; x++) {
-                        int pos = y * yStrideDst + x;
-                        if (y >= scanY - 1 && y <= scanY + 1) {
-                            yDst.put(pos, (byte) 240); // Bright laser line
-                        } else {
-                            byte orig = yDst.get(pos);
-                            int dimmed = Math.round((orig & 0xFF) * (1.0f - 0.75f * maskStrength));
-                            yDst.put(pos, (byte) dimmed);
+                        // Visor spans localX in [-1.05..1.05], localY around eyes [-0.46..-0.02]
+                        if (Math.abs(localX) <= 1.05f && localY >= -0.46f && localY <= -0.02f) {
+                            float visorNormY = (localY - (-0.24f)) / 0.22f; // [-1..1]
+                            int pos = y * yStrideDst + x;
+                            boolean isBorder = Math.abs(visorNormY) > 0.85f || Math.abs(localX) > 0.96f;
+                            boolean isLaser = Math.abs(visorNormY - scanPhase) < 0.08f;
+
+                            if (isLaser) {
+                                yDst.put(pos, (byte) 245);
+                            } else if (isBorder) {
+                                yDst.put(pos, (byte) 210);
+                                int uvPosU = (y / 2) * uStrideDst + (x / 2);
+                                int uvPosV = (y / 2) * vStrideDst + (x / 2);
+                                uDst.put(uvPosU, (byte) 190); // Cyan tint
+                                vDst.put(uvPosV, (byte) 75);
+                            } else {
+                                int orig = yDst.get(pos) & 0xFF;
+                                int dimmed = Math.round(orig * (1.0f - 0.82f * maskStrength) + 18 * maskStrength);
+                                yDst.put(pos, (byte) dimmed);
+                            }
                         }
                     }
                 }
                 break;
             }
             case MASK_PHANTOM: {
-                // Angular geometric faceplate darkening + sharp boundary contrast
-                int cx = width / 2;
-                for (int y = roiTop; y < roiBottom; y++) {
-                    float normY = (float) (y - roiTop) / (roiBottom - roiTop);
-                    int halfSpan = (int) ((roiRight - roiLeft) * 0.5f * (normY < 0.7f ? 1.0f : (1.0f - (normY - 0.7f) * 2f)));
-                    int left = Math.max(0, cx - halfSpan);
-                    int right = Math.min(width - 1, cx + halfSpan);
+                // Rotated faceted polygonal shield with golden wireframe edges & crimson eye slits
+                for (int y = roiTop; y <= roiBottom; y++) {
+                    for (int x = roiLeft; x <= roiRight; x++) {
+                        float dx = x - cx;
+                        float dy = y - cy;
+                        float localX = (dx * cosR - dy * sinR) / rx;
+                        float localY = (dx * sinR + dy * cosR) / ry;
 
-                    for (int x = left; x < right; x++) {
-                        int pos = y * yStrideDst + x;
-                        if (x == left || x == right - 1 || x == cx) {
-                            yDst.put(pos, (byte) 220); // Golden wireframe boundary in Y
-                        } else {
-                            byte orig = yDst.get(pos);
-                            int masked = Math.round((orig & 0xFF) * (1.0f - 0.85f * maskStrength) + 16);
-                            yDst.put(pos, (byte) masked);
+                        // Polygonal tapered jaw shield envelope
+                        float maxSpanX = localY < 0.25f ? 0.96f : Math.max(0.0f, 0.96f * (1.0f - (localY - 0.25f) * 1.15f));
+                        if (localY >= -0.92f && localY <= 0.98f && Math.abs(localX) <= maxSpanX) {
+                            int pos = y * yStrideDst + x;
+                            boolean inEyeSlit = (localY >= -0.30f && localY <= -0.18f)
+                                    && (Math.abs(localX) >= 0.18f && Math.abs(localX) <= 0.58f);
+                            boolean onCrestOrEdge = Math.abs(localX) < 0.03f
+                                    || Math.abs(Math.abs(localX) - maxSpanX) < 0.045f;
+
+                            if (inEyeSlit) {
+                                yDst.put(pos, (byte) 210);
+                                int uvPosV = (y / 2) * vStrideDst + (x / 2);
+                                vDst.put(uvPosV, (byte) 205); // Crimson glow
+                            } else if (onCrestOrEdge) {
+                                yDst.put(pos, (byte) 220); // Gold wireframe highlight
+                            } else {
+                                int orig = yDst.get(pos) & 0xFF;
+                                int masked = Math.round(orig * (1.0f - 0.88f * maskStrength) + 16 * maskStrength);
+                                yDst.put(pos, (byte) masked);
+                            }
                         }
                     }
                 }
                 break;
             }
             case MASK_GLITCH: {
-                // Real-time 16x16 macroblock mosaic pixelation
+                // Real-time 16x16 macroblock mosaic pixelation strictly inside the rotated face oval
                 int blockSize = 16;
-                for (int by = roiTop; by < roiBottom; by += blockSize) {
-                    for (int bx = roiLeft; bx < roiRight; bx += blockSize) {
+                for (int by = roiTop; by <= roiBottom; by += blockSize) {
+                    for (int bx = roiLeft; bx <= roiRight; bx += blockSize) {
+                        float bcx = bx + blockSize * 0.5f - cx;
+                        float bcy = by + blockSize * 0.5f - cy;
+                        float localX = (bcx * cosR - bcy * sinR) / rx;
+                        float localY = (bcx * sinR + bcy * cosR) / ry;
+                        if (localX * localX + localY * localY > 1.08f) {
+                            continue;
+                        }
+
                         int sum = 0;
                         int count = 0;
                         int maxBy = Math.min(by + blockSize, roiBottom);
@@ -425,13 +536,13 @@ public class VeilArMaskRenderer {
                                 count++;
                             }
                         }
-                        byte avg = (byte) (count > 0 ? (sum / count) : 128);
+                        int avg = count > 0 ? (sum / count) : 128;
 
                         for (int y = by; y < maxBy; y++) {
                             for (int x = bx; x < maxBx; x++) {
                                 int pos = y * yStrideDst + x;
-                                byte orig = yDst.get(pos);
-                                int blended = Math.round((orig & 0xFF) * (1.0f - maskStrength) + (avg & 0xFF) * maskStrength);
+                                int orig = yDst.get(pos) & 0xFF;
+                                int blended = Math.round(orig * (1.0f - maskStrength) + avg * maskStrength);
                                 yDst.put(pos, (byte) blended);
                             }
                         }
@@ -440,26 +551,23 @@ public class VeilArMaskRenderer {
                 break;
             }
             case MASK_SILHOUETTE: {
-                // Matte shadow blackout + glowing eye apertures
-                int eyeY = (int) (height * 0.35f);
-                int eyeLeftX = (int) (width * 0.38f);
-                int eyeRightX = (int) (width * 0.62f);
-
-                for (int y = roiTop; y < roiBottom; y++) {
-                    float dy = (float) (y - (roiTop + roiBottom) / 2) / ((roiBottom - roiTop) / 2);
-                    for (int x = roiLeft; x < roiRight; x++) {
-                        float dx = (float) (x - width / 2) / ((roiRight - roiLeft) / 2);
-                        if (dx * dx + dy * dy <= 1.0f) {
+                // Matte shadow blackout + glowing phantom eyes pinned to rotated face coordinates
+                for (int y = roiTop; y <= roiBottom; y++) {
+                    for (int x = roiLeft; x <= roiRight; x++) {
+                        float dx = x - cx;
+                        float dy = y - cy;
+                        float localX = (dx * cosR - dy * sinR) / rx;
+                        float localY = (dx * sinR + dy * cosR) / ry;
+                        float distSq = localX * localX + localY * localY;
+                        if (distSq <= 1.0f) {
                             int pos = y * yStrideDst + x;
-                            // Check if inside eye spot
-                            boolean inLeftEye = (Math.abs(x - eyeLeftX) < 8 && Math.abs(y - eyeY) < 5);
-                            boolean inRightEye = (Math.abs(x - eyeRightX) < 8 && Math.abs(y - eyeY) < 5);
-
-                            if (inLeftEye || inRightEye) {
-                                yDst.put(pos, (byte) 255); // Piercing bright eyes
+                            boolean inEye = (Math.abs(localY - (-0.24f)) < 0.08f)
+                                    && (Math.abs(Math.abs(localX) - 0.38f) < 0.12f);
+                            if (inEye) {
+                                yDst.put(pos, (byte) 250);
                             } else {
-                                byte orig = yDst.get(pos);
-                                int sil = Math.round((orig & 0xFF) * (1.0f - 0.92f * maskStrength) + 10);
+                                int orig = yDst.get(pos) & 0xFF;
+                                int sil = Math.round(orig * (1.0f - 0.92f * maskStrength) + 12 * maskStrength);
                                 yDst.put(pos, (byte) sil);
                             }
                         }
@@ -527,12 +635,21 @@ public class VeilArMaskRenderer {
             int h = getHeight();
             if (w <= 0 || h <= 0) return;
 
-            // Auto-compute centered face bounds
-            float faceW = w * 0.54f;
-            float faceH = h * 0.40f;
-            float faceL = (w - faceW) * 0.5f;
-            float faceT = h * 0.20f;
-            faceBounds.set(faceL, faceT, faceL + faceW, faceT + faceH);
+            com.m3.veil.calling.VeilFaceDetectionPipeline.TrackedFace face =
+                    com.m3.veil.calling.VeilFaceDetectionPipeline.getInstance().getLatestPrimaryFace();
+            if (face != null) {
+                float cx = face.centerX * w;
+                float cy = face.centerY * h;
+                float rx = face.radiusX * w * 1.08f;
+                float ry = face.radiusY * h * 1.10f;
+                faceBounds.set(cx - rx, cy - ry, cx + rx, cy + ry);
+            } else {
+                float faceW = w * 0.54f;
+                float faceH = h * 0.40f;
+                float faceL = (w - faceW) * 0.5f;
+                float faceT = h * 0.20f;
+                faceBounds.set(faceL, faceT, faceL + faceW, faceT + faceH);
+            }
 
             long now = SystemClock.uptimeMillis();
             VeilArMaskRenderer.getInstance().renderMaskOnCanvas(canvas, faceBounds, maskMode, trustReveal, now);

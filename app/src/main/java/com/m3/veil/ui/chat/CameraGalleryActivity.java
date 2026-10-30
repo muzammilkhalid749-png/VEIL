@@ -913,9 +913,8 @@ public class CameraGalleryActivity extends AppCompatActivity {
         tvRecordingTimer.setText("00:00");
         timerHandler.postDelayed(timerRunnable, 500);
 
-        // Turn shutter button red
-        shutterButton.setBackgroundResource(R.drawable.bg_shutter_recording);
-        shutterInnerCircle.setBackgroundColor(Color.parseColor("#EF4444"));
+        // Morph shutter button into rounded red square (#FF3B30, cornerRadius = 6dp) with pulsating outer ring
+        animateShutterRecordingState(true);
         if (currentCameraMode == MODE_PHOTO && layoutShutterLock != null) {
             layoutShutterLock.setVisibility(View.VISIBLE);
             if (tvShutterLockText != null) {
@@ -941,6 +940,93 @@ public class CameraGalleryActivity extends AppCompatActivity {
                 });
     }
 
+    private android.animation.ValueAnimator shutterMorphAnimator;
+    private android.animation.ValueAnimator outerRingPulseAnimator;
+
+    private void animateShutterRecordingState(boolean recordingActive) {
+        if (shutterButton == null || shutterInnerCircle == null) return;
+        final float dp = getResources().getDisplayMetrics().density;
+
+        // Outer white ring (2dp stroke)
+        android.graphics.drawable.GradientDrawable outerRing = new android.graphics.drawable.GradientDrawable();
+        outerRing.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        outerRing.setColor(Color.parseColor(recordingActive ? "#26FF3B30" : "#1AFFFFFF"));
+        outerRing.setStroke(Math.max(2, Math.round(2.2f * dp)), Color.WHITE);
+        shutterButton.setBackground(outerRing);
+
+        if (shutterMorphAnimator != null) {
+            shutterMorphAnimator.cancel();
+        }
+        if (outerRingPulseAnimator != null) {
+            outerRingPulseAnimator.cancel();
+            shutterButton.setScaleX(1f);
+            shutterButton.setScaleY(1f);
+        }
+
+        int baseSize = shutterInnerCircle.getWidth() > 0 ? shutterInnerCircle.getWidth() : Math.round(58f * dp);
+        float circleRadius = baseSize / 2f;
+        float squareRadius = 6f * dp;
+
+        final float startRadius = recordingActive ? circleRadius : squareRadius;
+        final float endRadius = recordingActive ? squareRadius : circleRadius;
+        final float startScale = recordingActive ? 1.0f : 0.54f;
+        final float endScale = recordingActive ? 0.54f : 1.0f;
+        final int innerColor = (recordingActive || currentCameraMode == MODE_VIDEO)
+                ? Color.parseColor("#FF3B30")
+                : Color.WHITE;
+
+        final android.graphics.drawable.GradientDrawable innerShape = new android.graphics.drawable.GradientDrawable();
+        innerShape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        innerShape.setColor(innerColor);
+        innerShape.setCornerRadius(startRadius);
+        shutterInnerCircle.setBackground(innerShape);
+
+        shutterMorphAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f);
+        shutterMorphAnimator.setDuration(200);
+        shutterMorphAnimator.addUpdateListener(anim -> {
+            float f = (float) anim.getAnimatedValue();
+            float r = startRadius + (endRadius - startRadius) * f;
+            float s = startScale + (endScale - startScale) * f;
+            innerShape.setCornerRadius(r);
+            shutterInnerCircle.setBackground(innerShape);
+            shutterInnerCircle.setScaleX(s);
+            shutterInnerCircle.setScaleY(s);
+        });
+        shutterMorphAnimator.start();
+
+        if (recordingActive) {
+            outerRingPulseAnimator = android.animation.ValueAnimator.ofFloat(1.0f, 1.12f);
+            outerRingPulseAnimator.setDuration(700);
+            outerRingPulseAnimator.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            outerRingPulseAnimator.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+            outerRingPulseAnimator.addUpdateListener(anim -> {
+                float s = (float) anim.getAnimatedValue();
+                shutterButton.setScaleX(s);
+                shutterButton.setScaleY(s);
+            });
+            outerRingPulseAnimator.start();
+        }
+    }
+
+    private void applyIdleShutterAppearance() {
+        if (shutterButton == null || shutterInnerCircle == null) return;
+        float dp = getResources().getDisplayMetrics().density;
+        android.graphics.drawable.GradientDrawable outerRing = new android.graphics.drawable.GradientDrawable();
+        outerRing.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        outerRing.setColor(Color.parseColor("#1AFFFFFF"));
+        outerRing.setStroke(Math.max(2, Math.round(2.2f * dp)), Color.WHITE);
+        shutterButton.setBackground(outerRing);
+        shutterButton.setScaleX(1f);
+        shutterButton.setScaleY(1f);
+
+        android.graphics.drawable.GradientDrawable innerCircle = new android.graphics.drawable.GradientDrawable();
+        innerCircle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        innerCircle.setColor(currentCameraMode == MODE_VIDEO ? Color.parseColor("#FF3B30") : Color.WHITE);
+        shutterInnerCircle.setBackground(innerCircle);
+        shutterInnerCircle.setScaleX(1f);
+        shutterInnerCircle.setScaleY(1f);
+    }
+
     private void stopRecording() {
         if (!isRecording) return;
         isRecording = false;
@@ -954,13 +1040,8 @@ public class CameraGalleryActivity extends AppCompatActivity {
                 tvShutterLockText.setText("Slide up to lock");
             }
         }
-        // Restore shutter button
-        shutterButton.setBackgroundResource(R.drawable.bg_shutter_outer);
-        if (currentCameraMode == MODE_VIDEO) {
-            shutterInnerCircle.setBackgroundResource(R.drawable.bg_shutter_recording);
-        } else {
-            shutterInnerCircle.setBackgroundResource(R.drawable.bg_shutter_inner);
-        }
+        // Morph shutter button back from rounded red square to idle circle
+        animateShutterRecordingState(false);
 
         if (currentRecording != null) {
             currentRecording.stop();
@@ -1356,15 +1437,12 @@ public class CameraGalleryActivity extends AppCompatActivity {
         if (mode == MODE_PHOTO) {
             if (btnModePhoto != null) btnModePhoto.setTextColor(Color.parseColor("#FFCC00"));
             if (btnModeVideo != null) btnModeVideo.setTextColor(Color.parseColor("#88FFFFFF"));
-            if (!isRecording && shutterInnerCircle != null) {
-                shutterInnerCircle.setBackgroundResource(R.drawable.bg_shutter_inner);
-            }
         } else {
             if (btnModeVideo != null) btnModeVideo.setTextColor(Color.parseColor("#FFCC00"));
             if (btnModePhoto != null) btnModePhoto.setTextColor(Color.parseColor("#88FFFFFF"));
-            if (!isRecording && shutterInnerCircle != null) {
-                shutterInnerCircle.setBackgroundResource(R.drawable.bg_shutter_recording);
-            }
+        }
+        if (!isRecording) {
+            applyIdleShutterAppearance();
         }
         if (modeChanged && !isRecording && cameraProvider != null) {
             bindCameraUseCases();

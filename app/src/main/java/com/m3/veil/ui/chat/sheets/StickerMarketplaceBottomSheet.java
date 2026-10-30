@@ -172,17 +172,11 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
     private void renderStoreTab() {
         Context ctx = requireContext();
         float dp = getResources().getDisplayMetrics().density;
-        List<VeilFeatureManager.StickerPack> allPacks = featureManager.getAllStickerPacks();
-        List<VeilFeatureManager.StickerPack> installed = featureManager.getInstalledStickerPacks();
+        com.m3.veil.manager.StickerRepository repo = com.m3.veil.manager.StickerRepository.getInstance(ctx);
+        List<com.m3.veil.manager.StickerRepository.StickerPackMeta> allPacks = repo.getAllStorePacks();
 
-        for (VeilFeatureManager.StickerPack pack : allPacks) {
-            boolean isInstalled = false;
-            for (VeilFeatureManager.StickerPack ins : installed) {
-                if (ins.id.equals(pack.id)) {
-                    isInstalled = true;
-                    break;
-                }
-            }
+        for (com.m3.veil.manager.StickerRepository.StickerPackMeta pack : allPacks) {
+            boolean isInstalled = repo.isPackInstalled(pack.packId);
 
             LinearLayout card = new LinearLayout(ctx);
             card.setOrientation(LinearLayout.VERTICAL);
@@ -199,7 +193,7 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
             top.setGravity(Gravity.CENTER_VERTICAL);
 
             TextView title = new TextView(ctx);
-            title.setText(pack.name);
+            title.setText((pack.iconEmoji != null ? pack.iconEmoji + " " : "") + pack.title);
             title.setTextSize(15f);
             title.setTypeface(null, Typeface.BOLD);
             title.setTextColor(ContextCompat.getColor(ctx, R.color.textPrimary));
@@ -215,9 +209,9 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
 
             card.addView(top);
 
-            // Author subtitle
+            // Author & Sticker Count subtitle
             TextView author = new TextView(ctx);
-            author.setText("Created by " + pack.author);
+            author.setText("By " + pack.author + " • " + pack.getStickerCount() + " stickers (.webp)");
             author.setTextSize(12f);
             author.setTextColor(ContextCompat.getColor(ctx, R.color.textSecondary));
             author.setPadding(0, 0, 0, (int) (8 * dp));
@@ -227,37 +221,45 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
             TextView preview = new TextView(ctx);
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < Math.min(8, pack.stickers.size()); i++) {
-                sb.append(pack.stickers.get(i)).append("  ");
+                sb.append(pack.stickers.get(i).emoji).append("  ");
             }
             preview.setText(sb.toString());
             preview.setTextSize(20f);
             preview.setPadding(0, 0, 0, (int) (10 * dp));
             card.addView(preview);
 
-            // Action Button
+            // Action Button (Add Pack / Remove Pack)
             Button actionBtn = new Button(ctx);
             actionBtn.setTextSize(13f);
             if (isInstalled) {
-                actionBtn.setText("✓ Installed");
-                actionBtn.setEnabled(false);
-                actionBtn.setBackgroundColor(Color.parseColor("#1E293B"));
-                actionBtn.setTextColor(Color.parseColor("#94A3B8"));
+                actionBtn.setText("✓ Installed • Remove Pack");
+                actionBtn.setBackgroundColor(Color.parseColor("#334155"));
+                actionBtn.setTextColor(Color.WHITE);
+                actionBtn.setOnClickListener(v -> {
+                    repo.removePack(pack.packId);
+                    Toast.makeText(ctx, "Removed " + pack.title, Toast.LENGTH_SHORT).show();
+                    renderStoreTab();
+                });
             } else {
-                actionBtn.setText(pack.priceVc == 0 ? "Install Free Pack" : "Buy & Install (" + pack.priceVc + " VC)");
+                actionBtn.setText(pack.priceVc == 0 ? "+ Add Pack (Free)" : "+ Add Pack (" + pack.priceVc + " VC)");
                 actionBtn.setBackgroundColor(ContextCompat.getColor(ctx, R.color.veil_primary));
                 actionBtn.setTextColor(Color.WHITE);
-                final boolean finalIsInstalled = isInstalled;
                 actionBtn.setOnClickListener(v -> {
                     if (pack.priceVc > 0 && featureManager.getVeilCoins() < pack.priceVc) {
                         Toast.makeText(ctx, "Not enough VeilCoins (Need " + pack.priceVc + " VC)", Toast.LENGTH_SHORT).show();
                         return;
                     }
-                    boolean ok = featureManager.buyStickerPack(pack.id);
-                    if (ok) {
-                        Toast.makeText(ctx, "🎉 Installed " + pack.name + "!", Toast.LENGTH_SHORT).show();
+                    if (pack.priceVc > 0) {
+                        featureManager.spendCoins(pack.priceVc);
+                    }
+                    actionBtn.setEnabled(false);
+                    actionBtn.setText("Downloading & Caching...");
+                    repo.downloadAndAddPack(pack.packId, (success, addedPack) -> {
+                        if (!isAdded()) return;
+                        Toast.makeText(ctx, "🎉 Added " + addedPack.title + "!", Toast.LENGTH_SHORT).show();
                         tvCoinsHeader.setText("🪙 " + featureManager.getVeilCoins() + " VC");
                         renderStoreTab();
-                    }
+                    });
                 });
             }
             card.addView(actionBtn);
@@ -270,7 +272,8 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
     private void renderMyPacksTab() {
         Context ctx = requireContext();
         float dp = getResources().getDisplayMetrics().density;
-        List<VeilFeatureManager.StickerPack> installed = featureManager.getInstalledStickerPacks();
+        com.m3.veil.manager.StickerRepository repo = com.m3.veil.manager.StickerRepository.getInstance(ctx);
+        List<com.m3.veil.manager.StickerRepository.StickerPackMeta> installed = repo.getInstalledPacks();
 
         if (installed.isEmpty()) {
             TextView empty = new TextView(ctx);
@@ -283,7 +286,7 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
             return;
         }
 
-        for (VeilFeatureManager.StickerPack pack : installed) {
+        for (com.m3.veil.manager.StickerRepository.StickerPackMeta pack : installed) {
             LinearLayout card = new LinearLayout(ctx);
             card.setOrientation(LinearLayout.VERTICAL);
             card.setBackgroundResource(R.drawable.bg_reply_preview);
@@ -294,7 +297,7 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
             card.setLayoutParams(clp);
 
             TextView title = new TextView(ctx);
-            title.setText(pack.name);
+            title.setText((pack.iconEmoji != null ? pack.iconEmoji + " " : "") + pack.title + " (" + pack.getStickerCount() + ")");
             title.setTextSize(15f);
             title.setTypeface(null, Typeface.BOLD);
             title.setTextColor(ContextCompat.getColor(ctx, R.color.textPrimary));
@@ -302,8 +305,8 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
 
             TextView preview = new TextView(ctx);
             StringBuilder sb = new StringBuilder();
-            for (String s : pack.stickers) {
-                sb.append(s).append(" ");
+            for (com.m3.veil.manager.StickerRepository.StickerItem s : pack.stickers) {
+                sb.append(s.emoji).append(" ");
             }
             preview.setText(sb.toString());
             preview.setTextSize(18f);
@@ -322,18 +325,18 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
             blp.setMargins(0, 0, (int) (6 * dp), 0);
             btnSeed.setLayoutParams(blp);
             btnSeed.setOnClickListener(v -> {
-                Toast.makeText(ctx, "P2P Seeding: Shared " + pack.name + " over mesh swarms!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(ctx, "P2P Seeding: Shared " + pack.title + " over mesh swarms!", Toast.LENGTH_SHORT).show();
             });
             btnRow.addView(btnSeed);
 
             Button btnRemove = new Button(ctx);
-            btnRemove.setText("Uninstall");
+            btnRemove.setText("Remove Pack");
             btnRemove.setTextSize(12f);
             btnRemove.setBackgroundColor(Color.parseColor("#334155"));
             btnRemove.setTextColor(Color.WHITE);
             btnRemove.setOnClickListener(v -> {
-                featureManager.uninstallStickerPack(pack.id);
-                Toast.makeText(ctx, "Uninstalled " + pack.name, Toast.LENGTH_SHORT).show();
+                repo.removePack(pack.packId);
+                Toast.makeText(ctx, "Removed " + pack.title, Toast.LENGTH_SHORT).show();
                 renderMyPacksTab();
             });
             btnRow.addView(btnRemove);

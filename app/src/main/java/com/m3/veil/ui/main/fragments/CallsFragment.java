@@ -89,6 +89,31 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
         return view;
     }
 
+    private final com.m3.veil.manager.PersonaManager.PersonaSwitchListener personaSwitchListener = newActivePersona -> {
+        if (isAdded() && getContext() != null) {
+            currentUserId = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+            loadLocalCalls();
+        }
+    };
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (getContext() != null) {
+            com.m3.veil.manager.PersonaManager.getInstance(requireContext()).addPersonaSwitchListener(personaSwitchListener);
+            currentUserId = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+        }
+        loadLocalCalls();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (getContext() != null) {
+            com.m3.veil.manager.PersonaManager.getInstance(requireContext()).removePersonaSwitchListener(personaSwitchListener);
+        }
+    }
+
     public void showCallHubMenu() {
         BottomSheetDialog sheet = new BottomSheetDialog(requireContext());
         View sheetView = getLayoutInflater().inflate(R.layout.dialog_call_hub_sheet, null);
@@ -391,12 +416,6 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
             btnCancel.setOnClickListener(v -> sheet.dismiss());
         }
         sheet.show();
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        loadLocalCalls();
     }
 
     @Override

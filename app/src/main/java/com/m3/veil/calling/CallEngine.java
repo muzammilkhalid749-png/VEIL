@@ -205,6 +205,27 @@ public class CallEngine implements CallSignaling.Listener {
                 }
             });
         });
+        CallStateMachine.getInstance().addListener(new CallStateMachine.Listener() {
+            @Override
+            public void onStateTransition(CallStateMachine.State previousState, CallStateMachine.State newState, String activeCallId) {
+                // Handled in setState
+            }
+
+            @Override
+            public void onRingingTimeout(CallStateMachine.State timedOutState, String timedOutCallId) {
+                main.post(() -> {
+                    if (timedOutState == CallStateMachine.State.OUTGOING_RINGING) {
+                        if (state == CallState.CALLING || state == CallState.PRE_ACCEPT_RECEIVED) {
+                            hangup(CallEndReason.NO_ANSWER);
+                        }
+                    } else if (timedOutState == CallStateMachine.State.INCOMING_RINGING) {
+                        if (state == CallState.RECEIVED_CALL) {
+                            decline(CallEndReason.TIMEOUT);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     public static CallEngine getInstance(Context context) {
@@ -794,6 +815,7 @@ public class CallEngine implements CallSignaling.Listener {
         if (state != CallState.RECEIVED_CALL) return;
         cancelOfferExpiry();
         cancelIncomingRingingWatchdog();
+        VeilCallService.stopRingingAndDismissIncomingNotifications(context);
         if (pendingInviteKey != null) e2ee.importMasterKeyBase64(pendingInviteKey);
         else e2ee.generateMasterKey();
         audioDevice.start(callType == CallType.VIDEO);
@@ -817,7 +839,15 @@ public class CallEngine implements CallSignaling.Listener {
         if (state != CallState.RECEIVED_CALL && state != CallState.PRE_ACCEPT_RECEIVED) return;
         cancelOfferExpiry();
         cancelIncomingRingingWatchdog();
+        VeilCallService.stopRingingAndDismissIncomingNotifications(context);
         CallEndReason why = reason == null ? CallEndReason.DECLINED : reason;
+        if (why == CallEndReason.TIMEOUT || why == CallEndReason.CONNECTION_LOST) {
+            try {
+                CallNotificationHelper.showMissedCall(context,
+                        primaryPeerName != null ? primaryPeerName : primaryPeerId,
+                        callType == CallType.VIDEO);
+            } catch (Throwable ignored) { }
+        }
         if (primaryPeerId != null) {
             CallSignal decline = CallSignal.of(CallSignal.DECLINE, callId, currentUserId).to(primaryPeerId);
             decline.payload = reasonPayload(why);
@@ -1131,18 +1161,30 @@ public class CallEngine implements CallSignaling.Listener {
                     rememberEnded(signal.callId, from);
                     break;
                 }
+                VeilCallService.stopRingingAndDismissIncomingNotifications(context);
                 endCall(parseReason(signal.payload, CallEndReason.DECLINED), false);
                 break;
+            case CallSignal.CALL_CANCEL:
             case CallSignal.END:
                 if (!isSignalForCurrentCall(signal) && !(isInCall() && from != null && from.equals(primaryPeerId))) {
                     rememberEnded(signal.callId, from);
                     break;
                 }
-                if (groupId != null && peers.size() > 1 && from != null) {
+                if (groupId != null && peers.size() > 1 && from != null && !CallSignal.CALL_CANCEL.equals(signal.type)) {
                     removeGroupParticipant(from);
                     evaluateTopologyScaling();
                 } else {
-                    endCall(parseReason(signal.payload, CallEndReason.REMOTE_HANGUP), false);
+                    boolean wasUnansweredIncoming = (state == CallState.RECEIVED_CALL);
+                    VeilCallService.stopRingingAndDismissIncomingNotifications(context);
+                    if (wasUnansweredIncoming) {
+                        try {
+                            CallNotificationHelper.showMissedCall(context,
+                                    primaryPeerName != null ? primaryPeerName : from,
+                                    callType == CallType.VIDEO);
+                        } catch (Throwable ignored) { }
+                    }
+                    endCall(parseReason(signal.payload,
+                            wasUnansweredIncoming ? CallEndReason.NO_ANSWER : CallEndReason.REMOTE_HANGUP), false);
                 }
                 break;
             case CallSignal.GROUP_LEAVE:
@@ -1251,6 +1293,38 @@ public class CallEngine implements CallSignaling.Listener {
             sig.callType = incomingCallType != null ? incomingCallType : "audio";
             sig.timestamp = System.currentTimeMillis();
             onInvite(sig, fromUserId);
+        });
+    }
+
+    /**
+     * Invoked when legacy SignalingClient / WebRtcManager receives a call_end or call_reject signal.
+     * Immediately stops ringing, dismisses incoming notifications, posts a Missed Call notification if
+     * unanswered, and tears down the call session.
+     */
+    public void onExternalCallCancelled(String fromUserId, String cancelledCallId, String reasonStr) {
+        main.post(() -> {
+            if (cancelledCallId != null) {
+                rememberEnded(cancelledCallId, fromUserId != null ? fromUserId : "remote");
+            }
+            VeilCallService.stopRingingAndDismissIncomingNotifications(context);
+            if (!isInCall()) return;
+            boolean matchesCall = (cancelledCallId != null && cancelledCallId.equals(callId))
+                    || (fromUserId != null && fromUserId.equals(primaryPeerId));
+            if (!matchesCall) return;
+
+            boolean wasUnansweredIncoming = (state == CallState.RECEIVED_CALL);
+            if (wasUnansweredIncoming) {
+                try {
+                    CallNotificationHelper.showMissedCall(context,
+                            primaryPeerName != null ? primaryPeerName : fromUserId,
+                            callType == CallType.VIDEO);
+                } catch (Throwable ignored) { }
+            }
+            CallEndReason reason = wasUnansweredIncoming
+                    ? CallEndReason.NO_ANSWER
+                    : ("declined".equalsIgnoreCase(reasonStr) || "busy".equalsIgnoreCase(reasonStr)
+                            ? CallEndReason.DECLINED : CallEndReason.REMOTE_HANGUP);
+            endCall(reason, false);
         });
     }
 
@@ -2658,10 +2732,13 @@ public class CallEngine implements CallSignaling.Listener {
     private void setState(CallState newState) {
         if (state == newState) return;
         state = newState;
+        CallStateMachine.getInstance().transitionTo(CallStateMachine.fromCallState(newState), callId);
         CallInfo info = buildInfo();
+        if (newState == CallState.ACCEPT_SENT || newState == CallState.ACCEPT_RECEIVED || newState.isEstablished()) {
+            VeilCallService.stopRingingAndDismissIncomingNotifications(context);
+        }
         if (newState.isEstablished()) {
             VeilCallService.start(context);
-            CallNotificationHelper.cancelIncoming(context);
         }
         for (Listener l : listeners) l.onStateChanged(newState, info);
         notifyInfo();
@@ -2747,6 +2824,7 @@ public class CallEngine implements CallSignaling.Listener {
 
     private void endCall(CallEndReason reason, boolean notifyRemote) {
         if (state == CallState.NONE || state == CallState.ENDING) return;
+        boolean wasCallerRinging = caller && (state == CallState.CALLING || state == CallState.PRE_ACCEPT_RECEIVED);
         endReason = reason == null ? CallEndReason.LOCAL_HANGUP : reason;
         rememberEnded(callId, "local");
         endedAtMs = System.currentTimeMillis();
@@ -2762,16 +2840,30 @@ public class CallEngine implements CallSignaling.Listener {
                 targets.add(primaryPeerId);
             }
             for (String targetPeerId : targets) {
+                if (wasCallerRinging) {
+                    CallSignal cancelSig = CallSignal.of(CallSignal.CALL_CANCEL, callId, currentUserId).to(targetPeerId);
+                    cancelSig.payload = reasonPayload(endReason);
+                    signaling.send(cancelSig);
+                }
                 CallSignal end = CallSignal.of(CallSignal.END, callId, currentUserId).to(targetPeerId);
                 end.payload = reasonPayload(endReason);
                 signaling.send(end);
+                try {
+                    com.m3.veil.webrtc.SignalingClient.getInstance().sendCallEnd(targetPeerId, callId);
+                } catch (Throwable ignored) { }
             }
         }
 
         setState(CallState.ENDING);
         CallInfo info = buildInfo();
+        VeilCallService.stopRingingAndDismissIncomingNotifications(context);
         CallNotificationHelper.cancelAll(context);
         VeilCallService.stop(context);
+        try {
+            Intent termBroadcast = new Intent(VeilCallService.BROADCAST_CALL_TERMINATED);
+            termBroadcast.setPackage(context.getPackageName());
+            context.sendBroadcast(termBroadcast);
+        } catch (Throwable ignored) { }
         teardown();
         persistCallRecord(info, endReason);
         if (logSink != null) {
@@ -2779,6 +2871,7 @@ public class CallEngine implements CallSignaling.Listener {
         }
         for (Listener l : listeners) l.onCallEnded(endReason, info);
         state = CallState.NONE;
+        CallStateMachine.getInstance().resetToIdle();
     }
 
     /**

@@ -137,6 +137,85 @@ public class GroupSettingsActivity extends AppCompatActivity {
 
         SharedPreferences prefs = getSharedPreferences("VeilGroupPrefs", MODE_PRIVATE);
 
+        // Section 0: Group Participants & Role Hierarchy (Phase 6)
+        MaterialCardView membersCard = createSectionCard(dp);
+        LinearLayout membersBox = createCardInnerLayout(dp);
+        membersBox.addView(createSectionHeader("👥 Group Participants & Role Hierarchy", dp));
+
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(this);
+        if (currentChat != null && currentChat.getParticipants() != null) {
+            String ownerId = currentChat.getAdminId() != null ? currentChat.getAdminId() : currentUserId;
+            db.saveGroupMembers(chatId, currentChat.getParticipants(), ownerId);
+        }
+        java.util.List<EncryptedChatDatabase.GroupMemberRecord> memberRecords =
+                chatId != null ? db.getGroupMembers(chatId) : new java.util.ArrayList<>();
+        String myRole = chatId != null ? db.getGroupMemberRole(chatId, currentUserId) : EncryptedChatDatabase.ROLE_MEMBER;
+        boolean amIOwner = EncryptedChatDatabase.ROLE_OWNER.equals(myRole)
+                || (currentChat != null && currentUserId != null && currentUserId.equals(currentChat.getAdminId()));
+        boolean amIAdmin = amIOwner || EncryptedChatDatabase.ROLE_ADMIN.equals(myRole)
+                || (currentChat != null && currentUserId != null && currentChat.isAdmin(currentUserId));
+
+        TextView tvRoleSummary = new TextView(this);
+        tvRoleSummary.setText("Your Role: " + myRole + " • Total Participants: " + memberRecords.size());
+        tvRoleSummary.setTextSize(12.5f);
+        tvRoleSummary.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
+        tvRoleSummary.setPadding(0, 0, 0, (int) (10 * dp));
+        membersBox.addView(tvRoleSummary);
+
+        for (EncryptedChatDatabase.GroupMemberRecord rec : memberRecords) {
+            LinearLayout mRow = new LinearLayout(this);
+            mRow.setOrientation(LinearLayout.HORIZONTAL);
+            mRow.setGravity(Gravity.CENTER_VERTICAL);
+            mRow.setPadding(0, (int) (8 * dp), 0, (int) (8 * dp));
+
+            TextView tvPeer = new TextView(this);
+            String label = rec.peerId.equals(currentUserId)
+                    ? "You (" + (rec.peerId.length() > 6 ? rec.peerId.substring(0, 6) : rec.peerId) + ")"
+                    : ("Peer #" + (rec.peerId.length() > 6 ? rec.peerId.substring(0, 6) : rec.peerId));
+            tvPeer.setText(label);
+            tvPeer.setTextSize(14f);
+            tvPeer.setTypeface(null, Typeface.BOLD);
+            tvPeer.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
+            tvPeer.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            mRow.addView(tvPeer);
+
+            TextView tvBadge = new TextView(this);
+            String roleBadge = EncryptedChatDatabase.ROLE_OWNER.equals(rec.role)
+                    ? "👑 OWNER" : (EncryptedChatDatabase.ROLE_ADMIN.equals(rec.role) ? "🛡️ ADMIN" : "👤 MEMBER");
+            tvBadge.setText(roleBadge);
+            tvBadge.setTextSize(11f);
+            tvBadge.setTypeface(null, Typeface.BOLD);
+            tvBadge.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
+            tvBadge.setBackgroundResource(R.drawable.bg_filter_chip);
+            tvBadge.setPadding((int) (8 * dp), (int) (3 * dp), (int) (8 * dp), (int) (3 * dp));
+            mRow.addView(tvBadge);
+
+            if (amIAdmin && !rec.peerId.equals(currentUserId)) {
+                mRow.setOnClickListener(v -> {
+                    Intent manageIntent = new Intent(this, UserProfileActivity.class);
+                    manageIntent.putExtra("chatId", chatId);
+                    manageIntent.putExtra("isGroup", true);
+                    manageIntent.putExtra("userName", currentChat != null ? currentChat.getName() : "Group Info");
+                    startActivity(manageIntent);
+                });
+            }
+            membersBox.addView(mRow);
+        }
+
+        MaterialButton btnManageParticipants = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnManageParticipants.setText("➕ Add / Manage Group Participants & Roles");
+        btnManageParticipants.setCornerRadius((int) (12 * dp));
+        btnManageParticipants.setOnClickListener(v -> {
+            Intent manageIntent = new Intent(this, UserProfileActivity.class);
+            manageIntent.putExtra("chatId", chatId);
+            manageIntent.putExtra("isGroup", true);
+            manageIntent.putExtra("userName", currentChat != null ? currentChat.getName() : "Group Info");
+            startActivity(manageIntent);
+        });
+        membersBox.addView(btnManageParticipants);
+        membersCard.addView(membersBox);
+        content.addView(membersCard);
+
         // Section 1: Media Visibility in Gallery & File Manager (NEW)
         MaterialCardView visibilityCard = createSectionCard(dp);
         LinearLayout visibilityBox = createCardInnerLayout(dp);

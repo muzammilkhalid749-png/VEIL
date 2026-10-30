@@ -82,6 +82,7 @@ public class CallActivity extends AppCompatActivity {
     public static final String EXTRA_IS_INCOMING = "extra_is_incoming";
     public static final String EXTRA_FROM_NOTIFICATION = "extra_from_notification";
     public static final String EXTRA_DECLINE_ON_START = "extra_decline_on_start";
+    public static final String EXTRA_AUTO_ANSWER = "extra_auto_answer";
     public static final String EXTRA_GROUP_ID = "extra_group_id";
     public static final String EXTRA_GROUP_NAME = "extra_group_name";
     public static final String EXTRA_PARTICIPANT_IDS = "extra_participant_ids";
@@ -242,11 +243,13 @@ public class CallActivity extends AppCompatActivity {
             engine.addListener(engineListener);
         }
 
+        registerCallActionReceiver();
         VeilCallService.start(this);
 
         ensurePermissions();
 
         if (getIntent().getBooleanExtra(EXTRA_DECLINE_ON_START, false)) {
+            VeilCallService.stopRingingAndDismissIncomingNotifications(this);
             engine.decline(CallEndReason.DECLINED);
             finish();
             return;
@@ -254,17 +257,71 @@ public class CallActivity extends AppCompatActivity {
 
         startPulseAnimation();
 
+        boolean autoAnswer = getIntent().getBooleanExtra(EXTRA_AUTO_ANSWER, false)
+                || (engine.getState() == CallState.ACCEPT_SENT
+                    || engine.getState() == CallState.ACCEPT_RECEIVED
+                    || engine.getState().isEstablished());
         if (isIncoming) {
             if (engine.getState() == CallState.NONE && contactId != null) {
                 engine.onExternalInvite(contactId, callId, contactName, callType);
             }
-            showIncomingUi();
+            if (autoAnswer) {
+                acceptCall();
+            } else {
+                showIncomingUi();
+            }
         } else {
             showOutgoingUi();
             startOutgoingCall();
         }
         updateUiFromEngine(engine.getCallInfo());
         startTimerLoop();
+    }
+
+    private boolean isReceiverRegistered = false;
+    private final android.content.BroadcastReceiver callActionReceiver = new android.content.BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null || intent.getAction() == null) return;
+            String action = intent.getAction();
+            if (VeilCallService.BROADCAST_CALL_ANSWERED_FROM_NOTIFICATION.equals(action)) {
+                runOnUiThread(() -> {
+                    accepted = true;
+                    stopRingtone();
+                    if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
+                    if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
+                    if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
+                    if (tvStatus != null && !isConnected) tvStatus.setText("Connecting\u2026");
+                    if (engine != null) updateUiFromEngine(engine.getCallInfo());
+                });
+            } else if (VeilCallService.BROADCAST_CALL_TERMINATED.equals(action)) {
+                runOnUiThread(() -> {
+                    stopRingtoneAndRingback();
+                    if (!isFinishing()) {
+                        finish();
+                    }
+                });
+            }
+        }
+    };
+
+    private void registerCallActionReceiver() {
+        if (isReceiverRegistered) return;
+        try {
+            android.content.IntentFilter filter = new android.content.IntentFilter();
+            filter.addAction(VeilCallService.BROADCAST_CALL_ANSWERED_FROM_NOTIFICATION);
+            filter.addAction(VeilCallService.BROADCAST_CALL_TERMINATED);
+            ContextCompat.registerReceiver(this, callActionReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
+            isReceiverRegistered = true;
+        } catch (Throwable ignored) { }
+    }
+
+    private void unregisterCallActionReceiver() {
+        if (!isReceiverRegistered) return;
+        try {
+            unregisterReceiver(callActionReceiver);
+        } catch (Throwable ignored) { }
+        isReceiverRegistered = false;
     }
 
     private void applyLockScreenFlags() {
@@ -465,16 +522,25 @@ public class CallActivity extends AppCompatActivity {
 
     private void acceptCall() {
         accepted = true;
+        stopRingtone();
+        VeilCallService.stopRingingAndDismissIncomingNotifications(this);
         if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
         if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
-        stopRingtone();
-        if (engine != null) engine.accept();
+        if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
+        if (tvStatus != null && !isConnected) tvStatus.setText("Connecting\u2026");
+        if (engine != null) {
+            if (engine.getState() == CallState.RECEIVED_CALL) {
+                engine.accept();
+            }
+            updateUiFromEngine(engine.getCallInfo());
+        }
     }
 
     private void onEndClicked() {
         if (finishingCall) return;
         finishingCall = true;
         stopRingtoneAndRingback();
+        VeilCallService.stopRingingAndDismissIncomingNotifications(this);
         if (layoutAcceptCall != null && layoutAcceptCall.getVisibility() == View.VISIBLE) {
             if (engine != null) engine.decline(CallEndReason.DECLINED);
         } else if (engine != null) {
@@ -489,9 +555,20 @@ public class CallActivity extends AppCompatActivity {
         @Override public void onStateChanged(CallState state, CallInfo info) {
             runOnUiThread(() -> {
                 lastState = state;
-                if (state == CallState.CONNECTED_LONELY || state == CallState.ACTIVE
+                if (state == CallState.ACCEPT_SENT || state == CallState.ACCEPT_RECEIVED) {
+                    accepted = true;
+                    stopRingtone();
+                    VeilCallService.stopRingingAndDismissIncomingNotifications(CallActivity.this);
+                    if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
+                    if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
+                    if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
+                } else if (state == CallState.CONNECTED_LONELY || state == CallState.ACTIVE
                         || state == CallState.REJOINING) {
                     if (!isConnected) onConnected();
+                } else if (state.isEnded()) {
+                    stopRingtoneAndRingback();
+                    if (!isFinishing()) finish();
+                    return;
                 }
                 updateUiFromEngine(info);
             });
@@ -1803,18 +1880,10 @@ public class CallActivity extends AppCompatActivity {
     }
 
     private void playRingtone() {
-        try {
-            Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-            ringtonePlayer = new MediaPlayer();
-            ringtonePlayer.setDataSource(this, uri);
-            ringtonePlayer.setAudioStreamType(AudioManager.STREAM_RING);
-            ringtonePlayer.setLooping(true);
-            ringtonePlayer.prepare();
-            ringtonePlayer.start();
-        } catch (Throwable t) {
-            try { android.os.Vibrator vibrator = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                if (vibrator != null) vibrator.vibrate(500);
-            } catch (Throwable ignored) { }
+        if (engine != null && engine.getCallInfo() != null) {
+            VeilCallService.startIncomingRinging(this, engine.getCallInfo());
+        } else {
+            VeilCallService.startIncomingRinging(this, null);
         }
     }
 
@@ -1826,6 +1895,7 @@ public class CallActivity extends AppCompatActivity {
             }
         } catch (Throwable ignored) { }
         ringtonePlayer = null;
+        VeilCallService.stopRingingAndDismissIncomingNotifications(this);
     }
 
     private void stopRingtoneAndRingback() {
@@ -1841,6 +1911,15 @@ public class CallActivity extends AppCompatActivity {
     // ---- ui helpers ----------------------------------------------------------
 
     private void showIncomingUi() {
+        if (accepted || (engine != null && (engine.getState() == CallState.ACCEPT_SENT
+                || engine.getState() == CallState.ACCEPT_RECEIVED
+                || engine.getState().isEstablished()))) {
+            if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
+            if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
+            if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
+            stopRingtone();
+            return;
+        }
         if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.VISIBLE);
         if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
         if (tvEndCallLabel != null) tvEndCallLabel.setText("Decline");
@@ -1948,16 +2027,25 @@ public class CallActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         if (intent.getBooleanExtra(EXTRA_DECLINE_ON_START, false)) {
+            VeilCallService.stopRingingAndDismissIncomingNotifications(this);
             if (engine != null) engine.decline(CallEndReason.DECLINED);
             finish();
             return;
         }
         readExtras(intent);
+        if (intent.getBooleanExtra(EXTRA_AUTO_ANSWER, false)
+                || (engine != null && (engine.getState() == CallState.ACCEPT_SENT
+                    || engine.getState() == CallState.ACCEPT_RECEIVED
+                    || engine.getState().isEstablished()))) {
+            acceptCall();
+            return;
+        }
         if (isIncoming) showIncomingUi();
     }
 
     @Override
     protected void onDestroy() {
+        unregisterCallActionReceiver();
         dismissActiveSheet();
         super.onDestroy();
         isCallActive = false;

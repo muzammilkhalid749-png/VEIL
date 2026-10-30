@@ -573,9 +573,19 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     }
 
     /**
-     * Reload active user credentials from Veil preferences.
+     * Reload active user credentials from PersonaManager & Veil preferences.
      */
     public void reloadCurrentIdentity() {
+        try {
+            PersonaManager pm = PersonaManager.getInstance(mContext);
+            com.m3.veil.model.Persona active = pm.getActivePersona();
+            if (active != null && !PersonaManager.PRIMARY_PERSONA_ID.equals(active.getPersonaId())) {
+                this.mCurrentUserId = pm.getActivePersonaPeerId();
+                this.mCurrentUserName = active.getDisplayName();
+                return;
+            }
+        } catch (Exception ignored) {}
+
         android.content.SharedPreferences prefs = mContext.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE);
         this.mCurrentUserId = prefs.getString("user_id", null);
         if (this.mCurrentUserId == null) {
@@ -597,6 +607,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     }
 
     public String getCurrentUserName() {
+        try {
+            com.m3.veil.model.Persona active = PersonaManager.getInstance(mContext).getActivePersona();
+            if (active != null && !PersonaManager.PRIMARY_PERSONA_ID.equals(active.getPersonaId())
+                    && !VeilFeatureManager.isShadowVeilOrGeneric(active.getDisplayName())) {
+                return active.getDisplayName();
+            }
+        } catch (Exception ignored) {}
         if (VeilFeatureManager.isShadowVeilOrGeneric(mCurrentUserName)) {
             String activeName = VeilFeatureManager.getInstance(mContext).getActivePersona().getDisplayName();
             if (!VeilFeatureManager.isShadowVeilOrGeneric(activeName)) {
@@ -4193,33 +4210,352 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     }
 
     /**
-     * Adds participants to an existing P2P mesh group.
+     * Adds participants to an existing P2P mesh group and dispatches GROUP_MEMBER_JOINED
+     * containing group metadata, participant list, and current group key ratchet epoch.
      */
     public void addParticipantsToGroup(String groupId, List<String> newPeerIds) {
         if (groupId == null || newPeerIds == null || newPeerIds.isEmpty()) return;
 
         mStageQueue.post(() -> {
             Chat group = getDialog(groupId);
+            if (group == null) {
+                group = mDatabase.getChat(groupId);
+            }
             if (group == null || !group.isGroup()) return;
+
+            String myId = getCurrentUserId();
+            if (!mDatabase.hasGroupPermission(groupId, myId, EncryptedChatDatabase.PERM_CAN_ADD_MEMBERS)
+                    && !group.isAdmin(myId)) {
+                Log.w(TAG, "addParticipantsToGroup blocked: peer lacks PERM_CAN_ADD_MEMBERS");
+                return;
+            }
 
             List<String> rawParticipants = group.getParticipants();
             final List<String> updatedParticipants = rawParticipants != null ? new ArrayList<>(rawParticipants) : new ArrayList<>();
+            final List<String> newlyAdded = new ArrayList<>();
             for (String peer : newPeerIds) {
-                if (!updatedParticipants.contains(peer)) {
-                    updatedParticipants.add(peer);
+                if (peer != null && !peer.trim().isEmpty() && !updatedParticipants.contains(peer.trim())) {
+                    updatedParticipants.add(peer.trim());
+                    newlyAdded.add(peer.trim());
                 }
             }
             group.setParticipants(updatedParticipants);
+            mDialogsDict.put(groupId, group);
+
+            final Chat finalGroup = group;
+            mStorageQueue.execute(() -> {
+                mDatabase.saveOrUpdateChat(finalGroup);
+                String ownerId = finalGroup.getAdminId() != null ? finalGroup.getAdminId() : myId;
+                mDatabase.saveGroupMembers(groupId, updatedParticipants, ownerId);
+                for (String addedPeer : newlyAdded) {
+                    mDatabase.upsertGroupMember(
+                            groupId,
+                            addedPeer,
+                            EncryptedChatDatabase.ROLE_MEMBER,
+                            EncryptedChatDatabase.PERM_DEFAULT_MEMBER
+                    );
+                }
+            });
+
+            // Dispatch GROUP_MEMBER_JOINED packet + full group invite to all peers and new members
+            mCryptoQueue.execute(() -> {
+                try {
+                    int currentEpoch = com.m3.veil.utils.EncryptionManager.getGroupSenderKeyEpoch(groupId);
+                    org.json.JSONObject pkt = new org.json.JSONObject();
+                    pkt.put("type", "group_member_control");
+                    pkt.put("action", "GROUP_MEMBER_JOINED");
+                    pkt.put("groupId", groupId);
+                    pkt.put("groupName", finalGroup.getName());
+                    pkt.put("groupType", finalGroup.getType() != null ? finalGroup.getType() : "group");
+                    pkt.put("ownerId", finalGroup.getAdminId() != null ? finalGroup.getAdminId() : myId);
+                    pkt.put("groupKeyEpoch", currentEpoch);
+                    org.json.JSONArray partArr = new org.json.JSONArray(updatedParticipants);
+                    pkt.put("participants", partArr);
+                    org.json.JSONArray addedArr = new org.json.JSONArray(newlyAdded);
+                    pkt.put("addedPeers", addedArr);
+
+                    VeilPacket veilPkt = new VeilPacket(VeilPacket.LANE_CTRL, VeilPacket.TYPE_GROUP_SETTINGS, pkt.toString());
+                    for (String memberId : updatedParticipants) {
+                        if (memberId != null && !memberId.equals(myId)) {
+                            WebRtcManager.getInstance(mContext).sendPacket(memberId, veilPkt);
+                            WebRtcManager.getInstance(mContext).initiateConnection(memberId);
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to dispatch GROUP_MEMBER_JOINED packet", e);
+                }
+                WebRtcManager.getInstance(mContext).sendGroupInviteToPeers(finalGroup);
+            });
+        });
+    }
+
+    /**
+     * Removes a participant from a group (available to OWNER and ADMIN; ADMIN cannot remove OWNER),
+     * rotates the group sender key so the removed user cannot decrypt future messages,
+     * and dispatches GROUP_MEMBER_REMOVED across the mesh.
+     */
+    public void removeParticipantFromGroup(String groupId, String targetPeerId) {
+        if (groupId == null || targetPeerId == null || targetPeerId.isEmpty()) return;
+
+        mStageQueue.post(() -> {
+            Chat group = getDialog(groupId);
+            if (group == null) {
+                group = mDatabase.getChat(groupId);
+            }
+            if (group == null) return;
+
+            String myId = getCurrentUserId();
+            String myRole = mDatabase.getGroupMemberRole(groupId, myId);
+            String targetRole = mDatabase.getGroupMemberRole(groupId, targetPeerId);
+            boolean amIOwner = EncryptedChatDatabase.ROLE_OWNER.equals(myRole)
+                    || (group.getAdminId() != null && group.getAdminId().equals(myId));
+            boolean amIAdmin = amIOwner || EncryptedChatDatabase.ROLE_ADMIN.equals(myRole) || group.isAdmin(myId);
+            boolean isTargetOwner = EncryptedChatDatabase.ROLE_OWNER.equals(targetRole)
+                    || (group.getAdminId() != null && group.getAdminId().equals(targetPeerId));
+
+            if (!amIAdmin || isTargetOwner) {
+                Log.w(TAG, "removeParticipantFromGroup denied: caller role=" + myRole + ", targetRole=" + targetRole);
+                return;
+            }
+
+            List<String> updatedParticipants = group.getParticipants() != null
+                    ? new ArrayList<>(group.getParticipants()) : new ArrayList<>();
+            updatedParticipants.remove(targetPeerId);
+            group.setParticipants(updatedParticipants);
+            group.removeAdmin(targetPeerId);
+            mDialogsDict.put(groupId, group);
+
+            final int newKeyEpoch = com.m3.veil.utils.EncryptionManager.rotateGroupSenderKeyEpoch(groupId);
+            final Chat finalGroup = group;
 
             mStorageQueue.execute(() -> {
-                mDatabase.saveOrUpdateChat(group);
-                mDatabase.saveGroupMembers(groupId, updatedParticipants, getCurrentUserId());
+                mDatabase.removeGroupMember(groupId, targetPeerId);
+                mDatabase.saveOrUpdateChat(finalGroup);
             });
 
-            // Notify all peers of membership update
             mCryptoQueue.execute(() -> {
-                WebRtcManager.getInstance(mContext).sendGroupInviteToPeers(group);
+                try {
+                    org.json.JSONObject pkt = new org.json.JSONObject();
+                    pkt.put("type", "group_member_control");
+                    pkt.put("action", "GROUP_MEMBER_REMOVED");
+                    pkt.put("groupId", groupId);
+                    pkt.put("removedPeerId", targetPeerId);
+                    pkt.put("actorPeerId", myId);
+                    pkt.put("groupKeyEpoch", newKeyEpoch);
+
+                    VeilPacket veilPkt = new VeilPacket(VeilPacket.LANE_CTRL, VeilPacket.TYPE_GROUP_SETTINGS, pkt.toString());
+                    for (String memberId : updatedParticipants) {
+                        if (memberId != null && !memberId.equals(myId)) {
+                            WebRtcManager.getInstance(mContext).sendPacket(memberId, veilPkt);
+                        }
+                    }
+                    // Also send to the removed peer so their client revokes access immediately
+                    WebRtcManager.getInstance(mContext).sendPacket(targetPeerId, veilPkt);
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to dispatch GROUP_MEMBER_REMOVED packet", e);
+                }
+                WebRtcManager.getInstance(mContext).sendGroupInviteToPeers(finalGroup);
             });
+        });
+    }
+
+    /**
+     * Promotes or demotes a group member (ADMIN <-> MEMBER) and updates their permission bitmask,
+     * broadcasting ROLE_UPDATE across all group peers.
+     */
+    public void updateGroupMemberRoleAndPermissions(String groupId, String targetPeerId, String newRole, int permissionsBitmask) {
+        if (groupId == null || targetPeerId == null || newRole == null) return;
+
+        mStageQueue.post(() -> {
+            Chat group = getDialog(groupId);
+            if (group == null) {
+                group = mDatabase.getChat(groupId);
+            }
+            if (group == null) return;
+
+            if (EncryptedChatDatabase.ROLE_ADMIN.equalsIgnoreCase(newRole)
+                    || EncryptedChatDatabase.ROLE_OWNER.equalsIgnoreCase(newRole)) {
+                group.addAdmin(targetPeerId);
+            } else {
+                group.removeAdmin(targetPeerId);
+            }
+            mDialogsDict.put(groupId, group);
+
+            final Chat finalGroup = group;
+            mStorageQueue.execute(() -> {
+                mDatabase.updateGroupMemberRole(groupId, targetPeerId, newRole);
+                mDatabase.updateGroupMemberPermissions(groupId, targetPeerId, permissionsBitmask);
+                mDatabase.saveOrUpdateChat(finalGroup);
+            });
+
+            mCryptoQueue.execute(() -> {
+                try {
+                    org.json.JSONObject pkt = new org.json.JSONObject();
+                    pkt.put("type", "group_member_control");
+                    pkt.put("action", "ROLE_UPDATE");
+                    pkt.put("groupId", groupId);
+                    pkt.put("targetPeerId", targetPeerId);
+                    pkt.put("newRole", newRole);
+                    pkt.put("permissionsBitmask", permissionsBitmask);
+
+                    VeilPacket veilPkt = new VeilPacket(VeilPacket.LANE_CTRL, VeilPacket.TYPE_GROUP_SETTINGS, pkt.toString());
+                    if (finalGroup.getParticipants() != null) {
+                        String myId = getCurrentUserId();
+                        for (String memberId : finalGroup.getParticipants()) {
+                            if (memberId != null && !memberId.equals(myId)) {
+                                WebRtcManager.getInstance(mContext).sendPacket(memberId, veilPkt);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to dispatch ROLE_UPDATE packet", e);
+                }
+                WebRtcManager.getInstance(mContext).sendGroupInviteToPeers(finalGroup);
+            });
+        });
+    }
+
+    /**
+     * Transfers group ownership from the current OWNER to another member,
+     * automatically demoting the previous OWNER to ADMIN and syncing ROLE_UPDATE across all peers.
+     */
+    public void transferGroupOwnership(String groupId, String newOwnerPeerId) {
+        if (groupId == null || newOwnerPeerId == null || newOwnerPeerId.isEmpty()) return;
+
+        mStageQueue.post(() -> {
+            Chat group = getDialog(groupId);
+            if (group == null) {
+                group = mDatabase.getChat(groupId);
+            }
+            if (group == null) return;
+
+            String myId = getCurrentUserId();
+            group.setAdminId(newOwnerPeerId);
+            group.addAdmin(newOwnerPeerId);
+            if (myId != null) {
+                group.addAdmin(myId); // Previous owner remains ADMIN
+            }
+            mDialogsDict.put(groupId, group);
+
+            final Chat finalGroup = group;
+            mStorageQueue.execute(() -> {
+                mDatabase.transferGroupOwnership(groupId, newOwnerPeerId);
+                mDatabase.saveOrUpdateChat(finalGroup);
+            });
+
+            mCryptoQueue.execute(() -> {
+                try {
+                    org.json.JSONObject pkt = new org.json.JSONObject();
+                    pkt.put("type", "group_member_control");
+                    pkt.put("action", "OWNERSHIP_TRANSFER");
+                    pkt.put("groupId", groupId);
+                    pkt.put("newOwnerPeerId", newOwnerPeerId);
+                    pkt.put("previousOwnerPeerId", myId);
+
+                    VeilPacket veilPkt = new VeilPacket(VeilPacket.LANE_CTRL, VeilPacket.TYPE_GROUP_SETTINGS, pkt.toString());
+                    if (finalGroup.getParticipants() != null) {
+                        for (String memberId : finalGroup.getParticipants()) {
+                            if (memberId != null && !memberId.equals(myId)) {
+                                WebRtcManager.getInstance(mContext).sendPacket(memberId, veilPkt);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to dispatch OWNERSHIP_TRANSFER packet", e);
+                }
+                WebRtcManager.getInstance(mContext).sendGroupInviteToPeers(finalGroup);
+            });
+        });
+    }
+
+    /**
+     * Processes inbound GROUP_MEMBER_JOINED, GROUP_MEMBER_REMOVED, ROLE_UPDATE, and OWNERSHIP_TRANSFER packets.
+     */
+    public void processInboundGroupControlPacket(org.json.JSONObject json) {
+        if (json == null) return;
+        String action = json.optString("action", "");
+        String groupId = json.optString("groupId", "");
+        if (groupId.isEmpty()) return;
+
+        mStorageQueue.execute(() -> {
+            Chat group = mDatabase.getChat(groupId);
+            if ("GROUP_MEMBER_JOINED".equals(action)) {
+                org.json.JSONArray partArr = json.optJSONArray("participants");
+                List<String> parts = new ArrayList<>();
+                if (partArr != null) {
+                    for (int i = 0; i < partArr.length(); i++) {
+                        String p = partArr.optString(i, "");
+                        if (!p.isEmpty() && !parts.contains(p)) parts.add(p);
+                    }
+                }
+                String ownerId = json.optString("ownerId", group != null ? group.getAdminId() : "");
+                if (group == null) {
+                    group = new Chat(
+                            groupId,
+                            json.optString("groupName", "Encrypted Group"),
+                            "Added to group",
+                            Timestamp.now(),
+                            "avatar_2",
+                            1,
+                            true,
+                            true,
+                            json.optString("groupType", "group"),
+                            parts
+                    );
+                    group.setAdminId(ownerId);
+                } else if (!parts.isEmpty()) {
+                    group.setParticipants(parts);
+                }
+                mDatabase.saveOrUpdateChat(group);
+                mDatabase.saveGroupMembers(groupId, group.getParticipants(), ownerId);
+                mDialogsDict.put(groupId, group);
+            } else if ("GROUP_MEMBER_REMOVED".equals(action)) {
+                String removedPeerId = json.optString("removedPeerId", "");
+                String myId = getCurrentUserId();
+                mDatabase.removeGroupMember(groupId, removedPeerId);
+                if (removedPeerId.equals(myId)) {
+                    // Revoke our local access to this group
+                    wipeDialog(groupId);
+                    return;
+                }
+                if (group != null && group.getParticipants() != null) {
+                    List<String> parts = new ArrayList<>(group.getParticipants());
+                    parts.remove(removedPeerId);
+                    group.setParticipants(parts);
+                    group.removeAdmin(removedPeerId);
+                    mDatabase.saveOrUpdateChat(group);
+                    mDialogsDict.put(groupId, group);
+                }
+            } else if ("ROLE_UPDATE".equals(action)) {
+                String targetPeerId = json.optString("targetPeerId", "");
+                String newRole = json.optString("newRole", EncryptedChatDatabase.ROLE_MEMBER);
+                int bitmask = json.optInt("permissionsBitmask", EncryptedChatDatabase.PERM_DEFAULT_MEMBER);
+                if (!targetPeerId.isEmpty()) {
+                    mDatabase.updateGroupMemberRole(groupId, targetPeerId, newRole);
+                    mDatabase.updateGroupMemberPermissions(groupId, targetPeerId, bitmask);
+                    if (group != null) {
+                        if (EncryptedChatDatabase.ROLE_ADMIN.equalsIgnoreCase(newRole)
+                                || EncryptedChatDatabase.ROLE_OWNER.equalsIgnoreCase(newRole)) {
+                            group.addAdmin(targetPeerId);
+                        } else {
+                            group.removeAdmin(targetPeerId);
+                        }
+                        mDatabase.saveOrUpdateChat(group);
+                        mDialogsDict.put(groupId, group);
+                    }
+                }
+            } else if ("OWNERSHIP_TRANSFER".equals(action)) {
+                String newOwnerPeerId = json.optString("newOwnerPeerId", "");
+                if (!newOwnerPeerId.isEmpty()) {
+                    mDatabase.transferGroupOwnership(groupId, newOwnerPeerId);
+                    if (group != null) {
+                        group.setAdminId(newOwnerPeerId);
+                        group.addAdmin(newOwnerPeerId);
+                        mDatabase.saveOrUpdateChat(group);
+                        mDialogsDict.put(groupId, group);
+                    }
+                }
+            }
         });
     }
 
@@ -4604,7 +4940,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     }
                 });
             }
-            wipeDialog(dialogId);
+            wipeDialog(dialogId, recipientId);
         });
     }
 
@@ -4639,8 +4975,24 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
      * Completely wipes a chat dialog and unlinks all associated media files.
      */
     public void wipeDialog(String dialogId) {
+        wipeDialog(dialogId, null);
+    }
+
+    public void wipeDialog(String dialogId, @Nullable String peerIdHint) {
         if (dialogId == null) return;
         mStageQueue.post(() -> {
+            Chat existingChat = mDialogsDict.get(dialogId);
+            String resolvedPeerId = peerIdHint;
+            if ((resolvedPeerId == null || resolvedPeerId.isEmpty()) && existingChat != null && existingChat.getParticipants() != null) {
+                String myId = getCurrentUserId();
+                for (String p : existingChat.getParticipants()) {
+                    if (p != null && !p.equals(myId)) {
+                        resolvedPeerId = p;
+                        break;
+                    }
+                }
+            }
+
             List<Message> msgs = getLoadedMessages(dialogId);
             for (Message m : msgs) {
                 if (m.getLocalFilePath() != null) {
@@ -4652,9 +5004,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             mDialogsDict.remove(dialogId);
             mSortedDialogsList.removeIf(c -> c.getId().equals(dialogId));
 
+            final String finalPeerId = resolvedPeerId;
+            final String activePersonaId = PersonaManager.getInstance(mContext).getActivePersonaId();
             mStorageQueue.execute(() -> {
-                mDatabase.clearChatMessages(dialogId);
-                mDatabase.deleteChat(dialogId);
+                mDatabase.deleteConversationCascade(dialogId, finalPeerId, activePersonaId);
             });
 
             List<Chat> copy = new ArrayList<>(mSortedDialogsList);

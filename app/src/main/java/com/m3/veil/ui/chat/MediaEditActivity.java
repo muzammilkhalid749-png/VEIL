@@ -1303,24 +1303,39 @@ public class MediaEditActivity extends AppCompatActivity {
                 .start(this);
     }
 
-    private int getEmbeddedVideoRotation(Uri uri) {
-        if (uri == null) return 0;
-        MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-        try {
-            mmr.setDataSource(this, uri);
-            String rot = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
-            if (rot != null && !rot.isEmpty()) {
-                return Integer.parseInt(rot);
+    private int[] resolveVideoNaturalDimensions(Uri uri, int fallbackW, int fallbackH) {
+        int rawW = fallbackW;
+        int rawH = fallbackH;
+        int embeddedRot = 0;
+        if (uri != null) {
+            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+            try {
+                mmr.setDataSource(this, uri);
+                String wStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH);
+                String hStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT);
+                String rotStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
+                if (wStr != null && !wStr.isEmpty()) rawW = Integer.parseInt(wStr);
+                if (hStr != null && !hStr.isEmpty()) rawH = Integer.parseInt(hStr);
+                if (rotStr != null && !rotStr.isEmpty()) embeddedRot = Integer.parseInt(rotStr);
+            } catch (Throwable ignored) {
+            } finally {
+                try { mmr.release(); } catch (Throwable ignored) {}
             }
-        } catch (Throwable ignored) {
-        } finally {
-            try { mmr.release(); } catch (Throwable ignored) {}
         }
-        return 0;
+        int normalizedEmbedded = ((embeddedRot % 360) + 360) % 360;
+        // Swap width and height if raw encoded stream has 90° or 270° rotation metadata
+        // (unless fallback dimensions from MediaPlayer already swapped them)
+        int naturalW = (normalizedEmbedded == 90 || normalizedEmbedded == 270) ? rawH : rawW;
+        int naturalH = (normalizedEmbedded == 90 || normalizedEmbedded == 270) ? rawW : rawH;
+        return new int[]{Math.max(1, naturalW), Math.max(1, naturalH), normalizedEmbedded};
+    }
+
+    private int getEmbeddedVideoRotation(Uri uri) {
+        return resolveVideoNaturalDimensions(uri, 0, 0)[2];
     }
 
     private void fitVideoViewToContainer(int videoWidth, int videoHeight) {
-        if (videoView == null || videoContainer == null || videoWidth <= 0 || videoHeight <= 0) return;
+        if (videoView == null || videoContainer == null || (videoWidth <= 0 && videoHeight <= 0)) return;
         videoContainer.post(() -> {
             int containerW = videoContainer.getWidth();
             int containerH = videoContainer.getHeight();
@@ -1332,15 +1347,19 @@ public class MediaEditActivity extends AppCompatActivity {
             }
             if (containerW <= 0 || containerH <= 0) return;
 
-            int embeddedRot = getEmbeddedVideoRotation(mediaUri);
-            int totalRotation = (embeddedRot + currentVideoRotation) % 360;
-            boolean isRotated = (totalRotation == 90 || totalRotation == 270);
-            int realW = isRotated ? videoHeight : videoWidth;
-            int realH = isRotated ? videoWidth : videoHeight;
+            int[] natural = resolveVideoNaturalDimensions(mediaUri, videoWidth, videoHeight);
+            int displayW = natural[0];
+            int displayH = natural[1];
 
-            float scale = Math.min((float) containerW / realW, (float) containerH / realH);
-            int targetW = Math.max(1, Math.round(realW * scale));
-            int targetH = Math.max(1, Math.round(realH * scale));
+            int userRot = ((currentVideoRotation % 360) + 360) % 360;
+            boolean userSwapped = (userRot == 90 || userRot == 270);
+            int realW = userSwapped ? displayH : displayW;
+            int realH = userSwapped ? displayW : displayH;
+
+            // FIT_CENTER / RESIZE_MODE_FIT scaling so portrait and landscape videos never stretch
+            float scale = Math.min((float) containerW / (float) realW, (float) containerH / (float) realH);
+            int targetW = Math.max(1, Math.round(displayW * scale));
+            int targetH = Math.max(1, Math.round(displayH * scale));
 
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) videoView.getLayoutParams();
             if (lp == null) {
@@ -1351,6 +1370,7 @@ public class MediaEditActivity extends AppCompatActivity {
                 lp.gravity = Gravity.CENTER;
             }
             videoView.setLayoutParams(lp);
+            videoView.setRotation(currentVideoRotation);
             videoView.requestLayout();
         });
     }

@@ -117,10 +117,27 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
         return view;
     }
 
+    private final com.m3.veil.manager.PersonaManager.PersonaSwitchListener personaSwitchListener = newActivePersona -> {
+        if (isAdded() && getContext() != null) {
+            loadLocalPosts();
+        }
+    };
+
     @Override
     public void onResume() {
         super.onResume();
+        if (getContext() != null) {
+            com.m3.veil.manager.PersonaManager.getInstance(requireContext()).addPersonaSwitchListener(personaSwitchListener);
+        }
         loadLocalPosts();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (getContext() != null) {
+            com.m3.veil.manager.PersonaManager.getInstance(requireContext()).removePersonaSwitchListener(personaSwitchListener);
+        }
     }
 
     @Override

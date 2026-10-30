@@ -20,6 +20,7 @@ public class CallSignal {
     public static final String PRE_ACCEPT = "pre_accept";
     public static final String ACCEPT = "accept";
     public static final String DECLINE = "decline";
+    public static final String CALL_CANCEL = "call_cancel";
     public static final String END = "end";
     public static final String OFFER = "offer";
     public static final String ANSWER = "answer";

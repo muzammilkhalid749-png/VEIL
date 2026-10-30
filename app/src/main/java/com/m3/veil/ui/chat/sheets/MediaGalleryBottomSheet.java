@@ -134,6 +134,14 @@ public class MediaGalleryBottomSheet extends BottomSheetDialogFragment {
             }
 
             @Override
+            public void onSingleMediaItemClicked(GalleryMediaItem item) {
+                if (item != null && item.getUri() != null && listener != null) {
+                    dismiss();
+                    listener.onMediaSelectedToEdit(item.getUri(), item.isVideo() ? "video" : "image");
+                }
+            }
+
+            @Override
             public void onMultiSelectionChanged(List<GalleryMediaItem> selectedItems) {
                 currentSelectedBatch.clear();
                 if (selectedItems != null) {

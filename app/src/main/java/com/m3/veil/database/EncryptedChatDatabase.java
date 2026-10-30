@@ -358,6 +358,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     private static EncryptedChatDatabase instance;
     private static final Map<String, EncryptedChatDatabase> sPersonaInstances = new ConcurrentHashMap<>();
+    private static final List<DatabaseChangeListener> sGlobalListeners = new CopyOnWriteArrayList<>();
 
     private final Context context;
     private final String dbName;
@@ -372,11 +373,21 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     // Prepared Statement Pool
     private final Map<String, net.sqlcipher.database.SQLiteStatement> statementPool = new ConcurrentHashMap<>();
 
+    public static boolean isPrimaryPersonaId(String personaId) {
+        return personaId == null || personaId.trim().isEmpty()
+                || "default".equalsIgnoreCase(personaId.trim())
+                || "persona_primary".equalsIgnoreCase(personaId.trim());
+    }
+
+    public static synchronized EncryptedChatDatabase getMasterDatabase(Context context) {
+        return getInstance(context, "persona_primary", false);
+    }
+
     public static synchronized EncryptedChatDatabase getInstance(Context context, String personaId, boolean isDecoy) {
         String dbKey;
         if (isDecoy) {
             dbKey = "veil_vault_decoy.db";
-        } else if (personaId != null && !personaId.trim().isEmpty() && !"default".equals(personaId)) {
+        } else if (!isPrimaryPersonaId(personaId)) {
             dbKey = "veil_vault_persona_" + personaId.trim() + ".db";
         } else {
             dbKey = DATABASE_NAME; // "veil_vault_encrypted.db"
@@ -401,25 +412,35 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             android.content.SharedPreferences sp = context.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE);
             android.content.SharedPreferences fsp = context.getSharedPreferences("VeilFeaturePrefs", Context.MODE_PRIVATE);
             isDecoy = sp.getBoolean("decoy_mode_active", fsp.getBoolean("decoy_mode_active", false));
-            personaId = sp.getString("active_persona_id", fsp.getString("active_persona_id", null));
+            personaId = fsp.getString("active_persona_id", sp.getString("active_persona_id", "persona_primary"));
         } catch (Exception ignored) {}
         return getInstance(context, personaId, isDecoy);
     }
 
     public static synchronized EncryptedChatDatabase switchActiveVault(Context context, String personaId, boolean isDecoy) {
+        String resolvedId = (personaId != null && !personaId.trim().isEmpty()) ? personaId.trim() : "persona_primary";
         try {
             context.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean("decoy_mode_active", isDecoy)
-                    .putString("active_persona_id", personaId != null ? personaId : "persona_primary")
+                    .putString("active_persona_id", resolvedId)
                     .apply();
             context.getSharedPreferences("VeilFeaturePrefs", Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean("decoy_mode_active", isDecoy)
-                    .putString("active_persona_id", personaId != null ? personaId : "persona_primary")
+                    .putString("active_persona_id", resolvedId)
                     .apply();
         } catch (Exception ignored) {}
-        return getInstance(context, personaId, isDecoy);
+        EncryptedChatDatabase targetDb = getInstance(context, resolvedId, isDecoy);
+        targetDb.notifyChatsChanged();
+        targetDb.notifyPostsChanged();
+        targetDb.notifyCallsChanged();
+        targetDb.notifyStatusesChanged();
+        return targetDb;
+    }
+
+    public static synchronized EncryptedChatDatabase switchActiveVault(Context context, String personaId) {
+        return switchActiveVault(context, personaId, false);
     }
 
     private EncryptedChatDatabase(Context context, String dbName) {
@@ -449,14 +470,20 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     }
 
     public void addListener(DatabaseChangeListener listener) {
-        if (listener != null && !listeners.contains(listener)) {
-            listeners.add(listener);
+        if (listener != null) {
+            if (!listeners.contains(listener)) {
+                listeners.add(listener);
+            }
+            if (!sGlobalListeners.contains(listener)) {
+                sGlobalListeners.add(listener);
+            }
         }
     }
 
     public void removeListener(DatabaseChangeListener listener) {
         if (listener != null) {
             listeners.remove(listener);
+            sGlobalListeners.remove(listener);
         }
     }
 
@@ -473,7 +500,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     }
 
     private void notifyMessagesChanged(String chatId) {
-        for (DatabaseChangeListener l : listeners) {
+        for (DatabaseChangeListener l : sGlobalListeners) {
             try {
                 l.onMessagesUpdated(chatId);
             } catch (Exception ignored) {}
@@ -481,7 +508,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     }
 
     private void notifyChatsChanged() {
-        for (DatabaseChangeListener l : listeners) {
+        for (DatabaseChangeListener l : sGlobalListeners) {
             try {
                 l.onChatsUpdated();
             } catch (Exception ignored) {}
@@ -489,7 +516,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     }
 
     private void notifyPostsChanged() {
-        for (DatabaseChangeListener l : listeners) {
+        for (DatabaseChangeListener l : sGlobalListeners) {
             try {
                 l.onPostsUpdated();
             } catch (Exception ignored) {}
@@ -497,7 +524,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     }
 
     private void notifyCallsChanged() {
-        for (DatabaseChangeListener l : listeners) {
+        for (DatabaseChangeListener l : sGlobalListeners) {
             try {
                 l.onCallsUpdated();
             } catch (Exception ignored) {}
@@ -505,7 +532,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     }
 
     private void notifyStatusesChanged() {
-        for (DatabaseChangeListener l : listeners) {
+        for (DatabaseChangeListener l : sGlobalListeners) {
             try {
                 l.onStatusesUpdated();
             } catch (Exception ignored) {}
@@ -846,6 +873,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     public void onOpen(SQLiteDatabase db) {
         super.onOpen(db);
         try {
+            db.rawExecSQL("PRAGMA foreign_keys = ON;");
             db.rawExecSQL("PRAGMA journal_mode = WAL;");
             db.rawExecSQL("PRAGMA synchronous = NORMAL;");
             db.rawExecSQL("PRAGMA temp_store = MEMORY;");
@@ -1033,6 +1061,67 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                         COL_MTL_SIGNATURE + " TEXT" +
                         ");");
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_transparency_time ON " + TABLE_MODERATION_TRANSPARENCY_LOG + " (" + COL_MTL_TIMESTAMP_MS + " DESC);");
+            } catch (Exception ignored) {}
+
+            // Phase 1: Personas Table with unique username constraint & owner_persona_id isolation
+            try {
+                db.execSQL("CREATE TABLE IF NOT EXISTS personas (" +
+                        "persona_id TEXT PRIMARY KEY, " +
+                        "display_name TEXT NOT NULL, " +
+                        "username TEXT NOT NULL UNIQUE COLLATE NOCASE, " +
+                        "avatar_uri TEXT, " +
+                        "bio TEXT, " +
+                        "key_pair_id TEXT, " +
+                        "is_active INTEGER DEFAULT 0, " +
+                        "mood TEXT, " +
+                        "bubble_color TEXT, " +
+                        "is_temporary INTEGER DEFAULT 0, " +
+                        "expires_at INTEGER DEFAULT 0" +
+                        ");");
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_personas_username_unique ON personas (username COLLATE NOCASE);");
+                ensureColumnExists(db, TABLE_CHATS, "owner_persona_id", "TEXT DEFAULT 'persona_primary'");
+                ensureColumnExists(db, TABLE_MESSAGES, "owner_persona_id", "TEXT DEFAULT 'persona_primary'");
+                ensureColumnExists(db, TABLE_POSTS, "owner_persona_id", "TEXT DEFAULT 'persona_primary'");
+                ensureColumnExists(db, TABLE_CALLS, "owner_persona_id", "TEXT DEFAULT 'persona_primary'");
+            } catch (Exception ignored) {}
+
+            // Phase 4: FTS4 Full-Text Search Virtual Table for Messages
+            try {
+                db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts4(" +
+                        "message_id, chat_id, sender_name, body_text" +
+                        ");");
+            } catch (Exception ignored) {}
+
+            // Phase 5: Deleted Conversations Tombstone Table + Cascade Delete Trigger
+            try {
+                db.execSQL("CREATE TABLE IF NOT EXISTS deleted_conversations (" +
+                        "chat_id TEXT PRIMARY KEY, " +
+                        "peer_id TEXT, " +
+                        "owner_persona_id TEXT, " +
+                        "deleted_at_ms INTEGER NOT NULL" +
+                        ");");
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_deleted_conv_peer ON deleted_conversations (peer_id, owner_persona_id);");
+                db.execSQL("CREATE TRIGGER IF NOT EXISTS trg_cascade_delete_chat_messages " +
+                        "AFTER DELETE ON " + TABLE_CHATS + " " +
+                        "BEGIN " +
+                        "DELETE FROM " + TABLE_MESSAGES + " WHERE " + COL_MSG_CHAT_ID + " = OLD." + COL_CHAT_ID + "; " +
+                        "END;");
+            } catch (Exception ignored) {}
+
+            // Phase 6: Group Members & Role-Based Permissions Table
+            try {
+                db.execSQL("CREATE TABLE IF NOT EXISTS group_members (" +
+                        "group_id TEXT NOT NULL, " +
+                        "user_id TEXT NOT NULL, " +
+                        "display_name TEXT, " +
+                        "username TEXT, " +
+                        "avatar_uri TEXT, " +
+                        "role TEXT DEFAULT 'MEMBER', " +
+                        "permissions_mask INTEGER DEFAULT 15, " +
+                        "joined_at INTEGER DEFAULT 0, " +
+                        "PRIMARY KEY (group_id, user_id)" +
+                        ");");
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members (group_id);");
             } catch (Exception ignored) {}
         } catch (Exception e) {
             Log.e(TAG, "Error checking/updating database schema", e);
@@ -1526,17 +1615,17 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     }
 
     public synchronized void deleteChat(String chatId) {
-        if (chatId == null) return;
-        ramChatCache.remove(chatId);
-        ramMessageListCache.remove(chatId);
+        deleteConversationCascade(chatId, null, getActivePersonaIdForDb());
+    }
+
+    public String getActivePersonaIdForDb() {
         try {
-            com.m3.veil.manager.VeilMessagesController.getInstance(context).removeDialogFromCache(chatId);
-        } catch (Throwable ignored) {}
-        SQLiteDatabase db = getEncryptedDb();
-        db.delete(TABLE_MESSAGES, COL_MSG_CHAT_ID + "=?", new String[]{chatId});
-        db.delete(TABLE_CHATS, COL_CHAT_ID + "=?", new String[]{chatId});
-        notifyMessagesChanged(chatId);
-        notifyChatsChanged();
+            android.content.SharedPreferences fsp = context.getSharedPreferences("VeilFeaturePrefs", Context.MODE_PRIVATE);
+            String id = fsp.getString("active_persona_id", "persona_primary");
+            return (id != null && !id.trim().isEmpty()) ? id.trim() : "persona_primary";
+        } catch (Exception e) {
+            return "persona_primary";
+        }
     }
 
     public synchronized void updateChatPinStatus(String chatId, boolean pinned) {
@@ -1852,7 +1941,15 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             cv.put(COL_MSG_REACTIONS, "");
         }
 
+        long msgTimestampMs = message.getTimestamp() != null ? message.getTimestamp().toDate().getTime() : System.currentTimeMillis();
+        // Phase 5: Prevent resurrected old messages if conversation was previously deleted
+        long deletedCutoff = getConversationDeletedCutoffMs(chatId, message.getSenderId());
+        if (deletedCutoff > 0 && msgTimestampMs <= deletedCutoff) {
+            return;
+        }
+
         try {
+            cv.put("owner_persona_id", getActivePersonaIdForDb());
             db.insertWithOnConflict(TABLE_MESSAGES, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
         } catch (Exception e) {
             ensureSchema(db);
@@ -1862,6 +1959,19 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 Log.e(TAG, "saveMessage retry failed", retryEx);
             }
         }
+
+        // Phase 4: Index message in FTS4 table for fast snippet search
+        try {
+            if (message.getText() != null && !message.getText().trim().isEmpty() && !"deleted".equals(message.getType())) {
+                db.delete("messages_fts", "message_id = ?", new String[]{message.getId()});
+                ContentValues ftsCv = new ContentValues();
+                ftsCv.put("message_id", message.getId());
+                ftsCv.put("chat_id", chatId);
+                ftsCv.put("sender_name", message.getSenderName() != null ? message.getSenderName() : "");
+                ftsCv.put("body_text", message.getText());
+                db.insert("messages_fts", null, ftsCv);
+            }
+        } catch (Exception ignored) {}
 
         // Update parent chat summary
         ContentValues chatCv = new ContentValues();
@@ -5051,5 +5161,675 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             }
         }
         return list;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════════════════════
+    // PHASE 1: PERSONA SCHEMA & STORAGE ISOLATION DAO
+    // ═════════════════════════════════════════════════════════════════════════════════════════════
+
+    public synchronized List<com.m3.veil.model.Persona> getAllPersonasFromDb() {
+        List<com.m3.veil.model.Persona> list = new ArrayList<>();
+        SQLiteDatabase db = getEncryptedDb();
+        Cursor c = null;
+        try {
+            c = db.query("personas", null, null, null, null, null, "rowid ASC");
+            if (c != null) {
+                while (c.moveToNext()) {
+                    list.add(cursorToPersona(c));
+                }
+            }
+        } catch (Exception e) {
+            ensureSchema(db);
+        } finally {
+            if (c != null) c.close();
+        }
+        return list;
+    }
+
+    private com.m3.veil.model.Persona cursorToPersona(Cursor c) {
+        String id = c.getString(c.getColumnIndexOrThrow("persona_id"));
+        String displayName = c.getString(c.getColumnIndexOrThrow("display_name"));
+        String username = c.getString(c.getColumnIndexOrThrow("username"));
+        String avatarUri = c.getString(c.getColumnIndexOrThrow("avatar_uri"));
+        String bio = c.getString(c.getColumnIndexOrThrow("bio"));
+        String keyPairId = c.getString(c.getColumnIndexOrThrow("key_pair_id"));
+        boolean isActive = c.getInt(c.getColumnIndexOrThrow("is_active")) == 1;
+        String mood = c.getString(c.getColumnIndexOrThrow("mood"));
+        String bubbleColor = c.getString(c.getColumnIndexOrThrow("bubble_color"));
+        boolean isTemp = c.getInt(c.getColumnIndexOrThrow("is_temporary")) == 1;
+        long expiresAt = c.getLong(c.getColumnIndexOrThrow("expires_at"));
+        return new com.m3.veil.model.Persona(
+                id, displayName, username, avatarUri, bio, keyPairId, isActive, bubbleColor, mood, isTemp, expiresAt
+        );
+    }
+
+    public synchronized boolean isPersonaUsernameTakenInDb(String username, String excludePersonaId) {
+        if (username == null || username.trim().isEmpty()) return false;
+        String norm = com.m3.veil.model.Persona.normalizeUsername(username);
+        SQLiteDatabase db = getEncryptedDb();
+        Cursor c = null;
+        try {
+            if (excludePersonaId != null && !excludePersonaId.isEmpty()) {
+                c = db.query("personas", new String[]{"persona_id"},
+                        "LOWER(username) = LOWER(?) AND persona_id != ?",
+                        new String[]{norm, excludePersonaId}, null, null, null);
+            } else {
+                c = db.query("personas", new String[]{"persona_id"},
+                        "LOWER(username) = LOWER(?)",
+                        new String[]{norm}, null, null, null);
+            }
+            return c != null && c.moveToFirst();
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (c != null) c.close();
+        }
+    }
+
+    public synchronized boolean upsertPersonaInDb(com.m3.veil.model.Persona persona) {
+        if (persona == null || persona.getPersonaId() == null) return false;
+        SQLiteDatabase db = getEncryptedDb();
+        ensureSchema(db);
+        String normUser = com.m3.veil.model.Persona.normalizeUsername(persona.getUsername());
+        if (normUser.isEmpty()) {
+            normUser = com.m3.veil.model.Persona.normalizeUsername(persona.getPersonaId());
+        }
+        if (isPersonaUsernameTakenInDb(normUser, persona.getPersonaId())) {
+            normUser = normUser + "_" + Math.abs(persona.getPersonaId().hashCode() % 1000);
+        }
+        persona.setUsername(normUser);
+
+        ContentValues cv = new ContentValues();
+        cv.put("persona_id", persona.getPersonaId());
+        cv.put("display_name", persona.getDisplayName());
+        cv.put("username", normUser);
+        cv.put("avatar_uri", persona.getAvatarUri());
+        cv.put("bio", persona.getBio());
+        cv.put("key_pair_id", persona.getKeyPairId());
+        cv.put("is_active", persona.isActive() ? 1 : 0);
+        cv.put("mood", persona.getMood());
+        cv.put("bubble_color", persona.getBubbleColor());
+        cv.put("is_temporary", persona.isTemporary() ? 1 : 0);
+        cv.put("expires_at", persona.getExpiresAt());
+        long row = db.insertWithOnConflict("personas", null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+        return row != -1;
+    }
+
+    public synchronized void setActivePersonaInDb(String personaId) {
+        if (personaId == null) return;
+        SQLiteDatabase db = getEncryptedDb();
+        ensureSchema(db);
+        try {
+            ContentValues clearCv = new ContentValues();
+            clearCv.put("is_active", 0);
+            db.update("personas", clearCv, null, null);
+
+            ContentValues activeCv = new ContentValues();
+            activeCv.put("is_active", 1);
+            db.update("personas", activeCv, "persona_id = ?", new String[]{personaId});
+        } catch (Exception ignored) {}
+    }
+
+    public synchronized void deletePersonaFromDb(String personaId) {
+        if (personaId == null) return;
+        SQLiteDatabase db = getEncryptedDb();
+        try {
+            db.delete("personas", "persona_id = ?", new String[]{personaId});
+        } catch (Exception ignored) {}
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════════════════════
+    // PHASE 4: GLOBAL DUAL-LEVEL FTS4 MESSAGE SEARCH WITH SNIPPETS
+    // ═════════════════════════════════════════════════════════════════════════════════════════════
+
+    public static class FtsMessageSearchResult {
+        public final Message message;
+        public final Chat chat;
+        public final String chatId;
+        public final String chatName;
+        public final String snippet;
+        public final String snippetHtml;
+        public final long timestampMillis;
+        public final long timestampMs;
+        public final boolean unread;
+        public final boolean isUnread;
+
+        public FtsMessageSearchResult(Message message, Chat chat, String snippetHtml, long timestampMs, boolean isUnread) {
+            this.message = message;
+            this.chat = chat;
+            this.chatId = chat != null ? chat.getId() : (message != null ? message.getChatId() : "");
+            this.chatName = chat != null && chat.getName() != null ? chat.getName() : "Encrypted Chat";
+            this.snippetHtml = snippetHtml != null ? snippetHtml : "";
+            this.snippet = this.snippetHtml;
+            this.timestampMs = timestampMs;
+            this.timestampMillis = timestampMs;
+            this.isUnread = isUnread;
+            this.unread = isUnread;
+        }
+    }
+
+    public static class MessageSearchResult extends FtsMessageSearchResult {
+        public MessageSearchResult(Message message, Chat chat, String snippetHtml, long timestampMs, boolean isUnread) {
+            super(message, chat, snippetHtml, timestampMs, isUnread);
+        }
+    }
+
+    public synchronized List<FtsMessageSearchResult> searchMessagesFtsWithSnippets(String rawQuery, int limit) {
+        List<FtsMessageSearchResult> results = new ArrayList<>();
+        if (rawQuery == null || rawQuery.trim().isEmpty()) return results;
+        String cleanQuery = rawQuery.trim();
+        SQLiteDatabase db = getEncryptedDb();
+        Set<String> seenMsgIds = new HashSet<>();
+
+        // 1. Try FTS4 MATCH with snippet()
+        Cursor ftsCursor = null;
+        try {
+            String ftsToken = cleanQuery.replaceAll("[^a-zA-Z0-9_\\s]", " ").trim();
+            if (!ftsToken.isEmpty()) {
+                String matchExpr = ftsToken.replaceAll("\\s+", "* ") + "*";
+                ftsCursor = db.rawQuery(
+                        "SELECT message_id, chat_id, snippet(messages_fts, '<b>', '</b>', '…', 3, 12) " +
+                        "FROM messages_fts WHERE messages_fts MATCH ? LIMIT ?",
+                        new String[]{matchExpr, String.valueOf(limit > 0 ? limit : 40)}
+                );
+                if (ftsCursor != null) {
+                    while (ftsCursor.moveToNext()) {
+                        String msgId = ftsCursor.getString(0);
+                        String chatId = ftsCursor.getString(1);
+                        String snippet = ftsCursor.getString(2);
+                        if (msgId == null || !seenMsgIds.add(msgId)) continue;
+                        Message m = getMessageById(msgId);
+                        if (m != null && !"deleted".equals(m.getType())) {
+                            Chat c = getChat(chatId != null ? chatId : m.getChatId());
+                            long ts = m.getTimestamp() != null ? m.getTimestamp().toDate().getTime() : 0L;
+                            boolean unread = !m.isRead() && (c != null && c.getUnreadCount() > 0);
+                            results.add(new FtsMessageSearchResult(m, c, snippet != null ? snippet : m.getText(), ts, unread));
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (ftsCursor != null) ftsCursor.close();
+        }
+
+        // 2. Supplement with direct table substring match and build highlighted snippet
+        List<Message> fallbackMessages = searchMessages(cleanQuery, limit > 0 ? limit : 40);
+        for (Message m : fallbackMessages) {
+            if (m == null || m.getId() == null || "deleted".equals(m.getType())) continue;
+            if (!seenMsgIds.add(m.getId())) continue;
+            Chat c = getChat(m.getChatId());
+            long ts = m.getTimestamp() != null ? m.getTimestamp().toDate().getTime() : 0L;
+            boolean unread = !m.isRead() && (c != null && c.getUnreadCount() > 0);
+            String snippet = buildHighlightedSnippet(m.getText(), cleanQuery);
+            results.add(new FtsMessageSearchResult(m, c, snippet, ts, unread));
+            if (results.size() >= (limit > 0 ? limit : 40)) break;
+        }
+
+        results.sort((a, b) -> Long.compare(b.timestampMs, a.timestampMs));
+        return results;
+    }
+
+    private String buildHighlightedSnippet(String fullText, String query) {
+        if (fullText == null) return "";
+        if (query == null || query.isEmpty()) return fullText;
+        String lowerText = fullText.toLowerCase( java.util.Locale.ROOT);
+        String lowerQ = query.toLowerCase(java.util.Locale.ROOT);
+        int idx = lowerText.indexOf(lowerQ);
+        if (idx < 0) return fullText;
+        int start = Math.max(0, idx - 28);
+        int end = Math.min(fullText.length(), idx + query.length() + 40);
+        StringBuilder sb = new StringBuilder();
+        if (start > 0) sb.append("…");
+        sb.append(fullText, start, idx);
+        sb.append("<b>").append(fullText, idx, idx + query.length()).append("</b>");
+        sb.append(fullText, idx + query.length(), end);
+        if (end < fullText.length()) sb.append("…");
+        return sb.toString();
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════════════════════
+    // PHASE 5: TRUE CASCADE DELETION, DISK MEDIA CLEANUP & TOMBSTONE PROTECTION
+    // ═════════════════════════════════════════════════════════════════════════════════════════════
+
+    public synchronized long getConversationDeletedCutoffMs(String chatId, String peerId) {
+        long cutoff = 0L;
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilPrefs", Context.MODE_PRIVATE);
+            if (chatId != null && !chatId.isEmpty()) {
+                cutoff = Math.max(cutoff, prefs.getLong("del_cutoff_" + chatId, 0L));
+            }
+            if (peerId != null && !peerId.isEmpty()) {
+                cutoff = Math.max(cutoff, prefs.getLong("del_cutoff_peer_" + peerId, 0L));
+            }
+        } catch (Exception ignored) {}
+        SQLiteDatabase db = getEncryptedDb();
+        Cursor c = null;
+        try {
+            if (chatId != null && !chatId.isEmpty()) {
+                c = db.query("deleted_conversations", new String[]{"deleted_at_ms"},
+                        "chat_id = ?", new String[]{chatId}, null, null, null);
+                if (c != null && c.moveToFirst()) {
+                    cutoff = Math.max(cutoff, c.getLong(0));
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (c != null) c.close();
+        }
+        return cutoff;
+    }
+
+    public synchronized void clearConversationDeletionTombstone(String chatId, String peerId) {
+        // Note: We keep the cutoff timestamp at the moment of deletion so only NEW messages
+        // sent AFTER the deletion timestamp are accepted when restarting a chat!
+    }
+
+    public synchronized void deleteConversationCascade(String chatId, String peerId, String ownerPersonaId) {
+        if (chatId == null && (peerId == null || peerId.isEmpty())) return;
+        SQLiteDatabase db = getEncryptedDb();
+        ensureSchema(db);
+        long now = System.currentTimeMillis();
+        String activePersona = (ownerPersonaId != null && !ownerPersonaId.isEmpty())
+                ? ownerPersonaId : getActivePersonaIdForDb();
+
+        // Collect all matching chatIds (direct chatId, reverse chatId, or peerId match)
+        Set<String> targetChatIds = new HashSet<>();
+        if (chatId != null && !chatId.isEmpty()) {
+            targetChatIds.add(chatId);
+        }
+        String resolvedPeerId = peerId;
+        if ((resolvedPeerId == null || resolvedPeerId.isEmpty()) && chatId != null && chatId.contains("_")
+                && !chatId.startsWith("group_") && !chatId.startsWith("channel_")) {
+            String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(context);
+            String[] parts = chatId.split("_");
+            if (parts.length == 2 && myUid != null) {
+                resolvedPeerId = parts[0].equals(myUid) ? parts[1] : parts[0];
+            }
+        }
+        if (resolvedPeerId != null && !resolvedPeerId.isEmpty()) {
+            targetChatIds.add(resolvedPeerId);
+            String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(context);
+            if (myUid != null && !myUid.isEmpty()) {
+                targetChatIds.add(generateDirectChatId(myUid, resolvedPeerId));
+            }
+            for (Chat c : new ArrayList<>(ramChatCache.values())) {
+                if (c != null && !c.isGroup() && c.getParticipants() != null && c.getParticipants().contains(resolvedPeerId)) {
+                    targetChatIds.add(c.getId());
+                }
+            }
+        }
+
+        // 1. Delete stored audio notes, downloaded images, and cached attachments from disk
+        for (String cid : targetChatIds) {
+            Cursor msgCursor = null;
+            try {
+                msgCursor = db.query(TABLE_MESSAGES, new String[]{COL_MSG_ID, COL_MSG_LOCAL_PATH},
+                        COL_MSG_CHAT_ID + " = ?", new String[]{cid}, null, null, null);
+                if (msgCursor != null) {
+                    while (msgCursor.moveToNext()) {
+                        String mid = msgCursor.getString(0);
+                        String path = msgCursor.getString(1);
+                        if (mid != null) {
+                            ramSingleMessageCache.remove(mid);
+                        }
+                        if (path != null && !path.trim().isEmpty()) {
+                            try {
+                                File f = new File(path);
+                                if (f.exists() && f.isFile()) {
+                                    f.delete();
+                                }
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (msgCursor != null) msgCursor.close();
+            }
+
+            // 2. Delete all rows across messages, messages_fts, file_transfers, outbox, reminders, scheduled, and chats
+            try {
+                db.delete("messages_fts", "chat_id = ?", new String[]{cid});
+            } catch (Exception ignored) {}
+            try {
+                db.delete(TABLE_MESSAGES, COL_MSG_CHAT_ID + " = ?", new String[]{cid});
+            } catch (Exception ignored) {}
+            try {
+                db.delete(TABLE_OUTBOX, COL_OUTBOX_CHAT_ID + " = ?", new String[]{cid});
+            } catch (Exception ignored) {}
+            try {
+                db.delete(TABLE_SCHEDULED_MESSAGES, COL_SCHED_DIALOG_ID + " = ?", new String[]{cid});
+            } catch (Exception ignored) {}
+            try {
+                db.delete(TABLE_REMINDERS, COL_REM_DIALOG_ID + " = ?", new String[]{cid});
+            } catch (Exception ignored) {}
+            try {
+                db.delete("group_members", "group_id = ?", new String[]{cid});
+            } catch (Exception ignored) {}
+            try {
+                db.delete(TABLE_CHATS, COL_CHAT_ID + " = ?", new String[]{cid});
+            } catch (Exception ignored) {}
+
+            // 3. Record deletion tombstone so old messages from Firestore/mesh never resurface
+            try {
+                ContentValues tombCv = new ContentValues();
+                tombCv.put("chat_id", cid);
+                tombCv.put("peer_id", resolvedPeerId != null ? resolvedPeerId : "");
+                tombCv.put("owner_persona_id", activePersona);
+                tombCv.put("deleted_at_ms", now);
+                db.insertWithOnConflict("deleted_conversations", null, tombCv, SQLiteDatabase.CONFLICT_REPLACE);
+            } catch (Exception ignored) {}
+
+            try {
+                android.content.SharedPreferences prefs = context.getSharedPreferences("VeilPrefs", Context.MODE_PRIVATE);
+                android.content.SharedPreferences.Editor ed = prefs.edit();
+                ed.putLong("del_cutoff_" + cid, now);
+                if (resolvedPeerId != null && !resolvedPeerId.isEmpty()) {
+                    ed.putLong("del_cutoff_peer_" + resolvedPeerId, now);
+                }
+                Set<String> delSet = new HashSet<>(prefs.getStringSet("deleted_group_ids", new HashSet<>()));
+                delSet.add(cid);
+                ed.putStringSet("deleted_group_ids", delSet);
+                ed.apply();
+            } catch (Exception ignored) {}
+
+            // 4. Clear in-memory caches and pagination pointers
+            ramChatCache.remove(cid);
+            ramMessageListCache.remove(cid);
+            try {
+                com.m3.veil.manager.VeilMessagesController.getInstance(context).removeDialogFromCache(cid);
+            } catch (Throwable ignored) {}
+        }
+
+        if (resolvedPeerId != null && !resolvedPeerId.isEmpty()) {
+            try {
+                db.delete(TABLE_MESSAGES,
+                        "(" + COL_MSG_SENDER_ID + " = ? OR " + COL_MSG_RECEIVER_ID + " = ?) AND " + COL_MSG_CHAT_ID + " NOT LIKE 'group_%' AND " + COL_MSG_CHAT_ID + " NOT LIKE 'channel_%'",
+                        new String[]{resolvedPeerId, resolvedPeerId});
+            } catch (Exception ignored) {}
+        }
+
+        if (chatId != null) {
+            notifyMessagesChanged(chatId);
+        }
+        notifyChatsChanged();
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════════════════════
+    // PHASE 6: COMPLETE GROUP ROLE & PERMISSION MODEL DAO
+    // ═════════════════════════════════════════════════════════════════════════════════════════════
+
+    public static final String ROLE_OWNER = "OWNER";
+    public static final String ROLE_ADMIN = "ADMIN";
+    public static final String ROLE_MEMBER = "MEMBER";
+
+    public static final int PERM_CAN_SEND_MESSAGES = 1;       // 1 << 0
+    public static final int PERM_CAN_ADD_MEMBERS = 1 << 1;    // 2
+    public static final int PERM_CAN_PIN_MESSAGES = 1 << 2;   // 4
+    public static final int PERM_CAN_CHANGE_INFO = 1 << 3;    // 8
+
+    public static final int DEFAULT_MEMBER_PERMISSIONS = PERM_CAN_SEND_MESSAGES | PERM_CAN_ADD_MEMBERS;
+    public static final int DEFAULT_ADMIN_PERMISSIONS = PERM_CAN_SEND_MESSAGES | PERM_CAN_ADD_MEMBERS | PERM_CAN_PIN_MESSAGES | PERM_CAN_CHANGE_INFO;
+    public static final int DEFAULT_OWNER_PERMISSIONS = DEFAULT_ADMIN_PERMISSIONS;
+    public static final int PERM_DEFAULT_MEMBER = DEFAULT_MEMBER_PERMISSIONS;
+    public static final int PERM_ALL_ADMIN = DEFAULT_ADMIN_PERMISSIONS;
+
+    public static class GroupMemberRecord {
+        public String groupId;
+        public String userId;
+        public String peerId;
+        public String displayName;
+        public String username;
+        public String avatarUri;
+        public String role; // OWNER, ADMIN, MEMBER
+        public int permissionsMask;
+        public long joinedAt;
+
+        public GroupMemberRecord() {}
+
+        public GroupMemberRecord(String groupId, String userId, String displayName, String username,
+                                 String avatarUri, String role, int permissionsMask, long joinedAt) {
+            this.groupId = groupId;
+            this.userId = userId;
+            this.peerId = userId != null ? userId : "";
+            this.displayName = displayName != null ? displayName : "";
+            this.username = username != null ? username : "";
+            this.avatarUri = avatarUri != null ? avatarUri : "";
+            this.role = role != null ? role : ROLE_MEMBER;
+            this.permissionsMask = permissionsMask;
+            this.joinedAt = joinedAt;
+        }
+
+        public boolean hasPermission(int permBit) {
+            if (ROLE_OWNER.equalsIgnoreCase(role) || ROLE_ADMIN.equalsIgnoreCase(role)) {
+                return true;
+            }
+            return (permissionsMask & permBit) != 0;
+        }
+    }
+
+    public synchronized void upsertGroupMemberRecord(GroupMemberRecord member) {
+        if (member == null || member.groupId == null || member.userId == null) return;
+        SQLiteDatabase db = getEncryptedDb();
+        ensureSchema(db);
+        ContentValues cv = new ContentValues();
+        cv.put("group_id", member.groupId);
+        cv.put("user_id", member.userId);
+        cv.put("display_name", member.displayName);
+        cv.put("username", member.username);
+        cv.put("avatar_uri", member.avatarUri);
+        cv.put("role", member.role != null ? member.role : ROLE_MEMBER);
+        cv.put("permissions_mask", member.permissionsMask);
+        cv.put("joined_at", member.joinedAt > 0 ? member.joinedAt : System.currentTimeMillis());
+        db.insertWithOnConflict("group_members", null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public synchronized void upsertGroupMember(String groupId, String userId, String role, int permissionsMask) {
+        if (groupId == null || userId == null) return;
+        GroupMemberRecord existing = getGroupMemberRecord(groupId, userId);
+        if (existing != null) {
+            existing.role = role != null ? role : existing.role;
+            existing.permissionsMask = permissionsMask;
+            upsertGroupMemberRecord(existing);
+        } else {
+            upsertGroupMemberRecord(new GroupMemberRecord(
+                    groupId, userId, "", "", "",
+                    role != null ? role : ROLE_MEMBER,
+                    permissionsMask,
+                    System.currentTimeMillis()
+            ));
+        }
+    }
+
+    public synchronized List<GroupMemberRecord> getGroupMemberRecords(String groupId) {
+        List<GroupMemberRecord> list = new ArrayList<>();
+        if (groupId == null) return list;
+        SQLiteDatabase db = getEncryptedDb();
+        ensureSchema(db);
+        Cursor c = null;
+        try {
+            c = db.query("group_members", null, "group_id = ?", new String[]{groupId}, null, null,
+                    "CASE role WHEN 'OWNER' THEN 0 WHEN 'ADMIN' THEN 1 ELSE 2 END ASC, joined_at ASC");
+            if (c != null) {
+                while (c.moveToNext()) {
+                    GroupMemberRecord r = new GroupMemberRecord(
+                            c.getString(c.getColumnIndexOrThrow("group_id")),
+                            c.getString(c.getColumnIndexOrThrow("user_id")),
+                            c.getString(c.getColumnIndexOrThrow("display_name")),
+                            c.getString(c.getColumnIndexOrThrow("username")),
+                            c.getString(c.getColumnIndexOrThrow("avatar_uri")),
+                            c.getString(c.getColumnIndexOrThrow("role")),
+                            c.getInt(c.getColumnIndexOrThrow("permissions_mask")),
+                            c.getLong(c.getColumnIndexOrThrow("joined_at"))
+                    );
+                    list.add(r);
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (c != null) c.close();
+        }
+        return list;
+    }
+
+    public synchronized List<GroupMemberRecord> getGroupMembers(String groupId) {
+        return getGroupMemberRecords(groupId);
+    }
+
+    public synchronized GroupMemberRecord getGroupMemberRecord(String groupId, String userId) {
+        if (groupId == null || userId == null) return null;
+        SQLiteDatabase db = getEncryptedDb();
+        Cursor c = null;
+        try {
+            c = db.query("group_members", null, "group_id = ? AND user_id = ?",
+                    new String[]{groupId, userId}, null, null, null);
+            if (c != null && c.moveToFirst()) {
+                return new GroupMemberRecord(
+                        c.getString(c.getColumnIndexOrThrow("group_id")),
+                        c.getString(c.getColumnIndexOrThrow("user_id")),
+                        c.getString(c.getColumnIndexOrThrow("display_name")),
+                        c.getString(c.getColumnIndexOrThrow("username")),
+                        c.getString(c.getColumnIndexOrThrow("avatar_uri")),
+                        c.getString(c.getColumnIndexOrThrow("role")),
+                        c.getInt(c.getColumnIndexOrThrow("permissions_mask")),
+                        c.getLong(c.getColumnIndexOrThrow("joined_at"))
+                );
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (c != null) c.close();
+        }
+        return null;
+    }
+
+    public synchronized String getGroupMemberRole(String groupId, String userId) {
+        if (groupId == null || userId == null) return ROLE_MEMBER;
+        GroupMemberRecord rec = getGroupMemberRecord(groupId, userId);
+        if (rec != null && rec.role != null && !rec.role.isEmpty()) {
+            return rec.role;
+        }
+        Chat chat = getChat(groupId);
+        if (chat != null) {
+            if (userId.equals(chat.getAdminId())) return ROLE_OWNER;
+            if (chat.isAdmin(userId)) return ROLE_ADMIN;
+        }
+        return ROLE_MEMBER;
+    }
+
+    public synchronized int getGroupMemberPermissions(String groupId, String userId) {
+        if (groupId == null || userId == null) return DEFAULT_MEMBER_PERMISSIONS;
+        GroupMemberRecord rec = getGroupMemberRecord(groupId, userId);
+        if (rec != null) {
+            return rec.permissionsMask;
+        }
+        String role = getGroupMemberRole(groupId, userId);
+        if (ROLE_OWNER.equalsIgnoreCase(role) || ROLE_ADMIN.equalsIgnoreCase(role)) {
+            return DEFAULT_ADMIN_PERMISSIONS;
+        }
+        return DEFAULT_MEMBER_PERMISSIONS;
+    }
+
+    public synchronized boolean hasGroupPermission(String groupId, String userId, int permBit) {
+        if (groupId == null || userId == null) return false;
+        String role = getGroupMemberRole(groupId, userId);
+        if (ROLE_OWNER.equalsIgnoreCase(role) || ROLE_ADMIN.equalsIgnoreCase(role)) {
+            return true;
+        }
+        int mask = getGroupMemberPermissions(groupId, userId);
+        return (mask & permBit) != 0;
+    }
+
+    public synchronized void removeGroupMemberRecord(String groupId, String userId) {
+        if (groupId == null || userId == null) return;
+        SQLiteDatabase db = getEncryptedDb();
+        try {
+            db.delete("group_members", "group_id = ? AND user_id = ?", new String[]{groupId, userId});
+        } catch (Exception ignored) {}
+        Chat chat = getChat(groupId);
+        if (chat != null) {
+            if (chat.getParticipants() != null) {
+                List<String> nextParts = new ArrayList<>(chat.getParticipants());
+                nextParts.remove(userId);
+                chat.setParticipants(nextParts);
+            }
+            if (chat.getAdminIds() != null) {
+                List<String> nextAdmins = new ArrayList<>(chat.getAdminIds());
+                nextAdmins.remove(userId);
+                chat.setAdminIds(nextAdmins);
+            }
+            saveOrUpdateChat(chat);
+        }
+    }
+
+    public synchronized void removeGroupMember(String groupId, String userId) {
+        removeGroupMemberRecord(groupId, userId);
+    }
+
+    public synchronized void updateGroupMemberRoleRecord(String groupId, String userId, String newRole, int permissionsMask) {
+        if (groupId == null || userId == null || newRole == null) return;
+        SQLiteDatabase db = getEncryptedDb();
+        ensureSchema(db);
+        GroupMemberRecord existing = getGroupMemberRecord(groupId, userId);
+        if (existing != null) {
+            existing.role = newRole;
+            existing.permissionsMask = permissionsMask;
+            upsertGroupMemberRecord(existing);
+        } else {
+            upsertGroupMemberRecord(new GroupMemberRecord(
+                    groupId, userId, "", "", "", newRole, permissionsMask, System.currentTimeMillis()
+            ));
+        }
+        Chat chat = getChat(groupId);
+        if (chat != null) {
+            List<String> admins = chat.getAdminIds() != null ? new ArrayList<>(chat.getAdminIds()) : new ArrayList<>();
+            if (ROLE_OWNER.equalsIgnoreCase(newRole) || ROLE_ADMIN.equalsIgnoreCase(newRole)) {
+                if (!admins.contains(userId)) admins.add(userId);
+            } else {
+                admins.remove(userId);
+            }
+            chat.setAdminIds(admins);
+            if (ROLE_OWNER.equalsIgnoreCase(newRole)) {
+                chat.setAdminId(userId);
+            }
+            saveOrUpdateChat(chat);
+        }
+    }
+
+    public synchronized void updateGroupMemberRole(String groupId, String userId, String newRole) {
+        int currentMask = getGroupMemberPermissions(groupId, userId);
+        if (ROLE_OWNER.equalsIgnoreCase(newRole) || ROLE_ADMIN.equalsIgnoreCase(newRole)) {
+            currentMask = DEFAULT_ADMIN_PERMISSIONS;
+        }
+        updateGroupMemberRoleRecord(groupId, userId, newRole, currentMask);
+    }
+
+    public synchronized void updateGroupMemberPermissions(String groupId, String userId, int permissionsBitmask) {
+        String currentRole = getGroupMemberRole(groupId, userId);
+        updateGroupMemberRoleRecord(groupId, userId, currentRole, permissionsBitmask);
+    }
+
+    public synchronized void transferGroupOwnershipRecord(String groupId, String oldOwnerId, String newOwnerId) {
+        if (groupId == null || newOwnerId == null) return;
+        if (oldOwnerId != null && !oldOwnerId.equals(newOwnerId)) {
+            updateGroupMemberRoleRecord(groupId, oldOwnerId, ROLE_ADMIN, DEFAULT_ADMIN_PERMISSIONS);
+        }
+        updateGroupMemberRoleRecord(groupId, newOwnerId, ROLE_OWNER, DEFAULT_OWNER_PERMISSIONS);
+        Chat chat = getChat(groupId);
+        if (chat != null) {
+            chat.setAdminId(newOwnerId);
+            List<String> admins = chat.getAdminIds() != null ? new ArrayList<>(chat.getAdminIds()) : new ArrayList<>();
+            if (!admins.contains(newOwnerId)) admins.add(newOwnerId);
+            if (oldOwnerId != null && !admins.contains(oldOwnerId)) admins.add(oldOwnerId);
+            chat.setAdminIds(admins);
+            saveOrUpdateChat(chat);
+        }
+    }
+
+    public synchronized void transferGroupOwnership(String groupId, String newOwnerPeerId) {
+        if (groupId == null || newOwnerPeerId == null) return;
+        Chat chat = getChat(groupId);
+        String oldOwnerId = chat != null ? chat.getAdminId() : null;
+        transferGroupOwnershipRecord(groupId, oldOwnerId, newOwnerPeerId);
     }
 }

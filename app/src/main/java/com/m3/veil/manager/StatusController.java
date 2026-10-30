@@ -682,6 +682,13 @@ public class StatusController {
     }
 
     public String getCurrentUserId() {
+        try {
+            PersonaManager pm = PersonaManager.getInstance(appContext);
+            com.m3.veil.model.Persona active = pm.getActivePersona();
+            if (active != null && !PersonaManager.PRIMARY_PERSONA_ID.equals(active.getPersonaId())) {
+                return pm.getActivePersonaPeerId();
+            }
+        } catch (Exception ignored) {}
         String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(appContext);
         if (uid != null && !uid.isEmpty()) return uid;
         FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
@@ -690,6 +697,11 @@ public class StatusController {
 
     public String getCurrentUserName() {
         try {
+            com.m3.veil.model.Persona active = PersonaManager.getInstance(appContext).getActivePersona();
+            if (active != null && !PersonaManager.PRIMARY_PERSONA_ID.equals(active.getPersonaId())
+                    && active.getDisplayName() != null && !active.getDisplayName().trim().isEmpty()) {
+                return active.getDisplayName().trim();
+            }
             com.m3.veil.utils.UserPreferences up = new com.m3.veil.utils.UserPreferences(appContext);
             String dn = up.getDisplayName();
             if (dn != null && !dn.trim().isEmpty()) return dn.trim();

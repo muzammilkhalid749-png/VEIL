@@ -41,10 +41,19 @@ public class VeilCallService extends Service implements CallEngine.Listener {
     public static final String ACTION_START = "com.m3.veil.calling.action.START";
     public static final String ACTION_STOP = "com.m3.veil.calling.action.STOP";
     public static final String ACTION_HANGUP = "com.m3.veil.calling.action.HANGUP";
+    public static final String ACTION_ANSWER_CALL = "com.m3.veil.calling.action.ANSWER_CALL";
+    public static final String ACTION_DECLINE_CALL = "com.m3.veil.calling.action.DECLINE_CALL";
+    public static final String ACTION_START_RINGING = "com.m3.veil.calling.action.START_RINGING";
+    public static final String ACTION_STOP_RINGING = "com.m3.veil.calling.action.STOP_RINGING";
     public static final String ACTION_TOGGLE_MUTE = "com.m3.veil.calling.action.TOGGLE_MUTE";
     public static final String ACTION_TOGGLE_SPEAKER = "com.m3.veil.calling.action.TOGGLE_SPEAKER";
 
+    public static final String BROADCAST_CALL_ANSWERED_FROM_NOTIFICATION = "com.m3.veil.calling.BROADCAST_ANSWERED";
+    public static final String BROADCAST_CALL_TERMINATED = "com.m3.veil.calling.BROADCAST_TERMINATED";
+
     private static volatile VeilCallService sharedInstance;
+    private static volatile android.media.MediaPlayer sRingtonePlayer;
+    private static volatile android.os.Vibrator sVibrator;
 
     private PowerManager.WakeLock wakeLock;
     private CallEngine engine;
@@ -69,7 +78,78 @@ public class VeilCallService extends Service implements CallEngine.Listener {
         }
     }
 
+    public static synchronized void startIncomingRinging(Context context, CallInfo info) {
+        if (context == null) return;
+        stopRingingOnly();
+        try {
+            android.net.Uri uri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE);
+            android.media.MediaPlayer mp = new android.media.MediaPlayer();
+            mp.setDataSource(context.getApplicationContext(), uri);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                mp.setAudioAttributes(new android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build());
+            } else {
+                mp.setAudioStreamType(android.media.AudioManager.STREAM_RING);
+            }
+            mp.setLooping(true);
+            mp.prepare();
+            mp.start();
+            sRingtonePlayer = mp;
+        } catch (Throwable t) {
+            Log.w(TAG, "Ringtone MediaPlayer start fallback: " + t.getMessage());
+        }
+        try {
+            android.os.Vibrator vib = (android.os.Vibrator) context.getApplicationContext().getSystemService(Context.VIBRATOR_SERVICE);
+            if (vib != null && vib.hasVibrator()) {
+                long[] pattern = new long[]{0L, 1000L, 1000L, 1000L, 1000L};
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vib.vibrate(android.os.VibrationEffect.createWaveform(pattern, 0));
+                } else {
+                    vib.vibrate(pattern, 0);
+                }
+                sVibrator = vib;
+            }
+        } catch (Throwable ignored) { }
+    }
+
+    public static synchronized void stopRingingOnly() {
+        if (sRingtonePlayer != null) {
+            try {
+                if (sRingtonePlayer.isPlaying()) {
+                    sRingtonePlayer.stop();
+                }
+            } catch (Throwable ignored) { }
+            try {
+                sRingtonePlayer.release();
+            } catch (Throwable ignored) { }
+            sRingtonePlayer = null;
+        }
+        if (sVibrator != null) {
+            try {
+                sVibrator.cancel();
+            } catch (Throwable ignored) { }
+            sVibrator = null;
+        }
+    }
+
+    /**
+     * Immediately stops ringtone playback, cancels vibration, and dismisses all incoming call
+     * notifications ({@link CallNotificationHelper#ID_INCOMING} and legacy 9991).
+     */
+    public static void stopRingingAndDismissIncomingNotifications(Context context) {
+        stopRingingOnly();
+        if (context != null) {
+            CallNotificationHelper.cancelIncoming(context);
+            try {
+                com.m3.veil.webrtc.WebRtcManager.getInstance(context).dismissIncomingCallNotification();
+            } catch (Throwable ignored) { }
+        }
+    }
+
     public static void stop(Context context) {
+        stopRingingAndDismissIncomingNotifications(context);
         try {
             Intent intent = new Intent(context, VeilCallService.class);
             intent.setAction(ACTION_STOP);
@@ -104,9 +184,66 @@ public class VeilCallService extends Service implements CallEngine.Listener {
         if (intent != null && intent.getAction() != null) {
             String action = intent.getAction();
             switch (action) {
+                case ACTION_ANSWER_CALL: {
+                    stopRingingAndDismissIncomingNotifications(this);
+                    if (engine == null) engine = CallEngine.getInstance(this);
+                    String contactId = intent.getStringExtra(CallActivity.EXTRA_CONTACT_ID);
+                    String contactName = intent.getStringExtra(CallActivity.EXTRA_CONTACT_NAME);
+                    String callType = intent.getStringExtra(CallActivity.EXTRA_CALL_TYPE);
+                    String callId = intent.getStringExtra(CallActivity.EXTRA_CALL_ID);
+                    if (engine != null) {
+                        if (engine.getState() == CallState.NONE && contactId != null && callId != null) {
+                            engine.onExternalInvite(contactId, callId, contactName, callType);
+                        }
+                        engine.accept();
+                    }
+                    // Notify any open IncomingCallActivity / CallActivity instance immediately
+                    try {
+                        Intent answeredBroadcast = new Intent(BROADCAST_CALL_ANSWERED_FROM_NOTIFICATION);
+                        answeredBroadcast.setPackage(getPackageName());
+                        if (callId != null) answeredBroadcast.putExtra(CallActivity.EXTRA_CALL_ID, callId);
+                        sendBroadcast(answeredBroadcast);
+                    } catch (Throwable ignored) { }
+
+                    // Launch or bring OngoingCallActivity / CallActivity to front with CLEAR_TOP | SINGLE_TOP
+                    try {
+                        Intent launch = new Intent(this, CallActivity.class);
+                        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                                | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                        if (intent.getExtras() != null) {
+                            launch.putExtras(intent.getExtras());
+                        }
+                        launch.putExtra(CallActivity.EXTRA_AUTO_ANSWER, true);
+                        launch.putExtra(CallActivity.EXTRA_FROM_NOTIFICATION, true);
+                        startActivity(launch);
+                    } catch (Throwable t) {
+                        Log.w(TAG, "Failed to launch CallActivity on ACTION_ANSWER_CALL: " + t.getMessage());
+                    }
+                    startForegroundWithNotification();
+                    return START_NOT_STICKY;
+                }
+                case ACTION_DECLINE_CALL: {
+                    stopRingingAndDismissIncomingNotifications(this);
+                    if (engine == null) engine = CallEngine.getInstance(this);
+                    if (engine != null) {
+                        engine.decline(CallEndReason.DECLINED);
+                    }
+                    try {
+                        Intent termBroadcast = new Intent(BROADCAST_CALL_TERMINATED);
+                        termBroadcast.setPackage(getPackageName());
+                        sendBroadcast(termBroadcast);
+                    } catch (Throwable ignored) { }
+                    stopForegroundAndService();
+                    return START_NOT_STICKY;
+                }
+                case ACTION_STOP_RINGING:
+                    stopRingingAndDismissIncomingNotifications(this);
+                    return START_NOT_STICKY;
                 case ACTION_HANGUP:
+                    stopRingingAndDismissIncomingNotifications(this);
                     if (engine != null) engine.hangup();
-                    stopSelf();
+                    stopForegroundAndService();
                     return START_NOT_STICKY;
                 case ACTION_TOGGLE_MUTE:
                     if (engine != null) engine.setMuted(!engine.isMuted());
@@ -117,6 +254,7 @@ public class VeilCallService extends Service implements CallEngine.Listener {
                     updateNotificationFromEngine();
                     return START_NOT_STICKY;
                 case ACTION_STOP:
+                    stopRingingAndDismissIncomingNotifications(this);
                     stopForegroundAndService();
                     return START_NOT_STICKY;
                 default:

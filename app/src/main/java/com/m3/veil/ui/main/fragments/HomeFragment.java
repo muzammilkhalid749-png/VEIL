@@ -271,7 +271,10 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_home, container, false);
 
-        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        }
         if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(requireContext()).getCurrentUserId();
         }
@@ -652,8 +655,14 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         View btnAddNew = view.findViewById(R.id.btnAddNewPersona);
         float density = getResources().getDisplayMetrics().density;
 
-        for (Persona p : personas) {
-            boolean isSelected = current != null && p.getPersonaId().equals(current.getPersonaId());
+        com.m3.veil.manager.BillingManager billingManager = com.m3.veil.manager.BillingManager.getInstance(requireContext());
+
+        for (int i = 0; i < personas.size(); i++) {
+            Persona p = personas.get(i);
+            final int slotIndex = i;
+            boolean isLocked = !billingManager.canAccessPersonaSlot(slotIndex);
+            boolean isSelected = !isLocked && current != null && p.getPersonaId().equals(current.getPersonaId());
+
             com.google.android.material.card.MaterialCardView card =
                     new com.google.android.material.card.MaterialCardView(requireContext());
             card.setCardElevation(0);
@@ -679,7 +688,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
             TextView tvName = new TextView(requireContext());
-            tvName.setText((isSelected ? "✅ " : "🎭 ") + p.getDisplayName() + (p.isTemporary() ? " [Temp 24h]" : ""));
+            String prefix = isLocked ? "🔒 " : (isSelected ? "✅ " : "🎭 ");
+            String proSuffix = isLocked ? "  [PRO]" : (p.isTemporary() ? " [Temp 24h]" : "");
+            tvName.setText(prefix + p.getDisplayName() + " (" + p.getFormattedUsername() + ")" + proSuffix);
             tvName.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
             tvName.setTextSize(15);
             tvName.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -695,6 +706,19 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             card.addView(itemLayout);
 
             card.setOnClickListener(vCard -> {
+                if (!billingManager.canAccessPersonaSlot(slotIndex)) {
+                    dialog.dismiss();
+                    PremiumUpgradeBottomSheetDialog.showPaywall(
+                            getParentFragmentManager(),
+                            "Unlock Persona " + (slotIndex + 1) + " (" + p.getDisplayName() + ")",
+                            () -> {
+                                fm.setActivePersona(p.getPersonaId());
+                                updatePersonaAndMeshHeader();
+                                Toast.makeText(getContext(), "Switched persona to " + p.getDisplayName(), Toast.LENGTH_SHORT).show();
+                            }
+                    );
+                    return;
+                }
                 fm.setActivePersona(p.getPersonaId());
                 updatePersonaAndMeshHeader();
                 Toast.makeText(getContext(), "Switched persona to " + p.getDisplayName(), Toast.LENGTH_SHORT).show();
@@ -706,6 +730,14 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         btnAddNew.setOnClickListener(v -> {
             dialog.dismiss();
+            if (!billingManager.canCreateNewPersona(personas.size())) {
+                PremiumUpgradeBottomSheetDialog.showPaywall(
+                        getParentFragmentManager(),
+                        "Create Unlimited Anonymous Personas",
+                        this::showCreatePersonaDialog
+                );
+                return;
+            }
             showCreatePersonaDialog();
         });
 
@@ -827,7 +859,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         final Context ctx = requireContext().getApplicationContext();
         homeExecutor.execute(() -> {
             List<Chat> localChats = EncryptedChatDatabase.getInstance(ctx).getAllChats(true);
-            String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(ctx);
+            String myUid = com.m3.veil.manager.PersonaManager.getInstance(ctx).getActivePersonaPeerId();
             String myPersonaName = VeilFeatureManager.getInstance(ctx).getActivePersona().getDisplayName();
             if (localChats != null) {
                 int prewarmIdx = 0;
@@ -996,7 +1028,14 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             return c2.getLastMessageTime().compareTo(c1.getLastMessageTime());
         });
 
-        chatsAdapter.notifyDataSetChanged();
+        chatsAdapter.refreshCurrentUserId();
+        if (!q.isEmpty() && getContext() != null) {
+            List<EncryptedChatDatabase.FtsMessageSearchResult> ftsResults =
+                    EncryptedChatDatabase.getInstance(requireContext()).searchMessagesFtsWithSnippets(searchQuery, 40);
+            chatsAdapter.setMessageSearchResults(searchQuery, ftsResults);
+        } else {
+            chatsAdapter.setMessageSearchResults("", null);
+        }
         updateFilterCounts();
         updateEmptyState();
         updateArchivedHeader();
@@ -1211,15 +1250,41 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         }
     }
 
+    private final com.m3.veil.manager.PersonaManager.PersonaSwitchListener personaSwitchListener = newActivePersona -> {
+        if (!isAdded() || getContext() == null) return;
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+        if (groupsListenerRegistration != null) {
+            groupsListenerRegistration.remove();
+            groupsListenerRegistration = null;
+        }
+        if (directChatsListenerRegistration != null) {
+            directChatsListenerRegistration.remove();
+            directChatsListenerRegistration = null;
+        }
+        allLocalChats.clear();
+        displayedChats.clear();
+        if (chatsAdapter != null) {
+            chatsAdapter.refreshCurrentUserId();
+            chatsAdapter.notifyDataSetChanged();
+        }
+        updatePersonaAndMeshHeader();
+        loadLocalEncryptedChats();
+        renderStatusTray();
+    };
+
     @Override
     public void onResume() {
         super.onResume();
+        if (getContext() != null) {
+            com.m3.veil.manager.PersonaManager.getInstance(requireContext()).addPersonaSwitchListener(personaSwitchListener);
+            currentUserId = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+        }
         loadLocalEncryptedChats();
         if (getContext() != null) {
             com.m3.veil.VeilApplication.prewarmMessageViewHolders(requireContext());
         }
         if (getContext() != null && com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(requireContext())) {
-            String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+            String uid = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
             final Context appCtx = requireContext().getApplicationContext();
             homeExecutor.execute(() -> WebRtcManager.getInstance(appCtx).fetchAndProcessOfflineInboxOnce(uid));
             if (groupsListenerRegistration == null) {
@@ -1779,6 +1844,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         super.onPause();
         stopVanishTicker();
         if (getContext() != null) {
+            com.m3.veil.manager.PersonaManager.getInstance(requireContext()).removePersonaSwitchListener(personaSwitchListener);
             com.m3.veil.manager.StatusController.getInstance(requireContext()).removeObserver(statusObserver);
             VeilFeatureManager.getInstance(requireContext()).stopStatusSync();
         }
@@ -1827,7 +1893,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             return;
         }
 
-        if (displayedChats.isEmpty()) {
+        boolean noItems = chatsAdapter != null ? !chatsAdapter.hasAnyDisplayItems() : displayedChats.isEmpty();
+        if (noItems) {
             emptyState.setVisibility(View.VISIBLE);
             chatsRecyclerView.setVisibility(View.GONE);
             if (startChatButton != null) {
@@ -1853,6 +1920,48 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             emptyState.setVisibility(View.GONE);
             chatsRecyclerView.setVisibility(View.VISIBLE);
         }
+    }
+
+    @Override
+    public void onMessageSearchResultClick(EncryptedChatDatabase.FtsMessageSearchResult result) {
+        if (result == null || result.message == null || getContext() == null) return;
+        String targetChatId = result.chatId;
+        Chat matchedChat = null;
+        for (Chat c : allLocalChats) {
+            if (c != null && targetChatId != null && targetChatId.equals(c.getId())) {
+                matchedChat = c;
+                break;
+            }
+        }
+        Intent intent = new Intent(getContext(), ChatActivity.class);
+        intent.putExtra("chatId", targetChatId);
+        intent.putExtra("recipientName", matchedChat != null ? matchedChat.getName() : result.chatName);
+        intent.putExtra("scrollToMessageId", result.message.getId());
+        intent.putExtra("targetMessageId", result.message.getId());
+        boolean isGroupChat = (matchedChat != null && matchedChat.isGroupChat())
+                || (targetChatId != null && (targetChatId.startsWith("group_") || targetChatId.startsWith("channel_") || targetChatId.startsWith("lounge_")));
+        intent.putExtra("isGroup", isGroupChat);
+        if (!isGroupChat && matchedChat != null) {
+            String recipientId = null;
+            if (matchedChat.getParticipants() != null) {
+                for (String id : matchedChat.getParticipants()) {
+                    if (id != null && !id.equals(currentUserId)) {
+                        recipientId = id;
+                        break;
+                    }
+                }
+            }
+            if ((recipientId == null || recipientId.trim().isEmpty()) && targetChatId != null && targetChatId.contains("_")) {
+                String[] parts = targetChatId.split("_");
+                if (parts.length == 2) {
+                    recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+                }
+            }
+            if (recipientId != null && !recipientId.trim().isEmpty()) {
+                intent.putExtra("recipientId", recipientId);
+            }
+        }
+        startActivity(intent);
     }
 
     @Override
@@ -2567,7 +2676,11 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                 }
                 com.m3.veil.manager.VeilMessagesController.getInstance(requireContext())
                         .deleteConversation(deletedId, targetPeerId, deleteForBoth);
-                EncryptedChatDatabase.getInstance(requireContext()).deleteChat(deletedId);
+                EncryptedChatDatabase.getInstance(requireContext()).deleteConversationCascade(
+                        deletedId,
+                        targetPeerId,
+                        com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaId()
+                );
                 for (int i = allLocalChats.size() - 1; i >= 0; i--) {
                     if (deletedId.equals(allLocalChats.get(i).getId())) {
                         allLocalChats.remove(i);
@@ -2583,8 +2696,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                 }
                 loadLocalEncryptedChats();
                 Toast.makeText(getContext(), deleteForBoth
-                        ? "Conversation deleted from both devices"
-                        : "Conversation deleted from your device", Toast.LENGTH_SHORT).show();
+                        ? "Conversation deleted for you and " + peerLabel
+                        : "Conversation deleted for me", Toast.LENGTH_SHORT).show();
             });
         }
         if (btnCancel != null) {
