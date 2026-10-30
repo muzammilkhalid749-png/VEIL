@@ -415,12 +415,44 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 cm.registerDefaultNetworkCallback(new android.net.ConnectivityManager.NetworkCallback() {
                     @Override
                     public void onAvailable(@NonNull android.net.Network network) {
-                        flushPendingOfflineMessagesOnNetworkAvailable();
+                        scheduleOfflineFlushWithRetries();
+                    }
+
+                    @Override
+                    public void onCapabilitiesChanged(@NonNull android.net.Network network, @NonNull android.net.NetworkCapabilities networkCapabilities) {
+                        if (networkCapabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                                && networkCapabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                            flushPendingOfflineMessagesOnNetworkAvailable();
+                        }
+                    }
+
+                    @Override
+                    public void onLost(@NonNull android.net.Network network) {
+                        mMainHandler.postDelayed(() -> {
+                            if (!isNetworkConnected()) {
+                                haltInFlightMediaTransfersOnNetworkLoss();
+                            }
+                        }, 150L);
                     }
                 });
             }
         } catch (Exception e) {
             Log.w(TAG, "Could not register network callback", e);
+        }
+    }
+
+    private void scheduleOfflineFlushWithRetries() {
+        flushPendingOfflineMessagesOnNetworkAvailable();
+        mMainHandler.postDelayed(this::flushPendingOfflineMessagesOnNetworkAvailable, 900L);
+        mMainHandler.postDelayed(this::flushPendingOfflineMessagesOnNetworkAvailable, 2400L);
+        mMainHandler.postDelayed(this::flushPendingOfflineMessagesOnNetworkAvailable, 5000L);
+    }
+
+    private void haltInFlightMediaTransfersOnNetworkLoss() {
+        for (String msgId : new ArrayList<>(sHighestMediaProgress.keySet())) {
+            Message m = getMessage(msgId);
+            String dId = m != null ? m.getChatId() : "";
+            notifyGlobalMediaTransferProgress(dId, msgId, -1);
         }
     }
 
@@ -432,6 +464,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 if (pendingMsgs == null || pendingMsgs.isEmpty()) return;
                 for (Message msg : pendingMsgs) {
                     if (msg == null || msg.getId() == null) continue;
+                    if (P2PFileTransferHelper.isTransferCanceled(msg.getId())) continue;
                     final String dialogId = msg.getChatId();
                     if (dialogId == null || dialogId.isEmpty()) continue;
                     final Chat chat = getDialog(dialogId) != null ? getDialog(dialogId) : mDatabase.getChat(dialogId);
@@ -440,48 +473,94 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     final String recipientId = msg.getReceiverId();
 
                     mCryptoQueue.execute(() -> {
-                        if (!isNetworkConnected()) return;
+                        if (!isNetworkConnected() || P2PFileTransferHelper.isTransferCanceled(msg.getId())) return;
                         try {
                             File pendingLocalFile = (msg.getLocalFilePath() != null && !msg.getLocalFilePath().isEmpty())
                                     ? new File(msg.getLocalFilePath()) : null;
+                            boolean hasLocalMedia = pendingLocalFile != null && pendingLocalFile.exists() && pendingLocalFile.length() >= 64;
+                            List<String> targetPeers = resolveTargetPeers(dialogId, recipientId, msg);
+
+                            boolean anyP2PStarted = false;
+                            if (hasLocalMedia) {
+                                for (String peer : targetPeers) {
+                                    if (sendMediaP2P(peer, msg, pendingLocalFile)) {
+                                        anyP2PStarted = true;
+                                    }
+                                }
+                            }
+
                             encodeInlineMediaForTransport(dialogId, msg, pendingLocalFile);
-                            if (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()) {
+                            if (!isNetworkConnected() || P2PFileTransferHelper.isTransferCanceled(msg.getId())) {
+                                notifyGlobalMediaTransferProgress(dialogId, msg.getId(), -1);
+                                return;
+                            }
+
+                            boolean hasCloudPayload = msg.getMediaUrl() != null
+                                    && (msg.getMediaUrl().startsWith("ENC:v")
+                                    || msg.getMediaUrl().startsWith("INLINE_B64:")
+                                    || msg.getMediaUrl().startsWith("CHUNKED:v1:"));
+                            if (hasCloudPayload) {
                                 mStorageQueue.execute(() -> mDatabase.saveMessage(dialogId, msg));
                             }
-                            if (isGroup) {
-                                syncGroupOrChannelMessageToFirestore(chat, dialogId, msg);
-                            } else {
-                                syncDirectMessageToFirestore(chat, dialogId, recipientId, msg);
+
+                            if (!hasLocalMedia || hasCloudPayload) {
+                                if (isGroup) {
+                                    syncGroupOrChannelMessageToFirestore(chat, dialogId, msg);
+                                } else {
+                                    syncDirectMessageToFirestore(chat, dialogId, recipientId, msg);
+                                }
                             }
-                            List<String> targetPeers = resolveTargetPeers(dialogId, recipientId, msg);
+
                             String jsonPayloadStr = buildJsonFallbackString(dialogId, msg);
                             for (String peer : targetPeers) {
-                                VeilPacket pkt = new VeilPacket(VeilPacket.LANE_MSG, VeilPacket.TYPE_CHAT_MESSAGE, jsonPayloadStr);
-                                if (WebRtcManager.getInstance(mContext).sendPacket(peer, pkt)) {
+                                boolean peerConnected = WebRtcManager.getInstance(mContext).isPeerConnected(peer);
+                                if (!hasLocalMedia && peerConnected && WebRtcManager.getInstance(mContext).sendPacket(peer,
+                                        new VeilPacket(VeilPacket.LANE_MSG, VeilPacket.TYPE_CHAT_MESSAGE, jsonPayloadStr))) {
+                                    com.m3.veil.services.VeilHybridNotificationManager.getInstance(mContext)
+                                            .sendDirectP2PNotificationFrame(peer, dialogId, msg);
+                                } else if (hasLocalMedia && anyP2PStarted) {
                                     com.m3.veil.services.VeilHybridNotificationManager.getInstance(mContext)
                                             .sendDirectP2PNotificationFrame(peer, dialogId, msg);
                                 } else {
-                                    try {
-                                        com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(
-                                                peer, "p2p_chat", new org.json.JSONObject(jsonPayloadStr));
-                                    } catch (Exception ignored) {}
+                                    if ((!hasLocalMedia || hasCloudPayload) && jsonPayloadStr.length() <= 32768) {
+                                        try {
+                                            com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(
+                                                    peer, "p2p_chat", new org.json.JSONObject(jsonPayloadStr));
+                                        } catch (Exception ignored) {}
+                                    }
                                     com.m3.veil.services.VeilHybridNotificationManager.getInstance(mContext)
                                             .dispatchCloudFallbackWakePush(peer, dialogId, msg);
                                     WebRtcManager.getInstance(mContext).initiateConnection(peer);
+
+                                    String outboxKey = isGroup ? (msg.getId() + "_" + peer) : msg.getId();
+                                    if (!mPendingOutboxById.containsKey(outboxKey)) {
+                                        OutboxEntry outbox = new OutboxEntry(msg, dialogId, peer, isGroup,
+                                                chat != null && isGroup ? chat.getName() : getCurrentUserName(),
+                                                chat != null ? chat.getType() : "direct", pendingLocalFile);
+                                        mOutboxQueue.add(outbox);
+                                        mPendingOutboxById.put(outboxKey, outbox);
+                                    }
+                                    VeilMeshDaemonService.getInstance(mContext).enqueueOutgoingMessage(chat, peer, msg);
                                 }
                             }
-                            msg.setPending(false);
-                            Message cached = mMessagesById.get(msg.getId());
-                            if (cached != null) cached.setPending(false);
-                            mStorageQueue.execute(() -> {
-                                mDatabase.setMessagePending(msg.getId(), false);
-                                refreshDialogInCache(dialogId);
-                            });
-                            mMainHandler.post(() -> {
-                                for (MessagesObserver obs : mObservers) {
-                                    obs.onMessageStatusChanged(dialogId, msg.getId(), msg.isDelivered(), msg.isRead());
+
+                            if (!hasLocalMedia || hasCloudPayload) {
+                                msg.setPending(false);
+                                Message cached = mMessagesById.get(msg.getId());
+                                if (cached != null) cached.setPending(false);
+                                mStorageQueue.execute(() -> {
+                                    mDatabase.setMessagePending(msg.getId(), false);
+                                    refreshDialogInCache(dialogId);
+                                });
+                                if (hasCloudPayload && !anyP2PStarted) {
+                                    notifyGlobalMediaTransferProgress(dialogId, msg.getId(), 100);
                                 }
-                            });
+                                mMainHandler.post(() -> {
+                                    for (MessagesObserver obs : mObservers) {
+                                        obs.onMessageStatusChanged(dialogId, msg.getId(), msg.isDelivered(), msg.isRead());
+                                    }
+                                });
+                            }
                         } catch (Exception ex) {
                             Log.w(TAG, "Error flushing pending offline message: " + ex.getMessage());
                         }
@@ -1249,10 +1328,16 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
                 List<String> targetPeers = resolveTargetPeers(dialogId, recipientId, msg);
                 boolean hasNetwork = isNetworkConnected();
+                boolean hasLocalMedia = localFile != null && localFile.exists() && localFile.length() >= 64;
+
+                if (P2PFileTransferHelper.isTransferCanceled(msg.getId())) {
+                    notifyGlobalMediaTransferProgress(dialogId, msg.getId(), -1);
+                    return;
+                }
 
                 // Stream over WebRTC P2P DataChannel immediately if peer is connected (zero delay!)
                 boolean anyTransmittedP2P = false;
-                if (hasNetwork && localFile != null && localFile.exists()) {
+                if (hasNetwork && hasLocalMedia) {
                     for (String peer : targetPeers) {
                         if (sendMediaP2P(peer, msg, localFile)) {
                             anyTransmittedP2P = true;
@@ -1260,17 +1345,37 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     }
                 }
 
-                // Embed encrypted inline payload (<= 450KB) or chunked payload (up to 64MB when online)
+                // Embed encrypted inline payload (<= 450KB) or chunked payload (up to 4MB when online)
                 // so the recipient can download even if sender closes the app or receiver is currently offline.
-                if (hasNetwork || (localFile != null && localFile.exists() && localFile.length() <= 450 * 1024L)) {
+                if (hasNetwork && hasLocalMedia) {
                     encodeInlineMediaForTransport(dialogId, msg, localFile);
-                    if (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()) {
-                        mStorageQueue.execute(() -> mDatabase.saveMessage(dialogId, msg));
-                    }
                 }
 
-                // Sync to Firestore/Nostr if device has network connectivity.
-                if (hasNetwork) {
+                // Re-verify live network state & user cancellation after media encoding!
+                hasNetwork = isNetworkConnected();
+                if (P2PFileTransferHelper.isTransferCanceled(msg.getId()) || (!hasNetwork && hasLocalMedia)) {
+                    msg.setPending(true);
+                    msg.setDelivered(false);
+                    msg.setRead(false);
+                    mStorageQueue.execute(() -> {
+                        mDatabase.setMessagePending(msg.getId(), true);
+                        refreshDialogInCache(dialogId);
+                    });
+                    notifyGlobalMediaTransferProgress(dialogId, msg.getId(), -1);
+                    return;
+                }
+
+                boolean hasCloudPayload = msg.getMediaUrl() != null
+                        && (msg.getMediaUrl().startsWith("ENC:v")
+                        || msg.getMediaUrl().startsWith("INLINE_B64:")
+                        || msg.getMediaUrl().startsWith("CHUNKED:v1:"));
+                if (hasCloudPayload) {
+                    mStorageQueue.execute(() -> mDatabase.saveMessage(dialogId, msg));
+                }
+
+                // Sync to Firestore/Nostr if device has network connectivity AND either it's a non-media message
+                // or its cloud media payload is attached (so a 65MB P2P-only file never creates a phantom empty message on Device B before P2P transfer!).
+                if (hasNetwork && (!hasLocalMedia || hasCloudPayload)) {
                     if (isGroup && dialogId != null) {
                         syncGroupOrChannelMessageToFirestore(chat, dialogId, msg);
                     } else if (dialogId != null) {
@@ -1284,8 +1389,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 for (String peer : targetPeers) {
                     boolean transmitted = false;
                     if (hasNetwork) {
-                        if (localFile != null && localFile.exists()) {
-                            transmitted = anyTransmittedP2P || WebRtcManager.getInstance(mContext).isPeerConnected(peer);
+                        if (hasLocalMedia) {
+                            transmitted = anyTransmittedP2P;
                         } else {
                             VeilPacket pkt = new VeilPacket(VeilPacket.LANE_MSG, VeilPacket.TYPE_CHAT_MESSAGE, jsonPayloadStr);
                             transmitted = WebRtcManager.getInstance(mContext).sendPacket(peer, pkt);
@@ -1294,16 +1399,11 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
                     if (transmitted) {
                         anyTransmitted = true;
-                        // PATH A: Peer is actively connected over P2P DataChannel ->
-                        // Dispatch real-time P2P notification frame directly over WebRTC without relying on Firebase!
                         com.m3.veil.services.VeilHybridNotificationManager.getInstance(mContext)
                                 .sendDirectP2PNotificationFrame(peer, dialogId, msg);
                     } else {
                         if (hasNetwork) {
-                            // PATH B: Peer is NOT connected over P2P ->
-                            // Automatically fall back to Firebase Signaling + Cloud Wake Push
-                            if ((localFile == null || !localFile.exists() || (msg.getMediaUrl() != null && !msg.getMediaUrl().isEmpty()))
-                                    && jsonPayloadStr.length() <= 32768) {
+                            if ((!hasLocalMedia || hasCloudPayload) && jsonPayloadStr.length() <= 32768) {
                                 try {
                                     com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(
                                             peer, "p2p_chat", new org.json.JSONObject(jsonPayloadStr));
@@ -1321,23 +1421,34 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         mOutboxQueue.add(outbox);
                         mPendingOutboxById.put(outboxKey, outbox);
 
-                        // Enqueue into VeilMeshDaemonService with full Chat metadata
                         VeilMeshDaemonService.getInstance(mContext).enqueueOutgoingMessage(chat, peer, msg);
                     }
                 }
 
-                if (hasNetwork) {
-                    // Dispatched while online: transition from Clock (pending=true) to Single Tick (pending=false)
-                    msg.setPending(false);
-                    mStorageQueue.execute(() -> {
-                        mDatabase.updateMessageStatus(msg.getId(), msg.isDelivered(), msg.isRead());
-                        refreshDialogInCache(dialogId);
-                    });
+                boolean requiresDirectP2PStream = hasLocalMedia && !hasCloudPayload;
+                if (hasNetwork && (!requiresDirectP2PStream || anyTransmittedP2P)) {
+                    // For cloud-backed or text messages (or active P2P stream):
+                    // Only mark pending=false immediately if it doesn't require a still-waiting P2P file stream.
+                    if (!requiresDirectP2PStream) {
+                        msg.setPending(false);
+                        mStorageQueue.execute(() -> {
+                            mDatabase.setMessagePending(msg.getId(), false);
+                            mDatabase.updateMessageStatus(msg.getId(), msg.isDelivered(), msg.isRead());
+                            refreshDialogInCache(dialogId);
+                        });
+                    } else {
+                        // Large P2P file actively streaming: keep pending=true in DB until sendMediaP2P onComplete fires!
+                        msg.setPending(true);
+                        mStorageQueue.execute(() -> {
+                            mDatabase.setMessagePending(msg.getId(), true);
+                            refreshDialogInCache(dialogId);
+                        });
+                    }
                     final String fDialogId = dialogId;
                     final String fMsgId = msg.getId();
                     final boolean fDelivered = msg.isDelivered();
                     final boolean fRead = msg.isRead();
-                    if (!anyTransmittedP2P) {
+                    if (!anyTransmittedP2P && !requiresDirectP2PStream) {
                         notifyGlobalMediaTransferProgress(fDialogId, fMsgId, 100);
                     }
                     mMainHandler.post(() -> {
@@ -1346,7 +1457,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         }
                     });
                 } else {
-                    // Device has NO network connectivity: strictly keep Clock icon (pending=true)
+                    // Offline OR waiting for peer to connect for large P2P file stream: keep pending=true in DB
                     msg.setPending(true);
                     msg.setDelivered(false);
                     msg.setRead(false);
@@ -1354,6 +1465,9 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         mDatabase.setMessagePending(msg.getId(), true);
                         refreshDialogInCache(dialogId);
                     });
+                    if (!hasNetwork && hasLocalMedia) {
+                        notifyGlobalMediaTransferProgress(dialogId, msg.getId(), -1);
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error encoding and dispatching message packet", e);
@@ -1550,12 +1664,21 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
         long fileLen = fileToRead.length();
         long maxInlineBytes = 450 * 1024L; // 450 KB inline (~2 min AAC voice note or compressed HD photo)
-        long maxChunkedBytes = 64 * 1024 * 1024L; // 64 MB chunked zero-knowledge cloud-shadow fallback
+        long maxChunkedBytes = 4 * 1024 * 1024L; // 4 MB chunked cloud-shadow fallback (larger files stream via direct P2P)
         if (fileLen > maxChunkedBytes) return;
+
+        VeilMessagesController ctrl = sInstance;
+        if (ctrl != null && !ctrl.isNetworkConnected()) {
+            return;
+        }
+        if (P2PFileTransferHelper.isTransferCanceled(msg.getId())) {
+            return;
+        }
 
         try {
             String keyScope = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
             if (fileLen <= maxInlineBytes) {
+                if (ctrl != null && !ctrl.isNetworkConnected()) return;
                 notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 18);
                 byte[] bytes = new byte[(int) fileLen];
                 try (java.io.FileInputStream fis = new java.io.FileInputStream(fileToRead)) {
@@ -1565,7 +1688,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         offset += read;
                     }
                 }
-                try { Thread.sleep(45L); } catch (InterruptedException ignored) {}
+                if ((ctrl != null && !ctrl.isNetworkConnected()) || P2PFileTransferHelper.isTransferCanceled(msg.getId())) {
+                    notifyGlobalMediaTransferProgress(keyScope, msg.getId(), -1);
+                    return;
+                }
                 notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 52);
                 String b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
                 String payload = "INLINE_B64:" + b64;
@@ -1574,10 +1700,14 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 } else {
                     msg.setMediaUrl(payload);
                 }
-                try { Thread.sleep(45L); } catch (InterruptedException ignored) {}
+                if ((ctrl != null && !ctrl.isNetworkConnected()) || P2PFileTransferHelper.isTransferCanceled(msg.getId())) {
+                    msg.setMediaUrl(String.valueOf(fileLen));
+                    notifyGlobalMediaTransferProgress(keyScope, msg.getId(), -1);
+                    return;
+                }
                 notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 88);
             } else if (keyScope != null && !keyScope.isEmpty() && msg.getId() != null) {
-                int chunkSize = 300 * 1024; // 300 KB raw bytes per chunk
+                int chunkSize = 256 * 1024; // 256 KB raw bytes per chunk
                 int totalChunks = (int) ((fileLen + chunkSize - 1) / chunkSize);
                 com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
                 byte[] sliceBuffer = new byte[chunkSize];
@@ -1586,6 +1716,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 int uploadedChunks = 0;
                 try (java.io.FileInputStream fis = new java.io.FileInputStream(fileToRead)) {
                     for (int i = 0; i < totalChunks; i++) {
+                        if ((ctrl != null && !ctrl.isNetworkConnected()) || P2PFileTransferHelper.isTransferCanceled(msg.getId())) {
+                            notifyGlobalMediaTransferProgress(keyScope, msg.getId(), -1);
+                            return;
+                        }
                         int expected = (int) Math.min(chunkSize, fileLen - ((long) i * chunkSize));
                         int offset = 0;
                         int read;
@@ -1605,13 +1739,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         if (keyScope.startsWith("group_") || keyScope.startsWith("channel_") || keyScope.startsWith("lounge_")) {
                             pendingBatch.add(fs.collection("groups").document(keyScope).collection("media_chunks").document(docKey).set(chunkDoc));
                         }
-                        if (pendingBatch.size() >= 3 || i == totalChunks - 1) {
+                        if (pendingBatch.size() >= 2 || i == totalChunks - 1) {
                             for (com.google.android.gms.tasks.Task<?> batchTask : pendingBatch) {
-                                try {
-                                    com.google.android.gms.tasks.Tasks.await(
-                                            batchTask,
-                                            10, java.util.concurrent.TimeUnit.SECONDS);
-                                } catch (Exception ignored) {}
+                                if ((ctrl != null && !ctrl.isNetworkConnected()) || P2PFileTransferHelper.isTransferCanceled(msg.getId())) {
+                                    notifyGlobalMediaTransferProgress(keyScope, msg.getId(), -1);
+                                    return;
+                                }
+                                com.google.android.gms.tasks.Tasks.await(
+                                        batchTask,
+                                        10, java.util.concurrent.TimeUnit.SECONDS);
                             }
                             pendingBatch.clear();
                         }
@@ -1620,13 +1756,19 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         notifyGlobalMediaTransferProgress(keyScope, msg.getId(), pct);
                     }
                 }
-                if (uploadedChunks == totalChunks && totalChunks > 0) {
+                if (uploadedChunks == totalChunks && totalChunks > 0
+                        && (ctrl == null || ctrl.isNetworkConnected())
+                        && !P2PFileTransferHelper.isTransferCanceled(msg.getId())) {
                     msg.setMediaUrl("CHUNKED:v1:" + totalChunks + ":" + fileLen);
+                    notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 100);
+                } else {
+                    notifyGlobalMediaTransferProgress(keyScope, msg.getId(), -1);
                 }
-                notifyGlobalMediaTransferProgress(keyScope, msg.getId(), 100);
             }
         } catch (Throwable t) {
             Log.w(TAG, "encodeInlineMediaForTransport notice: " + t.getMessage());
+            String keyScope = (dialogId != null && !dialogId.isEmpty()) ? dialogId : msg.getChatId();
+            notifyGlobalMediaTransferProgress(keyScope, msg.getId(), -1);
         }
     }
 
@@ -1889,6 +2031,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
     private static final String MEDIA_NOTIFICATION_CHANNEL_ID = "veil_media_transfer_channel";
     private static final ConcurrentHashMap<String, Integer> sHighestMediaProgress = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Long> sLastMediaNotifTimeMs = new ConcurrentHashMap<>();
+
+    public boolean isOutboundMediaTransferIncomplete(String messageId) {
+        if (messageId == null) return false;
+        if (P2PFileTransferHelper.isTransferCanceled(messageId)) return true;
+        if (mPendingOutboxById.containsKey(messageId)) return true;
+        if (sHighestMediaProgress.containsKey(messageId)) return true;
+        return false;
+    }
 
     public static void notifyGlobalMediaTransferProgress(String dialogId, String messageId, int percent) {
         VeilMessagesController ctrl = sInstance;
@@ -1907,6 +2058,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             }
         } else if (percent >= 100 || percent < 0) {
             sHighestMediaProgress.remove(messageId);
+            sLastMediaNotifTimeMs.remove(messageId);
         }
 
         final int finalPercent = percent;
@@ -1921,6 +2073,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     private void updateMediaTransferNotification(@Nullable Message msg, String dialogId, String messageId, int percent) {
         if (mContext == null || messageId == null) return;
         try {
+            if (percent >= 0 && percent < 100) {
+                long now = System.currentTimeMillis();
+                Long lastMs = sLastMediaNotifTimeMs.get(messageId);
+                if (lastMs != null && (now - lastMs) < 550L) {
+                    return;
+                }
+                sLastMediaNotifTimeMs.put(messageId, now);
+            }
+
             android.app.NotificationManager nm =
                     (android.app.NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm == null) return;
@@ -1962,7 +2123,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         new androidx.core.app.NotificationCompat.Builder(mContext, MEDIA_NOTIFICATION_CHANNEL_ID)
                                 .setSmallIcon(isSending ? android.R.drawable.stat_sys_upload_done : android.R.drawable.stat_sys_download_done)
                                 .setContentTitle(isSending ? (typeLabel + " sent") : (typeLabel + " downloaded"))
-                                .setContentText("100% • Encrypted transfer complete")
+                                .setContentText("100% • Transfer complete")
                                 .setProgress(0, 0, false)
                                 .setOngoing(false)
                                 .setAutoCancel(true)
@@ -2299,6 +2460,9 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
     private boolean sendMediaP2P(String peerId, Message msg, File localFile) {
         try {
+            if (P2PFileTransferHelper.isTransferCanceled(msg.getId()) || !isNetworkConnected()) {
+                return false;
+            }
             boolean isConnected = WebRtcManager.getInstance(mContext).isPeerConnected(peerId);
             if (!isConnected) {
                 Log.d(TAG, "Peer " + peerId + " is currently offline; enqueuing media P2P transfer");
@@ -2314,12 +2478,36 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         @Override
                         public void onComplete(String transferId) {
                             Log.d(TAG, "P2P media stream complete for message: " + msg.getId());
+                            mPendingOutboxById.remove(msg.getId());
+                            mPendingOutboxById.remove(msg.getId() + "_" + peerId);
+                            msg.setPending(false);
+                            msg.setDelivered(true);
+                            mStorageQueue.execute(() -> {
+                                mDatabase.setMessagePending(msg.getId(), false);
+                                mDatabase.updateMessageStatus(msg.getId(), true, msg.isRead());
+                                if (msg.getChatId() != null) {
+                                    refreshDialogInCache(msg.getChatId());
+                                }
+                            });
                             notifyGlobalMediaTransferProgress(msg.getChatId(), msg.getId(), 100);
+                            runOnUI(() -> {
+                                for (MessagesObserver obs : mObservers) {
+                                    obs.onMessageStatusChanged(msg.getChatId(), msg.getId(), true, msg.isRead());
+                                }
+                            });
                         }
 
                         @Override
                         public void onError(String error) {
                             Log.e(TAG, "P2P media stream failed: " + error);
+                            msg.setPending(true);
+                            mStorageQueue.execute(() -> {
+                                mDatabase.setMessagePending(msg.getId(), true);
+                                if (msg.getChatId() != null) {
+                                    refreshDialogInCache(msg.getChatId());
+                                }
+                            });
+                            notifyGlobalMediaTransferProgress(msg.getChatId(), msg.getId(), -1);
                         }
                     });
             return true;
@@ -2835,11 +3023,58 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     }
 
     /**
-     * Cancels an ongoing P2P media download.
+     * Cancels an ongoing P2P or cloud media transfer (either outbound upload or inbound download).
      */
     public void cancelMediaDownload(String recipientId, String messageId) {
-        if (recipientId == null || messageId == null) return;
-        WebRtcManager.getInstance(mContext).cancelMediaDownload(recipientId, messageId);
+        if (messageId == null) return;
+        P2PFileTransferHelper.cancelTransfer(messageId);
+        sHighestMediaProgress.remove(messageId);
+        mPendingOutboxById.remove(messageId);
+        if (recipientId != null) {
+            mPendingOutboxById.remove(messageId + "_" + recipientId);
+        }
+        mOutboxQueue.removeIf(entry -> entry != null && entry.message != null && messageId.equals(entry.message.getId()));
+        Message msg = getMessage(messageId);
+        String dialogId = msg != null ? msg.getChatId() : null;
+        if (recipientId != null) {
+            try {
+                WebRtcManager.getInstance(mContext).cancelMediaDownload(recipientId, messageId);
+            } catch (Throwable ignored) {}
+        }
+        notifyGlobalMediaTransferProgress(dialogId != null ? dialogId : "", messageId, -1);
+    }
+
+    /**
+     * Retries a canceled or failed outbound media upload (or inbound download).
+     */
+    public void retryMediaTransfer(String dialogId, String recipientId, Message message, P2PFileTransferHelper.DownloadProgressListener downloadCallback) {
+        if (message == null || message.getId() == null) return;
+        P2PFileTransferHelper.clearCanceledTransfer(message.getId());
+        String myId = getCurrentUserId();
+        boolean isOutgoing = (message.getSenderId() != null && message.getSenderId().equals(myId))
+                || com.m3.veil.manager.AuthManager.getInstance().isMyUserId(mContext, message.getSenderId());
+        String resolvedDialogId = (dialogId != null && !dialogId.isEmpty()) ? dialogId : message.getChatId();
+        String resolvedPeerId = (recipientId != null && !recipientId.isEmpty()) ? recipientId : message.getReceiverId();
+
+        if (isOutgoing) {
+            File localFile = (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty())
+                    ? new File(message.getLocalFilePath()) : null;
+            if ((localFile == null || !localFile.exists()) && mContext != null) {
+                String ext = resolveMediaExtension(message);
+                File dec = new File(mContext.getExternalCacheDir(), "dec_" + message.getId() + ext);
+                if (dec.exists()) localFile = dec;
+            }
+            if (!isNetworkConnected()) {
+                notifyGlobalMediaTransferProgress(resolvedDialogId, message.getId(), -1);
+                return;
+            }
+            message.setPending(true);
+            notifyGlobalMediaTransferProgress(resolvedDialogId, message.getId(), 1);
+            dispatchMessageInternal(resolvedDialogId, resolvedPeerId, message, localFile);
+        } else {
+            String targetPeer = (resolvedPeerId != null && !resolvedPeerId.isEmpty()) ? resolvedPeerId : message.getSenderId();
+            downloadMedia(targetPeer, message.getId(), downloadCallback);
+        }
     }
 
     /**
@@ -3275,7 +3510,9 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             if (list != null) {
                 for (Message m : list) {
                     if (m != null && m.getSenderId() != null && m.getSenderId().equals(myId)
-                            && !m.isRead() && m.isDelivered() && !m.isPending() && !m.isMediaRequiringActionToRead()) {
+                            && !m.isRead() && m.isDelivered() && !m.isPending()
+                            && !isOutboundMediaTransferIncomplete(m.getId())
+                            && !m.isMediaRequiringActionToRead()) {
                         m.setDelivered(true);
                         m.setRead(true);
                         updatedIds.add(m.getId());
@@ -3288,12 +3525,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             });
             runOnUI(() -> {
                 for (MessagesObserver obs : mObservers) {
-                    if (updatedIds.isEmpty()) {
-                        obs.onMessageStatusChanged(chatId, null, true, true);
-                    } else {
-                        for (String mId : updatedIds) {
-                            obs.onMessageStatusChanged(chatId, mId, true, true);
-                        }
+                    for (String mId : updatedIds) {
+                        obs.onMessageStatusChanged(chatId, mId, true, true);
                     }
                 }
             });
@@ -3341,45 +3574,79 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     public void onCallEnded(String peerId) {}
 
     /**
-     * Flushes pending outbox messages when a WebRTC peer reconnects.
+     * Flushes pending outbox messages when a WebRTC peer reconnects, including rehydrating
+     * any unsent/pending large media files from SQLCipher DB.
      */
     private void flushOutboxForPeer(String peerId) {
-        Iterator<OutboxEntry> iter = mOutboxQueue.iterator();
-        while (iter.hasNext()) {
-            OutboxEntry entry = iter.next();
-            if (entry.peerId != null && entry.peerId.equals(peerId)) {
-                iter.remove();
-                mPendingOutboxById.remove(entry.message.getId());
-                mPendingOutboxById.remove(entry.message.getId() + "_" + peerId);
+        mStorageQueue.execute(() -> {
+            try {
+                List<Message> dbPending = mDatabase.getUnsentPendingMessages();
+                if (dbPending != null) {
+                    for (Message pm : dbPending) {
+                        if (pm == null || pm.getId() == null || P2PFileTransferHelper.isTransferCanceled(pm.getId())) continue;
+                        String dId = pm.getChatId();
+                        List<String> peers = resolveTargetPeers(dId, pm.getReceiverId(), pm);
+                        if (peers.contains(peerId) && !mPendingOutboxById.containsKey(pm.getId())) {
+                            File lf = (pm.getLocalFilePath() != null && !pm.getLocalFilePath().isEmpty())
+                                    ? new File(pm.getLocalFilePath()) : null;
+                            Chat c = getDialog(dId);
+                            boolean isGrp = c != null && c.isGroupChat();
+                            OutboxEntry hydrated = new OutboxEntry(pm, dId, peerId, isGrp,
+                                    c != null && isGrp ? c.getName() : getCurrentUserName(),
+                                    c != null ? c.getType() : "direct", lf);
+                            mOutboxQueue.add(hydrated);
+                            mPendingOutboxById.put(pm.getId(), hydrated);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
 
-                mCryptoQueue.execute(() -> {
-                    boolean ok = false;
-                    if (entry.localMediaFile != null && entry.localMediaFile.exists()) {
-                        ok = sendMediaP2P(peerId, entry.message, entry.localMediaFile);
-                    } else {
-                        VeilPacket pkt = new VeilPacket(VeilPacket.LANE_MSG, VeilPacket.TYPE_CHAT_MESSAGE,
-                                buildJsonFallbackString(entry.dialogId, entry.message));
-                        ok = WebRtcManager.getInstance(mContext).sendPacket(peerId, pkt);
+            Iterator<OutboxEntry> iter = mOutboxQueue.iterator();
+            while (iter.hasNext()) {
+                OutboxEntry entry = iter.next();
+                if (entry.peerId != null && entry.peerId.equals(peerId)) {
+                    if (entry.message != null && P2PFileTransferHelper.isTransferCanceled(entry.message.getId())) {
+                        iter.remove();
+                        continue;
                     }
-                    if (ok) {
-                        entry.message.setPending(false);
-                        mStorageQueue.execute(() -> {
-                            mDatabase.updateMessageStatus(entry.message.getId(), false, false);
-                            refreshDialogInCache(entry.dialogId);
-                        });
-                        runOnUI(() -> {
-                            for (MessagesObserver obs : mObservers) {
-                                obs.onMessageStatusChanged(entry.dialogId, entry.message.getId(), false, false);
+                    iter.remove();
+                    mPendingOutboxById.remove(entry.message.getId());
+                    mPendingOutboxById.remove(entry.message.getId() + "_" + peerId);
+
+                    mCryptoQueue.execute(() -> {
+                        boolean hasLocalMedia = entry.localMediaFile != null && entry.localMediaFile.exists() && entry.localMediaFile.length() >= 64;
+                        boolean ok = false;
+                        if (hasLocalMedia) {
+                            ok = sendMediaP2P(peerId, entry.message, entry.localMediaFile);
+                        } else {
+                            VeilPacket pkt = new VeilPacket(VeilPacket.LANE_MSG, VeilPacket.TYPE_CHAT_MESSAGE,
+                                    buildJsonFallbackString(entry.dialogId, entry.message));
+                            ok = WebRtcManager.getInstance(mContext).sendPacket(peerId, pkt);
+                        }
+                        if (ok) {
+                            if (!hasLocalMedia) {
+                                entry.message.setPending(false);
+                                mStorageQueue.execute(() -> {
+                                    mDatabase.setMessagePending(entry.message.getId(), false);
+                                    mDatabase.updateMessageStatus(entry.message.getId(), false, false);
+                                    refreshDialogInCache(entry.dialogId);
+                                });
+                                runOnUI(() -> {
+                                    for (MessagesObserver obs : mObservers) {
+                                        obs.onMessageStatusChanged(entry.dialogId, entry.message.getId(), false, false);
+                                    }
+                                });
                             }
-                        });
-                        Log.d(TAG, "Outbox packet flushed successfully for peer: " + peerId);
-                    } else {
-                        // Re-enqueue if still failed
-                        mOutboxQueue.add(entry);
-                    }
-                });
+                            Log.d(TAG, "Outbox packet flushed successfully for peer: " + peerId);
+                        } else {
+                            // Re-enqueue if still failed
+                            mOutboxQueue.add(entry);
+                            mPendingOutboxById.put(entry.message.getId(), entry);
+                        }
+                    });
+                }
             }
-        }
+        });
     }
 
     // ═════════════════════════════════════════════════════════════════════════════════════════════

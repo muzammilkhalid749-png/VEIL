@@ -505,13 +505,18 @@ public class ChatActivity extends AppCompatActivity {
 
                 @Override
                 public void onMediaTransferProgress(String dialogId, String messageId, int percent) {
-                    if (dialogId == null || (chatId != null && chatId.equals(dialogId))) {
+                    if (dialogId == null || dialogId.isEmpty() || (chatId != null && chatId.equals(dialogId))) {
                         runOnUiThread(() -> {
                             if (messagesAdapter != null) {
-                                int state = percent >= 100
-                                        ? MessagesAdapter.STATE_DOWNLOADED
-                                        : MessagesAdapter.STATE_DOWNLOADING;
-                                messagesAdapter.setMediaDownloadState(messageId, state, percent);
+                                int state;
+                                if (percent < 0) {
+                                    state = MessagesAdapter.STATE_RETRY;
+                                } else if (percent >= 100) {
+                                    state = MessagesAdapter.STATE_DOWNLOADED;
+                                } else {
+                                    state = MessagesAdapter.STATE_DOWNLOADING;
+                                }
+                                messagesAdapter.setMediaDownloadState(messageId, state, Math.max(0, percent));
                             }
                             if (percent >= 100) {
                                 reloadMessagesFromLocalVault();
@@ -555,9 +560,12 @@ public class ChatActivity extends AppCompatActivity {
                 for (int i = 0; i < messageList.size(); i++) {
                     Message m = messageList.get(i);
                     if (m.getId() != null && m.getId().equals(messageId)) {
-                        m.setDelivered(delivered);
-                        m.setRead(read);
-                        if (delivered || read || isNetworkAvailable()) {
+                        boolean newRead = m.isRead() || read;
+                        m.setDelivered(m.isDelivered() || delivered || newRead);
+                        m.setRead(newRead);
+                        boolean transferIncomplete = com.m3.veil.manager.VeilMessagesController
+                                .getInstance(ChatActivity.this).isOutboundMediaTransferIncomplete(messageId);
+                        if ((delivered || read) && !transferIncomplete) {
                             m.setPending(false);
                             if (messagesAdapter != null) {
                                 messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADED, 100);
@@ -575,22 +583,30 @@ public class ChatActivity extends AppCompatActivity {
             if (chatId != null && chatId.equals(updatedChatId)) {
                 runOnUiThread(() -> {
                     boolean updated = false;
+                    com.m3.veil.manager.VeilMessagesController ctrl =
+                            com.m3.veil.manager.VeilMessagesController.getInstance(ChatActivity.this);
                     for (Message m : messageList) {
-                        if (m != null && isSenderMe(m.getSenderId(), m)) {
+                        if (m != null && isSenderMe(m.getSenderId(), m)
+                                && m.isDelivered()
+                                && !m.isPending()
+                                && !ctrl.isOutboundMediaTransferIncomplete(m.getId())
+                                && !m.isMediaRequiringActionToRead()) {
                             m.setDelivered(true);
                             m.setRead(true);
                             m.setPending(false);
                             updated = true;
-                            if (m.getId() != null) {
-                                dbExecutor.execute(() -> com.m3.veil.database.EncryptedChatDatabase
-                                        .getInstance(ChatActivity.this)
-                                        .updateMessageStatus(m.getId(), true, true));
+                            if (m.getId() != null && !dbExecutor.isShutdown()) {
+                                try {
+                                    dbExecutor.execute(() -> com.m3.veil.database.EncryptedChatDatabase
+                                            .getInstance(ChatActivity.this)
+                                            .updateMessageStatus(m.getId(), true, true));
+                                } catch (Exception ignored) {}
                             }
                         }
                     }
                     if (updated && messagesAdapter != null) {
                         messagesAdapter.notifyDataSetChanged();
-        checkAndShowJumpToMentionPill();
+                        checkAndShowJumpToMentionPill();
                     }
                 });
             }
@@ -2708,10 +2724,11 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void loadLocalChatSettings() {
-        if (chatId == null) return;
-        dbExecutor.execute(() -> {
-            com.m3.veil.model.Chat chat = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
-            if (isFinishing() || isDestroyed()) return;
+        if (chatId == null || isFinishing() || isDestroyed() || dbExecutor == null || dbExecutor.isShutdown()) return;
+        try {
+            dbExecutor.execute(() -> {
+                com.m3.veil.model.Chat chat = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
+                if (isFinishing() || isDestroyed()) return;
             if (chat == null) {
                 if (currentLocalChat != null) {
                     currentLocalChat = null;
@@ -2776,7 +2793,8 @@ public class ChatActivity extends AppCompatActivity {
                 updatePresenceAndToolbarStatus();
                 refreshPinnedMessagesBanner();
             });
-        });
+            });
+        } catch (java.util.concurrent.RejectedExecutionException ignored) {}
     }
 
     private String resolveThemeAdaptiveWallpaper(String wpValue, boolean isNight) {
@@ -3740,13 +3758,44 @@ public class ChatActivity extends AppCompatActivity {
             @Override
             public void onMediaCancelClick(Message message) {
                 if (message == null || message.getId() == null) return;
-                com.m3.veil.manager.VeilMessagesController.getInstance(ChatActivity.this).cancelMediaDownload(recipientId, message.getId());
-                messagesAdapter.setMediaDownloadState(message.getId(), MessagesAdapter.STATE_IDLE, 0);
+                com.m3.veil.manager.VeilMessagesController.getInstance(ChatActivity.this)
+                        .cancelMediaDownload(recipientId, message.getId());
+                messagesAdapter.setMediaDownloadState(message.getId(), MessagesAdapter.STATE_RETRY, 0);
             }
 
             @Override
             public void onMediaRetryClick(Message message) {
-                onMediaDownloadClick(message);
+                if (message == null || message.getId() == null) return;
+                if (!com.m3.veil.manager.VeilMessagesController.getInstance(ChatActivity.this).isNetworkConnected()) {
+                    Toast.makeText(ChatActivity.this, "No internet connection. Please turn on Wi-Fi or mobile data.", Toast.LENGTH_SHORT).show();
+                    messagesAdapter.setMediaDownloadState(message.getId(), MessagesAdapter.STATE_RETRY, 0);
+                    return;
+                }
+                messagesAdapter.setMediaDownloadState(message.getId(), MessagesAdapter.STATE_DOWNLOADING, 1);
+                com.m3.veil.manager.VeilMessagesController.getInstance(ChatActivity.this).retryMediaTransfer(
+                        chatId,
+                        recipientId,
+                        message,
+                        new com.m3.veil.webrtc.P2PFileTransferHelper.DownloadProgressListener() {
+                            @Override
+                            public void onProgress(String transferId, int percent) {
+                                runOnUiThread(() -> messagesAdapter.setMediaDownloadState(transferId, MessagesAdapter.STATE_DOWNLOADING, percent));
+                            }
+
+                            @Override
+                            public void onComplete(String transferId, File file) {
+                                runOnUiThread(() -> {
+                                    messagesAdapter.setMediaDownloadState(transferId, MessagesAdapter.STATE_DOWNLOADED, 100);
+                                    reloadMessagesFromLocalVault();
+                                });
+                            }
+
+                            @Override
+                            public void onError(String transferId, String error) {
+                                runOnUiThread(() -> messagesAdapter.setMediaDownloadState(transferId, MessagesAdapter.STATE_RETRY, 0));
+                            }
+                        }
+                );
             }
         });
         messagesAdapter.setOnQuickForwardClickListener(this::showForwardMessageSheet);
@@ -6150,6 +6199,31 @@ public class ChatActivity extends AppCompatActivity {
         }
     }
 
+    @Nullable
+    private static List<String> extractSafeStringList(@Nullable Object raw) {
+        if (raw == null) return null;
+        List<String> out = new ArrayList<>();
+        if (raw instanceof List<?>) {
+            for (Object item : (List<?>) raw) {
+                if (item != null) out.add(String.valueOf(item));
+            }
+            return out;
+        } else if (raw instanceof Object[]) {
+            for (Object item : (Object[]) raw) {
+                if (item != null) out.add(String.valueOf(item));
+            }
+            return out;
+        } else if (raw instanceof org.json.JSONArray) {
+            org.json.JSONArray arr = (org.json.JSONArray) raw;
+            for (int i = 0; i < arr.length(); i++) {
+                String s = arr.optString(i, null);
+                if (s != null) out.add(s);
+            }
+            return out;
+        }
+        return null;
+    }
+
     private void attachGroupRealtimeListeners() {
         if (chatId == null || db == null) return;
         if (currentLocalChat != null && currentLocalChat.getParticipants() != null) {
@@ -6164,16 +6238,15 @@ public class ChatActivity extends AppCompatActivity {
         if (groupDocListener != null) groupDocListener.remove();
         groupDocListener = db.collection("groups").document(chatId)
                 .addSnapshotListener(this, (doc, error) -> {
-                    if (error != null || doc == null || !doc.exists()) return;
-                    dbExecutor.execute(() -> {
-                        String gName = doc.getString("groupName");
-                        String adminId = doc.getString("adminId");
-                        String description = doc.getString("description");
-                        String chatType = doc.getString("type");
-                        @SuppressWarnings("unchecked")
-                        List<String> parts = (List<String>) doc.get("participants");
-                        @SuppressWarnings("unchecked")
-                        List<String> adminIds = (List<String>) doc.get("adminIds");
+                    if (error != null || doc == null || !doc.exists() || isFinishing() || isDestroyed() || dbExecutor == null || dbExecutor.isShutdown()) return;
+                    try {
+                        dbExecutor.execute(() -> {
+                            String gName = doc.getString("groupName");
+                            String adminId = doc.getString("adminId");
+                            String description = doc.getString("description");
+                            String chatType = doc.getString("type");
+                            List<String> parts = extractSafeStringList(doc.get("participants"));
+                            List<String> adminIds = extractSafeStringList(doc.get("adminIds"));
 
                         // Sync group permissions & Sender-Key epoch from Firestore to local preferences
                         Boolean adminsOnly = doc.getBoolean("adminsOnlySend");
@@ -6217,7 +6290,8 @@ public class ChatActivity extends AppCompatActivity {
                             com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveOrUpdateChat(currentLocalChat);
                             runOnUiThread(this::loadLocalChatSettings);
                         }
-                    });
+                        });
+                    } catch (java.util.concurrent.RejectedExecutionException ignored) {}
                 });
 
         if (groupMessagesListener != null) groupMessagesListener.remove();

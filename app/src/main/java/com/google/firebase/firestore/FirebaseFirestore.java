@@ -426,11 +426,16 @@ public class FirebaseFirestore {
             tags.add(new String[]{"t", collectionTagFor(normCol)});
             tags.add(new String[]{"t", documentTagFor(normPath)});
 
-            String eventJson = buildSignedNostrEventJson(seckey32, 30078, tags, wrapper.toString(), createdAtSec);
+            String wrapperStr = wrapper.toString();
+            if (wrapperStr.length() > 750_000) {
+                Log.w(TAG, "Skipping Nostr broadcast for oversized document (" + wrapperStr.length() + " chars): " + normPath);
+                return;
+            }
+            String eventJson = buildSignedNostrEventJson(seckey32, 30078, tags, wrapperStr, createdAtSec);
             String wireMsg = "[\"EVENT\"," + eventJson + "]";
 
             broadcastRawNostrEvent(wireMsg);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.w(TAG, "publishNostrDocument notice: " + e.getMessage());
         }
     }
@@ -1368,6 +1373,9 @@ public class FirebaseFirestore {
         }
         tagsBuilder.append("]");
         String tagsJson = tagsBuilder.toString();
+        if (content != null && content.length() > 750_000) {
+            throw new IllegalArgumentException("Payload too large for Nostr event signing");
+        }
         String escapedContent = nip01EscapeString(content != null ? content : "");
 
         String commitment = "[0,\"" + pubkeyHex + "\"," + createdAtSec + "," + kind + ","
@@ -1377,7 +1385,7 @@ public class FirebaseFirestore {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             idBytes = md.digest(commitment.getBytes(StandardCharsets.UTF_8));
-        } catch (Exception e) {
+        } catch (Throwable e) {
             throw new RuntimeException(e);
         }
         String idHex = bytesToHex(idBytes);

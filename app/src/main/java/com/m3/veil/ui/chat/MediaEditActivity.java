@@ -324,15 +324,17 @@ public class MediaEditActivity extends AppCompatActivity {
         View btnDrawView = findViewById(R.id.btnDraw);
         View btnUndoView = findViewById(R.id.btnUndo);
 
-        UiAnimator.attachSpringPress(btnCloseView);
-        UiAnimator.attachSpringPress(btnSendView);
-        UiAnimator.attachSpringPress(btnCropView);
-        UiAnimator.attachSpringPress(btnEmojiView);
-        UiAnimator.attachSpringPress(btnTextView);
-        UiAnimator.attachSpringPress(btnDrawView);
-        UiAnimator.attachSpringPress(btnUndoView);
+        if (btnCloseView != null) {
+            UiAnimator.attachSpringPress(btnCloseView);
+            btnCloseView.setOnClickListener(v -> finish());
+        }
+        if (btnSendView != null) UiAnimator.attachSpringPress(btnSendView);
+        if (btnCropView != null) UiAnimator.attachSpringPress(btnCropView);
+        if (btnEmojiView != null) UiAnimator.attachSpringPress(btnEmojiView);
+        if (btnTextView != null) UiAnimator.attachSpringPress(btnTextView);
+        if (btnDrawView != null) UiAnimator.attachSpringPress(btnDrawView);
+        if (btnUndoView != null) UiAnimator.attachSpringPress(btnUndoView);
 
-        btnCloseView.setOnClickListener(v -> finish());
         applyAdaptiveThemeElements(isNight);
 
         setupViewsForState();
@@ -365,57 +367,69 @@ public class MediaEditActivity extends AppCompatActivity {
             });
         }
 
-        btnSendView.setOnClickListener(v -> saveAndSend());
+        if (btnSendView != null) {
+            btnSendView.setOnClickListener(v -> saveAndSend());
+        }
 
-        btnCropView.setOnClickListener(v -> {
-            if (mediaUri != null && mediaType != null && mediaType.startsWith("video")) {
-                showVideoTransformAndCropSheet();
-            } else if (mediaUri != null && mediaType != null && mediaType.startsWith("image") && photoEditor != null) {
-                photoEditorView.setDrawingCacheEnabled(true);
-                Bitmap bitmap = Bitmap.createBitmap(photoEditorView.getDrawingCache());
-                photoEditorView.setDrawingCacheEnabled(false);
+        if (btnCropView != null) {
+            btnCropView.setOnClickListener(v -> {
+                if (mediaUri != null && mediaType != null && mediaType.startsWith("video")) {
+                    showVideoTransformAndCropSheet();
+                } else if (mediaUri != null && mediaType != null && mediaType.startsWith("image") && photoEditor != null) {
+                    photoEditorView.setDrawingCacheEnabled(true);
+                    Bitmap bitmap = Bitmap.createBitmap(photoEditorView.getDrawingCache());
+                    photoEditorView.setDrawingCacheEnabled(false);
 
-                File tempBake = new File(getExternalCacheDir(), "pre_crop_" + System.currentTimeMillis() + ".jpg");
-                try {
-                    FileOutputStream out = new FileOutputStream(tempBake);
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
-                    out.flush();
-                    out.close();
-                    launchUCrop(Uri.fromFile(tempBake));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    launchUCrop(mediaUri);
+                    File tempBake = new File(getExternalCacheDir(), "pre_crop_" + System.currentTimeMillis() + ".jpg");
+                    try {
+                        FileOutputStream out = new FileOutputStream(tempBake);
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
+                        out.flush();
+                        out.close();
+                        launchUCrop(Uri.fromFile(tempBake));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        launchUCrop(mediaUri);
+                    }
                 }
-            }
-        });
+            });
+        }
 
-        btnEmojiView.setOnClickListener(v -> {
-            EmojiStickerBottomSheet bottomSheet = new EmojiStickerBottomSheet();
-            bottomSheet.setOnEmojiSelectedListener(emoji -> {
+        if (btnEmojiView != null) {
+            btnEmojiView.setOnClickListener(v -> {
+                EmojiStickerBottomSheet bottomSheet = new EmojiStickerBottomSheet();
+                bottomSheet.setOnEmojiSelectedListener(emoji -> {
+                    if (photoEditor != null) {
+                        photoEditor.addEmoji(emoji);
+                    }
+                });
+                bottomSheet.show(getSupportFragmentManager(), "EmojiBottomSheet");
+            });
+        }
+
+        if (btnTextView != null) {
+            btnTextView.setOnClickListener(v -> {
+                updateState(UIState.TEXT);
+                TextEditorDialogFragment dialog = TextEditorDialogFragment.show(this, "", currentSelectedColor);
+                dialog.setOnTextEditorListener((newText, colorCode) -> {
+                    if (photoEditor != null && newText != null && !newText.trim().isEmpty()) {
+                        photoEditor.addText(newText, colorCode);
+                    }
+                    updateState(UIState.BASE);
+                });
+            });
+        }
+
+        if (btnDrawView != null) {
+            btnDrawView.setOnClickListener(v -> updateState(UIState.DRAWING));
+        }
+        if (btnUndoView != null) {
+            btnUndoView.setOnClickListener(v -> {
                 if (photoEditor != null) {
-                    photoEditor.addEmoji(emoji);
+                    photoEditor.undo();
                 }
             });
-            bottomSheet.show(getSupportFragmentManager(), "EmojiBottomSheet");
-        });
-
-        btnTextView.setOnClickListener(v -> {
-            updateState(UIState.TEXT);
-            TextEditorDialogFragment dialog = TextEditorDialogFragment.show(this, "", currentSelectedColor);
-            dialog.setOnTextEditorListener((newText, colorCode) -> {
-                if (photoEditor != null && newText != null && !newText.trim().isEmpty()) {
-                    photoEditor.addText(newText, colorCode);
-                }
-                updateState(UIState.BASE);
-            });
-        });
-
-        btnDrawView.setOnClickListener(v -> updateState(UIState.DRAWING));
-        btnUndoView.setOnClickListener(v -> {
-            if (photoEditor != null) {
-                photoEditor.undo();
-            }
-        });
+        }
 
         View btnAddMoreMedia = findViewById(R.id.btnAddMoreMedia);
         if (btnAddMoreMedia != null) {

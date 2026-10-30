@@ -104,6 +104,39 @@ public class P2PFileTransferHelper {
         fileRequestListener = listener;
     }
 
+    private static final java.util.Set<String> canceledTransfers = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    public static void cancelTransfer(String transferId) {
+        if (transferId == null || transferId.isEmpty()) return;
+        canceledTransfers.add(transferId);
+        InboundTransfer inbound = activeInboundTransfers.remove(transferId);
+        if (inbound != null) {
+            inbound.isCompleted.set(true);
+            try {
+                if (inbound.raf != null) inbound.raf.close();
+            } catch (Exception ignored) {}
+        }
+    }
+
+    public static void clearCanceledTransfer(String transferId) {
+        if (transferId == null || transferId.isEmpty()) return;
+        canceledTransfers.remove(transferId);
+    }
+
+    public static boolean isTransferCanceled(String transferId) {
+        return transferId != null && canceledTransfers.contains(transferId);
+    }
+
+    private static boolean isDeviceNetworkConnected() {
+        try {
+            android.content.Context ctx = com.m3.veil.VeilApplication.getInstance();
+            if (ctx == null) return true;
+            return com.m3.veil.manager.VeilMessagesController.getInstance(ctx).isNetworkConnected();
+        } catch (Throwable ignored) {
+            return true;
+        }
+    }
+
     // Inbound Transfer State
     public static class InboundTransfer {
         public String transferId;
@@ -304,6 +337,12 @@ public class P2PFileTransferHelper {
             RandomAccessFile raf = null;
             try {
                 String transferId = (messageId != null && !messageId.isEmpty()) ? messageId : UUID.randomUUID().toString();
+                if (isTransferCanceled(transferId)) {
+                    throw new IOException("Transfer canceled by user");
+                }
+                if (!isDeviceNetworkConnected()) {
+                    throw new IOException("No network connection available");
+                }
                 long totalBytes = file.length();
                 int totalChunks = (int) Math.ceil((double) totalBytes / CHUNK_SIZE);
                 if (totalChunks == 0) totalChunks = 1;
@@ -344,18 +383,40 @@ public class P2PFileTransferHelper {
                 int lastReportedProgress = 1;
                 try {
                     for (int chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                        if (isTransferCanceled(transferId)) {
+                            throw new IOException("Transfer canceled by user");
+                        }
+                        if (!isDeviceNetworkConnected()) {
+                            throw new IOException("Network disconnected during file transfer");
+                        }
                         // If resuming, skip chunks already possessed by recipient
                         if (requestedMissingChunks != null && !requestedMissingChunks.get(chunkIndex)) {
                             continue;
                         }
 
                         // Sliding-window backpressure: wait until buffer drains below resume threshold
-                        long maxBuf = getMaxBufferAmount();
-                        long resumeBuf = Math.max(CHUNK_SIZE * 4L, maxBuf / 2);
+                        long maxBuf = Math.min(getMaxBufferAmount(), 256 * 1024L);
+                        long resumeBuf = Math.max(CHUNK_SIZE * 2L, maxBuf / 2);
                         if (dataChannel.bufferedAmount() > maxBuf) {
+                            long lastObservedBuf = dataChannel.bufferedAmount();
+                            long lastDrainMs = System.currentTimeMillis();
                             while (dataChannel.state() == DataChannel.State.OPEN && dataChannel.bufferedAmount() > resumeBuf) {
+                                if (isTransferCanceled(transferId)) {
+                                    throw new IOException("Transfer canceled by user");
+                                }
+                                if (!isDeviceNetworkConnected()) {
+                                    throw new IOException("Network disconnected during file transfer");
+                                }
+                                long curBuf = dataChannel.bufferedAmount();
+                                long nowMs = System.currentTimeMillis();
+                                if (curBuf < lastObservedBuf) {
+                                    lastObservedBuf = curBuf;
+                                    lastDrainMs = nowMs;
+                                } else if (nowMs - lastDrainMs > 4500L) {
+                                    throw new IOException("Network connection stalled during file transfer");
+                                }
                                 try {
-                                    Thread.sleep(1);
+                                    Thread.sleep(5);
                                 } catch (InterruptedException ignored) {}
                             }
                         }
@@ -375,16 +436,57 @@ public class P2PFileTransferHelper {
                         sendPacketOrFallback(dataChannel, chunkPacket, null);
                         chunksSent++;
 
-                        final int progress = Math.max(1, (int) (((double) (chunkIndex + 1) / totalChunks) * 100));
+                        long queuedBytes = Math.min(totalBytes, (long) (chunkIndex + 1) * CHUNK_SIZE);
+                        long wireFlushedBytes = Math.max(0L, queuedBytes - dataChannel.bufferedAmount());
+                        final int progress = Math.max(1, Math.min(99, (int) ((wireFlushedBytes * 100L) / Math.max(1L, totalBytes))));
                         if (progress > lastReportedProgress) {
                             lastReportedProgress = progress;
                             mainHandler.post(() -> {
-                                if (callback != null) callback.onProgress(progress);
+                                if (callback != null && !isTransferCanceled(transferId) && isDeviceNetworkConnected()) {
+                                    callback.onProgress(progress);
+                                }
                             });
                         }
                     }
                 } finally {
                     VeilBufferPool.recycleByteArray(buffer);
+                }
+
+                // Wait for remaining buffered bytes to flush onto the wire before declaring 100% complete
+                long flushLastBuf = dataChannel.bufferedAmount();
+                long flushLastMs = System.currentTimeMillis();
+                while (dataChannel.state() == DataChannel.State.OPEN && dataChannel.bufferedAmount() > CHUNK_SIZE * 2L) {
+                    if (isTransferCanceled(transferId)) {
+                        throw new IOException("Transfer canceled by user");
+                    }
+                    if (!isDeviceNetworkConnected()) {
+                        throw new IOException("Network disconnected before transfer completed");
+                    }
+                    long curBuf = dataChannel.bufferedAmount();
+                    long nowMs = System.currentTimeMillis();
+                    if (curBuf < flushLastBuf) {
+                        flushLastBuf = curBuf;
+                        flushLastMs = nowMs;
+                        long wireFlushedBytes = Math.max(0L, totalBytes - curBuf);
+                        final int flushPct = Math.max(lastReportedProgress, Math.min(99, (int) ((wireFlushedBytes * 100L) / Math.max(1L, totalBytes))));
+                        if (flushPct > lastReportedProgress) {
+                            lastReportedProgress = flushPct;
+                            mainHandler.post(() -> {
+                                if (callback != null && !isTransferCanceled(transferId) && isDeviceNetworkConnected()) {
+                                    callback.onProgress(flushPct);
+                                }
+                            });
+                        }
+                    } else if (nowMs - flushLastMs > 4500L) {
+                        throw new IOException("Network connection stalled before transfer finished");
+                    }
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException ignored) {}
+                }
+
+                if (dataChannel.state() != DataChannel.State.OPEN || !isDeviceNetworkConnected() || isTransferCanceled(transferId)) {
+                    throw new IOException("Transfer interrupted before completion");
                 }
 
                 // 3. Send FILE_END Header

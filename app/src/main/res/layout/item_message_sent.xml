@@ -674,21 +674,21 @@
                     android:layout_height="38dp"
                     android:background="@drawable/bg_voice_circle_sent">
 
-                    <ImageView
-                        android:id="@+id/voiceActionButton"
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_play_arrow"
-                        app:tint="@android:color/white" />
-
                     <ProgressBar
                         android:id="@+id/voiceProgressBar"
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
                         android:layout_gravity="center"
                         android:indeterminateTint="@android:color/white"
                         android:visibility="gone" />
+
+                    <ImageView
+                        android:id="@+id/voiceActionButton"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_play_arrow"
+                        app:tint="@android:color/white" />
                 </FrameLayout>
 
                 <!-- Audio Waveform Visualization -->
@@ -848,26 +848,26 @@
                         android:ellipsize="middle" />
                 </LinearLayout>
 
-                <!-- Circular Action / Download Button -->
+                <!-- Circular Action / Download / Cancel / Retry Button -->
                 <FrameLayout
-                    android:layout_width="30dp"
-                    android:layout_height="30dp">
-
-                    <ImageView
-                        android:id="@+id/documentActionIcon"
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_download"
-                        app:tint="@color/message_text_secondary" />
+                    android:layout_width="32dp"
+                    android:layout_height="32dp">
 
                     <ProgressBar
                         android:id="@+id/documentProgressBar"
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
                         android:layout_gravity="center"
                         android:indeterminateTint="@color/message_action_button"
                         android:visibility="gone" />
+
+                    <ImageView
+                        android:id="@+id/documentActionIcon"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_download"
+                        app:tint="@color/message_text_secondary" />
                 </FrameLayout>
             </LinearLayout>
 

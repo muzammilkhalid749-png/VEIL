@@ -909,6 +909,22 @@ public class VeilMeshDaemonService extends Service {
         super.onDestroy();
     }
 
+    public void onTimeout(int startId) {
+        Log.w(TAG, "FGS timeout reached (API 34); demoting foreground state gracefully");
+        try {
+            stopForeground(true);
+            stopSelf(startId);
+        } catch (Throwable ignored) {}
+    }
+
+    public void onTimeout(int startId, int fgsType) {
+        Log.w(TAG, "FGS timeout reached (API 35, type=" + fgsType + "); demoting foreground state gracefully");
+        try {
+            stopForeground(true);
+            stopSelf(startId);
+        } catch (Throwable ignored) {}
+    }
+
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {

@@ -1,0 +1,268 @@
+2026-10-29 21:42:32.402 28517-28517 AndroidRuntime          pid-28517                            E  FATAL EXCEPTION: main (Fix with AI)
+                                                                                                    Process: com.m3.veil, PID: 28517
+                                                                                                    java.lang.RuntimeException: Unable to start activity ComponentInfo{com.m3.veil/com.m3.veil.ui.chat.MediaEditActivity}: java.lang.NullPointerException: Attempt to invoke virtual method 'void android.view.View.setOnClickListener(android.view.View$OnClickListener)' on a null object reference
+                                                                                                    	at android.app.ActivityThread.performLaunchActivity(ActivityThread.java:4478)
+                                                                                                    	at android.app.ActivityThread.handleLaunchActivity(ActivityThread.java:4665)
+                                                                                                    	at android.app.servertransaction.LaunchActivityItem.execute(LaunchActivityItem.java:239)
+                                                                                                    	at android.app.servertransaction.TransactionExecutor.executeNonLifecycleItem(TransactionExecutor.java:133)
+                                                                                                    	at android.app.servertransaction.TransactionExecutor.executeTransactionItems(TransactionExecutor.java:103)
+                                                                                                    	at android.app.servertransaction.TransactionExecutor.execute(TransactionExecutor.java:80)
+                                                                                                    	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2957)
+                                                                                                    	at android.os.Handler.dispatchMessage(Handler.java:110)
+                                                                                                    	at android.os.Looper.loopOnce(Looper.java:331)
+                                                                                                    	at android.os.Looper.loop(Looper.java:440)
+                                                                                                    	at android.app.ActivityThread.main(ActivityThread.java:9398)
+                                                                                                    	at java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:629)
+                                                                                                    	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1024)
+                                                                                                    Caused by: java.lang.NullPointerException: Attempt to invoke virtual method 'void android.view.View.setOnClickListener(android.view.View$OnClickListener)' on a null object reference
+                                                                                                    	at com.m3.veil.ui.chat.MediaEditActivity.configureDarkMediaSystemBars(MediaEditActivity.java:194)
+                                                                                                    	at com.m3.veil.ui.chat.MediaEditActivity.onCreate(MediaEditActivity.java:124)
+                                                                                                    	at android.app.Activity.performCreate(Activity.java:9184)
+                                                                                                    	at android.app.Activity.performCreate(Activity.java:9162)
+                                                                                                    	at android.app.Instrumentation.callActivityOnCreate(Instrumentation.java:1525)
+                                                                                                    	at android.app.ActivityThread.performLaunchActivity(ActivityThread.java:4460)
+                                                                                                    	... 13 more
+2026-10-29 21:42:52.651 31527-31527 AndroidRuntime          pid-31527                            E  FATAL EXCEPTION: main (Fix with AI)
+                                                                                                    Process: com.m3.veil, PID: 31527
+                                                                                                    java.lang.RuntimeException: Unable to start activity ComponentInfo{com.m3.veil/com.m3.veil.ui.chat.MediaEditActivity}: java.lang.NullPointerException: Attempt to invoke virtual method 'void android.view.View.setOnClickListener(android.view.View$OnClickListener)' on a null object reference
+                                                                                                    	at android.app.ActivityThread.performLaunchActivity(ActivityThread.java:4478)
+                                                                                                    	at android.app.ActivityThread.handleLaunchActivity(ActivityThread.java:4665)
+                                                                                                    	at android.app.servertransaction.LaunchActivityItem.execute(LaunchActivityItem.java:239)
+                                                                                                    	at android.app.servertransaction.TransactionExecutor.executeNonLifecycleItem(TransactionExecutor.java:133)
+                                                                                                    	at android.app.servertransaction.TransactionExecutor.executeTransactionItems(TransactionExecutor.java:103)
+                                                                                                    	at android.app.servertransaction.TransactionExecutor.execute(TransactionExecutor.java:80)
+                                                                                                    	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2957)
+                                                                                                    	at android.os.Handler.dispatchMessage(Handler.java:110)
+                                                                                                    	at android.os.Looper.loopOnce(Looper.java:331)
+                                                                                                    	at android.os.Looper.loop(Looper.java:440)
+                                                                                                    	at android.app.ActivityThread.main(ActivityThread.java:9398)
+                                                                                                    	at java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:629)
+                                                                                                    	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1024)
+                                                                                                    Caused by: java.lang.NullPointerException: Attempt to invoke virtual method 'void android.view.View.setOnClickListener(android.view.View$OnClickListener)' on a null object reference
+                                                                                                    	at com.m3.veil.ui.chat.MediaEditActivity.configureDarkMediaSystemBars(MediaEditActivity.java:194)
+                                                                                                    	at com.m3.veil.ui.chat.MediaEditActivity.onCreate(MediaEditActivity.java:124)
+                                                                                                    	at android.app.Activity.performCreate(Activity.java:9184)
+                                                                                                    	at android.app.Activity.performCreate(Activity.java:9162)
+                                                                                                    	at android.app.Instrumentation.callActivityOnCreate(Instrumentation.java:1525)
+                                                                                                    	at android.app.ActivityThread.performLaunchActivity(ActivityThread.java:4460)
+                                                                                                    	... 13 more
+2026-10-30 08:22:37.692  6812-7840  AndroidRuntime          pid-6812                             E  FATAL EXCEPTION: pool-19-thread-1 (Fix with AI)
+                                                                                                    Process: com.m3.veil, PID: 6812
+                                                                                                    java.lang.ClassCastException: java.lang.Object[] cannot be cast to java.util.List
+                                                                                                    	at com.m3.veil.ui.chat.ChatActivity.lambda$attachGroupRealtimeListeners$1$com-m3-veil-ui-chat-ChatActivity(ChatActivity.java:5106)
+                                                                                                    	at com.m3.veil.ui.chat.ChatActivity$$ExternalSyntheticLambda47.run(D8$$SyntheticClass:0)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1571)
+2026-10-30 16:16:52.270 23860-10957 AndroidRuntime          com.whatsapp                         E  FATAL EXCEPTION: pool-19-thread-1 (Fix with AI)
+                                                                                                    Process: com.m3.veil, PID: 23860
+                                                                                                    java.lang.ClassCastException: java.lang.Object[] cannot be cast to java.util.List
+                                                                                                    	at com.m3.veil.ui.chat.ChatActivity.lambda$attachGroupRealtimeListeners$1$com-m3-veil-ui-chat-ChatActivity(ChatActivity.java:6084)
+                                                                                                    	at com.m3.veil.ui.chat.ChatActivity$$ExternalSyntheticLambda68.run(D8$$SyntheticClass:0)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1571)
+2026-10-30 20:19:28.187 28560-31280 AndroidRuntime          pid-28560                            E  FATAL EXCEPTION: VeilFirestoreWrite (Fix with AI)
+                                                                                                    Process: com.m3.veil, PID: 28560
+                                                                                                    java.lang.OutOfMemoryError: Failed to allocate a 1128368 byte allocation with 842096 free bytes and 822KB until OOM, target footprint 268435456, growth limit 268435456
+                                                                                                    	at java.util.Arrays.copyOf(Arrays.java:4275)
+                                                                                                    	at java.lang.AbstractStringBuilder.ensureCapacityInternal(AbstractStringBuilder.java:301)
+                                                                                                    	at java.lang.AbstractStringBuilder.append(AbstractStringBuilder.java:643)
+                                                                                                    	at java.lang.StringBuilder.append(StringBuilder.java:190)
+                                                                                                    	at com.google.firebase.firestore.FirebaseFirestore.buildSignedNostrEventJson(FirebaseFirestore.java:1373)
+                                                                                                    	at com.google.firebase.firestore.FirebaseFirestore.publishNostrDocument(FirebaseFirestore.java:429)
+                                                                                                    	at com.google.firebase.firestore.FirebaseFirestore.lambda$setDocumentAsync$0$com-google-firebase-firestore-FirebaseFirestore(FirebaseFirestore.java:591)
+                                                                                                    	at com.google.firebase.firestore.FirebaseFirestore$$ExternalSyntheticLambda24.run(D8$$SyntheticClass:0)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1571)
+2026-10-30 20:19:36.846  2049-2160  ActivityManager         system_server                        E  FGS (dataSync) timed out: ServiceRecord{1e34694 u0 com.m3.veil/.services.VeilMeshDaemonService c:com.m3.veil}
+2026-10-30 20:20:15.377  2049-3777  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-10-30 20:20:18.817  2049-2981  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-10-30 20:21:52.055  2049-2999  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-10-30 20:21:57.009  2049-2274  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-10-30 20:21:57.715  2049-2132  AppOps                  system_server                        E  attributionTag  not declared in manifest of com.m3.veil
+2026-10-30 20:21:57.717  2049-2132  AppOps                  system_server                        E  attributionTag  not declared in manifest of com.m3.veil
+2026-10-30 20:22:00.768  2049-2132  AppOps                  system_server                        E  attributionTag  not declared in manifest of com.m3.veil
+2026-10-30 20:22:00.768  2049-2132  AppOps                  system_server                        E  attributionTag  not declared in manifest of com.m3.veil
+2026-10-30 20:23:16.276  2049-3730  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:1
+2026-10-30 20:23:16.301  2049-2191  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-10-30 20:27:27.157  2049-2131  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-10-30 20:27:29.110  2049-3100  NotificationService     system_server                        E  Package enqueue rate is 6.4540267. Shedding 0|com.m3.veil|46357|null|10325. package=com.m3.veil
+2026-10-30 20:27:34.173  2049-2201  NotificationService     system_server                        E  Package enqueue rate is 6.444163. Shedding 0|com.m3.veil|46357|null|10325. package=com.m3.veil
+2026-10-30 20:27:39.229  2049-2131  NotificationService     system_server                        E  Package enqueue rate is 6.4026303. Shedding 0|com.m3.veil|46357|null|10325. package=com.m3.veil
+2026-10-30 20:27:44.302  2049-3093  NotificationService     system_server                        E  Package enqueue rate is 5.171795. Shedding 0|com.m3.veil|46357|null|10325. package=com.m3.veil
+2026-10-30 20:27:49.320  2049-2132  NotificationService     system_server                        E  Package enqueue rate is 5.9481974. Shedding 0|com.m3.veil|46357|null|10325. package=com.m3.veil
+2026-10-30 20:27:54.405  2049-2132  NotificationService     system_server                        E  Package enqueue rate is 5.5994034. Shedding 0|com.m3.veil|46357|null|10325. package=com.m3.veil
+2026-10-30 20:28:27.617 10802-10802 AndroidRuntime          pid-10802                            E  FATAL EXCEPTION: main (Fix with AI)
+                                                                                                    Process: com.m3.veil, PID: 10802
+                                                                                                    java.util.concurrent.RejectedExecutionException: Task com.m3.veil.ui.chat.ChatActivity$$ExternalSyntheticLambda93@c05bb5c rejected from java.util.concurrent.ThreadPoolExecutor@633e374[Terminated, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 101]
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$AbortPolicy.rejectedExecution(ThreadPoolExecutor.java:2050)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.reject(ThreadPoolExecutor.java:797)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.execute(ThreadPoolExecutor.java:1338)
+                                                                                                    	at java.util.concurrent.Executors$DelegatedExecutorService.execute(Executors.java:643)
+                                                                                                    	at com.m3.veil.ui.chat.ChatActivity.loadLocalChatSettings(ChatActivity.java:2712)
+                                                                                                    	at com.m3.veil.ui.chat.ChatActivity.-$$Nest$mloadLocalChatSettings(ChatActivity.java:0)
+                                                                                                    	at com.m3.veil.ui.chat.ChatActivity$4.lambda$onChatsUpdated$0$com-m3-veil-ui-chat-ChatActivity$4(ChatActivity.java:264)
+                                                                                                    	at com.m3.veil.ui.chat.ChatActivity$4$$ExternalSyntheticLambda1.run(D8$$SyntheticClass:0)
+                                                                                                    	at android.os.Handler.handleCallback(Handler.java:995)
+                                                                                                    	at android.os.Handler.dispatchMessage(Handler.java:103)
+                                                                                                    	at android.os.Looper.loopOnce(Looper.java:331)
+                                                                                                    	at android.os.Looper.loop(Looper.java:440)
+                                                                                                    	at android.app.ActivityThread.main(ActivityThread.java:9398)
+                                                                                                    	at java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:629)
+                                                                                                    	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1024)
+2026-10-30 20:29:23.328  2049-3001  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:1
+2026-10-30 20:29:23.351  2049-2191  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:1
+2026-10-30 20:29:23.404 31540-31540 com.m3.veil             com.m3.veil                          I  Late-enabling -Xcheck:jni
+2026-10-30 20:29:23.436 31540-31540 com.m3.veil             com.m3.veil                          I  Using generational CollectorTypeCMC GC.
+2026-10-30 20:29:23.600 31540-31540 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f71410898) locale list changing from [] to [en-US]
+2026-10-30 20:29:23.613 31540-31540 LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsion.thub.res
+2026-10-30 20:29:23.613 31540-31540 LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsion.theme.icon
+2026-10-30 20:29:23.613 31540-31540 LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsionui
+2026-10-30 20:29:23.628 31540-16246 AsyncDrawableCache      com.m3.veil                          W  can not found res: 2131230852, maybe dynamic res id.
+2026-10-30 20:29:23.809 31540-31540 VeilPerfController      com.m3.veil                          I  VeilPerformanceController active: class=AVERAGE (CPU=8 cores @2050MHz, RAM=7687MB, RefreshRate=90.0Hz)
+2026-10-30 20:29:24.160 31540-31540 VeilIntegrityGuard      com.m3.veil                          I  Runtime integrity verified. APK Cert SHA-256: D0:F9:6F:C5:10:3D:DB:37:1D:06:C7:55:7A:44:7C:31:83:E4:FF:37:00:A4:D2:5F:68:B8:45:05:13:90:15:B9
+2026-10-30 20:29:24.169 31540-31540 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->get()Ldalvik/system/CloseGuard; (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-10-30 20:29:24.169 31540-31540 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->open(Ljava/lang/String;)V (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-10-30 20:29:24.169 31540-31540 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->warnIfOpen()V (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-10-30 20:29:24.194 31540-31540 PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-10-30 20:29:24.194 31540-31540 PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-10-30 20:29:24.194 31540-31540 M-ProMotion             com.m3.veil                          I  M-ProMotion is disabled
+2026-10-30 20:29:24.203 31540-31540 Choreographer           com.m3.veil                          I  Skipped 50 frames!  The application may be doing too much work on its main thread.
+2026-10-30 20:29:24.211 31540-16265 DisplayManager          com.m3.veil                          I  Choreographer implicitly registered for the refresh rate.
+2026-10-30 20:29:24.213 31540-31540 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f7140d378) locale list changing from [] to [en-US]
+2026-10-30 20:29:24.217 31540-16265 mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-10-30 20:29:24.221 31540-31540 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f71412af8) locale list changing from [] to [en-US]
+2026-10-30 20:29:24.223 31540-31540 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f7140ff38) locale list changing from [] to [en-US]
+2026-10-30 20:29:24.226 31540-16265 mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-10-30 20:29:24.227 31540-31540 ashmem                  com.m3.veil                          E  Pinning is deprecated since Android Q. Please use trim or other methods.
+2026-10-30 20:29:24.274 31540-31540 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-10-30 20:29:24.343 31540-16282 StatusController        com.m3.veil                          I  Initializing StatusController (100% Pure P2P WebRTC Mesh)...
+2026-10-30 20:29:24.360 31540-31540 QT                      com.m3.veil                          W  qt_process_init() called
+2026-10-30 20:29:24.360 31540-31540 QT                      com.m3.veil                          E  [QT]file does not exist
+2026-10-30 20:29:24.360 31540-31540 QT                      com.m3.veil                          W  Support!!
+2026-10-30 20:29:24.361 31540-31540 libMEOW_gift            com.m3.veil                          I  open /vendor/etc/vconfig/gift/arc.ini
+2026-10-30 20:29:24.361 31540-31540 QT                      com.m3.veil                          E  [QT]file does not exist
+2026-10-30 20:29:24.365 31540-31540 mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-10-30 20:29:24.370 31540-31540 org.webrtc.Logging      com.m3.veil                          I  EglBase14Impl: Using OpenGL ES version 2
+2026-10-30 20:29:24.378 31540-16301 org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Loading native library: jingle_peerconnection_so
+2026-10-30 20:29:24.378 31540-16301 org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Loading library: jingle_peerconnection_so
+2026-10-30 20:29:24.389 31540-16301 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: PeerConnectionFactory was initialized without an injected Loggable. Any existing Loggable will be deleted.
+2026-10-30 20:29:24.396 31540-31540 VeilMessagesCtrl        com.m3.veil                          I  VeilMessagesController initialized successfully.
+2026-10-30 20:29:24.407 31540-16255 VeilSchedulerDaemon     com.m3.veil                          I  Starting VeilSchedulerDaemon tick loop...
+2026-10-30 20:29:24.418 31540-16260 PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-10-30 20:29:24.424 31540-31540 libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.tgpa_resolution_tuner"
+2026-10-30 20:29:24.432 31540-31540 libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.scaler_version"
+2026-10-30 20:29:24.433 31540-31540 libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.scaler_version"
+2026-10-30 20:29:24.437 31540-31540 os.SingleLiceFactory    com.m3.veil                          W  instance failed. com.transsion.triplefingerscreenshot.TripleFingerScreenshotLiceFactory  from android.view.IViewRootImplLice
+2026-10-30 20:29:24.438 31540-31540 os.SingleLiceFactory    com.m3.veil                          W  instance failed. com.transsion.server.threefingerslideup.ThreeFingerSlideUpServiceLiceFactory  from android.view.IViewRootImplLice
+2026-10-30 20:29:24.448 31540-16301 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-10-30 20:29:24.450 31540-16301 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-10-30 20:29:24.450 31540-16301 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: createAudioDeviceModule
+2026-10-30 20:29:24.450 31540-16301 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW NS will be used.
+2026-10-30 20:29:24.451 31540-16301 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW AEC will be used.
+2026-10-30 20:29:24.451 31540-16301 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: ctor@[name=VeilRtcWorker, id=4638]
+2026-10-30 20:29:24.452 31540-16301 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: ctor@[name=VeilRtcWorker, id=4638]
+2026-10-30 20:29:24.453 31540-16301 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioTrackExternal: ctor@[name=VeilRtcWorker, id=4638]
+2026-10-30 20:29:24.459 31540-16314 org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Native library has already been loaded.
+2026-10-30 20:29:24.459 31540-16314 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: PeerConnectionFactory was initialized without an injected Loggable. Any existing Loggable will be deleted.
+2026-10-30 20:29:24.460 31540-16314 org.webrtc.Logging      com.m3.veil                          I  EglBase14Impl: Using OpenGL ES version 2
+2026-10-30 20:29:24.478 31540-16314 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-10-30 20:29:24.480 31540-16314 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-10-30 20:29:24.480 31540-16314 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: createAudioDeviceModule
+2026-10-30 20:29:24.480 31540-16314 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW NS will be used.
+2026-10-30 20:29:24.480 31540-16314 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW AEC will be used.
+2026-10-30 20:29:24.481 31540-16314 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: ctor@[name=pool-5-thread-1, id=4649]
+2026-10-30 20:29:24.481 31540-16314 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: ctor@[name=pool-5-thread-1, id=4649]
+2026-10-30 20:29:24.481 31540-16314 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioTrackExternal: ctor@[name=pool-5-thread-1, id=4649]
+2026-10-30 20:29:24.490 31540-16301 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-10-30 20:29:24.490 31540-31540 com.m3.veil             com.m3.veil                          E  [perfctl] 31540 31540 FPSGO ver:7
+2026-10-30 20:29:24.490 31540-31540 com.m3.veil             com.m3.veil                          E  [perfctl] 1 1 1 0
+2026-10-30 20:29:24.490 31540-16301 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-10-30 20:29:24.496 31540-16301 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-10-30 20:29:24.513 31540-16265 GrallocExtra            com.m3.veil                          I  gralloc_extra_query:is_SW3D 0
+2026-10-30 20:29:24.538 31540-16301 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-10-30 20:29:24.538 31540-16301 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-10-30 20:29:24.544 31540-16301 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-10-30 20:29:24.555 31540-16265 GrallocExtra            com.m3.veil                          I  gralloc_extra_query:is_SW3D 0
+2026-10-30 20:29:24.560 31540-31540 Choreographer           com.m3.veil                          W  Already have a pending vsync event.  There should only be one at a time.
+2026-10-30 20:29:24.646 31540-16301 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-10-30 20:29:24.650 31540-16301 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-10-30 20:29:24.676 31540-16301 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-10-30 20:29:24.800 31540-16301 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-10-30 20:29:24.802 31540-16301 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-10-30 20:29:24.828 31540-16301 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-10-30 20:29:24.892 31540-16341 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInAEC(true)
+2026-10-30 20:29:24.892 31540-16335 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInAEC(true)
+2026-10-30 20:29:24.892 31540-16341 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setAEC(true)
+2026-10-30 20:29:24.892 31540-16335 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setAEC(true)
+2026-10-30 20:29:24.893 31540-16341 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInNS(true)
+2026-10-30 20:29:24.893 31540-16335 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInNS(true)
+2026-10-30 20:29:24.893 31540-16341 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setNS(true)
+2026-10-30 20:29:24.893 31540-16335 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setNS(true)
+2026-10-30 20:29:24.895 31540-16335 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onWorkerThreadReady
+2026-10-30 20:29:24.895 31540-16334 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onNetworkThreadReady
+2026-10-30 20:29:24.895 31540-16341 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onWorkerThreadReady
+2026-10-30 20:29:24.895 31540-16314 CallMediaFactory        com.m3.veil                          I  WebRTC call stack initialised
+2026-10-30 20:29:24.895 31540-16342 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onSignalingThreadReady
+2026-10-30 20:29:24.895 31540-16336 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onSignalingThreadReady
+2026-10-30 20:29:24.896 31540-16340 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onNetworkThreadReady
+2026-10-30 20:29:24.917 31540-16303 VeilMeshDaemon          com.m3.veil                          I  Network available -> re-syncing signaling & draining P2P outbox
+2026-10-30 20:29:24.934 31540-31540 ImeTracker              com.m3.veil                          I  com.m3.veil:60c74e3e: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+2026-10-30 20:29:24.984 31540-16314 CallEngine              com.m3.veil                          I  CallEngine ready for veil_51202d910265a62444ebc8d8cc22 (e2ee=true, turn=true)
+2026-10-30 20:29:25.220 31540-16301 TurnCredentialManager   com.m3.veil                          I  Rotated RFC 5389 Ephemeral TURN Credentials: TurnCredentials{user='1793417365:af0b2462314b7a07', ttlRemaining=719m}
+2026-10-30 20:29:25.222 31540-16301 WebRtcManager           com.m3.veil                          I  Tor/Strict Relay mode active: PeerConnection initialized with IceTransportsType.RELAY
+2026-10-30 20:29:25.319 31540-16334 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitor: Start monitoring with native observer -5476376670924950736 fieldTrialsString: 
+2026-10-30 20:29:25.356 31540-16303 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: Network handle: 501621903373 becomes available: 116
+2026-10-30 20:29:25.364 31540-16303 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 501621903373 capabilities changed: [ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED LinkUpBandwidth>=12000Kbps LinkDnBandwidth>=60000Kbps TransportInfo: <SSID: <unknown ssid>, BSSID: 02:00:00:00:00:00, MAC: 02:00:00:00:00:00, IP: /192.168.1.4, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 11ac, RSSI: -59, Link speed: 86Mbps, Tx Link speed: 86Mbps, Max Supported Tx Link speed: 96Mbps, Calculated Tx : 0Mbps, Rx Link speed: 86Mbps, Max Supported Rx Link speed: 96Mbps, Calculated Rx : 0Mbps, Frequency: 5825MHz, Net ID: -1, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: -1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>> SignalStrength: -59 UnderlyingNetworks: Null]
+2026-10-30 20:29:25.370 31540-16303 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 501621903373 link properties changed
+2026-10-30 20:29:25.572 31540-16330 SovereignIdentity       com.m3.veil                          I  Subscribed to ephemeral signals on wss://relay.primal.net for veil_51202d910265a62444ebc8d8cc22
+2026-10-30 20:29:26.585 31540-16302 TurnCredentialManager   com.m3.veil                          I  Completed Multi-Region Edge Relay Probing. Fleet Status:
+2026-10-30 20:29:26.586 31540-16302 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[cloudflare-stun (Cloudflare Anycast STUN): stun.cloudflare.com, rtt=18ms]
+2026-10-30 20:29:26.588 31540-16302 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[google-stun-1 (Google Global STUN 1): stun.l.google.com, rtt=55ms]
+2026-10-30 20:29:26.589 31540-16302 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[anycast-global (Global Anycast Edge): openrelay.metered.ca, rtt=UNREACHABLE]
+2026-10-30 20:29:26.589 31540-16302 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[global-standard (Global Standard Relay): standard.relay.metered.ca, rtt=UNREACHABLE]
+2026-10-30 20:29:26.626 31540-16301 WebRtcManager           com.m3.veil                          I  Tor/Strict Relay mode active: PeerConnection initialized with IceTransportsType.RELAY
+2026-10-30 20:29:26.672 31540-16301 WebRtcManager           com.m3.veil                          I  Tor/Strict Relay mode active: PeerConnection initialized with IceTransportsType.RELAY
+2026-10-30 20:29:27.231  2049-4758  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-10-30 20:29:27.260 31540-31540 PowerHalMgrImpl         com.m3.veil                          I  perfLockAcq is supported. 
+2026-10-30 20:29:28.021 31540-16231 com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 31MB AllocSpace bytes, 111(3564KB) LOS objects, 49% free, 14MB/29MB, paused 1.728ms,2.373ms total 150.428ms
+2026-10-30 20:29:28.023 31540-31540 FinalizerDaemon         com.m3.veil                          W  type=1400 audit(0.0:53827): avc:  denied  { getopt } for  path="/dev/socket/usap_pool_primary" scontext=u:r:untrusted_app:s0:c69,c257,c512,c768 tcontext=u:r:zygote:s0 tclass=unix_stream_socket permissive=0 app=com.m3.veil
+2026-10-30 20:29:28.426 31540-31540 DisplayEventDispatcher  com.m3.veil                          W  Vsync time out! vsyncScheduleDelay=874ms
+2026-10-30 20:29:28.426 31540-31540 Choreographer           com.m3.veil                          W  Already have a pending vsync event.  There should only be one at a time.
+2026-10-30 20:29:28.427 31540-31540 Choreographer           com.m3.veil                          W  Already have a pending vsync event.  There should only be one at a time.
+2026-10-30 20:29:28.428 31540-31540 Choreographer           com.m3.veil                          I  Skipped 78 frames!  The application may be doing too much work on its main thread.
+2026-10-30 20:29:28.433 31540-16237 HWUI                    com.m3.veil                          I  Davey! duration=873ms; Flags=1, FrameTimelineVsyncId=-1, IntendedVsync=56254653554890, Vsync=56254653561967, InputEventId=0, HandleInputStart=56254653893890, AnimationStart=56254653899429, PerformTraversalsStart=56254654330198, DrawStart=56255398514813, FrameDeadline=56254663555813, FrameStartTime=56254653561967, FrameInterval=16666667, WorkloadTarget=10000923, SyncQueued=56255508921352, SyncStart=56255508981352, IssueDrawCommandsStart=56255509471121, SwapBuffers=56255525308352, FrameCompleted=56255527176967, DequeueBufferDuration=9307, QueueBufferDuration=296692, GpuCompleted=56255527176967, SwapBuffersCompleted=56255525770506, DisplayPresentTime=0, CommandSubmissionCompleted=56255525308352, 
+2026-10-30 20:29:28.764 31540-31540 WindowOnBackDispatcher  com.m3.veil                          W  sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@b4b592c
+2026-10-30 20:29:28.772 31540-31540 TranScrollOptimizer     com.m3.veil                          I  Optimizer temporarily enabled
+2026-10-30 20:29:28.772 31540-31540 ImeTracker              com.m3.veil                          I  com.m3.veil:d862befb: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+2026-10-30 20:29:29.215 31540-16301 WebRtcManager           com.m3.veil                          I  Tor/Strict Relay mode active: PeerConnection initialized with IceTransportsType.RELAY
+2026-10-30 20:29:30.059 31540-16231 com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 13MB AllocSpace bytes, 5(96KB) LOS objects, 46% free, 15MB/29MB, paused 2.400ms,4.406ms total 162.540ms
+2026-10-30 20:29:31.268 31540-16231 com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 14MB AllocSpace bytes, 1(16KB) LOS objects, 49% free, 16MB/32MB, paused 2.838ms,3.182ms total 175.997ms
+2026-10-30 20:29:31.434 31540-16230 com.m3.veil             com.m3.veil                          I  Compiler allocated 6828KB to compile void android.view.ViewRootImpl.performTraversals()
+2026-10-30 20:29:31.775 31540-31540 VRI[MainActivity]       com.m3.veil                          I  enqueueInputEvent: event = MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=674.25, y[0]=1427.25, rawx[0]=674.25, rawy[0]=1427.25, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=56258873, downTime=56258873, deviceId=7, source=0x1002, displayId=0, eventId=110374234 },processImmediately = true,mProcessInputEventsScheduled = false,bufferedMoveCount = 0
+2026-10-30 20:29:31.810 31540-31540 VRI[MainActivity]       com.m3.veil                          I  enqueueInputEvent: event = MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=674.25, y[0]=1427.25, rawx[0]=674.25, rawy[0]=1427.25, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=56258911, downTime=56258873, deviceId=7, source=0x1002, displayId=0, eventId=704133817 },processImmediately = true,mProcessInputEventsScheduled = false,bufferedMoveCount = 0
+2026-10-30 20:29:31.824  2049-3730  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-10-30 20:29:31.881 31540-31540 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f7147f798) locale list changing from [] to [en-US]
+2026-10-30 20:29:32.506 31540-16301 WebRtcManager           com.m3.veil                          I  Tor/Strict Relay mode active: PeerConnection initialized with IceTransportsType.RELAY
+2026-10-30 20:29:33.203 31540-31540 DisplayEventDispatcher  com.m3.veil                          W  Vsync time out! vsyncScheduleDelay=936ms
+2026-10-30 20:29:33.203 31540-31540 Choreographer           com.m3.veil                          W  Already have a pending vsync event.  There should only be one at a time.
+2026-10-30 20:29:33.209 31540-31540 Choreographer           com.m3.veil                          W  Already have a pending vsync event.  There should only be one at a time.
+2026-10-30 20:29:33.209 31540-16237 HWUI                    com.m3.veil                          I  Davey! duration=943ms; Flags=1, FrameTimelineVsyncId=-1, IntendedVsync=56259367253583, Vsync=56259367259429, InputEventId=0, HandleInputStart=56259367621044, AnimationStart=56259367626275, PerformTraversalsStart=56259367851737, DrawStart=56260260712660, FrameDeadline=56259377254506, FrameStartTime=56259367259429, FrameInterval=11134789, WorkloadTarget=10000923, SyncQueued=56260275793660, SyncStart=56260275845583, IssueDrawCommandsStart=56260278721660, SwapBuffers=56260301627429, FrameCompleted=56260310971429, DequeueBufferDuration=9231, QueueBufferDuration=316231, GpuCompleted=56260310971429, SwapBuffersCompleted=56260302076968, DisplayPresentTime=16204911611572, CommandSubmissionCompleted=56260301627429, 
+2026-10-30 20:29:33.210 31540-31540 Choreographer           com.m3.veil                          I  Skipped 84 frames!  The application may be doing too much work on its main thread.
+2026-10-30 20:29:33.423 31540-31540 ImeTracker              com.m3.veil                          I  com.m3.veil:77385ea7: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+2026-10-30 20:29:34.438 31540-16230 com.m3.veil             com.m3.veil                          I  Compiler allocated 4614KB to compile void com.m3.veil.ui.chat.adapters.MessagesAdapter$SentMessageViewHolder.bind(com.m3.veil.model.Message, java.lang.String, boolean, java.lang.String)
+2026-10-30 20:30:08.957 31540-31540 Choreographer           com.m3.veil                          I  Skipped 33 frames!  The application may be doing too much work on its main thread.
+2026-10-30 20:30:16.244 31540-31540 VRI[ChatActivity]       com.m3.veil                          I  enqueueInputEvent: event = MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=623.75, y[0]=1743.75, rawx[0]=623.75, rawy[0]=1743.75, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=56303340, downTime=56303340, deviceId=7, source=0x1002, displayId=0, eventId=912964687 },processImmediately = true,mProcessInputEventsScheduled = false,bufferedMoveCount = 0
+2026-10-30 20:30:16.314 31540-18479 PowerHalMgrImpl         com.m3.veil                          I  hdl:57108, pid:31540 
+2026-10-30 20:30:16.318 31540-16265 com.m3.veil             com.m3.veil                          E  legacy_receive_flag: 1
+2026-10-30 20:30:16.321 31540-18479 PowerHalMgrImpl         com.m3.veil                          I  hdl:57109, pid:31540 
+2026-10-30 20:30:16.351 31540-31540 VRI[ChatActivity]       com.m3.veil                          I  enqueueInputEvent: event = MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=680.0, y[0]=1241.75, rawx[0]=680.0, rawy[0]=1241.75, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=56303448, downTime=56303340, deviceId=7, source=0x1002, displayId=0, eventId=332978176 },processImmediately = true,mProcessInputEventsScheduled = false,bufferedMoveCount = 5
+2026-10-30 20:30:16.353 31540-31540 ScrollIdentify          com.m3.veil                          I  on fling
+2026-10-30 20:30:16.358 31540-18479 PowerHalMgrImpl         com.m3.veil                          I  hdl:57111, pid:31540 
+2026-10-30 20:30:19.373 31540-18479 PowerHalMgrImpl         com.m3.veil                          I  hdl:57114, pid:31540 
+2026-10-30 20:30:50.973 31540-16231 com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 21MB AllocSpace bytes, 7(116KB) LOS objects, 41% free, 28MB/49MB, paused 1.555ms,5.511ms total 50.627ms

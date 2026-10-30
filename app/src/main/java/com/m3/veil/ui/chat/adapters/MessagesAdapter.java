@@ -3185,9 +3185,55 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             });
                         }
 
-                        if (!hasLocal && (message.getMediaUrl() == null || message.getMediaUrl().isEmpty())) {
-                            if (voiceActionButton != null) voiceActionButton.setVisibility(View.GONE);
-                            if (voiceProgressBar != null) voiceProgressBar.setVisibility(View.VISIBLE);
+                        int voiceSendState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
+                        final int voiceSendProg = downloadProgresses.getOrDefault(message.getId(), 0);
+                        boolean isVoiceCanceled = com.m3.veil.webrtc.P2PFileTransferHelper.isTransferCanceled(message.getId());
+                        boolean isVoiceOffline = !com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).isNetworkConnected();
+                        if (voiceSendProg >= 100 || message.isRead() || (voiceSendState != STATE_DOWNLOADING && (!message.isPending() || message.isDelivered()))) {
+                            if (voiceSendState == STATE_DOWNLOADING) {
+                                voiceSendState = STATE_DOWNLOADED;
+                                downloadStates.put(message.getId(), STATE_DOWNLOADED);
+                            }
+                        }
+                        boolean isVoiceRetry = (voiceSendState == STATE_RETRY)
+                                || isVoiceCanceled
+                                || (message.isPending() && !message.isDelivered() && !message.isRead() && isVoiceOffline);
+                        boolean isVoiceSending = !isVoiceRetry && ((message.isPending() && !message.isDelivered() && !message.isRead())
+                                || (voiceSendState == STATE_DOWNLOADING && voiceSendProg < 100)
+                                || (!hasLocal && (message.getMediaUrl() == null || message.getMediaUrl().isEmpty())));
+
+                        if (isVoiceRetry) {
+                            if (voiceProgressBar != null) voiceProgressBar.setVisibility(View.GONE);
+                            if (voiceActionButton != null) {
+                                voiceActionButton.setVisibility(View.VISIBLE);
+                                voiceActionButton.setImageResource(R.drawable.ic_undo);
+                                voiceActionButton.setOnClickListener(v -> {
+                                    if (mediaDownloadClickListener != null) {
+                                        mediaDownloadClickListener.onMediaRetryClick(message);
+                                    }
+                                });
+                            }
+                            if (voiceDurationText != null) {
+                                voiceDurationText.setText("Tap to retry");
+                            }
+                        } else if (isVoiceSending) {
+                            int shownPct = Math.max(1, Math.min(99, voiceSendProg > 0 ? voiceSendProg : 1));
+                            if (voiceProgressBar != null) {
+                                voiceProgressBar.setVisibility(View.VISIBLE);
+                                voiceProgressBar.setIndeterminate(true);
+                            }
+                            if (voiceActionButton != null) {
+                                voiceActionButton.setVisibility(View.VISIBLE);
+                                voiceActionButton.setImageResource(R.drawable.ic_close);
+                                voiceActionButton.setOnClickListener(v -> {
+                                    if (mediaDownloadClickListener != null) {
+                                        mediaDownloadClickListener.onMediaCancelClick(message);
+                                    }
+                                });
+                            }
+                            if (voiceDurationText != null) {
+                                voiceDurationText.setText("Sending " + shownPct + "%");
+                            }
                         } else {
                             if (voiceActionButton != null) {
                                 voiceActionButton.setImageResource(R.drawable.ic_play_arrow);
@@ -3583,27 +3629,51 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         boolean isInlinePresetGif = message.getText() != null && message.getText().trim().startsWith("[GIF:");
                         int dlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                         final int progress = downloadProgresses.getOrDefault(message.getId(), 0);
+                        boolean isImgCanceled = com.m3.veil.webrtc.P2PFileTransferHelper.isTransferCanceled(message.getId());
+                        boolean isImgOffline = !com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).isNetworkConnected();
                         if (isInlinePresetGif || progress >= 100 || message.isRead() || (dlState != STATE_DOWNLOADING && (!message.isPending() || message.isDelivered()))) {
                             if (dlState == STATE_DOWNLOADING) {
                                 dlState = STATE_DOWNLOADED;
                                 downloadStates.put(message.getId(), STATE_DOWNLOADED);
                             }
                         }
-                        final boolean isSending = !isAlbumCollage && !isInlinePresetGif && ((message.isPending() && !message.isDelivered() && !message.isRead())
+                        final boolean isImgRetry = !isInlinePresetGif && ((dlState == STATE_RETRY)
+                                || isImgCanceled
+                                || (message.isPending() && !message.isDelivered() && !message.isRead() && isImgOffline));
+                        final boolean isSending = !isInlinePresetGif && !isImgRetry && ((message.isPending() && !message.isDelivered() && !message.isRead())
                                 || (dlState == STATE_DOWNLOADING && progress < 100));
 
                         if (imageDownloadOverlay != null) {
-                            if (isSending) {
+                            if (isImgRetry) {
+                                imageDownloadOverlay.setVisibility(View.VISIBLE);
+                                if (imageDownloadIdleLayout != null) imageDownloadIdleLayout.setVisibility(View.GONE);
+                                if (imageDownloadingLayout != null) imageDownloadingLayout.setVisibility(View.GONE);
+                                if (imageDownloadRetryLayout != null) {
+                                    imageDownloadRetryLayout.setVisibility(View.VISIBLE);
+                                    imageDownloadRetryLayout.setOnClickListener(v -> {
+                                        if (mediaDownloadClickListener != null) {
+                                            mediaDownloadClickListener.onMediaRetryClick(message);
+                                        }
+                                    });
+                                }
+                                if (imageTimeText != null) {
+                                    imageTimeText.setText("Retry • " + time);
+                                }
+                            } else if (isSending) {
                                 int shownPct = Math.max(1, Math.min(99, progress > 0 ? progress : 1));
                                 imageDownloadOverlay.setVisibility(View.VISIBLE);
                                 if (imageDownloadingLayout != null) {
                                     imageDownloadingLayout.setVisibility(View.VISIBLE);
                                     bindCircularOverlayPercent(imageDownloadingLayout, imageDownloadCancelBtn, shownPct);
-                                    imageDownloadingLayout.setOnClickListener(v -> {
+                                    View.OnClickListener cancelImgClick = v -> {
                                         if (mediaDownloadClickListener != null) {
                                             mediaDownloadClickListener.onMediaCancelClick(message);
                                         }
-                                    });
+                                    };
+                                    imageDownloadingLayout.setOnClickListener(cancelImgClick);
+                                    if (imageDownloadCancelBtn != null) {
+                                        imageDownloadCancelBtn.setOnClickListener(cancelImgClick);
+                                    }
                                 }
                                 if (imageDownloadIdleLayout != null) imageDownloadIdleLayout.setVisibility(View.GONE);
                                 if (imageDownloadRetryLayout != null) imageDownloadRetryLayout.setVisibility(View.GONE);
@@ -3710,27 +3780,53 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
                         int vDlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                         final int vProgress = downloadProgresses.getOrDefault(message.getId(), 0);
+                        boolean isVidCanceled = com.m3.veil.webrtc.P2PFileTransferHelper.isTransferCanceled(message.getId());
+                        boolean isVidOffline = !com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).isNetworkConnected();
                         if (vProgress >= 100 || message.isRead() || (vDlState != STATE_DOWNLOADING && (!message.isPending() || message.isDelivered()))) {
                             if (vDlState == STATE_DOWNLOADING) {
                                 vDlState = STATE_DOWNLOADED;
                                 downloadStates.put(message.getId(), STATE_DOWNLOADED);
                             }
                         }
-                        final boolean isVideoSending = (message.isPending() && !message.isDelivered() && !message.isRead())
-                                || (vDlState == STATE_DOWNLOADING && vProgress < 100);
+                        final boolean isVideoRetry = (vDlState == STATE_RETRY)
+                                || isVidCanceled
+                                || (message.isPending() && !message.isDelivered() && !message.isRead() && isVidOffline);
+                        final boolean isVideoSending = !isVideoRetry && ((message.isPending() && !message.isDelivered() && !message.isRead())
+                                || (vDlState == STATE_DOWNLOADING && vProgress < 100));
 
                         if (videoDownloadOverlay != null) {
-                            if (isVideoSending) {
+                            if (isVideoRetry) {
+                                videoDownloadOverlay.setVisibility(View.VISIBLE);
+                                if (videoDownloadIdleLayout != null) videoDownloadIdleLayout.setVisibility(View.GONE);
+                                if (videoDownloadingLayout != null) videoDownloadingLayout.setVisibility(View.GONE);
+                                if (videoPlayButtonContainer != null) videoPlayButtonContainer.setVisibility(View.GONE);
+                                if (videoDownloadRetryLayout != null) {
+                                    videoDownloadRetryLayout.setVisibility(View.VISIBLE);
+                                    videoDownloadRetryLayout.setOnClickListener(v -> {
+                                        if (mediaDownloadClickListener != null) {
+                                            mediaDownloadClickListener.onMediaRetryClick(message);
+                                        }
+                                    });
+                                }
+                                if (videoDurationText != null) {
+                                    String durStr = dur > 0 ? VoicePlayerManager.formatDuration(dur) : "0:30";
+                                    videoDurationText.setText("Retry • " + durStr);
+                                }
+                            } else if (isVideoSending) {
                                 int shownPct = Math.max(1, Math.min(99, vProgress > 0 ? vProgress : 1));
                                 videoDownloadOverlay.setVisibility(View.VISIBLE);
                                 if (videoDownloadingLayout != null) {
                                     videoDownloadingLayout.setVisibility(View.VISIBLE);
                                     bindCircularOverlayPercent(videoDownloadingLayout, videoDownloadCancelBtn, shownPct);
-                                    videoDownloadingLayout.setOnClickListener(v -> {
+                                    View.OnClickListener cancelVidClick = v -> {
                                         if (mediaDownloadClickListener != null) {
                                             mediaDownloadClickListener.onMediaCancelClick(message);
                                         }
-                                    });
+                                    };
+                                    videoDownloadingLayout.setOnClickListener(cancelVidClick);
+                                    if (videoDownloadCancelBtn != null) {
+                                        videoDownloadCancelBtn.setOnClickListener(cancelVidClick);
+                                    }
                                 }
                                 if (videoDownloadIdleLayout != null) videoDownloadIdleLayout.setVisibility(View.GONE);
                                 if (videoDownloadRetryLayout != null) videoDownloadRetryLayout.setVisibility(View.GONE);
@@ -3797,33 +3893,19 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         documentFileSize.setText(formattedInfo);
                         int docDlState = downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                         final int docProgress = downloadProgresses.getOrDefault(message.getId(), 0);
+                        boolean isDocCanceled = com.m3.veil.webrtc.P2PFileTransferHelper.isTransferCanceled(message.getId());
+                        boolean isDocOffline = !com.m3.veil.manager.VeilMessagesController.getInstance(itemView.getContext()).isNetworkConnected();
                         if (docProgress >= 100 || message.isRead() || (docDlState != STATE_DOWNLOADING && (!message.isPending() || message.isDelivered()))) {
                             if (docDlState == STATE_DOWNLOADING) {
                                 docDlState = STATE_DOWNLOADED;
                                 downloadStates.put(message.getId(), STATE_DOWNLOADED);
                             }
                         }
-                        final boolean isDocSending = (message.isPending() && !message.isDelivered() && !message.isRead())
-                                || (docDlState == STATE_DOWNLOADING && docProgress < 100);
-
-                        if (documentProgressBar != null) {
-                            if (isDocSending) {
-                                int shownPct = Math.max(1, Math.min(99, docProgress > 0 ? docProgress : 1));
-                                documentProgressBar.setVisibility(View.VISIBLE);
-                                documentProgressBar.setIndeterminate(false);
-                                documentProgressBar.setMax(100);
-                                documentProgressBar.setProgress(shownPct);
-                                documentFileSize.setText(formattedInfo + " • Sending " + shownPct + "%");
-                                if (documentActionIcon != null) documentActionIcon.setVisibility(View.GONE);
-                            } else {
-                                documentProgressBar.setVisibility(View.GONE);
-                                if (documentActionIcon != null) {
-                                    documentActionIcon.setVisibility(View.VISIBLE);
-                                    documentActionIcon.setImageResource(R.drawable.ic_check);
-                                    documentActionIcon.setColorFilter(isDarkBubble ? 0xFF34D399 : ContextCompat.getColor(itemView.getContext(), R.color.statusSuccess));
-                                }
-                            }
-                        }
+                        final boolean isDocRetry = (docDlState == STATE_RETRY)
+                                || isDocCanceled
+                                || (message.isPending() && !message.isDelivered() && !message.isRead() && isDocOffline);
+                        final boolean isDocSending = !isDocRetry && ((message.isPending() && !message.isDelivered() && !message.isRead())
+                                || (docDlState == STATE_DOWNLOADING && docProgress < 100));
 
                         View.OnClickListener openSentDocClick = v -> {
                             File local = FileMediaManager.getDecryptedFile(itemView.getContext(), message, "");
@@ -3836,8 +3918,55 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 mediaDownloadClickListener.onMediaDownloadClick(message);
                             }
                         };
-                        documentMessageContainer.setOnClickListener(openSentDocClick);
-                        if (documentActionIcon != null) documentActionIcon.setOnClickListener(openSentDocClick);
+
+                        if (documentProgressBar != null) {
+                            if (isDocRetry) {
+                                documentProgressBar.setVisibility(View.GONE);
+                                documentFileSize.setText(formattedInfo + " • Tap to retry");
+                                if (documentActionIcon != null) {
+                                    documentActionIcon.setVisibility(View.VISIBLE);
+                                    documentActionIcon.setImageResource(R.drawable.ic_undo);
+                                    documentActionIcon.setColorFilter(ContextCompat.getColor(itemView.getContext(), R.color.statusError));
+                                    documentActionIcon.setOnClickListener(v -> {
+                                        if (mediaDownloadClickListener != null) {
+                                            mediaDownloadClickListener.onMediaRetryClick(message);
+                                        }
+                                    });
+                                }
+                                documentMessageContainer.setOnClickListener(v -> {
+                                    if (mediaDownloadClickListener != null) {
+                                        mediaDownloadClickListener.onMediaRetryClick(message);
+                                    }
+                                });
+                            } else if (isDocSending) {
+                                int shownPct = Math.max(1, Math.min(99, docProgress > 0 ? docProgress : 1));
+                                documentProgressBar.setVisibility(View.VISIBLE);
+                                documentProgressBar.setIndeterminate(false);
+                                documentProgressBar.setMax(100);
+                                documentProgressBar.setProgress(shownPct);
+                                documentFileSize.setText(formattedInfo + " • Sending " + shownPct + "%");
+                                if (documentActionIcon != null) {
+                                    documentActionIcon.setVisibility(View.VISIBLE);
+                                    documentActionIcon.setImageResource(R.drawable.ic_close);
+                                    documentActionIcon.setColorFilter(isDarkBubble ? 0xFFF8FAFC : ContextCompat.getColor(itemView.getContext(), R.color.message_text_primary));
+                                    documentActionIcon.setOnClickListener(v -> {
+                                        if (mediaDownloadClickListener != null) {
+                                            mediaDownloadClickListener.onMediaCancelClick(message);
+                                        }
+                                    });
+                                }
+                                documentMessageContainer.setOnClickListener(openSentDocClick);
+                            } else {
+                                documentProgressBar.setVisibility(View.GONE);
+                                if (documentActionIcon != null) {
+                                    documentActionIcon.setVisibility(View.VISIBLE);
+                                    documentActionIcon.setImageResource(R.drawable.ic_check);
+                                    documentActionIcon.setColorFilter(isDarkBubble ? 0xFF34D399 : ContextCompat.getColor(itemView.getContext(), R.color.statusSuccess));
+                                    documentActionIcon.setOnClickListener(openSentDocClick);
+                                }
+                                documentMessageContainer.setOnClickListener(openSentDocClick);
+                            }
+                        }
                     }
                 } else if ("location".equals(message.getType())) {
                     ensureLocationViews();
@@ -4618,12 +4747,20 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 }
                             });
                         } else if (voiceDownloadState == STATE_DOWNLOADING) {
-                            if (voiceActionButton != null) voiceActionButton.setVisibility(View.GONE);
                             int vProg = downloadProgresses.getOrDefault(message.getId(), 0);
                             if (voiceProgressBar != null) {
                                 voiceProgressBar.setVisibility(View.VISIBLE);
                                 voiceProgressBar.setIndeterminate(vProg <= 0);
                                 if (vProg > 0) voiceProgressBar.setProgress(vProg);
+                            }
+                            if (voiceActionButton != null) {
+                                voiceActionButton.setVisibility(View.VISIBLE);
+                                voiceActionButton.setImageResource(R.drawable.ic_close);
+                                voiceActionButton.setOnClickListener(v -> {
+                                    if (mediaDownloadClickListener != null) {
+                                        mediaDownloadClickListener.onMediaCancelClick(message);
+                                    }
+                                });
                             }
                             if (voiceDurationText != null) {
                                 voiceDurationText.setText(vProg > 0 ? ("Downloading " + vProg + "%") : "Downloading...");
@@ -4647,7 +4784,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             }
                             if (voiceDurationText != null) {
                                 String sizeStr = message.getFormattedMediaSize();
-                                voiceDurationText.setText(sizeStr.isEmpty() ? ("audio".equals(message.getType()) ? "Audio" : "Voice note") : sizeStr);
+                                if (voiceDownloadState == STATE_RETRY) {
+                                    voiceDurationText.setText(sizeStr.isEmpty() ? "Tap to retry" : (sizeStr + " • Retry"));
+                                } else {
+                                    voiceDurationText.setText(sizeStr.isEmpty() ? ("audio".equals(message.getType()) ? "Audio" : "Voice note") : sizeStr);
+                                }
                             }
                         }
                     }
@@ -5256,37 +5397,6 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         final int docDownloadState = hasLocalDoc ? STATE_DOWNLOADED : downloadStates.getOrDefault(message.getId(), STATE_IDLE);
                         final int docProgress = downloadProgresses.getOrDefault(message.getId(), 0);
 
-                        if (documentProgressBar != null) {
-                            if (docDownloadState == STATE_DOWNLOADING) {
-                                int shownPct = Math.max(1, Math.min(99, docProgress > 0 ? docProgress : 1));
-                                documentProgressBar.setVisibility(View.VISIBLE);
-                                documentProgressBar.setIndeterminate(false);
-                                documentProgressBar.setMax(100);
-                                documentProgressBar.setProgress(shownPct);
-                                documentFileSize.setText(formattedInfo + " • Downloading " + shownPct + "%");
-                                if (documentActionIcon != null) documentActionIcon.setVisibility(View.GONE);
-                            } else if (docDownloadState == STATE_DOWNLOADED) {
-                                documentProgressBar.setVisibility(View.GONE);
-                                documentFileSize.setText(formattedInfo + " • Downloaded");
-                                if (documentActionIcon != null) {
-                                    documentActionIcon.setVisibility(View.VISIBLE);
-                                    documentActionIcon.setImageResource(R.drawable.ic_check);
-                                    documentActionIcon.setColorFilter(isRecDarkBubble ? 0xFF34D399 : ContextCompat.getColor(itemView.getContext(), R.color.statusSuccess));
-                                }
-                            } else {
-                                documentProgressBar.setVisibility(View.GONE);
-                                documentFileSize.setText(formattedInfo + (docDownloadState == STATE_RETRY ? " • Tap to retry" : " • Tap to download"));
-                                if (documentActionIcon != null) {
-                                    documentActionIcon.setVisibility(View.VISIBLE);
-                                    documentActionIcon.setImageResource(docDownloadState == STATE_RETRY ? R.drawable.ic_undo : R.drawable.ic_download);
-                                    int iconColor = (docDownloadState == STATE_RETRY)
-                                            ? ContextCompat.getColor(itemView.getContext(), R.color.statusError)
-                                            : (isRecDarkBubble ? 0xFF818CF8 : ContextCompat.getColor(itemView.getContext(), R.color.message_action_button));
-                                    documentActionIcon.setColorFilter(iconColor);
-                                }
-                            }
-                        }
-
                         View.OnClickListener docClick = v -> {
                             File existingLocal = FileMediaManager.getDecryptedFile(itemView.getContext(), message, "");
                             if (existingLocal != null && existingLocal.exists() && existingLocal.length() >= 64 && !existingLocal.getName().startsWith("staged_")) {
@@ -5304,8 +5414,55 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                 }
                             }
                         };
-                        documentMessageContainer.setOnClickListener(docClick);
-                        if (documentActionIcon != null) documentActionIcon.setOnClickListener(docClick);
+
+                        if (documentProgressBar != null) {
+                            if (docDownloadState == STATE_DOWNLOADING) {
+                                int shownPct = Math.max(1, Math.min(99, docProgress > 0 ? docProgress : 1));
+                                documentProgressBar.setVisibility(View.VISIBLE);
+                                documentProgressBar.setIndeterminate(false);
+                                documentProgressBar.setMax(100);
+                                documentProgressBar.setProgress(shownPct);
+                                documentFileSize.setText(formattedInfo + " • Downloading " + shownPct + "%");
+                                if (documentActionIcon != null) {
+                                    documentActionIcon.setVisibility(View.VISIBLE);
+                                    documentActionIcon.setImageResource(R.drawable.ic_close);
+                                    documentActionIcon.setColorFilter(isRecDarkBubble ? 0xFFF8FAFC : ContextCompat.getColor(itemView.getContext(), R.color.message_text_primary));
+                                    documentActionIcon.setOnClickListener(v -> {
+                                        if (mediaDownloadClickListener != null) {
+                                            mediaDownloadClickListener.onMediaCancelClick(message);
+                                        }
+                                    });
+                                }
+                                documentMessageContainer.setOnClickListener(v -> {
+                                    if (mediaDownloadClickListener != null) {
+                                        mediaDownloadClickListener.onMediaCancelClick(message);
+                                    }
+                                });
+                            } else if (docDownloadState == STATE_DOWNLOADED) {
+                                documentProgressBar.setVisibility(View.GONE);
+                                documentFileSize.setText(formattedInfo + " • Downloaded");
+                                if (documentActionIcon != null) {
+                                    documentActionIcon.setVisibility(View.VISIBLE);
+                                    documentActionIcon.setImageResource(R.drawable.ic_check);
+                                    documentActionIcon.setColorFilter(isRecDarkBubble ? 0xFF34D399 : ContextCompat.getColor(itemView.getContext(), R.color.statusSuccess));
+                                    documentActionIcon.setOnClickListener(docClick);
+                                }
+                                documentMessageContainer.setOnClickListener(docClick);
+                            } else {
+                                documentProgressBar.setVisibility(View.GONE);
+                                documentFileSize.setText(formattedInfo + (docDownloadState == STATE_RETRY ? " • Tap to retry" : " • Tap to download"));
+                                if (documentActionIcon != null) {
+                                    documentActionIcon.setVisibility(View.VISIBLE);
+                                    documentActionIcon.setImageResource(docDownloadState == STATE_RETRY ? R.drawable.ic_undo : R.drawable.ic_download);
+                                    int iconColor = (docDownloadState == STATE_RETRY)
+                                            ? ContextCompat.getColor(itemView.getContext(), R.color.statusError)
+                                            : (isRecDarkBubble ? 0xFF818CF8 : ContextCompat.getColor(itemView.getContext(), R.color.message_action_button));
+                                    documentActionIcon.setColorFilter(iconColor);
+                                    documentActionIcon.setOnClickListener(docClick);
+                                }
+                                documentMessageContainer.setOnClickListener(docClick);
+                            }
+                        }
                     }
                 } else if ("location".equals(message.getType())) {
                     ensureLocationViews();

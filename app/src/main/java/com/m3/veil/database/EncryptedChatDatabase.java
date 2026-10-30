@@ -2568,8 +2568,16 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                         continue;
                     }
                     boolean isMediaAction = Message.isMediaRequiringActionToRead(mType);
-                    boolean listed = explicitIds != null && explicitIds.contains(id);
-                    boolean belowWatermark = !isMediaAction && readUpToTs > 0 && ts <= readUpToTs && !pending;
+                    boolean isTransferPending = false;
+                    try {
+                        isTransferPending = com.m3.veil.manager.VeilMessagesController.getInstance(this.context)
+                                .isOutboundMediaTransferIncomplete(id);
+                    } catch (Throwable ignored) {}
+                    if (pending || isTransferPending) {
+                        continue;
+                    }
+                    boolean listed = explicitIds != null && explicitIds.contains(id) && delivered;
+                    boolean belowWatermark = !isMediaAction && delivered && readUpToTs > 0 && ts <= readUpToTs;
                     if (listed || belowWatermark) updated.add(id);
                 }
             } finally {

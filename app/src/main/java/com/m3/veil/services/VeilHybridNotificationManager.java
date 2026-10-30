@@ -804,7 +804,7 @@ public class VeilHybridNotificationManager {
     }
 
     /**
-     * Plays a crisp, WhatsApp/Telegram-inspired outbound message sent pop/whoosh sound
+     * Plays a crisp, high-volume WhatsApp/Telegram-inspired outbound message sent pop/whoosh sound
      * when the user sends a message in ChatActivity.
      */
     public void playMessageSentSound() {
@@ -816,21 +816,26 @@ public class VeilHybridNotificationManager {
             new Thread(() -> {
                 try {
                     final int sampleRate = 44100;
-                    final int durationMs = 68;
+                    final int durationMs = 110;
                     final int numSamples = (sampleRate * durationMs) / 1000;
                     final short[] pcm = new short[numSamples];
                     double phase = 0.0;
                     for (int i = 0; i < numSamples; i++) {
                         double progress = (double) i / numSamples;
-                        // Fast upward pitch sweep (410 Hz -> 840 Hz) like WhatsApp/Telegram send pop
-                        double freq = 410.0 + 430.0 * Math.pow(progress, 1.35);
+                        // Fast upward pitch sweep (440 Hz -> 960 Hz) like WhatsApp/Telegram send pop
+                        double freq = 440.0 + 520.0 * Math.pow(progress, 1.25);
                         phase += (2.0 * Math.PI * freq) / sampleRate;
-                        // Smooth attack (first 12%) + exponential decay
-                        double env = (progress < 0.12)
-                                ? (progress / 0.12)
-                                : Math.exp(-5.2 * (progress - 0.12));
-                        double sample = Math.sin(phase) * 0.85 + Math.sin(phase * 2.0) * 0.15;
-                        pcm[i] = (short) (sample * env * 11500);
+                        // Punchy attack (first 8%) + full-bodied sustain/decay for higher perceived loudness
+                        double env = (progress < 0.08)
+                                ? (progress / 0.08)
+                                : Math.exp(-2.65 * (progress - 0.08));
+                        // Rich fundamental + 2nd & 3rd harmonics so phone micro-speakers project loudly
+                        double rawWave = Math.sin(phase) * 0.78
+                                + Math.sin(phase * 2.0) * 0.28
+                                + Math.sin(phase * 3.0) * 0.12;
+                        // Soft-saturating limiter (tanh) driven at 1.45x into 97% full-scale 16-bit PCM (31800)
+                        double boosted = Math.tanh(rawWave * 1.45) * env * 31800.0;
+                        pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(boosted)));
                     }
                     playSynthesizedPcm(pcm, sampleRate);
                 } catch (Throwable ignored) {}
@@ -839,8 +844,8 @@ public class VeilHybridNotificationManager {
     }
 
     /**
-     * Plays a warm, distinct WhatsApp/Telegram-inspired inbound message received two-tone
-     * marimba/water-drop chime when a message arrives in the active foreground chat.
+     * Plays a warm, high-volume WhatsApp/Telegram-inspired inbound message received two-tone
+     * chime when a message arrives in the active foreground chat.
      */
     public void playMessageReceivedInChatSound() {
         try {
@@ -851,24 +856,28 @@ public class VeilHybridNotificationManager {
             new Thread(() -> {
                 try {
                     final int sampleRate = 44100;
-                    final int durationMs = 125;
+                    final int durationMs = 185;
                     final int numSamples = (sampleRate * durationMs) / 1000;
                     final short[] pcm = new short[numSamples];
-                    final int splitSample = (int) (numSamples * 0.38);
+                    final int splitSample = (int) (numSamples * 0.40);
                     double phase = 0.0;
                     for (int i = 0; i < numSamples; i++) {
                         boolean secondNote = i >= splitSample;
                         double localProgress = secondNote
                                 ? (double) (i - splitSample) / (numSamples - splitSample)
                                 : (double) i / splitSample;
-                        // Note 1: D5 (587.33 Hz) -> Note 2: A5 (880.0 Hz) resonant interval
-                        double freq = secondNote ? 880.0 : 587.33;
+                        // Note 1: E5 (659.25 Hz) -> Note 2: B5 (987.77 Hz) bright, resonant fifth interval
+                        double freq = secondNote ? 987.77 : 659.25;
                         phase += (2.0 * Math.PI * freq) / sampleRate;
-                        double env = (localProgress < 0.08)
-                                ? (localProgress / 0.08)
-                                : Math.exp(-4.6 * (localProgress - 0.08));
-                        double sample = Math.sin(phase) * 0.82 + Math.sin(phase * 2.0) * 0.18;
-                        pcm[i] = (short) (sample * env * 12000);
+                        double env = (localProgress < 0.06)
+                                ? (localProgress / 0.06)
+                                : Math.exp(-2.35 * (localProgress - 0.06));
+                        double rawWave = Math.sin(phase) * 0.76
+                                + Math.sin(phase * 2.0) * 0.30
+                                + Math.sin(phase * 3.0) * 0.14;
+                        // Soft-saturating limiter driven at 1.5x into 98% full-scale 16-bit PCM (32100)
+                        double boosted = Math.tanh(rawWave * 1.50) * env * 32100.0;
+                        pcm[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(boosted)));
                     }
                     playSynthesizedPcm(pcm, sampleRate);
                 } catch (Throwable ignored) {}
@@ -878,11 +887,13 @@ public class VeilHybridNotificationManager {
 
     private void playSynthesizedPcm(@NonNull short[] pcm, int sampleRate) {
         AudioTrack track = null;
+        android.media.audiofx.LoudnessEnhancer enhancer = null;
         try {
             int byteCount = pcm.length * 2;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                // Route through USAGE_MEDIA so OEM system-sound attenuators do not muffle the chime
                 AudioAttributes attrs = new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build();
                 AudioFormat format = new AudioFormat.Builder()
@@ -891,16 +902,33 @@ public class VeilHybridNotificationManager {
                         .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                         .build();
                 track = new AudioTrack(attrs, format, byteCount, AudioTrack.MODE_STATIC, AudioManager.AUDIO_SESSION_ID_GENERATE);
+                track.setVolume(AudioTrack.getMaxVolume());
             } else {
-                track = new AudioTrack(AudioManager.STREAM_NOTIFICATION, sampleRate,
+                track = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
                         AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
                         byteCount, AudioTrack.MODE_STATIC);
+                track.setStereoVolume(AudioTrack.getMaxVolume(), AudioTrack.getMaxVolume());
             }
+            try {
+                int sessionId = track.getAudioSessionId();
+                if (sessionId != AudioManager.ERROR && sessionId != 0) {
+                    enhancer = new android.media.audiofx.LoudnessEnhancer(sessionId);
+                    enhancer.setTargetGain(600); // +6.0 dB hardware loudness boost
+                    enhancer.setEnabled(true);
+                }
+            } catch (Throwable ignored) {}
             track.write(pcm, 0, pcm.length);
             track.play();
-            Thread.sleep(160L);
+            long sleepMs = Math.max(200L, (pcm.length * 1000L) / sampleRate + 45L);
+            Thread.sleep(sleepMs);
         } catch (Throwable ignored) {
         } finally {
+            if (enhancer != null) {
+                try {
+                    enhancer.setEnabled(false);
+                    enhancer.release();
+                } catch (Throwable ignored) {}
+            }
             if (track != null) {
                 try {
                     track.stop();
