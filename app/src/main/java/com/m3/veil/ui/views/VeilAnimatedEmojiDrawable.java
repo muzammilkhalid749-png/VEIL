@@ -315,17 +315,7 @@ public class VeilAnimatedEmojiDrawable extends Drawable implements Animatable {
         float cy = bounds.top + h * 0.5f;
 
         long now = SystemClock.uptimeMillis();
-        float t = 0f;
-        if (isRunning) {
-            long elapsed = now - startUptimeMs;
-            long maxPlayMs = CYCLE_DURATION_MS * VeilStickerGifEngine.MAX_AUTO_PLAY_LOOPS;
-            if (elapsed >= maxPlayMs) {
-                isRunning = false;
-                t = 0f;
-            } else {
-                t = (float) (elapsed % CYCLE_DURATION_MS) / (float) CYCLE_DURATION_MS;
-            }
-        }
+        float t = isRunning ? (float) ((now - startUptimeMs) % CYCLE_DURATION_MS) / (float) CYCLE_DURATION_MS : 0f;
 
         if (burstProgress > 0f) {
             float burstElapsed = (now - burstStartMs) / (float) BURST_DURATION_MS;

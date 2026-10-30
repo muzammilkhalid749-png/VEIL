@@ -254,25 +254,12 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void populateCurrentProfileData() {
-        com.m3.veil.manager.VeilFeatureManager fm = com.m3.veil.manager.VeilFeatureManager.getInstance(requireContext());
-        String activePersonaId = fm.getActivePersonaId();
-        boolean isSecondaryPersona = activePersonaId != null && !"persona_primary".equals(activePersonaId);
-        com.m3.veil.model.Persona activePersona = fm.getActivePersona();
+        selectedMood = preferenceManager.getString("user_mood", MOODS[0]);
 
-        selectedMood = (isSecondaryPersona && activePersona != null && activePersona.getMood() != null)
-                ? activePersona.getMood()
-                : preferenceManager.getString("user_mood", MOODS[0]);
-
-        String displayName = isSecondaryPersona && activePersona != null
-                ? activePersona.getDisplayName()
-                : userPreferences.getDisplayName();
-        String username = isSecondaryPersona && activePersona != null
-                ? activePersona.getCleanUsername()
-                : userPreferences.getUsername();
-        String bio = isSecondaryPersona && activePersona != null
-                ? activePersona.getBio()
-                : userPreferences.getBio();
-        String avatar = isSecondaryPersona ? null : userPreferences.getAvatar();
+        String displayName = userPreferences.getDisplayName();
+        String username = userPreferences.getUsername();
+        String bio = userPreferences.getBio();
+        String avatar = userPreferences.getAvatar();
 
         if (currentUid != null) {
             SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
@@ -290,7 +277,7 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
                 if ((avatar == null || avatar.isEmpty()) && manifest.avatarBase64 != null) {
                     avatar = manifest.avatarBase64;
                 }
-                if (!isSecondaryPersona && manifest.mood != null && !manifest.mood.isEmpty()) {
+                if (manifest.mood != null && !manifest.mood.isEmpty()) {
                     selectedMood = manifest.mood;
                 }
             }
@@ -615,35 +602,27 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
         final String finalAvatarForPrefs = (resolvedAvatarPath != null && !resolvedAvatarPath.isEmpty())
                 ? resolvedAvatarPath : finalAvatarB64;
 
-        // 2. Update active persona or primary UserPreferences
-        com.m3.veil.manager.VeilFeatureManager fm = com.m3.veil.manager.VeilFeatureManager.getInstance(getContext());
-        String activePersonaId = fm.getActivePersonaId();
-        boolean isSecondaryPersona = activePersonaId != null && !"persona_primary".equals(activePersonaId);
+        // 2. Update UserPreferences & PreferenceManager immediately
+        preferenceManager.putString("user_mood", selectedMood);
+        userPreferences.saveProfileFields(uid, finalUsername, finalDisplayName, finalBio, finalAvatarForPrefs);
 
-        if (isSecondaryPersona) {
-            fm.updatePersonaDetails(activePersonaId, finalDisplayName, "@" + finalUsername, finalBio, selectedMood);
-        } else {
-            preferenceManager.putString("user_mood", selectedMood);
-            userPreferences.saveProfileFields(uid, finalUsername, finalDisplayName, finalBio, finalAvatarForPrefs);
-
-            User currentUser = userPreferences.getCurrentUser();
-            if (currentUser == null && uid != null) {
-                currentUser = new User(uid, "", "SOV");
-            }
-            if (currentUser != null) {
-                currentUser.setUsername(finalUsername);
-                currentUser.setDisplayName(finalDisplayName);
-                currentUser.setBio(finalBio);
-                currentUser.setAvatar(finalAvatarForPrefs);
-                currentUser.setPhotoUrl(finalAvatarForPrefs);
-                userPreferences.saveUser(currentUser);
-            }
-            fm.syncPrimaryPersonaWithUser(finalUsername, finalDisplayName, finalBio, selectedMood);
+        User currentUser = userPreferences.getCurrentUser();
+        if (currentUser == null && uid != null) {
+            currentUser = new User(uid, "", "SOV");
+        }
+        if (currentUser != null) {
+            currentUser.setUsername(finalUsername);
+            currentUser.setDisplayName(finalDisplayName);
+            currentUser.setBio(finalBio);
+            currentUser.setAvatar(finalAvatarForPrefs);
+            currentUser.setPhotoUrl(finalAvatarForPrefs);
+            userPreferences.saveUser(currentUser);
         }
 
-        // 3. Register new username in Bloom Filter
+        // 3. Register new username in Bloom Filter & sync active persona
         sovereignEngine.recordClaimedUsername(finalUsername);
-        com.m3.veil.manager.VeilMessagesController.getInstance(getContext()).reloadCurrentIdentity();
+        com.m3.veil.manager.VeilFeatureManager.getInstance(getContext())
+                .syncPrimaryPersonaWithUser(finalUsername, finalDisplayName, finalBio, selectedMood);
 
         // 4. Update Firestore ("users/{uid}" & "usernames/{finalUsername}")
         if (uid != null && !uid.isEmpty()) {

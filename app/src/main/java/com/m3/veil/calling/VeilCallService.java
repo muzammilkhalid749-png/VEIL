@@ -41,7 +41,6 @@ public class VeilCallService extends Service implements CallEngine.Listener {
     public static final String ACTION_START = "com.m3.veil.calling.action.START";
     public static final String ACTION_STOP = "com.m3.veil.calling.action.STOP";
     public static final String ACTION_HANGUP = "com.m3.veil.calling.action.HANGUP";
-    public static final String ACTION_DECLINE = "com.m3.veil.calling.action.DECLINE";
     public static final String ACTION_TOGGLE_MUTE = "com.m3.veil.calling.action.TOGGLE_MUTE";
     public static final String ACTION_TOGGLE_SPEAKER = "com.m3.veil.calling.action.TOGGLE_SPEAKER";
 
@@ -72,7 +71,6 @@ public class VeilCallService extends Service implements CallEngine.Listener {
 
     public static void stop(Context context) {
         try {
-            CallNotificationHelper.cancelAll(context);
             Intent intent = new Intent(context, VeilCallService.class);
             intent.setAction(ACTION_STOP);
             context.startService(intent);
@@ -106,16 +104,9 @@ public class VeilCallService extends Service implements CallEngine.Listener {
         if (intent != null && intent.getAction() != null) {
             String action = intent.getAction();
             switch (action) {
-                case ACTION_DECLINE:
-                case CallNotificationHelper.ACTION_DECLINE:
-                    CallNotificationHelper.cancelAll(this);
-                    if (engine != null) engine.decline(CallEndReason.DECLINED);
-                    stopForegroundAndService();
-                    return START_NOT_STICKY;
                 case ACTION_HANGUP:
-                    CallNotificationHelper.cancelAll(this);
                     if (engine != null) engine.hangup();
-                    stopForegroundAndService();
+                    stopSelf();
                     return START_NOT_STICKY;
                 case ACTION_TOGGLE_MUTE:
                     if (engine != null) engine.setMuted(!engine.isMuted());
@@ -126,7 +117,6 @@ public class VeilCallService extends Service implements CallEngine.Listener {
                     updateNotificationFromEngine();
                     return START_NOT_STICKY;
                 case ACTION_STOP:
-                    CallNotificationHelper.cancelAll(this);
                     stopForegroundAndService();
                     return START_NOT_STICKY;
                 default:
@@ -245,9 +235,6 @@ public class VeilCallService extends Service implements CallEngine.Listener {
     }
 
     public void updateOngoingNotification(CallInfo info) {
-        if (engine != null && (engine.getState() == CallState.NONE || engine.getState().isEnded())) {
-            return;
-        }
         try {
             android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
             if (nm != null) {
@@ -287,10 +274,6 @@ public class VeilCallService extends Service implements CallEngine.Listener {
 
     @Override
     public void onStateChanged(CallState state, CallInfo info) {
-        if (state == CallState.ACCEPT_SENT || state == CallState.ACCEPT_RECEIVED
-                || state == CallState.CONNECTED_LONELY || state == CallState.ACTIVE) {
-            CallNotificationHelper.cancelIncoming(this);
-        }
         if (state == CallState.ACTIVE) {
             startDurationTicker();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -300,11 +283,9 @@ public class VeilCallService extends Service implements CallEngine.Listener {
                     startForeground(NOTIFICATION_ID, buildNotification(info), type);
                 } catch (Throwable ignored) { }
             }
-        } else if (state != null && state.isEnded()) {
+        } else if (state.isEnded()) {
             stopDurationTicker();
-            CallNotificationHelper.cancelAll(this);
             stopForegroundAndService();
-            return;
         }
         updateOngoingNotification(info);
     }
@@ -317,7 +298,6 @@ public class VeilCallService extends Service implements CallEngine.Listener {
     @Override
     public void onCallEnded(CallEndReason reason, CallInfo info) {
         stopDurationTicker();
-        CallNotificationHelper.cancelAll(this);
         stopForegroundAndService();
     }
 

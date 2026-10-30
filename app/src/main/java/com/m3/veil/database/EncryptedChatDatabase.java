@@ -1525,65 +1525,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         updateSingleChatColumn(groupId, COL_CHAT_PARTICIPANTS, sb.toString());
     }
 
-    public String getActivePersonaScopeKey() {
-        try {
-            String pid = com.m3.veil.manager.VeilFeatureManager.getInstance(context).getActivePersonaId();
-            return (pid != null && !pid.trim().isEmpty()) ? pid.trim() : "persona_primary";
-        } catch (Throwable t) {
-            return "persona_primary";
-        }
-    }
-
-    public void recordChatDeletedWatermark(String chatId) {
-        if (chatId == null || chatId.trim().isEmpty()) return;
-        long watermark = System.currentTimeMillis() + 1500L;
-        String scope = getActivePersonaScopeKey();
-        context.getSharedPreferences("VeilDeletedChats", Context.MODE_PRIVATE)
-                .edit()
-                .putLong("deleted_at_" + scope + "_" + chatId, watermark)
-                .putLong("deleted_at_" + chatId, watermark)
-                .apply();
-    }
-
-    public long getChatDeletedWatermark(String chatId) {
-        if (chatId == null || chatId.trim().isEmpty()) return 0L;
-        String scope = getActivePersonaScopeKey();
-        android.content.SharedPreferences prefs = context.getSharedPreferences("VeilDeletedChats", Context.MODE_PRIVATE);
-        long scoped = prefs.getLong("deleted_at_" + scope + "_" + chatId, 0L);
-        long global = prefs.getLong("deleted_at_" + chatId, 0L);
-        return Math.max(scoped, global);
-    }
-
-    public void purgeRemoteChatMessagesAsync(final String chatId) {
-        if (chatId == null || chatId.trim().isEmpty()) return;
-        new Thread(() -> {
-            try {
-                com.google.firebase.firestore.FirebaseFirestore fs = com.google.firebase.firestore.FirebaseFirestore.getInstance();
-                fs.collection("chats").document(chatId).collection("messages").get()
-                        .addOnSuccessListener(snap -> {
-                            if (snap != null) {
-                                for (com.google.firebase.firestore.DocumentSnapshot d : snap.getDocuments()) {
-                                    d.getReference().delete();
-                                }
-                            }
-                        });
-                fs.collection("groups").document(chatId).collection("messages").get()
-                        .addOnSuccessListener(snap -> {
-                            if (snap != null) {
-                                for (com.google.firebase.firestore.DocumentSnapshot d : snap.getDocuments()) {
-                                    d.getReference().delete();
-                                }
-                            }
-                        });
-            } catch (Throwable ignored) {}
-        }).start();
-    }
-
     public synchronized void deleteChat(String chatId) {
         if (chatId == null) return;
-        Chat existingChat = ramChatCache.get(chatId);
-        boolean isGroupChat = existingChat != null && existingChat.isGroup();
-        recordChatDeletedWatermark(chatId);
         ramChatCache.remove(chatId);
         ramMessageListCache.remove(chatId);
         try {
@@ -1592,9 +1535,6 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         SQLiteDatabase db = getEncryptedDb();
         db.delete(TABLE_MESSAGES, COL_MSG_CHAT_ID + "=?", new String[]{chatId});
         db.delete(TABLE_CHATS, COL_CHAT_ID + "=?", new String[]{chatId});
-        if (!isGroupChat) {
-            purgeRemoteChatMessagesAsync(chatId);
-        }
         notifyMessagesChanged(chatId);
         notifyChatsChanged();
     }
@@ -1857,11 +1797,6 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     public synchronized void saveMessage(String chatId, Message message) {
         if (message == null || message.getId() == null || chatId == null) return;
-        long msgTimeMs = message.getTimestamp() != null ? message.getTimestamp().toDate().getTime() : System.currentTimeMillis();
-        long deletedWatermark = getChatDeletedWatermark(chatId);
-        if (deletedWatermark > 0L && msgTimeMs <= deletedWatermark) {
-            return;
-        }
         SQLiteDatabase db = getEncryptedDb();
 
         ContentValues cv = new ContentValues();
@@ -1871,7 +1806,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         cv.put(COL_MSG_RECEIVER_ID, message.getReceiverId());
         cv.put(COL_MSG_TEXT, message.getText());
         cv.put(COL_MSG_TYPE, message.getType() != null ? message.getType() : "text");
-        cv.put(COL_MSG_TIMESTAMP, msgTimeMs);
+        cv.put(COL_MSG_TIMESTAMP, message.getTimestamp() != null ? message.getTimestamp().toDate().getTime() : System.currentTimeMillis());
         cv.put(COL_MSG_READ, message.isRead() ? 1 : 0);
         cv.put(COL_MSG_DELIVERED, message.isDelivered() ? 1 : 0);
         cv.put(COL_MSG_PENDING, message.isPending() ? 1 : 0);
@@ -2516,7 +2451,6 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     public synchronized void clearChatMessages(String chatId) {
         if (chatId == null) return;
-        recordChatDeletedWatermark(chatId);
         ramMessageListCache.remove(chatId);
         SQLiteDatabase db = getEncryptedDb();
         db.delete(TABLE_MESSAGES, COL_MSG_CHAT_ID + "=?", new String[]{chatId});
@@ -2528,9 +2462,6 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
         Chat cachedChat = ramChatCache.get(chatId);
         if (cachedChat != null) {
-            if (!cachedChat.isGroup()) {
-                purgeRemoteChatMessagesAsync(chatId);
-            }
             populateLastMessageMetadata(cachedChat);
         }
 

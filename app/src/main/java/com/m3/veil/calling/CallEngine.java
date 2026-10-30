@@ -791,8 +791,7 @@ public class CallEngine implements CallSignaling.Listener {
     // ---- incoming ------------------------------------------------------------
 
     public void accept() {
-        CallNotificationHelper.cancelIncoming(context);
-        if (state != CallState.RECEIVED_CALL && state != CallState.PRE_ACCEPT_RECEIVED) return;
+        if (state != CallState.RECEIVED_CALL) return;
         cancelOfferExpiry();
         cancelIncomingRingingWatchdog();
         if (pendingInviteKey != null) e2ee.importMasterKeyBase64(pendingInviteKey);
@@ -807,35 +806,22 @@ public class CallEngine implements CallSignaling.Listener {
         accept.e2eeKeyB64 = e2ee.exportMasterKeyBase64();
         accept.e2eeKeyIndex = e2ee.getKeyIndex();
         signaling.send(accept);
-        try {
-            if (primaryPeerId != null && callId != null) {
-                com.m3.veil.webrtc.SignalingClient.getInstance().sendCallAccept(primaryPeerId, callId);
-            }
-        } catch (Throwable ignored) { }
 
         ensurePeer(primaryPeerId, primaryPeerName);
         if (pendingInvitePayload != null) joinGroupMesh(pendingInvitePayload);
         maybeInitiate(primaryPeerId);
-        CallNotificationHelper.showOngoingCall(context, buildInfo());
         notifyInfo();
     }
 
     public void decline(CallEndReason reason) {
-        CallNotificationHelper.cancelAll(context);
+        if (state != CallState.RECEIVED_CALL && state != CallState.PRE_ACCEPT_RECEIVED) return;
         cancelOfferExpiry();
         cancelIncomingRingingWatchdog();
         CallEndReason why = reason == null ? CallEndReason.DECLINED : reason;
-        if (primaryPeerId != null && callId != null) {
+        if (primaryPeerId != null) {
             CallSignal decline = CallSignal.of(CallSignal.DECLINE, callId, currentUserId).to(primaryPeerId);
             decline.payload = reasonPayload(why);
             signaling.send(decline);
-            try {
-                com.m3.veil.webrtc.SignalingClient.getInstance().sendCallReject(primaryPeerId, callId, "declined");
-            } catch (Throwable ignored) { }
-        }
-        if (state == CallState.NONE || state == CallState.ENDING) {
-            VeilCallService.stop(context);
-            return;
         }
         endCall(why, false);
     }
@@ -845,7 +831,6 @@ public class CallEngine implements CallSignaling.Listener {
     }
 
     public void hangup(CallEndReason reason) {
-        CallNotificationHelper.cancelAll(context);
         cancelRingingHeartbeat();
         endCall(reason == null ? CallEndReason.LOCAL_HANGUP : reason, true);
     }
@@ -1266,26 +1251,6 @@ public class CallEngine implements CallSignaling.Listener {
             sig.callType = incomingCallType != null ? incomingCallType : "audio";
             sig.timestamp = System.currentTimeMillis();
             onInvite(sig, fromUserId);
-        });
-    }
-
-    public void onExternalCallEnded(String fromUserId, String endedCallId, CallEndReason reason) {
-        main.post(() -> {
-            CallNotificationHelper.cancelAll(context);
-            if (endedCallId != null && !endedCallId.isEmpty()) {
-                endedCallIds.add(endedCallId);
-            }
-            if (!isInCall()) {
-                VeilCallService.stop(context);
-                return;
-            }
-            if ((endedCallId != null && endedCallId.equals(callId))
-                    || (fromUserId != null && fromUserId.equals(primaryPeerId))
-                    || state == CallState.RECEIVED_CALL
-                    || state == CallState.CALLING
-                    || state == CallState.PRE_ACCEPT_RECEIVED) {
-                endCall(reason != null ? reason : CallEndReason.REMOTE_HANGUP, false);
-            }
         });
     }
 
@@ -2800,11 +2765,6 @@ public class CallEngine implements CallSignaling.Listener {
                 CallSignal end = CallSignal.of(CallSignal.END, callId, currentUserId).to(targetPeerId);
                 end.payload = reasonPayload(endReason);
                 signaling.send(end);
-                try {
-                    if (callId != null) {
-                        com.m3.veil.webrtc.SignalingClient.getInstance().sendCallEnd(targetPeerId, callId);
-                    }
-                } catch (Throwable ignored) { }
             }
         }
 

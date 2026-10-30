@@ -205,16 +205,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private void handleCallEndPush(Map<String, String> data) {
         try {
-            String callId = data != null ? data.get("callId") : null;
-            String senderId = data != null ? data.get("senderId") : null;
-            if (senderId == null || senderId.isEmpty()) {
-                senderId = data != null ? data.get("from") : null;
-            }
-            CallNotificationHelper.cancelAll(this);
-            CallEngine.getInstance(this).onExternalCallEnded(senderId, callId, com.m3.veil.calling.CallEndReason.REMOTE_HANGUP);
-            if (senderId != null && callId != null) {
-                WebRtcManager.getInstance(this).onCallEndReceived(senderId, callId);
-            }
+            CallNotificationHelper.cancelIncoming(this);
             VeilCallService.stop(this);
         } catch (Throwable t) {
             Log.w(TAG, "handleCallEndPush warning", t);

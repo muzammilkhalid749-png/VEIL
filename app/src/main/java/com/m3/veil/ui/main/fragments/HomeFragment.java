@@ -289,34 +289,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         WebRtcManager.getInstance(requireContext()).addEventListener(p2pListener);
         com.m3.veil.manager.VeilMessagesController.getInstance(requireContext()).addObserver(messagesObserver);
         com.m3.veil.manager.StatusController.getInstance(requireContext()).addObserver(statusObserver);
-        VeilFeatureManager.getInstance(requireContext()).addPersonaChangeListener(personaChangeListener);
 
         return view;
     }
-
-    private final VeilFeatureManager.PersonaChangeListener personaChangeListener = activePersona -> {
-        if (!isAdded() || getContext() == null) return;
-        requireActivity().runOnUiThread(() -> {
-            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
-            if (groupsListenerRegistration != null) {
-                groupsListenerRegistration.remove();
-                groupsListenerRegistration = null;
-            }
-            if (directChatsListenerRegistration != null) {
-                directChatsListenerRegistration.remove();
-                directChatsListenerRegistration = null;
-            }
-            EncryptedChatDatabase.getInstance(requireContext()).addListener(dbListener);
-            updatePersonaAndMeshHeader();
-            allLocalChats.clear();
-            displayedChats.clear();
-            if (chatsAdapter != null) chatsAdapter.notifyDataSetChanged();
-            loadLocalEncryptedChats();
-            if (isResumed()) {
-                onResume();
-            }
-        });
-    };
 
     private void initializeViews(View view) {
         chatsRecyclerView = view.findViewById(R.id.chatsRecyclerView);
@@ -652,9 +627,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             if (VeilFeatureManager.isShadowVeilOrGeneric(handle)) {
                 handle = fm.resolveRealUserHandle();
             }
-            String uname = active.getUsername();
-            String handleDisplay = (uname != null && !uname.isEmpty()) ? (handle + " (" + uname + ")") : handle;
-            btnActivePersona.setText("🎭 " + handleDisplay + " • " + active.getMood());
+            btnActivePersona.setText("🎭 " + handle + " • " + active.getMood());
         }
         if (tvMeshStatusPill != null) {
             int peers = WebRtcManager.getInstance(requireContext()).getConnectedPeersCount();
@@ -679,12 +652,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         View btnAddNew = view.findViewById(R.id.btnAddNewPersona);
         float density = getResources().getDisplayMetrics().density;
 
-        for (int idx = 0; idx < personas.size(); idx++) {
-            final int personaIndex = idx;
-            final Persona p = personas.get(idx);
+        for (Persona p : personas) {
             boolean isSelected = current != null && p.getPersonaId().equals(current.getPersonaId());
-            boolean isLockedPremium = !fm.canAccessPersonaIndex(personaIndex);
-
             com.google.android.material.card.MaterialCardView card =
                     new com.google.android.material.card.MaterialCardView(requireContext());
             card.setCardElevation(0);
@@ -709,63 +678,35 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             textCol.setOrientation(LinearLayout.VERTICAL);
             textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-            String tierBadge;
-            if (personaIndex == 0) {
-                tierBadge = " [MAIN]";
-            } else if (personaIndex == 1) {
-                tierBadge = " [2ND • FREE]";
-            } else {
-                tierBadge = isLockedPremium ? " [👑 PREMIUM LOCKED]" : " [👑 PREMIUM]";
-            }
-
             TextView tvName = new TextView(requireContext());
-            tvName.setText((isSelected ? "✅ " : (isLockedPremium ? "🔒 " : "🎭 "))
-                    + p.getDisplayName() + tierBadge + (p.isTemporary() ? " [Temp 24h]" : ""));
+            tvName.setText((isSelected ? "✅ " : "🎭 ") + p.getDisplayName() + (p.isTemporary() ? " [Temp 24h]" : ""));
             tvName.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
             tvName.setTextSize(15);
             tvName.setTypeface(null, android.graphics.Typeface.BOLD);
 
-            TextView tvHandle = new TextView(requireContext());
-            tvHandle.setText(p.getUsername() + " • " + p.getMood() + " • " + p.getBio());
-            tvHandle.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
-            tvHandle.setTextSize(12);
+            TextView tvMood = new TextView(requireContext());
+            tvMood.setText(p.getMood() + " • " + p.getBio());
+            tvMood.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
+            tvMood.setTextSize(12);
 
             textCol.addView(tvName);
-            textCol.addView(tvHandle);
+            textCol.addView(tvMood);
             itemLayout.addView(textCol);
             card.addView(itemLayout);
 
             card.setOnClickListener(vCard -> {
-                if (!fm.canAccessPersonaIndex(personaIndex)) {
-                    dialog.dismiss();
-                    fm.showThirdPersonaPremiumPurchaseDialog(requireContext(), () -> {
-                        fm.setActivePersona(p.getPersonaId());
-                        updatePersonaAndMeshHeader();
-                        Toast.makeText(getContext(), "Switched persona to " + p.getDisplayName() + " (" + p.getUsername() + ")", Toast.LENGTH_SHORT).show();
-                    });
-                    return;
-                }
                 fm.setActivePersona(p.getPersonaId());
                 updatePersonaAndMeshHeader();
-                Toast.makeText(getContext(), "Switched persona to " + p.getDisplayName() + " (" + p.getUsername() + ")", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Switched persona to " + p.getDisplayName(), Toast.LENGTH_SHORT).show();
                 dialog.dismiss();
             });
 
             container.addView(card);
         }
 
-        if (btnAddNew instanceof TextView) {
-            boolean needsPro = personas.size() >= VeilFeatureManager.MAX_FREE_PERSONAS && !fm.isThirdPersonaPremiumUnlocked();
-            ((TextView) btnAddNew).setText(needsPro ? "👑 Unlock 3rd+ Persona (Veil Pro)" : "➕ Create New Persona");
-        }
-
         btnAddNew.setOnClickListener(v -> {
             dialog.dismiss();
-            if (personas.size() >= VeilFeatureManager.MAX_FREE_PERSONAS && !fm.isThirdPersonaPremiumUnlocked()) {
-                fm.showThirdPersonaPremiumPurchaseDialog(requireContext(), this::showCreatePersonaDialog);
-            } else {
-                showCreatePersonaDialog();
-            }
+            showCreatePersonaDialog();
         });
 
         dialog.show();
@@ -789,21 +730,16 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         layout.addView(tvTitle);
 
         TextView tvSub = new TextView(getContext());
-        tvSub.setText("Isolated identity with its own unique @username, display name & encrypted vault");
+        tvSub.setText("Zero-trace identity for chatting and posting anonymously");
         tvSub.setTextSize(13);
         tvSub.setTextColor(ContextCompat.getColor(getContext(), R.color.textSecondary));
         tvSub.setPadding(0, 4, 0, (int) (16 * getResources().getDisplayMetrics().density));
         layout.addView(tvSub);
 
         EditText etName = new EditText(getContext());
-        etName.setHint("Profile Display Name (e.g. Ghost Protocol)");
+        etName.setHint("Persona Handle (e.g. @GhostProtocol)");
         etName.setTextColor(ContextCompat.getColor(getContext(), R.color.textPrimary));
         layout.addView(etName);
-
-        EditText etUsername = new EditText(getContext());
-        etUsername.setHint("Unique @Username (e.g. @ghost_protocol)");
-        etUsername.setTextColor(ContextCompat.getColor(getContext(), R.color.textPrimary));
-        layout.addView(etUsername);
 
         EditText etMood = new EditText(getContext());
         etMood.setHint("Mood Badge (e.g. 🌙 Incognito, ⚡ Hyped)");
@@ -812,23 +748,22 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         com.google.android.material.button.MaterialButton btnCreate =
                 new com.google.android.material.button.MaterialButton(getContext());
-        btnCreate.setText("Create & Activate Persona");
+        btnCreate.setText("Create & Activate");
         btnCreate.setCornerRadius((int) (12 * getResources().getDisplayMetrics().density));
         LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         btnLp.topMargin = (int) (16 * getResources().getDisplayMetrics().density);
         btnCreate.setLayoutParams(btnLp);
         btnCreate.setOnClickListener(v -> {
             String name = etName.getText().toString().trim();
-            String uname = etUsername.getText().toString().trim();
             String mood = etMood.getText().toString().trim();
             if (!name.isEmpty()) {
                 VeilFeatureManager.getInstance(requireContext()).addPersona(
-                        name, uname.isEmpty() ? name : uname, "Custom zero-trace persona", mood.isEmpty() ? "🎭 Masked" : mood, "#4F46E5", false);
+                        name, "Custom zero-trace persona", mood.isEmpty() ? "🎭 Masked" : mood, "#4F46E5", false);
                 updatePersonaAndMeshHeader();
                 Toast.makeText(getContext(), "Persona created & activated!", Toast.LENGTH_SHORT).show();
                 dialog.dismiss();
             } else {
-                Toast.makeText(getContext(), "Please enter a display name", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Please enter a handle", Toast.LENGTH_SHORT).show();
             }
         });
         layout.addView(btnCreate);
@@ -1012,21 +947,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
     private void applyFilterAndDisplay() {
         displayedChats.clear();
-        String q = searchQuery != null ? searchQuery.toLowerCase(Locale.ROOT).trim() : "";
-
-        java.util.Map<String, Message> matchedMessagesByChatId = new java.util.HashMap<>();
-        if (!q.isEmpty() && getContext() != null) {
-            try {
-                List<Message> hitMessages = EncryptedChatDatabase.getInstance(requireContext()).searchMessages(q, 100);
-                if (hitMessages != null) {
-                    for (Message hit : hitMessages) {
-                        if (hit != null && hit.getChatId() != null && !matchedMessagesByChatId.containsKey(hit.getChatId())) {
-                            matchedMessagesByChatId.put(hit.getChatId(), hit);
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
+        String q = searchQuery != null ? searchQuery.toLowerCase(Locale.ROOT) : "";
 
         for (Chat c : allLocalChats) {
             if (c.isArchived()) continue;
@@ -1058,31 +979,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
             if (!q.isEmpty()) {
                 String name = c.getName() != null ? c.getName().toLowerCase(Locale.ROOT) : "";
-                String handle = c.getHandle() != null ? c.getHandle().toLowerCase(Locale.ROOT) : "";
                 String lastMsg = c.getLastMessage() != null ? c.getLastMessage().toLowerCase(Locale.ROOT) : "";
-                Message matchedMsg = matchedMessagesByChatId.get(c.getId());
-                boolean directMatch = name.contains(q) || handle.contains(q) || lastMsg.contains(q);
-                if (!directMatch && matchedMsg == null) continue;
-
-                if (matchedMsg != null && !lastMsg.contains(q)) {
-                    Chat searchHitCopy = new Chat(
-                            c.getId(),
-                            c.getName(),
-                            "💬 Matched: \"" + matchedMsg.getText() + "\"",
-                            matchedMsg.getTimestamp() != null ? matchedMsg.getTimestamp() : c.getLastMessageTime(),
-                            c.getAvatar(),
-                            c.getUnreadCount(),
-                            c.isGroup(),
-                            c.isSecret(),
-                            c.getType(),
-                            c.getParticipants()
-                    );
-                    searchHitCopy.setPinned(c.isPinned());
-                    searchHitCopy.setMuted(c.isMuted());
-                    searchHitCopy.setHandle(c.getHandle());
-                    displayedChats.add(searchHitCopy);
-                    continue;
-                }
+                if (!name.contains(q) && !lastMsg.contains(q)) continue;
             }
 
             displayedChats.add(c);
@@ -1364,11 +1262,6 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
                                     if (ts == null) ts = com.google.firebase.Timestamp.now();
 
-                                    long deletedWatermark = EncryptedChatDatabase.getInstance(appCtx).getChatDeletedWatermark(gId);
-                                    if (deletedWatermark > 0L && ts.toDate().getTime() <= deletedWatermark) {
-                                        continue;
-                                    }
-
                                     String peerId = null;
                                     if (parts != null) {
                                         for (String p : parts) {
@@ -1557,10 +1450,6 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                             if (existingMsg == null) {
                                                                 String sName = mDoc.getString("senderName");
                                                                 com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
-                                                                long grpWatermark = EncryptedChatDatabase.getInstance(appCtx).getChatDeletedWatermark(finalGroupId);
-                                                                if (grpWatermark > 0L && mTs != null && mTs.toDate().getTime() <= grpWatermark) {
-                                                                    continue;
-                                                                }
                                                                 com.m3.veil.model.Message m = new com.m3.veil.model.Message(
                                                                         mId,
                                                                         sId != null ? sId : "",
@@ -1710,11 +1599,6 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
                                     if (ts == null) ts = com.google.firebase.Timestamp.now();
 
-                                    long directDeletedWatermark = EncryptedChatDatabase.getInstance(appCtx).getChatDeletedWatermark(cId);
-                                    if (directDeletedWatermark > 0L && ts.toDate().getTime() <= directDeletedWatermark) {
-                                        continue;
-                                    }
-
                                     Chat existing = EncryptedChatDatabase.getInstance(appCtx).getChat(cId);
                                     boolean shouldSyncDirectMsgs = false;
                                     if (existing == null) {
@@ -1771,10 +1655,6 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                             String sId = mDoc.getString("senderId");
                                                             String sName = mDoc.getString("senderName");
                                                             com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
-                                                            long chatWatermark = EncryptedChatDatabase.getInstance(appCtx).getChatDeletedWatermark(finalChatId);
-                                                            if (chatWatermark > 0L && mTs != null && mTs.toDate().getTime() <= chatWatermark) {
-                                                                continue;
-                                                            }
                                                             boolean isFromMe = sId != null && sId.equals(uid);
                                                             boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
                                                             boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
@@ -1921,7 +1801,6 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             WebRtcManager.getInstance(requireContext()).removeEventListener(p2pListener);
             com.m3.veil.manager.VeilMessagesController.getInstance(requireContext()).removeObserver(messagesObserver);
             com.m3.veil.manager.StatusController.getInstance(requireContext()).removeObserver(statusObserver);
-            VeilFeatureManager.getInstance(requireContext()).removePersonaChangeListener(personaChangeListener);
         }
     }
 
