@@ -854,6 +854,52 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         homeDebounceHandler.postDelayed(loadChatsRunnable, 50);
     }
 
+    private boolean isSelfId(Context ctx, String id) {
+        if (id == null || id.isEmpty()) return false;
+        String authUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(ctx);
+        if (id.equals(authUid)) return true;
+        String userPrefUid = new com.m3.veil.utils.UserPreferences(ctx).getUserId();
+        if (id.equals(userPrefUid)) return true;
+        try {
+            com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(ctx);
+            if (id.equals(pm.getActivePersonaPeerId())) return true;
+            if (id.equals(pm.getActivePersonaId())) return true;
+            for (com.m3.veil.model.Persona p : pm.getPersonas()) {
+                if (p != null) {
+                    if (id.equals(p.getId()) || id.equals(p.getKeyPairId())) return true;
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    private String resolveDirectChatPeerId(Context ctx, Chat chat) {
+        if (chat == null || chat.getId() == null) return null;
+        if (chat.getParticipants() != null) {
+            for (String p : chat.getParticipants()) {
+                if (p != null && !isSelfId(ctx, p)) {
+                    return p;
+                }
+            }
+        }
+        String cid = chat.getId();
+        if (cid.contains("_") && !cid.startsWith("group_") && !cid.startsWith("channel_")) {
+            String[] sp = cid.split("_");
+            if (sp.length == 2) {
+                if (isSelfId(ctx, sp[0]) && !isSelfId(ctx, sp[1])) {
+                    return sp[1];
+                } else if (isSelfId(ctx, sp[1]) && !isSelfId(ctx, sp[0])) {
+                    return sp[0];
+                } else if (!isSelfId(ctx, sp[1])) {
+                    return sp[1];
+                } else if (!isSelfId(ctx, sp[0])) {
+                    return sp[0];
+                }
+            }
+        }
+        return null;
+    }
+
     private void executeLoadLocalEncryptedChats() {
         if (!isAdded() || getContext() == null) return;
         final Context ctx = requireContext().getApplicationContext();
@@ -868,13 +914,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                         com.m3.veil.manager.VeilMessagesController.getInstance(ctx).prewarmDialog(c.getId());
                         prewarmIdx++;
                     }
-                    String chatPeerId = null;
-                    if (!c.isGroup() && c.getId() != null && c.getId().contains("_") && myUid != null) {
-                        String[] sp = c.getId().split("_");
-                        if (sp.length == 2) {
-                            chatPeerId = sp[0].equals(myUid) ? sp[1] : sp[0];
-                        }
-                    }
+                    String chatPeerId = resolveDirectChatPeerId(ctx, c);
                     if (com.m3.veil.manager.VeilMessagesController.getInstance(ctx).isDialogTyping(c.getId(), chatPeerId)) {
                         c.setTyping(true);
                     }
@@ -887,22 +927,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                 || "Veil User".equals(curName)
                                 || "Anonymous Peer".equals(curName);
                         if (needsPeerLookup) {
-                            String peerId = null;
-                            if (c.getParticipants() != null) {
-                                for (String p : c.getParticipants()) {
-                                    if (p != null && !p.equals(myUid)) {
-                                        peerId = p;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (peerId == null && c.getId().contains("_")) {
-                                String[] sp = c.getId().split("_");
-                                if (sp.length == 2 && myUid != null) {
-                                    peerId = sp[0].equals(myUid) ? sp[1] : sp[0];
-                                }
-                            }
-                            if (peerId != null && !peerId.isEmpty()) {
+                            String peerId = resolveDirectChatPeerId(ctx, c);
+                            if (peerId != null && !peerId.isEmpty() && !isSelfId(ctx, peerId)) {
                                 final String fChatId = c.getId();
                                 final String fPeerId = peerId;
                                 com.google.firebase.firestore.FirebaseFirestore.getInstance()
@@ -913,18 +939,34 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                     String pName = uDoc.getString("displayName");
                                                     if (pName == null || pName.isEmpty()) pName = uDoc.getString("username");
                                                     String pAvatar = uDoc.getString("avatar");
-                                                    if (pName != null && !pName.isEmpty()) {
+                                                    if (pName != null && !pName.isEmpty() && !pName.equals(myPersonaName)) {
                                                         Chat target = EncryptedChatDatabase.getInstance(ctx).getChat(fChatId);
                                                         if (target != null && (!pName.equals(target.getName()) || (pAvatar != null && !pAvatar.isEmpty()))) {
                                                             target.setName(pName);
                                                             if (pAvatar != null && !pAvatar.isEmpty()) target.setAvatar(pAvatar);
                                                             EncryptedChatDatabase.getInstance(ctx).saveOrUpdateChat(target);
-                                                            loadLocalEncryptedChats();
+                                                            final String resolvedPName = pName;
+                                                            final String resolvedPAvatar = pAvatar;
+                                                            if (isAdded() && getActivity() != null) {
+                                                                requireActivity().runOnUiThread(() -> {
+                                                                    for (Chat dc : displayedChats) {
+                                                                        if (dc != null && fChatId.equals(dc.getId())) {
+                                                                            dc.setName(resolvedPName);
+                                                                            if (resolvedPAvatar != null && !resolvedPAvatar.isEmpty()) dc.setAvatar(resolvedPAvatar);
+                                                                            break;
+                                                                        }
+                                                                    }
+                                                                    if (chatsAdapter != null) chatsAdapter.notifyDataSetChanged();
+                                                                });
+                                                            }
                                                         }
                                                     }
                                                 });
                                             }
                                         });
+                            } else if (curName != null && curName.equals(myPersonaName)) {
+                                c.setName("Direct Chat");
+                                EncryptedChatDatabase.getInstance(ctx).saveOrUpdateChat(c);
                             }
                         }
                     }
@@ -1330,7 +1372,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     String peerId = null;
                                     if (parts != null) {
                                         for (String p : parts) {
-                                            if (p != null && !p.equals(uid)) {
+                                            if (p != null && !isSelfId(appCtx, p)) {
                                                 peerId = p;
                                                 break;
                                             }
@@ -1339,7 +1381,15 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     if (peerId == null && gId.contains("_")) {
                                         String[] split = gId.split("_");
                                         if (split.length == 2) {
-                                            peerId = split[0].equals(uid) ? split[1] : split[0];
+                                            if (isSelfId(appCtx, split[0]) && !isSelfId(appCtx, split[1])) {
+                                                peerId = split[1];
+                                            } else if (isSelfId(appCtx, split[1]) && !isSelfId(appCtx, split[0])) {
+                                                peerId = split[0];
+                                            } else if (!isSelfId(appCtx, split[1])) {
+                                                peerId = split[1];
+                                            } else if (!isSelfId(appCtx, split[0])) {
+                                                peerId = split[0];
+                                            }
                                         }
                                     }
 
@@ -1432,7 +1482,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                         }
                                     }
 
-                                    if (isDirectChat && peerId != null) {
+                                    if (isDirectChat && peerId != null && !isSelfId(appCtx, peerId)) {
                                         final String fPeerId = peerId;
                                         final String fGId = gId;
                                         com.google.firebase.firestore.FirebaseFirestore.getInstance()
@@ -1457,7 +1507,11 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                 }
                                                                 if (cChanged) {
                                                                     EncryptedChatDatabase.getInstance(appCtx).saveOrUpdateChat(c);
-                                                                    if (isAdded()) loadLocalEncryptedChats();
+                                                                    if (isAdded() && getActivity() != null) {
+                                                                        requireActivity().runOnUiThread(() -> {
+                                                                            if (chatsAdapter != null) chatsAdapter.notifyDataSetChanged();
+                                                                        });
+                                                                    }
                                                                 }
                                                             }
                                                         }

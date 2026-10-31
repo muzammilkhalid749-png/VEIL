@@ -3305,7 +3305,6 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             mcv.setStrokeWidth(0);
                             mcv.setCardElevation(0f);
                             mcv.setCardBackgroundColor(android.graphics.Color.TRANSPARENT);
-                            mcv.setBackground(null);
                             mcv.setRadius(0f);
                         }
                         if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
@@ -3419,7 +3418,6 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             mcv.setStrokeWidth(0);
                             mcv.setCardElevation(0f);
                             mcv.setCardBackgroundColor(android.graphics.Color.TRANSPARENT);
-                            mcv.setBackground(null);
                             mcv.setRadius(0f);
                         }
                         if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
@@ -4812,7 +4810,6 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             mcv.setStrokeWidth(0);
                             mcv.setCardElevation(0f);
                             mcv.setCardBackgroundColor(android.graphics.Color.TRANSPARENT);
-                            mcv.setBackground(null);
                             mcv.setRadius(0f);
                         }
                         if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);
@@ -4925,7 +4922,6 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             mcv.setStrokeWidth(0);
                             mcv.setCardElevation(0f);
                             mcv.setCardBackgroundColor(android.graphics.Color.TRANSPARENT);
-                            mcv.setBackground(null);
                             mcv.setRadius(0f);
                         }
                         if (imageScrimView != null) imageScrimView.setVisibility(View.GONE);

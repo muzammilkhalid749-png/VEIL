@@ -6977,7 +6977,17 @@ public class ChatActivity extends AppCompatActivity {
                     if (m != null && m.getText() != null && m.getText().startsWith("[roulette_control:")) {
                         continue;
                     }
-                    if (m != null) filtered.add(m);
+                    if (m != null) {
+                        boolean isSpecialOrMedia = (m.getMediaUrl() != null && !m.getMediaUrl().isEmpty())
+                                || (m.getLocalFilePath() != null && !m.getLocalFilePath().isEmpty())
+                                || (m.getPollJson() != null && !m.getPollJson().isEmpty())
+                                || m.isBlink()
+                                || (m.getType() != null && !"text".equalsIgnoreCase(m.getType()));
+                        if (!isSpecialOrMedia && (m.getText() == null || m.getText().trim().isEmpty())) {
+                            continue;
+                        }
+                        filtered.add(m);
+                    }
                 }
             }
             runOnUiThread(() -> {

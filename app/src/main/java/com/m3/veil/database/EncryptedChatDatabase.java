@@ -1491,9 +1491,28 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         try {
             SQLiteDatabase db = getEncryptedDb();
             long now = System.currentTimeMillis();
+
+            String cid = chat.getId();
+            String revCid = null;
+            if (cid.contains("_") && !cid.startsWith("group_") && !cid.startsWith("channel_")) {
+                String[] sp = cid.split("_");
+                if (sp.length == 2) {
+                    revCid = sp[1] + "_" + sp[0];
+                }
+            }
+
             // Filter out any messages that have expired (vanished)
-            String selection = COL_MSG_CHAT_ID + "=? AND (" + COL_MSG_EXPIRES_AT + "=0 OR " + COL_MSG_EXPIRES_AT + ">?)";
-            String[] selectionArgs = new String[]{chat.getId(), String.valueOf(now)};
+            String selection;
+            String[] selectionArgs;
+            if (revCid != null && !revCid.equals(cid)) {
+                selection = "(" + COL_MSG_CHAT_ID + "=? OR " + COL_MSG_CHAT_ID + "=?) AND ("
+                        + COL_MSG_EXPIRES_AT + " IS NULL OR " + COL_MSG_EXPIRES_AT + "=0 OR " + COL_MSG_EXPIRES_AT + ">?)";
+                selectionArgs = new String[]{cid, revCid, String.valueOf(now)};
+            } else {
+                selection = COL_MSG_CHAT_ID + "=? AND ("
+                        + COL_MSG_EXPIRES_AT + " IS NULL OR " + COL_MSG_EXPIRES_AT + "=0 OR " + COL_MSG_EXPIRES_AT + ">?)";
+                selectionArgs = new String[]{cid, String.valueOf(now)};
+            }
 
             msgCursor = db.query(TABLE_MESSAGES,
                     new String[]{COL_MSG_SENDER_ID, COL_MSG_TEXT, COL_MSG_TYPE, COL_MSG_TIMESTAMP, COL_MSG_DELIVERED, COL_MSG_READ, COL_MSG_PENDING, COL_MSG_BLINK},
@@ -1548,22 +1567,22 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     ContentValues cv = new ContentValues();
                     cv.put(COL_CHAT_LAST_MESSAGE, summary);
                     if (timestamp > 0) cv.put(COL_CHAT_LAST_MESSAGE_TIME, timestamp);
-                    db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{chat.getId()});
+                    int updated = db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{chat.getId()});
+                    if (updated == 0 && revCid != null) {
+                        db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{revCid});
+                    }
                 }
             } else {
                 String prevLastMsg = chat.getLastMessage();
-                // No surviving messages in this chat (all messages expired or chat is empty)
-                chat.setLastMessage("");
-                chat.setLastMessageSenderId(null);
-                chat.setLastMessageType(null);
-                chat.setLastMessageDelivered(false);
-                chat.setLastMessageRead(false);
-                chat.setLastMessagePending(false);
-
                 if (prevLastMsg != null && !prevLastMsg.isEmpty()) {
-                    ContentValues cv = new ContentValues();
-                    cv.put(COL_CHAT_LAST_MESSAGE, "");
-                    db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{chat.getId()});
+                    // Retain existing summary if already loaded
+                } else {
+                    chat.setLastMessage("");
+                    chat.setLastMessageSenderId(null);
+                    chat.setLastMessageType(null);
+                    chat.setLastMessageDelivered(false);
+                    chat.setLastMessageRead(false);
+                    chat.setLastMessagePending(false);
                 }
             }
         } catch (Exception ignored) {
@@ -1886,6 +1905,14 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     public synchronized void saveMessage(String chatId, Message message) {
         if (message == null || message.getId() == null || chatId == null) return;
+        boolean isSpecialOrMedia = (message.getMediaUrl() != null && !message.getMediaUrl().isEmpty())
+                || (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty())
+                || (message.getPollJson() != null && !message.getPollJson().isEmpty())
+                || message.isBlink()
+                || (message.getType() != null && !"text".equalsIgnoreCase(message.getType()));
+        if (!isSpecialOrMedia && (message.getText() == null || message.getText().trim().isEmpty())) {
+            return;
+        }
         SQLiteDatabase db = getEncryptedDb();
 
         ContentValues cv = new ContentValues();
@@ -1991,7 +2018,13 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         }
         chatCv.put(COL_CHAT_LAST_MESSAGE, summary);
         chatCv.put(COL_CHAT_LAST_MESSAGE_TIME, cv.getAsLong(COL_MSG_TIMESTAMP));
-        db.update(TABLE_CHATS, chatCv, COL_CHAT_ID + "=?", new String[]{chatId});
+        int chatRowsUpdated = db.update(TABLE_CHATS, chatCv, COL_CHAT_ID + "=?", new String[]{chatId});
+        if (chatRowsUpdated == 0 && chatId.contains("_") && !chatId.startsWith("group_") && !chatId.startsWith("channel_")) {
+            String[] sp = chatId.split("_");
+            if (sp.length == 2) {
+                db.update(TABLE_CHATS, chatCv, COL_CHAT_ID + "=?", new String[]{sp[1] + "_" + sp[0]});
+            }
+        }
 
         ramSingleMessageCache.put(message.getId(), message);
         List<Message> cachedList = ramMessageListCache.get(chatId);
@@ -2759,10 +2792,30 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         Cursor c = null;
         try {
             long now = System.currentTimeMillis();
+            String revCid = null;
+            if (chatId.contains("_") && !chatId.startsWith("group_") && !chatId.startsWith("channel_")) {
+                String[] sp = chatId.split("_");
+                if (sp.length == 2) {
+                    revCid = sp[1] + "_" + sp[0];
+                }
+            }
+
+            String selection;
+            String[] selectionArgs;
+            if (revCid != null && !revCid.equals(chatId)) {
+                selection = "(" + COL_MSG_CHAT_ID + "=? OR " + COL_MSG_CHAT_ID + "=?) AND ("
+                        + COL_MSG_EXPIRES_AT + " IS NULL OR " + COL_MSG_EXPIRES_AT + "=0 OR " + COL_MSG_EXPIRES_AT + ">?)";
+                selectionArgs = new String[]{chatId, revCid, String.valueOf(now)};
+            } else {
+                selection = COL_MSG_CHAT_ID + "=? AND ("
+                        + COL_MSG_EXPIRES_AT + " IS NULL OR " + COL_MSG_EXPIRES_AT + "=0 OR " + COL_MSG_EXPIRES_AT + ">?)";
+                selectionArgs = new String[]{chatId, String.valueOf(now)};
+            }
+
             c = db.query(TABLE_MESSAGES,
                     new String[]{COL_MSG_TEXT, COL_MSG_TYPE, COL_MSG_TIMESTAMP, COL_MSG_BLINK},
-                    COL_MSG_CHAT_ID + "=? AND (" + COL_MSG_EXPIRES_AT + "=0 OR " + COL_MSG_EXPIRES_AT + ">?)",
-                    new String[]{chatId, String.valueOf(now)},
+                    selection,
+                    selectionArgs,
                     null, null,
                     COL_MSG_TIMESTAMP + " DESC",
                     "1");
@@ -2795,11 +2848,11 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 if (timestamp > 0) {
                     cv.put(COL_CHAT_LAST_MESSAGE_TIME, timestamp);
                 }
-            } else {
-                // All messages in this chat have vanished or been deleted
-                cv.put(COL_CHAT_LAST_MESSAGE, "");
+                int updated = db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{chatId});
+                if (updated == 0 && revCid != null) {
+                    db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{revCid});
+                }
             }
-            db.update(TABLE_CHATS, cv, COL_CHAT_ID + "=?", new String[]{chatId});
         } catch (Exception ignored) {
         } finally {
             if (c != null) c.close();

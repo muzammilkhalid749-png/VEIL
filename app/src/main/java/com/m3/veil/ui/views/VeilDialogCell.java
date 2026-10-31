@@ -574,7 +574,8 @@ public class VeilDialogCell extends View {
         // 1. Outgoing Message Checkmark State Machine
         boolean isOutgoingLast = mChat.getLastMessageSenderId() != null
                 && !mChat.getLastMessageSenderId().isEmpty()
-                && mChat.getLastMessageSenderId().equals(mCurrentUserId);
+                && (mChat.getLastMessageSenderId().equals(mCurrentUserId)
+                    || com.m3.veil.manager.AuthManager.getInstance().isMyUserId(getContext(), mChat.getLastMessageSenderId()));
 
         int newCheckState = STATUS_NONE;
         if (isOutgoingLast && !mChat.isTyping()) {
