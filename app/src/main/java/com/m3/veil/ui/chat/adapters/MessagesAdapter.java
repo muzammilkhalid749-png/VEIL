@@ -138,6 +138,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         return "Peer";
     }
 
+    private static final androidx.collection.LruCache<String, String> SENDER_NAME_CACHE = new androidx.collection.LruCache<>(256);
+
     /**
      * Resolves the group sender display name honoring the user's privacy policy:
      * - If preferUsername or sovereign profile has showUsernameInGroup enabled, renders @username.
@@ -146,11 +148,18 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     public static String resolveSenderDisplayName(android.content.Context ctx, Message message) {
         if (message == null) return "Peer";
         String senderId = message.getSenderId();
+        if (senderId != null) {
+            String cached = SENDER_NAME_CACHE.get(senderId);
+            if (cached != null) return cached;
+        }
         String username = message.getSenderUsername();
         boolean preferUsername = message.isPreferUsername();
         String profileName = message.getSenderName();
 
-        if (senderId != null && ctx != null) {
+        boolean hasValidName = profileName != null && !profileName.trim().isEmpty()
+                && !com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(profileName);
+
+        if (!hasValidName && senderId != null && ctx != null) {
             try {
                 com.m3.veil.database.EncryptedChatDatabase db = com.m3.veil.database.EncryptedChatDatabase.getInstance(ctx);
                 com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest = db.getSovereignProfileManifest(senderId);
@@ -166,19 +175,23 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             } catch (Throwable ignored) {}
         }
 
+        String result;
         // According to user privacy setting: if user configured to show username -> show @username, otherwise show profile name
         if (preferUsername && username != null && !username.trim().isEmpty()) {
             String clean = username.trim();
-            return clean.startsWith("@") ? clean : "@" + clean;
+            result = clean.startsWith("@") ? clean : "@" + clean;
+        } else if (profileName != null && !profileName.trim().isEmpty() && !com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(profileName)) {
+            result = profileName.trim();
+        } else if (senderId != null && senderId.length() >= 4) {
+            result = "Peer #" + senderId.substring(0, 4);
+        } else {
+            result = "Peer";
         }
 
-        if (profileName != null && !profileName.trim().isEmpty() && !com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(profileName)) {
-            return profileName.trim();
+        if (senderId != null) {
+            SENDER_NAME_CACHE.put(senderId, result);
         }
-        if (senderId != null && senderId.length() >= 4) {
-            return "Peer #" + senderId.substring(0, 4);
-        }
-        return "Peer";
+        return result;
     }
 
     /**
@@ -1340,6 +1353,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     public void invalidateMessageCache() {
         this.lastIndexedSize = -1;
         this.messageByIdCache.clear();
+        SENDER_NAME_CACHE.evictAll();
     }
 
     public void stopAudioPlayback() {

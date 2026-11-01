@@ -3918,7 +3918,16 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    }
 
    public void initiateConnection(final String peerId) {
-      if (peerId != null && !peerId.isEmpty() && !peerId.equals(this.currentUserId)) {
+      if (peerId == null || peerId.isEmpty() || peerId.equals(this.currentUserId)) {
+         return;
+      }
+      try {
+         com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(this.context);
+         if (pm.isSelfForActivePersona(peerId) || pm.findLocalPersonaByPeerId(peerId) != null) {
+            return;
+         }
+      } catch (Throwable ignored) {}
+      if (true) {
          if (this.isPeerConnected(peerId)) {
             return;
          }

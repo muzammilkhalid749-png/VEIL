@@ -368,6 +368,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     // RAM Cache Layer for 0ms reads (modeled after Telegram MessagesStorage in-memory caches)
     private final Map<String, Chat> ramChatCache = new ConcurrentHashMap<>();
+    private final java.util.Set<String> unblockedCache = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private final Map<String, List<Message>> ramMessageListCache = new ConcurrentHashMap<>();
     private final Map<String, Message> ramSingleMessageCache = new ConcurrentHashMap<>();
 
@@ -1643,18 +1644,26 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             }
             ed.apply();
         } catch (Exception ignored) {}
+        unblockedCache.clear();
         notifyChatsChanged();
     }
 
     public boolean isChatBlocked(String chatIdOrPeerId) {
         if (chatIdOrPeerId == null || chatIdOrPeerId.isEmpty()) return false;
+        if (unblockedCache.contains(chatIdOrPeerId)) return false;
         try {
             android.content.SharedPreferences prefs = context.getSharedPreferences("VeilBlockedRegistry", Context.MODE_PRIVATE);
             if (prefs.getBoolean("blk_" + chatIdOrPeerId, false) || prefs.getBoolean("blk_peer_" + chatIdOrPeerId, false)) {
                 return true;
             }
             Chat direct = ramChatCache.get(chatIdOrPeerId);
-            if (direct != null && direct.isBlocked()) return true;
+            if (direct != null) {
+                if (direct.isBlocked()) return true;
+                if (chatIdOrPeerId.equals(direct.getId())) {
+                    unblockedCache.add(chatIdOrPeerId);
+                    return false;
+                }
+            }
             for (Chat c : ramChatCache.values()) {
                 if (c != null && c.isBlocked()) {
                     if (chatIdOrPeerId.equals(c.getId())
@@ -1687,6 +1696,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             }
         } catch (Exception ignored) {
         }
+        unblockedCache.add(chatIdOrPeerId);
         return false;
     }
 

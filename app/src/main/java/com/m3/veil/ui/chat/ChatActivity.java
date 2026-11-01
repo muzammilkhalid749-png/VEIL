@@ -694,7 +694,7 @@ public class ChatActivity extends AppCompatActivity {
                 if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId))) {
                     return;
                 }
-                if (!isGroupChatContext() && !com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+                if (!isGroupChatContext() && !isDirectChatAcceptedFastUi()) {
                     return;
                 }
                 runOnUiThread(() -> {
@@ -976,8 +976,10 @@ public class ChatActivity extends AppCompatActivity {
                 com.m3.veil.webrtc.WebRtcManager.getInstance(this).init(currentUserId);
                 if (recipientId != null && !recipientId.trim().isEmpty()
                         && !recipientId.startsWith("group_") && !recipientId.startsWith("channel_") && !recipientId.startsWith("lounge_")) {
-                    com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
                     com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(this);
+                    if (!pm.isSelfForActivePersona(recipientId) && pm.findLocalPersonaByPeerId(recipientId) == null) {
+                        com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
+                    }
                     com.m3.veil.model.Persona localPeerPersona = pm.findLocalPersonaByPeerId(recipientId);
                     if (localPeerPersona != null && !localPeerPersona.getId().equals(pm.getActivePersonaId())) {
                         String localName = localPeerPersona.getDisplayName();
@@ -4080,7 +4082,7 @@ public class ChatActivity extends AppCompatActivity {
                 Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (!com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+            if (!isDirectChatAcceptedFastUi()) {
                 Toast.makeText(this, "Calls are disabled until the chat request is accepted", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -4117,7 +4119,7 @@ public class ChatActivity extends AppCompatActivity {
                 Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (!com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+            if (!isDirectChatAcceptedFastUi()) {
                 Toast.makeText(this, "Calls are disabled until the chat request is accepted", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -4365,7 +4367,7 @@ public class ChatActivity extends AppCompatActivity {
 
         boolean isUnacceptedDirect = !isGroupChatContext()
                 && ((currentLocalChat != null && currentLocalChat.isRequest())
-                || !com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId));
+                || !isDirectChatAcceptedFastUi());
 
         if (!isUnacceptedDirect && isRecipientTypingState) {
             onlineStatus.setText(subPrefix + "typing...");
@@ -7571,8 +7573,11 @@ public class ChatActivity extends AppCompatActivity {
             int dialed = 0;
             for (String pId : currentLocalChat.getParticipants()) {
                 if (pId != null && !pId.equals(currentUserId)) {
-                    com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(pId);
-                    if (++dialed >= 12) break;
+                    com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(this);
+                    if (!pm.isSelfForActivePersona(pId) && pm.findLocalPersonaByPeerId(pId) == null) {
+                        com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(pId);
+                        if (++dialed >= 12) break;
+                    }
                 }
             }
         }
@@ -7623,8 +7628,11 @@ public class ChatActivity extends AppCompatActivity {
                                 int dialed = 0;
                                 for (String pId : parts) {
                                     if (pId != null && !pId.equals(currentUserId)) {
-                                        com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this).initiateConnection(pId);
-                                        if (++dialed >= 12) break;
+                                        com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(ChatActivity.this);
+                                        if (!pm.isSelfForActivePersona(pId) && pm.findLocalPersonaByPeerId(pId) == null) {
+                                            com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this).initiateConnection(pId);
+                                            if (++dialed >= 12) break;
+                                        }
                                     }
                                 }
                             }
@@ -7820,7 +7828,10 @@ public class ChatActivity extends AppCompatActivity {
 
         // Initiate WebRTC mesh link when opening conversation
         if (recipientId != null && !recipientId.isEmpty()) {
-            com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
+            com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(this);
+            if (!pm.isSelfForActivePersona(recipientId) && pm.findLocalPersonaByPeerId(recipientId) == null) {
+                com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
+            }
         }
 
         if (directMessagesListener != null) directMessagesListener.remove();
@@ -11526,9 +11537,13 @@ public class ChatActivity extends AppCompatActivity {
 
     private void jumpToNextUnreadMention() {
         if (messageList == null || messageList.isEmpty()) return;
-        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
-                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(this);
-        String myUname = manifest != null && manifest.username != null ? manifest.username.toLowerCase(java.util.Locale.ROOT).replace("@", "") : "";
+        String myUname = "";
+        try {
+            com.m3.veil.model.Persona activeP = com.m3.veil.manager.PersonaManager.getInstance(this).getActivePersona();
+            if (activeP != null && activeP.getUsername() != null) {
+                myUname = activeP.getUsername().toLowerCase(java.util.Locale.ROOT).replace("@", "");
+            }
+        } catch (Throwable ignored) {}
 
         int targetIndex = -1;
         for (int i = messageList.size() - 1; i >= 0; i--) {
@@ -11561,9 +11576,13 @@ public class ChatActivity extends AppCompatActivity {
         TextView tvCount = findViewById(R.id.tvJumpMentionCount);
         if (layoutJump == null) return;
 
-        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest =
-                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getLocalProfile(this);
-        String myUname = manifest != null && manifest.username != null ? manifest.username.toLowerCase(java.util.Locale.ROOT).replace("@", "") : "";
+        String myUname = "";
+        try {
+            com.m3.veil.model.Persona activeP = com.m3.veil.manager.PersonaManager.getInstance(this).getActivePersona();
+            if (activeP != null && activeP.getUsername() != null) {
+                myUname = activeP.getUsername().toLowerCase(java.util.Locale.ROOT).replace("@", "");
+            }
+        } catch (Throwable ignored) {}
 
         int mentionCount = 0;
         for (Message m : messageList) {

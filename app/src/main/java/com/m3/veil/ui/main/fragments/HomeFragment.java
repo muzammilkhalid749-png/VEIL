@@ -1028,7 +1028,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             if (localChats != null) {
                 int prewarmIdx = 0;
                 for (Chat c : localChats) {
-                    if (c.getId() != null && prewarmIdx < 12) {
+                    if (c.getId() != null && prewarmIdx < 3) {
                         com.m3.veil.manager.VeilMessagesController.getInstance(ctx).prewarmDialog(c.getId());
                         prewarmIdx++;
                     }
