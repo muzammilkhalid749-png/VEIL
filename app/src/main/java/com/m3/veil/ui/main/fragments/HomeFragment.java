@@ -908,25 +908,16 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         homeDebounceHandler.postDelayed(loadChatsRunnable, 50);
     }
 
+    private final java.util.Map<String, Long> homePeerConnectCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
+
     private boolean isSelfId(Context ctx, String id) {
         if (id == null || id.isEmpty()) return false;
         try {
-            com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(ctx);
-            String activePeerId = pm.getActivePersonaPeerId();
-            if (id.equals(activePeerId)) return true;
-            String activePersonaId = pm.getActivePersonaId();
-            if (id.equals(activePersonaId)) return true;
-            if (com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID.equals(activePersonaId)) {
-                String authUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(ctx);
-                if (id.equals(authUid)) return true;
-                String userPrefUid = new com.m3.veil.utils.UserPreferences(ctx).getUserId();
-                if (id.equals(userPrefUid)) return true;
-            }
+            return com.m3.veil.manager.PersonaManager.getInstance(ctx).isSelfForActivePersona(id);
         } catch (Exception ignored) {
             String authUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(ctx);
-            if (id.equals(authUid)) return true;
+            return id.equals(authUid);
         }
-        return false;
     }
 
     private String resolveDirectChatPeerId(Context ctx, Chat chat) {
@@ -940,6 +931,11 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         }
         String cid = chat.getId();
         if (cid.contains("_") && !cid.startsWith("group_") && !cid.startsWith("channel_")) {
+            String activeUid = com.m3.veil.manager.PersonaManager.getInstance(ctx).getActivePersonaPeerId();
+            String extracted = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(cid, activeUid);
+            if (extracted != null && !extracted.isEmpty() && !isSelfId(ctx, extracted)) {
+                return extracted;
+            }
             String[] sp = cid.split("_");
             if (sp.length == 2) {
                 if (isSelfId(ctx, sp[0]) && !isSelfId(ctx, sp[1])) {
@@ -985,6 +981,19 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                         if (needsPeerLookup) {
                             String peerId = resolveDirectChatPeerId(ctx, c);
                             if (peerId != null && !peerId.isEmpty() && !isSelfId(ctx, peerId)) {
+                                com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(ctx);
+                                com.m3.veil.model.Persona localPeerPersona = pm.findLocalPersonaByPeerId(peerId);
+                                if (localPeerPersona != null && !localPeerPersona.getId().equals(pm.getActivePersonaId())) {
+                                    String lpName = localPeerPersona.getDisplayName();
+                                    if (lpName != null && !lpName.trim().isEmpty()) {
+                                        c.setName(lpName);
+                                        if (localPeerPersona.getAvatarUri() != null) {
+                                            c.setAvatar(localPeerPersona.getAvatarUri());
+                                        }
+                                        EncryptedChatDatabase.getInstance(ctx).saveOrUpdateChat(c);
+                                        continue;
+                                    }
+                                }
                                 if (!resolvedPeerLookups.add(peerId)) {
                                     continue;
                                 }
@@ -1534,12 +1543,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     String avatar = doc.getString("avatar");
                                     Boolean isPublicObj = doc.getBoolean("isPublic");
                                     String handle = doc.getString("handle");
-                                    @SuppressWarnings("unchecked")
-                                    java.util.List<String> parts = (java.util.List<String>) doc.get("participants");
-                                    @SuppressWarnings("unchecked")
-                                    java.util.List<String> adminIds = (java.util.List<String>) doc.get("adminIds");
-                                    com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
-                                    if (ts == null) ts = com.google.firebase.Timestamp.now();
+                                    java.util.List<String> parts = VeilFirestoreUtils.getSafeStringList(doc, "participants");
+                                    java.util.List<String> adminIds = VeilFirestoreUtils.getSafeStringList(doc, "adminIds");
+                                    com.google.firebase.Timestamp ts = VeilFirestoreUtils.getSafeTimestamp(doc, "timestamp", com.google.firebase.Timestamp.now());
 
                                     String peerId = null;
                                     if (parts != null) {
@@ -1714,11 +1720,15 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 });
                                     }
 
-                                    if (parts != null) {
-                                        for (String pId : parts) {
-                                            if (pId != null && !pId.equals(uid) && !targetDb.isPeerOrChatBlocked(gId, pId)) {
-                                                WebRtcManager.getInstance(appCtx).initiateConnection(pId);
-                                            }
+                                    if (parts != null && isDirectChat && peerId != null
+                                            && com.m3.veil.manager.PersonaManager.getInstance(appCtx).findLocalPersonaByPeerId(peerId) == null) {
+                                        long nowConnectMs = System.currentTimeMillis();
+                                        Long lastDialed = homePeerConnectCooldowns.get(peerId);
+                                        if ((lastDialed == null || (nowConnectMs - lastDialed) > 60000L)
+                                                && homePeerConnectCooldowns.size() < 6
+                                                && !targetDb.isPeerOrChatBlocked(gId, peerId)) {
+                                            homePeerConnectCooldowns.put(peerId, nowConnectMs);
+                                            WebRtcManager.getInstance(appCtx).initiateConnection(peerId);
                                         }
                                     }
 
@@ -1910,8 +1920,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                 for (com.google.firebase.firestore.DocumentSnapshot doc : chatDocs) {
                                     String cId = doc.getString("chatId");
                                     if (cId == null) cId = doc.getId();
-                                    @SuppressWarnings("unchecked")
-                                    java.util.List<String> parts = (java.util.List<String>) doc.get("participants");
+                                    java.util.List<String> parts = VeilFirestoreUtils.getSafeStringList(doc, "participants");
                                     String peerId = null;
                                     if (parts != null) {
                                         for (String p : parts) {
@@ -1932,7 +1941,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     }
                                     if (peerId == null) continue;
 
-                                    EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(appCtx, cId, peerId);
+                                    EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(appCtx, cId, uid);
                                     if (targetDb.isPeerOrChatBlocked(cId, peerId)) {
                                         continue;
                                     }
@@ -2265,9 +2274,12 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                 }
             }
             if ((recipientId == null || recipientId.trim().isEmpty()) && targetChatId != null && targetChatId.contains("_")) {
-                String[] parts = targetChatId.split("_");
-                if (parts.length == 2) {
-                    recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+                recipientId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(targetChatId, currentUserId);
+                if (recipientId == null) {
+                    String[] parts = targetChatId.split("_");
+                    if (parts.length == 2) {
+                        recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+                    }
                 }
             }
             if (recipientId != null && !recipientId.trim().isEmpty()) {
@@ -2330,9 +2342,12 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                 }
             }
             if ((recipientId == null || recipientId.trim().isEmpty()) && chat.getId() != null) {
-                String[] parts = chat.getId().split("_");
-                if (parts.length == 2) {
-                    recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+                recipientId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(chat.getId(), currentUserId);
+                if (recipientId == null) {
+                    String[] parts = chat.getId().split("_");
+                    if (parts.length == 2) {
+                        recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+                    }
                 }
             }
             if (recipientId != null && !recipientId.trim().isEmpty()) {

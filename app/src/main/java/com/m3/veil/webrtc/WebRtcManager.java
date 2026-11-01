@@ -723,21 +723,31 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          pc = null;
       }
 
-      int maxConn = VeilPerformanceController.getInstance().getMaxWebRtcConnections();
+      int maxConn = Math.max(12, VeilPerformanceController.getInstance().getMaxWebRtcConnections());
       if (!this.peerConnections.containsKey(peerId) && this.peerConnections.size() >= maxConn) {
          String pruneCandidate = null;
+         long nowMs = System.currentTimeMillis();
 
          for(Map.Entry<String, PeerConnection> entry : this.peerConnections.entrySet()) {
+            String candidateId = (String)entry.getKey();
             PeerConnection.IceConnectionState state = ((PeerConnection)entry.getValue()).iceConnectionState();
-            if (state == IceConnectionState.DISCONNECTED || state == IceConnectionState.FAILED || state == IceConnectionState.CLOSED || state == IceConnectionState.NEW) {
-               pruneCandidate = (String)entry.getKey();
+            if (state == IceConnectionState.DISCONNECTED || state == IceConnectionState.FAILED || state == IceConnectionState.CLOSED) {
+               pruneCandidate = candidateId;
                break;
+            }
+            if (state == IceConnectionState.NEW) {
+               Long lastOffer = (Long)this.lastOfferTimestamp.get(candidateId);
+               if (lastOffer == null || nowMs - lastOffer > 25000L) {
+                  pruneCandidate = candidateId;
+                  break;
+               }
             }
          }
 
          if (pruneCandidate != null) {
             Log.i("WebRtcManager", "Pruning stale peer connection " + pruneCandidate + " to respect device budget (" + maxConn + " peers)");
             this.closePeerConnection(pruneCandidate);
+            this.lastOfferTimestamp.put(pruneCandidate, nowMs);
          }
       }
 

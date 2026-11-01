@@ -370,57 +370,66 @@
         </androidx.core.widget.NestedScrollView>
 
         <!-- Empty State -->
-        <LinearLayout
+        <androidx.core.widget.NestedScrollView
             android:id="@+id/emptyState"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center"
+            android:fillViewport="true"
+            android:nestedScrollingEnabled="true"
+            android:overScrollMode="always"
             android:visibility="gone"
-            android:padding="32dp"
-            android:layout_marginTop="72dp">
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-            <ImageView
-                android:layout_width="72dp"
-                android:layout_height="72dp"
-                android:src="@drawable/ic_chat_empty"
-                android:layout_marginBottom="20dp"
-                app:tint="@color/textSecondary"
-                android:contentDescription="@string/no_conversations" />
-
-            <TextView
-                android:id="@+id/tvEmptyTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/no_conversations"
-                android:textColor="@color/textPrimary"
-                android:textSize="20sp"
-                android:fontFamily="sans-serif-medium"
-                android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:id="@+id/tvEmptySubtitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/start_new_conversation_hint"
-                android:textColor="@color/textSecondary"
-                android:textSize="14sp"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
                 android:gravity="center"
-                android:lineSpacingExtra="2dp" />
+                android:padding="32dp"
+                android:paddingBottom="100dp">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/startChatButton"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:text="@string/start_chat"
-                android:textColor="@android:color/white"
-                app:backgroundTint="@color/colorPrimary"
-                app:cornerRadius="24dp"
-                android:layout_marginTop="24dp"
-                android:paddingStart="28dp"
-                android:paddingEnd="28dp" />
+                <ImageView
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:src="@drawable/ic_chat_empty"
+                    android:layout_marginBottom="20dp"
+                    app:tint="@color/textSecondary"
+                    android:contentDescription="@string/no_conversations" />
 
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/tvEmptyTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/no_conversations"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="20sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tvEmptySubtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/start_new_conversation_hint"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="14sp"
+                    android:gravity="center"
+                    android:lineSpacingExtra="2dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/startChatButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:text="@string/start_chat"
+                    android:textColor="@android:color/white"
+                    app:backgroundTint="@color/colorPrimary"
+                    app:cornerRadius="24dp"
+                    android:layout_marginTop="24dp"
+                    android:paddingStart="28dp"
+                    android:paddingEnd="28dp" />
+
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
 
         <!-- Loading State -->
         <ProgressBar

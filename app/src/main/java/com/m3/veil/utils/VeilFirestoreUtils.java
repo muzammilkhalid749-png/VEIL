@@ -134,4 +134,38 @@ public final class VeilFirestoreUtils {
         }
         return defaultVal;
     }
+
+    /**
+     * Safely reads a List<String> from a DocumentSnapshot field without throwing
+     * ClassCastException when the underlying value is an Object[], String[], or Collection.
+     */
+    public static java.util.List<String> getSafeStringList(@Nullable DocumentSnapshot doc, String field) {
+        java.util.List<String> result = new java.util.ArrayList<>();
+        if (doc == null || field == null || !doc.contains(field)) {
+            return result;
+        }
+        try {
+            Object obj = doc.get(field);
+            if (obj instanceof java.util.Collection<?>) {
+                for (Object item : (java.util.Collection<?>) obj) {
+                    if (item != null) {
+                        result.add(String.valueOf(item));
+                    }
+                }
+            } else if (obj instanceof Object[]) {
+                for (Object item : (Object[]) obj) {
+                    if (item != null) {
+                        result.add(String.valueOf(item));
+                    }
+                }
+            } else if (obj instanceof String) {
+                String s = ((String) obj).trim();
+                if (!s.isEmpty()) {
+                    result.add(s);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return result;
+    }
 }

@@ -336,7 +336,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
         if (senderId != null && !senderId.isEmpty()) {
             if (currentUserId != null && currentUserId.equals(senderId)) return true;
-            if (com.m3.veil.manager.AuthManager.getInstance().isMyUserId(com.m3.veil.VeilApplication.getInstance(), senderId)) return true;
+            try {
+                if (com.m3.veil.manager.PersonaManager.getInstance(com.m3.veil.VeilApplication.getInstance()).isSelfForActivePersona(senderId)) {
+                    return true;
+                }
+            } catch (Throwable ignored) {}
         }
         return false;
     }

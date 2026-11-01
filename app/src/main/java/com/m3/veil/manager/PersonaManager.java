@@ -326,16 +326,171 @@ public class PersonaManager {
      * Persona 1 uses the primary UID; Persona 2+ uses its isolated keyPairId so chats/groups never collide.
      */
     public synchronized String getActivePersonaPeerId() {
-        Persona active = getActivePersona();
+        return getPersonaPeerId(getActivePersona());
+    }
+
+    /**
+     * Returns the canonical P2P/Firestore peerId for any given Persona.
+     */
+    public synchronized String getPersonaPeerId(Persona persona) {
         UserPreferences userPrefs = new UserPreferences(appContext);
         String baseUid = userPrefs.getUserId();
-        if (active == null || PRIMARY_PERSONA_ID.equals(active.getId())) {
-            return !TextUtils.isEmpty(baseUid) ? baseUid : (active != null ? active.getKeyPairId() : "sovereign_node");
+        if (TextUtils.isEmpty(baseUid)) {
+            try {
+                if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                    baseUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid();
+                }
+            } catch (Throwable ignored) {}
         }
-        if (!TextUtils.isEmpty(active.getKeyPairId())) {
-            return active.getKeyPairId();
+        if (persona == null || PRIMARY_PERSONA_ID.equals(persona.getId())) {
+            return !TextUtils.isEmpty(baseUid) ? baseUid : (persona != null && !TextUtils.isEmpty(persona.getKeyPairId()) ? persona.getKeyPairId() : "sovereign_node");
         }
-        return (!TextUtils.isEmpty(baseUid) ? baseUid : "sovereign_node") + "_" + active.getId();
+        if (!TextUtils.isEmpty(persona.getKeyPairId()) && !persona.getKeyPairId().equals(baseUid)) {
+            return persona.getKeyPairId();
+        }
+        return (!TextUtils.isEmpty(baseUid) ? baseUid : "sovereign_node") + "_" + persona.getId();
+    }
+
+    /**
+     * Finds a local Persona on this device matching the given peerId / userId / keyPairId, or null if external peer.
+     */
+    public synchronized Persona findLocalPersonaByPeerId(String peerOrUserId) {
+        if (TextUtils.isEmpty(peerOrUserId)) return null;
+        String clean = peerOrUserId.trim();
+        List<Persona> list = getPersonas();
+        UserPreferences userPrefs = new UserPreferences(appContext);
+        String baseUid = userPrefs.getUserId();
+        String firebaseUid = null;
+        try {
+            if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                firebaseUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid();
+            }
+        } catch (Throwable ignored) {}
+
+        // 1. Check secondary personas first (most specific, e.g. contains _persona_)
+        for (Persona p : list) {
+            if (p == null || PRIMARY_PERSONA_ID.equals(p.getId())) continue;
+            String pPeerId = getPersonaPeerId(p);
+            if (clean.equals(p.getId())
+                    || clean.equals(pPeerId)
+                    || (!TextUtils.isEmpty(p.getKeyPairId()) && clean.equals(p.getKeyPairId()))
+                    || clean.endsWith("_" + p.getId())) {
+                return p;
+            }
+        }
+
+        // 2. Check primary persona (only if clean does NOT contain a secondary _persona_ suffix)
+        if (!clean.contains("_persona_")) {
+            for (Persona p : list) {
+                if (p != null && PRIMARY_PERSONA_ID.equals(p.getId())) {
+                    String pPeerId = getPersonaPeerId(p);
+                    if (clean.equals(PRIMARY_PERSONA_ID)
+                            || clean.equals(pPeerId)
+                            || (!TextUtils.isEmpty(baseUid) && clean.equals(baseUid))
+                            || (!TextUtils.isEmpty(firebaseUid) && clean.equals(firebaseUid))
+                            || (!TextUtils.isEmpty(p.getKeyPairId()) && clean.equals(p.getKeyPairId()))) {
+                        return p;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Strictly checks whether candidateId belongs to the CURRENTLY ACTIVE persona ONLY.
+     * Other personas belonging to the same user on this device return FALSE so they are treated as completely separate peer identities.
+     */
+    public synchronized boolean isSelfForActivePersona(String candidateId) {
+        if (TextUtils.isEmpty(candidateId)) return false;
+        String clean = candidateId.trim();
+        if ("me".equalsIgnoreCase(clean)) return true;
+
+        Persona active = getActivePersona();
+        String activeId = active != null ? active.getId() : PRIMARY_PERSONA_ID;
+        String activePeerId = getPersonaPeerId(active);
+
+        if (clean.equals(activeId) || clean.equals(activePeerId)) {
+            return true;
+        }
+        if (active != null && !TextUtils.isEmpty(active.getKeyPairId()) && clean.equals(active.getKeyPairId())) {
+            return true;
+        }
+
+        if (!PRIMARY_PERSONA_ID.equals(activeId)) {
+            // Secondary persona is active: ONLY IDs matching this secondary persona are self!
+            return clean.endsWith("_" + activeId);
+        } else {
+            // Primary persona is active: any ID referencing a secondary persona is NOT self!
+            if (clean.contains("_persona_") || (clean.startsWith("persona_") && !PRIMARY_PERSONA_ID.equals(clean))) {
+                return false;
+            }
+            UserPreferences userPrefs = new UserPreferences(appContext);
+            String prefUid = userPrefs.getUserId();
+            if (!TextUtils.isEmpty(prefUid) && clean.equals(prefUid)) {
+                return true;
+            }
+            try {
+                if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                    String fbUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid();
+                    if (!TextUtils.isEmpty(fbUid) && clean.equals(fbUid)) {
+                        return true;
+                    }
+                }
+            } catch (Throwable ignored) {}
+            return false;
+        }
+    }
+
+    /**
+     * Publishes a specific Persona as a standalone user entry in Firestore (`users/{peerId}` and `usernames/{username}`)
+     * and caches its SovereignProfileManifest locally so personas can discover and message each other as distinct identities.
+     */
+    public void publishPersonaToCloudDirectory(Persona persona) {
+        if (persona == null) return;
+        final String peerId = getPersonaPeerId(persona);
+        if (TextUtils.isEmpty(peerId)) return;
+        final String username = Persona.normalizeUsername(
+                !TextUtils.isEmpty(persona.getUsername()) ? persona.getUsername() : persona.getDisplayName());
+        final String displayName = !TextUtils.isEmpty(persona.getDisplayName()) ? persona.getDisplayName() : username;
+        final String bio = persona.getBio() != null ? persona.getBio() : "";
+        final String avatar = persona.getAvatarUri() != null ? persona.getAvatarUri() : "default_1";
+
+        new Thread(() -> {
+            try {
+                String pubKey = com.m3.veil.utils.EncryptionManager.getPublicKeyString();
+                java.util.Map<String, Object> userDoc = new java.util.HashMap<>();
+                userDoc.put("userId", peerId);
+                userDoc.put("uid", peerId);
+                userDoc.put("username", username);
+                userDoc.put("usernameLower", username.toLowerCase(java.util.Locale.ROOT));
+                userDoc.put("displayName", displayName);
+                userDoc.put("bio", bio);
+                userDoc.put("avatar", avatar);
+                userDoc.put("personaId", persona.getId());
+                userDoc.put("online", persona.getId().equals(getActivePersonaId()));
+                userDoc.put("lastSeen", com.google.firebase.Timestamp.now());
+                if (!TextUtils.isEmpty(pubKey)) {
+                    userDoc.put("publicKey", pubKey);
+                }
+                com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+                db.collection("users").document(peerId)
+                        .set(userDoc, com.google.firebase.firestore.SetOptions.merge());
+
+                if (!TextUtils.isEmpty(username)) {
+                    java.util.Map<String, Object> unameDoc = new java.util.HashMap<>();
+                    unameDoc.put("userId", peerId);
+                    unameDoc.put("uid", peerId);
+                    unameDoc.put("username", username);
+                    unameDoc.put("displayName", displayName);
+                    if (!TextUtils.isEmpty(pubKey)) {
+                        unameDoc.put("publicKey", pubKey);
+                    }
+                    db.collection("usernames").document(username.toLowerCase(java.util.Locale.ROOT))
+                            .set(unameDoc, com.google.firebase.firestore.SetOptions.merge());
+                }
+            } catch (Throwable ignored) {}
+        }).start();
     }
 
     public synchronized int getPersonaSlotIndex(String personaId) {
@@ -428,7 +583,8 @@ public class PersonaManager {
         List<Persona> updated = masterDb.getAllPersonasFromDb();
         syncPrefsMirror(updated, getActivePersonaId());
 
-        // Auto-sync manifest to cloud so newly added/edited personas survive relogin with 12-phrase or phone
+        // Publish this persona as a distinct discoverable identity in Firestore & cloud manifest
+        publishPersonaToCloudDirectory(persona);
         try {
             com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(appContext).ensureCurrentUserPublished();
         } catch (Throwable ignored) {}
@@ -502,6 +658,7 @@ public class PersonaManager {
                     }
                 }
                 masterDb.upsertPersonaInDb(p);
+                publishPersonaToCloudDirectory(p);
             }
             List<Persona> all = masterDb.getAllPersonasFromDb();
             syncPrefsMirror(all, getActivePersonaId());
@@ -532,6 +689,9 @@ public class PersonaManager {
         syncPrefsMirror(all, targetPersonaId);
 
         Persona active = getActivePersona();
+        for (Persona p : all) {
+            publishPersonaToCloudDirectory(p);
+        }
 
         // 1. Switch isolated SQLite vault + WHERE owner_persona_id filter
         EncryptedChatDatabase.switchActiveVault(appContext, active.getId());

@@ -966,9 +966,27 @@ public class ChatActivity extends AppCompatActivity {
                 if (recipientId != null && !recipientId.trim().isEmpty()
                         && !recipientId.startsWith("group_") && !recipientId.startsWith("channel_") && !recipientId.startsWith("lounge_")) {
                     com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
+                    com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(this);
+                    com.m3.veil.model.Persona localPeerPersona = pm.findLocalPersonaByPeerId(recipientId);
+                    if (localPeerPersona != null && !localPeerPersona.getId().equals(pm.getActivePersonaId())) {
+                        String localName = localPeerPersona.getDisplayName();
+                        if (localName != null && !localName.trim().isEmpty()) {
+                            recipientName = localName;
+                            if (currentLocalChat != null && !currentLocalChat.isGroup()) {
+                                currentLocalChat.setName(localName);
+                                if (localPeerPersona.getAvatarUri() != null) {
+                                    currentLocalChat.setAvatar(localPeerPersona.getAvatarUri());
+                                }
+                                if (com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).hasAnyMessagesInChat(chatId)) {
+                                    com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveOrUpdateChat(currentLocalChat);
+                                }
+                            }
+                            runOnUiThread(this::updateRecipientHeader);
+                        }
+                    }
                     String myOwnName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
                     if (com.m3.veil.manager.VeilFeatureManager.isShadowVeilOrGeneric(recipientName)
-                            || (myOwnName != null && recipientName.equals(myOwnName))) {
+                            || (myOwnName != null && recipientName != null && recipientName.equals(myOwnName))) {
                         db.collection("users").document(recipientId).get().addOnSuccessListener(dbExecutor, doc -> {
                             if (doc != null && doc.exists()) {
                                 String dName = doc.getString("displayName");
@@ -3669,13 +3687,16 @@ public class ChatActivity extends AppCompatActivity {
         // Only show Accept/Decline banner to receiver if there are inbound messages from peer
         boolean hasInboundFromPeer = false;
         List<Message> msgs = messageList;
-        if (msgs != null) {
+        if (msgs != null && !msgs.isEmpty()) {
             for (Message m : msgs) {
-                if (m != null && recipientId != null && recipientId.equals(m.getSenderId())) {
+                if (m != null && m.getSenderId() != null && !isSenderMe(m.getSenderId(), m)) {
                     hasInboundFromPeer = true;
                     break;
                 }
             }
+        } else if (chatId != null && currentUserId != null) {
+            hasInboundFromPeer = com.m3.veil.database.EncryptedChatDatabase.getInstance(this)
+                    .getInboundUserMessageCount(chatId, currentUserId) > 0;
         }
         if (!hasInboundFromPeer) {
             // Local user is the sender who initiated the request: do not show accept/decline banner
@@ -3707,6 +3728,16 @@ public class ChatActivity extends AppCompatActivity {
         com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markDirectChatAccepted(chatId, recipientId);
         new Thread(() -> {
             com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).updateChatRequestStatus(chatId, false);
+            com.m3.veil.database.EncryptedChatDatabase senderPersonaDb = null;
+            try {
+                com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(ChatActivity.this);
+                com.m3.veil.model.Persona senderPersona = pm.findLocalPersonaByPeerId(recipientId);
+                if (senderPersona != null && !senderPersona.getId().equals(pm.getActivePersonaId())) {
+                    senderPersonaDb = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this, senderPersona.getId(), false);
+                    senderPersonaDb.markDirectChatAccepted(chatId, currentUserId);
+                    senderPersonaDb.updateChatRequestStatus(chatId, false);
+                }
+            } catch (Exception ignored) {}
             // Update Firestore chat/group doc so sender immediately learns request was accepted
             try {
                 java.util.Map<String, Object> acceptData = new java.util.HashMap<>();
@@ -3721,18 +3752,23 @@ public class ChatActivity extends AppCompatActivity {
             List<Message> allMsgs = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).getMessagesForChat(chatId);
             if (allMsgs != null && recipientId != null && !recipientId.isEmpty()) {
                 for (Message m : allMsgs) {
-                    if (m != null && recipientId.equals(m.getSenderId())) {
+                    if (m != null && !isSenderMe(m.getSenderId(), m)) {
                         boolean canMarkRead = !m.isMediaRequiringActionToRead();
                         com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this)
                                 .sendReceipt(recipientId, m.getId(), true, canMarkRead);
+                        long nowMs = System.currentTimeMillis();
                         com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this)
-                                .updateMessageStatus(m.getId(), true, canMarkRead, System.currentTimeMillis());
+                                .updateMessageStatus(m.getId(), true, canMarkRead, nowMs);
+                        if (senderPersonaDb != null) {
+                            senderPersonaDb.setMessagePending(m.getId(), false);
+                            senderPersonaDb.updateMessageStatus(m.getId(), true, canMarkRead, nowMs);
+                        }
                         if (db != null && m.getId() != null) {
                             java.util.Map<String, Object> ack = new java.util.HashMap<>();
                             ack.put("delivered", true);
                             if (canMarkRead) {
                                 ack.put("read", true);
-                                ack.put("readAt", System.currentTimeMillis());
+                                ack.put("readAt", nowMs);
                             }
                             db.collection("groups").document(chatId).collection("messages").document(m.getId())
                                     .set(ack, com.google.firebase.firestore.SetOptions.merge());
@@ -7327,7 +7363,7 @@ public class ChatActivity extends AppCompatActivity {
                 if (recipientId.equals(existing.getReceiverId())) return true;
                 if (recipientId.equals(existing.getSenderId())) return false;
             }
-            if (existing.getSenderId() != null && com.m3.veil.manager.AuthManager.getInstance().isMyUserId(this, existing.getSenderId())) {
+            if (existing.getSenderId() != null && com.m3.veil.manager.PersonaManager.getInstance(this).isSelfForActivePersona(existing.getSenderId())) {
                 return true;
             }
         }
@@ -7340,7 +7376,7 @@ public class ChatActivity extends AppCompatActivity {
                     return true;
                 }
             }
-            if (com.m3.veil.manager.AuthManager.getInstance().isMyUserId(this, sId)) {
+            if (com.m3.veil.manager.PersonaManager.getInstance(this).isSelfForActivePersona(sId)) {
                 return true;
             }
         }
@@ -7652,6 +7688,14 @@ public class ChatActivity extends AppCompatActivity {
             }
 
             // 1. Send individual read receipts for unread inbound messages
+            com.m3.veil.database.EncryptedChatDatabase senderPersonaDb = null;
+            try {
+                com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(ChatActivity.this);
+                com.m3.veil.model.Persona senderPersona = pm.findLocalPersonaByPeerId(recipientId);
+                if (senderPersona != null && !senderPersona.getId().equals(pm.getActivePersonaId())) {
+                    senderPersonaDb = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this, senderPersona.getId(), false);
+                }
+            } catch (Exception ignored) {}
             List<Message> unreadCandidates = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).getMessagesForChat(targetChatId);
             if (unreadCandidates != null) {
                 for (Message m : unreadCandidates) {
@@ -7666,6 +7710,10 @@ public class ChatActivity extends AppCompatActivity {
                             m.setRead(true);
                         }
                         com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).updateMessageStatus(m.getId(), true, m.isRead());
+                        if (senderPersonaDb != null) {
+                            senderPersonaDb.setMessagePending(m.getId(), false);
+                            senderPersonaDb.updateMessageStatus(m.getId(), true, m.isRead());
+                        }
                         if (targetChatId != null && db != null && m.getId() != null) {
                             try {
                                 Map<String, Object> ack = new HashMap<>();
@@ -7947,6 +7995,8 @@ public class ChatActivity extends AppCompatActivity {
                 messageList.clear();
                 messageList.addAll(filtered);
                 hideMinimalLoadingDialog();
+                initMessageRequestBanner();
+                updateRequestLimitComposerState();
 
                 if (newCount > prevCount && prevCount > 0 && isActivityResumed) {
                     int incomingCount = 0;

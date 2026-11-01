@@ -241,14 +241,30 @@ public class AuthManager {
     }
 
     /**
-     * Determines whether a given UID string belongs to the local device / logged-in user.
-     * O(1) lock-free RAM check — zero Keystore / SharedPreferences IPC during RecyclerView scrolling.
+     * Determines whether a given UID string belongs to the currently active persona identity.
+     * Other personas belonging to the same user return false so they are treated as distinct peer identities.
      */
     public boolean isMyUserId(@NonNull Context context, @Nullable String uid) {
         if (uid == null || uid.trim().isEmpty()) return false;
         String clean = uid.trim();
+        try {
+            PersonaManager pm = PersonaManager.getInstance(context.getApplicationContext());
+            String activePersonaId = pm.getActivePersonaId();
+            if (!PersonaManager.PRIMARY_PERSONA_ID.equals(activePersonaId)) {
+                // When a secondary persona is active, ONLY that secondary persona's IDs are "mine"
+                return pm.isSelfForActivePersona(clean);
+            }
+            // When primary persona is active, any secondary persona ID is NOT "mine"
+            if (clean.contains("_persona_") || (clean.startsWith("persona_") && !PersonaManager.PRIMARY_PERSONA_ID.equals(clean))) {
+                return false;
+            }
+            if (pm.isSelfForActivePersona(clean)) {
+                return true;
+            }
+        } catch (Throwable ignored) {}
+
         String fastUid = cachedCurrentUserId;
-        if (fastUid != null && (clean.equals(fastUid) || clean.equalsIgnoreCase(fastUid))) {
+        if (fastUid != null && !fastUid.contains("_persona_") && (clean.equals(fastUid) || clean.equalsIgnoreCase(fastUid))) {
             return true;
         }
         if (cachedMyUserIds.contains(clean)) {

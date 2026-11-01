@@ -584,15 +584,22 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         try {
             PersonaManager pm = PersonaManager.getInstance(mContext);
             com.m3.veil.model.Persona active = pm.getActivePersona();
-            if (active != null && !PersonaManager.PRIMARY_PERSONA_ID.equals(active.getPersonaId())) {
-                this.mCurrentUserId = pm.getActivePersonaPeerId();
+            String peerId = pm.getActivePersonaPeerId();
+            if (!android.text.TextUtils.isEmpty(peerId)) {
+                this.mCurrentUserId = peerId;
+            }
+            if (active != null && !VeilFeatureManager.isShadowVeilOrGeneric(active.getDisplayName())) {
                 this.mCurrentUserName = active.getDisplayName();
-                return;
+                if (!android.text.TextUtils.isEmpty(this.mCurrentUserId)) {
+                    return;
+                }
             }
         } catch (Exception ignored) {}
 
         android.content.SharedPreferences prefs = mContext.getSharedPreferences("veil_prefs", Context.MODE_PRIVATE);
-        this.mCurrentUserId = prefs.getString("user_id", null);
+        if (this.mCurrentUserId == null) {
+            this.mCurrentUserId = prefs.getString("user_id", null);
+        }
         if (this.mCurrentUserId == null) {
             this.mCurrentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(mContext);
         }
@@ -607,6 +614,13 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     }
 
     public String getCurrentUserId() {
+        try {
+            String peerId = PersonaManager.getInstance(mContext).getActivePersonaPeerId();
+            if (peerId != null && !peerId.isEmpty()) {
+                mCurrentUserId = peerId;
+                return peerId;
+            }
+        } catch (Exception ignored) {}
         if (mCurrentUserId == null) reloadCurrentIdentity();
         return mCurrentUserId;
     }
@@ -614,9 +628,9 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     public String getCurrentUserName() {
         try {
             com.m3.veil.model.Persona active = PersonaManager.getInstance(mContext).getActivePersona();
-            if (active != null && !PersonaManager.PRIMARY_PERSONA_ID.equals(active.getPersonaId())
-                    && !VeilFeatureManager.isShadowVeilOrGeneric(active.getDisplayName())) {
-                return active.getDisplayName();
+            if (active != null && !VeilFeatureManager.isShadowVeilOrGeneric(active.getDisplayName())) {
+                mCurrentUserName = active.getDisplayName();
+                return mCurrentUserName;
             }
         } catch (Exception ignored) {}
         if (VeilFeatureManager.isShadowVeilOrGeneric(mCurrentUserName)) {
@@ -1463,8 +1477,14 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     }
                 }
 
-                boolean requiresDirectP2PStream = hasLocalMedia && !hasCloudPayload;
-                if (hasNetwork && (!requiresDirectP2PStream || anyTransmittedP2P)) {
+                boolean deliveredToLocalPersona = deliverToLocalPersonaVaultIfApplicable(chat, dialogId, recipientId, msg);
+                if (deliveredToLocalPersona) {
+                    anyTransmittedP2P = true;
+                    msg.setDelivered(true);
+                }
+
+                boolean requiresDirectP2PStream = hasLocalMedia && !hasCloudPayload && !deliveredToLocalPersona;
+                if ((hasNetwork || deliveredToLocalPersona) && (!requiresDirectP2PStream || anyTransmittedP2P)) {
                     // For cloud-backed or text messages (or active P2P stream):
                     // Only mark pending=false immediately if it doesn't require a still-waiting P2P file stream.
                     if (!requiresDirectP2PStream) {
@@ -1511,6 +1531,165 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 Log.e(TAG, "Error encoding and dispatching message packet", e);
             }
         });
+    }
+
+    /**
+     * When the active persona sends a message to another persona belonging to the same user on this device
+     * (1:1 or in a group), delivers an isolated inbound copy directly into that target persona's SQLCipher vault
+     * so cross-persona messaging and message requests work instantaneously without any identity mixup.
+     * Returns true if the target local persona already accepted the chat (so sender sees double-tick delivered).
+     */
+    private boolean deliverToLocalPersonaVaultIfApplicable(@Nullable Chat senderChat, String dialogId, @Nullable String recipientId, Message msg) {
+        if (dialogId == null || msg == null) return false;
+        try {
+            PersonaManager pm = PersonaManager.getInstance(mContext);
+            String activePersonaId = pm.getActivePersonaId();
+            com.m3.veil.model.Persona activePersona = pm.getActivePersona();
+            String senderPeerId = msg.getSenderId() != null && !msg.getSenderId().isEmpty() ? msg.getSenderId() : getCurrentUserId();
+            String senderName = msg.getSenderName() != null && !msg.getSenderName().isEmpty() ? msg.getSenderName() : getCurrentUserName();
+
+            boolean isGroupOrChannel = (senderChat != null && senderChat.isGroupChat())
+                    || dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_");
+
+            if (!isGroupOrChannel) {
+                String targetPeer = (recipientId != null && !recipientId.isEmpty()) ? recipientId : msg.getReceiverId();
+                if (targetPeer == null || targetPeer.isEmpty()) {
+                    targetPeer = WebRtcManager.extractPeerIdFromChatId(dialogId, senderPeerId);
+                }
+                com.m3.veil.model.Persona targetPersona = pm.findLocalPersonaByPeerId(targetPeer);
+                if (targetPersona == null || targetPersona.getId().equals(activePersonaId)) {
+                    return false;
+                }
+                String targetPeerId = pm.getPersonaPeerId(targetPersona);
+                EncryptedChatDatabase targetDb = EncryptedChatDatabase.getInstance(mContext, targetPersona.getId(), false);
+                if (targetDb.isPeerOrChatBlocked(dialogId, senderPeerId)) {
+                    return false;
+                }
+
+                // If sender had received messages from targetPersona previously, replying accepts the request on both sides
+                if (mDatabase.getInboundUserMessageCount(dialogId, senderPeerId) > 0) {
+                    mDatabase.markDirectChatAccepted(dialogId, targetPeerId);
+                    targetDb.markDirectChatAccepted(dialogId, senderPeerId);
+                }
+
+                boolean isAcceptedInTarget = targetDb.isExplicitContact(senderPeerId)
+                        || targetDb.isDirectChatAcceptedByPeer(dialogId, targetPeerId, senderPeerId)
+                        || targetDb.getOutboundUserMessageCount(dialogId, targetPeerId) > 0;
+                if (isAcceptedInTarget) {
+                    targetDb.markDirectChatAccepted(dialogId, senderPeerId);
+                    mDatabase.markDirectChatAccepted(dialogId, targetPeerId);
+                } else {
+                    if (targetDb.getInboundUserMessageCount(dialogId, targetPeerId) >= EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES) {
+                        return false;
+                    }
+                }
+
+                Chat targetChat = targetDb.getChat(dialogId);
+                if (targetChat == null) {
+                    targetChat = new Chat();
+                    targetChat.setId(dialogId);
+                    targetChat.setUnreadCount(0);
+                }
+                targetChat.setName(senderName);
+                if (activePersona != null && activePersona.getAvatarUri() != null) {
+                    targetChat.setAvatar(activePersona.getAvatarUri());
+                }
+                targetChat.setGroup(false);
+                targetChat.setType("direct");
+                List<String> parts = new ArrayList<>();
+                parts.add(senderPeerId);
+                parts.add(targetPeerId);
+                targetChat.setParticipants(parts);
+                String preview = msg.getText() != null && !msg.getText().isEmpty()
+                        ? msg.getText()
+                        : ("[" + (msg.getType() != null ? msg.getType() : "message") + "]");
+                targetChat.setLastMessage(preview);
+                targetChat.setLastMessageSenderId(senderPeerId);
+                targetChat.setLastMessageTime(msg.getTimestamp() != null ? msg.getTimestamp() : Timestamp.now());
+                targetChat.setUnreadCount(Math.max(0, targetChat.getUnreadCount()) + 1);
+                targetChat.setRequest(!isAcceptedInTarget);
+                targetDb.saveOrUpdateChat(targetChat);
+
+                Message inboundCopy = new Message(
+                        msg.getId(),
+                        senderPeerId,
+                        targetPeerId,
+                        msg.getText() != null ? msg.getText() : "",
+                        msg.getTimestamp() != null ? msg.getTimestamp() : Timestamp.now(),
+                        msg.getType() != null ? msg.getType() : "text"
+                );
+                inboundCopy.setChatId(dialogId);
+                inboundCopy.setSenderName(senderName);
+                inboundCopy.setReplyToMessageId(msg.getReplyToMessageId());
+                inboundCopy.setReplySenderName(msg.getReplySenderName());
+                inboundCopy.setBlink(msg.isBlink());
+                inboundCopy.setVoiceFilter(msg.getVoiceFilter());
+                inboundCopy.setPollJson(msg.getPollJson());
+                inboundCopy.setThumbnail(msg.getThumbnail());
+                inboundCopy.setMediaUrl(msg.getMediaUrl());
+                inboundCopy.setLocalFilePath(msg.getLocalFilePath());
+                inboundCopy.setVanishTimer(msg.getVanishTimer());
+                inboundCopy.setVanishMode(msg.getVanishMode());
+                inboundCopy.setPending(false);
+                inboundCopy.setDelivered(isAcceptedInTarget);
+                inboundCopy.setRead(false);
+                targetDb.saveMessage(dialogId, inboundCopy);
+                return isAcceptedInTarget;
+            } else if (senderChat != null && senderChat.getParticipants() != null) {
+                boolean anyLocalDelivered = false;
+                for (String pId : senderChat.getParticipants()) {
+                    com.m3.veil.model.Persona localP = pm.findLocalPersonaByPeerId(pId);
+                    if (localP != null && !localP.getId().equals(activePersonaId)) {
+                        EncryptedChatDatabase targetDb = EncryptedChatDatabase.getInstance(mContext, localP.getId(), false);
+                        Chat targetGroup = targetDb.getChat(dialogId);
+                        if (targetGroup == null) {
+                            targetGroup = new Chat();
+                            targetGroup.setId(dialogId);
+                            targetGroup.setUnreadCount(0);
+                        }
+                        targetGroup.setName(senderChat.getName());
+                        targetGroup.setAvatar(senderChat.getAvatar());
+                        targetGroup.setGroup(true);
+                        targetGroup.setType(senderChat.getType() != null ? senderChat.getType() : "group");
+                        targetGroup.setAdminId(senderChat.getAdminId());
+                        targetGroup.setAdminIds(senderChat.getAdminIds());
+                        targetGroup.setParticipants(senderChat.getParticipants());
+                        targetGroup.setDescription(senderChat.getDescription());
+                        targetGroup.setLastMessage(msg.getText() != null ? msg.getText() : "");
+                        targetGroup.setLastMessageSenderId(senderPeerId);
+                        targetGroup.setLastMessageTime(msg.getTimestamp() != null ? msg.getTimestamp() : Timestamp.now());
+                        targetGroup.setUnreadCount(Math.max(0, targetGroup.getUnreadCount()) + 1);
+                        targetDb.saveOrUpdateChat(targetGroup);
+
+                        Message inboundCopy = new Message(
+                                msg.getId(),
+                                senderPeerId,
+                                dialogId,
+                                msg.getText() != null ? msg.getText() : "",
+                                msg.getTimestamp() != null ? msg.getTimestamp() : Timestamp.now(),
+                                msg.getType() != null ? msg.getType() : "text"
+                        );
+                        inboundCopy.setChatId(dialogId);
+                        inboundCopy.setSenderName(senderName);
+                        inboundCopy.setReplyToMessageId(msg.getReplyToMessageId());
+                        inboundCopy.setReplySenderName(msg.getReplySenderName());
+                        inboundCopy.setPollJson(msg.getPollJson());
+                        inboundCopy.setThumbnail(msg.getThumbnail());
+                        inboundCopy.setMediaUrl(msg.getMediaUrl());
+                        inboundCopy.setLocalFilePath(msg.getLocalFilePath());
+                        inboundCopy.setPending(false);
+                        inboundCopy.setDelivered(true);
+                        inboundCopy.setRead(false);
+                        targetDb.saveMessage(dialogId, inboundCopy);
+                        anyLocalDelivered = true;
+                    }
+                }
+                return anyLocalDelivered;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "deliverToLocalPersonaVaultIfApplicable notice: " + e.getMessage());
+        }
+        return false;
     }
 
     private void syncGroupOrChannelMessageToFirestore(@Nullable Chat chat, String groupId, Message msg) {
@@ -2570,6 +2749,16 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             mStorageQueue.execute(() -> {
                 mDatabase.updateMessageText(dialogId, messageId, newText.trim());
                 updateDialogLastMessage(dialogId, msg);
+                try {
+                    PersonaManager pm = PersonaManager.getInstance(mContext);
+                    for (String peerId : resolveTargetPeers(dialogId, null, msg)) {
+                        com.m3.veil.model.Persona localP = pm.findLocalPersonaByPeerId(peerId);
+                        if (localP != null && !localP.getId().equals(pm.getActivePersonaId())) {
+                            EncryptedChatDatabase.getInstance(mContext, localP.getId(), false)
+                                    .updateMessageText(dialogId, messageId, newText.trim());
+                        }
+                    }
+                } catch (Exception ignored) {}
             });
 
             // Notify UI
@@ -2641,6 +2830,17 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 }
                 if (deleteForEveryone) {
                     mDatabase.markMessageDeletedForEveryone(dialogId, messageId);
+                    try {
+                        PersonaManager pm = PersonaManager.getInstance(mContext);
+                        for (String peerId : resolveTargetPeers(dialogId, null, msg)) {
+                            com.m3.veil.model.Persona localP = pm.findLocalPersonaByPeerId(peerId);
+                            if (localP != null && !localP.getId().equals(pm.getActivePersonaId())) {
+                                EncryptedChatDatabase targetDb = EncryptedChatDatabase.getInstance(mContext, localP.getId(), false);
+                                targetDb.markMessageDeletedForEveryone(dialogId, messageId);
+                                targetDb.updateChatLastMessageSummary(dialogId);
+                            }
+                        }
+                    } catch (Exception ignored) {}
                 } else {
                     mDatabase.deleteMessage(messageId);
                 }
@@ -2736,7 +2936,19 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             }
 
             // Update DB
-            mStorageQueue.execute(() -> mDatabase.updateMessageReaction(dialogId, messageId, reactorKey, emoji));
+            mStorageQueue.execute(() -> {
+                mDatabase.updateMessageReaction(dialogId, messageId, reactorKey, emoji);
+                try {
+                    PersonaManager pm = PersonaManager.getInstance(mContext);
+                    for (String peerId : resolveTargetPeers(dialogId, null, msg)) {
+                        com.m3.veil.model.Persona localP = pm.findLocalPersonaByPeerId(peerId);
+                        if (localP != null && !localP.getId().equals(pm.getActivePersonaId())) {
+                            EncryptedChatDatabase.getInstance(mContext, localP.getId(), false)
+                                    .updateMessageReaction(dialogId, messageId, reactorKey, emoji);
+                        }
+                    }
+                } catch (Exception ignored) {}
+            });
 
             // Notify UI
             runOnUI(() -> {

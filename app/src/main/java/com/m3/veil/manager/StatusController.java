@@ -724,35 +724,42 @@ public class StatusController {
         Set<String> ids = new HashSet<>();
         ids.add("me");
         try {
-            String cur = getCurrentUserId();
-            if (cur != null && !cur.isEmpty()) ids.add(cur);
-        } catch (Throwable ignored) {}
-        try {
-            String authUid = AuthManager.getInstance().getCurrentUserId(appContext);
-            if (authUid != null && !authUid.isEmpty()) ids.add(authUid);
-        } catch (Throwable ignored) {}
-        try {
-            FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
-            if (u != null && u.getUid() != null && !u.getUid().isEmpty()) ids.add(u.getUid());
-        } catch (Throwable ignored) {}
-        try {
             PersonaManager pm = PersonaManager.getInstance(appContext);
-            List<com.m3.veil.model.Persona> personas = pm.getPersonas();
-            if (personas != null) {
-                for (com.m3.veil.model.Persona p : personas) {
-                    if (p == null) continue;
-                    if (p.getPersonaId() != null && !p.getPersonaId().isEmpty()) {
-                        ids.add(p.getPersonaId());
-                        ids.add("persona_" + p.getPersonaId());
-                    }
-                    if (p.getKeyPairId() != null && !p.getKeyPairId().isEmpty()) {
-                        ids.add(p.getKeyPairId());
-                    }
+            com.m3.veil.model.Persona active = pm.getActivePersona();
+            String activePersonaId = active != null ? active.getId() : PersonaManager.PRIMARY_PERSONA_ID;
+            String activePeerId = pm.getActivePersonaPeerId();
+            if (activePeerId != null && !activePeerId.isEmpty()) {
+                ids.add(activePeerId);
+            }
+            if (active != null) {
+                if (active.getPersonaId() != null && !active.getPersonaId().isEmpty()) {
+                    ids.add(active.getPersonaId());
+                    ids.add("persona_" + active.getPersonaId());
+                }
+                if (active.getKeyPairId() != null && !active.getKeyPairId().isEmpty()) {
+                    ids.add(active.getKeyPairId());
                 }
             }
-            String activePeerId = pm.getActivePersonaPeerId();
-            if (activePeerId != null && !activePeerId.isEmpty()) ids.add(activePeerId);
-        } catch (Throwable ignored) {}
+            if (PersonaManager.PRIMARY_PERSONA_ID.equals(activePersonaId)) {
+                try {
+                    String authUid = AuthManager.getInstance().getCurrentUserId(appContext);
+                    if (authUid != null && !authUid.isEmpty() && !authUid.contains("_persona_")) {
+                        ids.add(authUid);
+                    }
+                } catch (Throwable ignored) {}
+                try {
+                    FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
+                    if (u != null && u.getUid() != null && !u.getUid().isEmpty() && !u.getUid().contains("_persona_")) {
+                        ids.add(u.getUid());
+                    }
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {
+            try {
+                String cur = getCurrentUserId();
+                if (cur != null && !cur.isEmpty()) ids.add(cur);
+            } catch (Throwable ignored2) {}
+        }
         return ids;
     }
 
@@ -1199,8 +1206,14 @@ public class StatusController {
     public synchronized void reloadForActiveVault() {
         allPeerChains.clear();
         statusItemCache.clear();
+        synchronized (remotePeerStatusesClearLock) {
+            try {
+                VeilFeatureManager.getInstance(appContext).notifyStatusListeners();
+            } catch (Throwable ignored) {}
+        }
         loadCachedDataFromDb();
     }
+    private final Object remotePeerStatusesClearLock = new Object();
 
     private void loadCachedDataFromDb() {
         workerExecutor.execute(() -> {
@@ -1216,7 +1229,9 @@ public class StatusController {
                         continue;
                     }
                     seg.contentText = sanitizeStatusText(seg.contentText);
-                    seg.isMine = seg.isMine || (seg.authorId != null && myIds.contains(seg.authorId));
+                    seg.isMine = (seg.authorId != null && !seg.authorId.isEmpty())
+                            ? myIds.contains(seg.authorId)
+                            : seg.isMine;
                     if (!seg.isMine && !isPeerStatusAllowedForMe(seg.authorId, null,
                             seg.privacyAcl != null ? seg.privacyAcl.code : 0, null, null)) {
                         continue;
@@ -2621,7 +2636,9 @@ public class StatusController {
         }
 
         int totalViews = Math.max(viewersList.size(), seg.viewCount);
-        boolean mine = seg.isMine || (seg.authorId != null && myIds.contains(seg.authorId));
+        boolean mine = (seg.authorId != null && !seg.authorId.isEmpty())
+                ? myIds.contains(seg.authorId)
+                : seg.isMine;
 
         return new StatusUpdate(
                 seg.id,

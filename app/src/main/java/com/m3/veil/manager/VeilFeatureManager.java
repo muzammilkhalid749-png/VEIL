@@ -203,9 +203,13 @@ public class VeilFeatureManager {
 
     public void setActivePersona(String personaId) {
         prefs.edit().putBoolean("decoy_mode_active", false).apply();
+        synchronized (remotePeerStatuses) {
+            remotePeerStatuses.clear();
+        }
         if (PersonaManager.getInstance(appContext).switchPersona(personaId)) {
             addXp(5);
         }
+        notifyStatusListeners();
     }
 
     public void activateDecoyVault(boolean isDecoy) {
@@ -1393,6 +1397,46 @@ public class VeilFeatureManager {
         prefs.edit().putString("deleted_status_ids", android.text.TextUtils.join(",", set)).apply();
     }
 
+    private String getActivePersonaScopeSuffix() {
+        try {
+            String activeId = PersonaManager.getInstance(appContext).getActivePersonaId();
+            if (activeId != null && !activeId.trim().isEmpty()) {
+                return activeId.trim();
+            }
+        } catch (Throwable ignored) {}
+        return PersonaManager.PRIMARY_PERSONA_ID;
+    }
+
+    private String getMyStatusesPrefKey() {
+        String suffix = getActivePersonaScopeSuffix();
+        String scopedKey = "my_statuses_json_" + suffix;
+        if (PersonaManager.PRIMARY_PERSONA_ID.equals(suffix) && !prefs.contains(scopedKey) && prefs.contains("my_statuses_json")) {
+            String legacy = prefs.getString("my_statuses_json", "[]");
+            prefs.edit().putString(scopedKey, legacy).remove("my_statuses_json").apply();
+        }
+        return scopedKey;
+    }
+
+    private String getPeerStatusesPrefKey() {
+        String suffix = getActivePersonaScopeSuffix();
+        String scopedKey = "peer_statuses_json_" + suffix;
+        if (PersonaManager.PRIMARY_PERSONA_ID.equals(suffix) && !prefs.contains(scopedKey) && prefs.contains("peer_statuses_json")) {
+            String legacy = prefs.getString("peer_statuses_json", "[]");
+            prefs.edit().putString(scopedKey, legacy).remove("peer_statuses_json").apply();
+        }
+        return scopedKey;
+    }
+
+    private String getViewedStatusIdsPrefKey() {
+        String suffix = getActivePersonaScopeSuffix();
+        String scopedKey = "viewed_status_ids_" + suffix;
+        if (PersonaManager.PRIMARY_PERSONA_ID.equals(suffix) && !prefs.contains(scopedKey) && prefs.contains("viewed_status_ids")) {
+            String legacy = prefs.getString("viewed_status_ids", "");
+            prefs.edit().putString(scopedKey, legacy).remove("viewed_status_ids").apply();
+        }
+        return scopedKey;
+    }
+
     public synchronized void addPeerStatus(String id, String authorId, String authorName,
                                            String contentText, String mediaUri, String bgColorHex,
                                            int fontStyleIndex, long timestamp) {
@@ -1403,9 +1447,6 @@ public class VeilFeatureManager {
                 return;
             }
         } catch (Throwable ignored) {}
-        String myUid = FirebaseAuth.getInstance().getCurrentUser() != null
-                ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "me";
-        if (authorId.equals(myUid)) return;
 
         String cleanText = StatusController.sanitizeStatusText(contentText);
         String resolvedMediaUri = mediaUri != null ? mediaUri : "";
@@ -1427,7 +1468,8 @@ public class VeilFeatureManager {
         }
 
         try {
-            JSONArray arr = new JSONArray(prefs.getString("peer_statuses_json", "[]"));
+            String peerKey = getPeerStatusesPrefKey();
+            JSONArray arr = new JSONArray(prefs.getString(peerKey, "[]"));
             JSONArray next = new JSONArray();
             JSONObject newObj = new JSONObject();
             newObj.put("id", id);
@@ -1449,7 +1491,7 @@ public class VeilFeatureManager {
                     next.put(o);
                 }
             }
-            prefs.edit().putString("peer_statuses_json", next.toString()).apply();
+            prefs.edit().putString(peerKey, next.toString()).apply();
             notifyStatusListeners();
         } catch (Exception ignored) {}
     }
@@ -1458,7 +1500,8 @@ public class VeilFeatureManager {
         if (statusId == null || statusId.isEmpty()) return;
         markDeletedStatusId(statusId);
         try {
-            JSONArray arr = new JSONArray(prefs.getString("peer_statuses_json", "[]"));
+            String peerKey = getPeerStatusesPrefKey();
+            JSONArray arr = new JSONArray(prefs.getString(peerKey, "[]"));
             JSONArray kept = new JSONArray();
             boolean changed = false;
             for (int i = 0; i < arr.length(); i++) {
@@ -1470,7 +1513,7 @@ public class VeilFeatureManager {
                 }
             }
             if (changed) {
-                prefs.edit().putString("peer_statuses_json", kept.toString()).apply();
+                prefs.edit().putString(peerKey, kept.toString()).apply();
             }
 
             synchronized (remotePeerStatuses) {
@@ -1484,7 +1527,8 @@ public class VeilFeatureManager {
                 }
             }
 
-            JSONArray myArr = new JSONArray(prefs.getString("my_statuses_json", "[]"));
+            String myKey = getMyStatusesPrefKey();
+            JSONArray myArr = new JSONArray(prefs.getString(myKey, "[]"));
             JSONArray myKept = new JSONArray();
             boolean myChanged = false;
             for (int i = 0; i < myArr.length(); i++) {
@@ -1496,7 +1540,7 @@ public class VeilFeatureManager {
                 }
             }
             if (myChanged) {
-                prefs.edit().putString("my_statuses_json", myKept.toString()).apply();
+                prefs.edit().putString(myKey, myKept.toString()).apply();
                 changed = true;
             }
 
@@ -1511,7 +1555,8 @@ public class VeilFeatureManager {
         long now = System.currentTimeMillis();
         long dayMs = 24L * 60L * 60L * 1000L;
         try {
-            JSONArray arr = new JSONArray(prefs.getString("peer_statuses_json", "[]"));
+            String peerKey = getPeerStatusesPrefKey();
+            JSONArray arr = new JSONArray(prefs.getString(peerKey, "[]"));
             JSONArray kept = new JSONArray();
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
@@ -1521,7 +1566,7 @@ public class VeilFeatureManager {
                 }
             }
             if (kept.length() != arr.length()) {
-                prefs.edit().putString("peer_statuses_json", kept.toString()).apply();
+                prefs.edit().putString(peerKey, kept.toString()).apply();
             }
         } catch (Exception ignored) {}
 
@@ -1542,7 +1587,8 @@ public class VeilFeatureManager {
         if (statusId == null || remoteViewers == null) return;
         try {
             java.util.Set<String> myIds = StatusController.getInstance(appContext).getMyAllIdentityIds();
-            JSONArray myArr = new JSONArray(prefs.getString("my_statuses_json", "[]"));
+            String myKey = getMyStatusesPrefKey();
+            JSONArray myArr = new JSONArray(prefs.getString(myKey, "[]"));
             boolean updated = false;
             int targetIdx = -1;
             for (int i = 0; i < myArr.length(); i++) {
@@ -1594,7 +1640,7 @@ public class VeilFeatureManager {
                 updated = true;
             }
             if (updated) {
-                prefs.edit().putString("my_statuses_json", myArr.toString()).apply();
+                prefs.edit().putString(myKey, myArr.toString()).apply();
                 notifyStatusListeners();
             }
         } catch (Exception ignored) {}
@@ -1609,14 +1655,20 @@ public class VeilFeatureManager {
             myIds.addAll(StatusController.getInstance(appContext).getMyAllIdentityIds());
         } catch (Throwable ignored) {}
 
-        // 1. Load user's own active statuses (< 24h old and not deleted)
+        // 1. Load active persona's own active statuses (< 24h old and not deleted)
         try {
-            JSONArray myArr = new JSONArray(prefs.getString("my_statuses_json", "[]"));
+            String myKey = getMyStatusesPrefKey();
+            String activePeerId = PersonaManager.getInstance(appContext).getActivePersonaPeerId();
+            JSONArray myArr = new JSONArray(prefs.getString(myKey, "[]"));
             JSONArray keptArr = new JSONArray();
             for (int i = 0; i < myArr.length(); i++) {
                 JSONObject o = myArr.getJSONObject(i);
                 String id = o.optString("id");
                 String scId = o.optString("sc_id", "");
+                String ownerPeerId = o.optString("ownerPeerId", "");
+                if (!ownerPeerId.isEmpty() && !myIds.contains(ownerPeerId) && !ownerPeerId.equals(activePeerId)) {
+                    continue;
+                }
                 long ts = o.optLong("timestamp", now);
                 if (now - ts < dayMs && !isDeletedStatusId(id) && (scId.isEmpty() || !isDeletedStatusId(scId))) {
                     keptArr.put(o);
@@ -1664,12 +1716,12 @@ public class VeilFeatureManager {
                 }
             }
             if (keptArr.length() != myArr.length()) {
-                prefs.edit().putString("my_statuses_json", keptArr.toString()).apply();
+                prefs.edit().putString(myKey, keptArr.toString()).apply();
             }
         } catch (Exception ignored) {}
 
         // 2. Peer statuses: Real remote peer statuses received over WebRTC mesh
-        String viewedIdsCsv = prefs.getString("viewed_status_ids", "");
+        String viewedIdsCsv = prefs.getString(getViewedStatusIdsPrefKey(), "");
         java.util.Set<String> viewedIdSet = new java.util.HashSet<>();
         if (!viewedIdsCsv.isEmpty()) {
             for (String s : viewedIdsCsv.split(",")) {
@@ -1677,7 +1729,8 @@ public class VeilFeatureManager {
             }
         }
         try {
-            JSONArray pArr = new JSONArray(prefs.getString("peer_statuses_json", "[]"));
+            String peerKey = getPeerStatusesPrefKey();
+            JSONArray pArr = new JSONArray(prefs.getString(peerKey, "[]"));
             JSONArray keptPArr = new JSONArray();
             for (int i = 0; i < pArr.length(); i++) {
                 JSONObject o = pArr.getJSONObject(i);
@@ -1709,7 +1762,7 @@ public class VeilFeatureManager {
                 }
             }
             if (keptPArr.length() != pArr.length()) {
-                prefs.edit().putString("peer_statuses_json", keptPArr.toString()).apply();
+                prefs.edit().putString(peerKey, keptPArr.toString()).apply();
             }
         } catch (Exception ignored) {}
 
@@ -1885,10 +1938,13 @@ public class VeilFeatureManager {
         } catch (Throwable ignored) {}
 
         try {
-            JSONArray myArr = new JSONArray(prefs.getString("my_statuses_json", "[]"));
+            String myKey = getMyStatusesPrefKey();
+            String ownerPeerId = PersonaManager.getInstance(appContext).getActivePersonaPeerId();
+            JSONArray myArr = new JSONArray(prefs.getString(myKey, "[]"));
             JSONObject o = new JSONObject();
             o.put("id", id);
             o.put("sc_id", scId);
+            o.put("ownerPeerId", ownerPeerId);
             o.put("text", cleanText);
             o.put("bgColor", bgColorHex != null ? bgColorHex : "#008069");
             o.put("fontStyle", fontStyleIndex);
@@ -1904,7 +1960,7 @@ public class VeilFeatureManager {
                     nextArr.put(prev);
                 }
             }
-            prefs.edit().putString("my_statuses_json", nextArr.toString()).apply();
+            prefs.edit().putString(myKey, nextArr.toString()).apply();
             addXp(15);
         } catch (Exception ignored) {}
 
@@ -1964,10 +2020,13 @@ public class VeilFeatureManager {
         } catch (Throwable ignored) {}
 
         try {
-            JSONArray myArr = new JSONArray(prefs.getString("my_statuses_json", "[]"));
+            String myKey = getMyStatusesPrefKey();
+            String ownerPeerId = PersonaManager.getInstance(appContext).getActivePersonaPeerId();
+            JSONArray myArr = new JSONArray(prefs.getString(myKey, "[]"));
             JSONObject o = new JSONObject();
             o.put("id", id);
             o.put("sc_id", scId);
+            o.put("ownerPeerId", ownerPeerId);
             o.put("text", cleanCaption);
             o.put("mediaUri", mediaUri != null ? mediaUri : "");
             o.put("bgColor", safeBg);
@@ -1987,7 +2046,7 @@ public class VeilFeatureManager {
                     nextArr.put(prev);
                 }
             }
-            prefs.edit().putString("my_statuses_json", nextArr.toString()).apply();
+            prefs.edit().putString(myKey, nextArr.toString()).apply();
             addXp(25);
         } catch (Exception ignored) {}
 
@@ -2108,7 +2167,8 @@ public class VeilFeatureManager {
             }
         } catch (Throwable ignored) {}
         try {
-            JSONArray myArr = new JSONArray(prefs.getString("my_statuses_json", "[]"));
+            String myKey = getMyStatusesPrefKey();
+            JSONArray myArr = new JSONArray(prefs.getString(myKey, "[]"));
             boolean updated = false;
             int targetIdx = -1;
             for (int i = 0; i < myArr.length(); i++) {
@@ -2146,7 +2206,7 @@ public class VeilFeatureManager {
                 }
             }
             if (updated) {
-                prefs.edit().putString("my_statuses_json", myArr.toString()).apply();
+                prefs.edit().putString(myKey, myArr.toString()).apply();
                 notifyStatusListeners();
             }
         } catch (Exception ignored) {}
@@ -2161,8 +2221,9 @@ public class VeilFeatureManager {
         java.util.Set<String> allIdsToDelete = new java.util.LinkedHashSet<>();
         allIdsToDelete.add(statusId);
 
+        String myKey = getMyStatusesPrefKey();
         try {
-            JSONArray myArr = new JSONArray(prefs.getString("my_statuses_json", "[]"));
+            JSONArray myArr = new JSONArray(prefs.getString(myKey, "[]"));
             for (int i = 0; i < myArr.length(); i++) {
                 JSONObject o = myArr.getJSONObject(i);
                 String oid = o.optString("id");
@@ -2205,7 +2266,7 @@ public class VeilFeatureManager {
         } catch (Throwable ignored) {}
 
         try {
-            JSONArray myArr = new JSONArray(prefs.getString("my_statuses_json", "[]"));
+            JSONArray myArr = new JSONArray(prefs.getString(myKey, "[]"));
             JSONArray nextArr = new JSONArray();
             for (int i = 0; i < myArr.length(); i++) {
                 JSONObject o = myArr.getJSONObject(i);
@@ -2223,7 +2284,7 @@ public class VeilFeatureManager {
                     nextArr.put(o);
                 }
             }
-            prefs.edit().putString("my_statuses_json", nextArr.toString()).apply();
+            prefs.edit().putString(myKey, nextArr.toString()).apply();
         } catch (Exception ignored) {}
 
         for (String delId : allIdsToDelete) {
@@ -2243,7 +2304,7 @@ public class VeilFeatureManager {
         if (statusId == null || statusId.isEmpty()) return;
         String peerAuthorId = null;
         try {
-            JSONArray pArr = new JSONArray(prefs.getString("peer_statuses_json", "[]"));
+            JSONArray pArr = new JSONArray(prefs.getString(getPeerStatusesPrefKey(), "[]"));
             for (int i = 0; i < pArr.length(); i++) {
                 JSONObject o = pArr.getJSONObject(i);
                 if (statusId.equals(o.optString("id"))) {
@@ -2255,7 +2316,8 @@ public class VeilFeatureManager {
         try {
             StatusController.getInstance(appContext).markStatusViewed(statusId, peerAuthorId);
         } catch (Throwable ignored) {}
-        String existing = prefs.getString("viewed_status_ids", "");
+        String viewedKey = getViewedStatusIdsPrefKey();
+        String existing = prefs.getString(viewedKey, "");
         java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<>();
         if (!existing.isEmpty()) {
             for (String s : existing.split(",")) {
@@ -2263,7 +2325,7 @@ public class VeilFeatureManager {
             }
         }
         if (set.add(statusId)) {
-            prefs.edit().putString("viewed_status_ids", android.text.TextUtils.join(",", set)).apply();
+            prefs.edit().putString(viewedKey, android.text.TextUtils.join(",", set)).apply();
             notifyStatusListeners();
         }
     }

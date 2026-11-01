@@ -4684,7 +4684,7 @@ public final class WhatsAppStatusUi {
                         String path = "file".equalsIgnoreCase(u.getScheme()) ? u.getPath() : s.mediaUri;
                         File f = new File(path != null ? path : s.mediaUri);
                         if (f.exists()) {
-                            videoView.setVideoPath(f.getAbsolutePath());
+                            videoView.setVideoURI(Uri.fromFile(f));
                         } else {
                             videoView.setVideoURI(u);
                         }

@@ -446,31 +446,48 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     /**
      * Resolves which persona vault database an incoming packet, message, or direct chat belongs to.
+     * If a chat is between two local personas on the same device (e.g. Persona 1 <-> Persona 2),
+     * routes to the currently active persona's vault so each persona maintains its own isolated view of the conversation.
      */
     public static String resolvePersonaIdForTarget(Context context, String chatId, String peerOrReceiverId) {
-        if (chatId != null) {
-            String c = chatId.toLowerCase(java.util.Locale.ROOT);
-            if (c.contains("_persona_ghost")) return "persona_ghost";
-            if (c.contains("_persona_neon")) return "persona_neon";
-        }
-        if (peerOrReceiverId != null) {
-            String p = peerOrReceiverId.toLowerCase(java.util.Locale.ROOT);
-            if (p.contains("_persona_ghost")) return "persona_ghost";
-            if (p.contains("_persona_neon")) return "persona_neon";
-        }
         try {
             if (context != null) {
                 com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(context);
                 List<com.m3.veil.model.Persona> list = pm.getPersonas();
-                for (com.m3.veil.model.Persona persona : list) {
-                    if (persona != null && persona.getId() != null) {
-                        String pId = persona.getId();
-                        if (chatId != null && chatId.contains(pId)) return pId;
-                        if (peerOrReceiverId != null && (peerOrReceiverId.equals(persona.getKeyPairId()) || peerOrReceiverId.contains(pId))) {
-                            return pId;
+
+                // Check if chatId is a conversation between TWO local personas on this device
+                if (chatId != null && list != null && list.size() > 1) {
+                    for (int i = 0; i < list.size(); i++) {
+                        com.m3.veil.model.Persona p1 = list.get(i);
+                        if (p1 == null) continue;
+                        String peer1 = pm.getPersonaPeerId(p1);
+                        for (int j = i + 1; j < list.size(); j++) {
+                            com.m3.veil.model.Persona p2 = list.get(j);
+                            if (p2 == null) continue;
+                            String peer2 = pm.getPersonaPeerId(p2);
+                            if (peer1 != null && peer2 != null) {
+                                String crossChatId = com.m3.veil.webrtc.WebRtcManager.getChatId(peer1, peer2);
+                                if (chatId.equals(crossChatId)) {
+                                    // Both participants are local personas on this device: use the currently active persona's vault
+                                    return pm.getActivePersonaId();
+                                }
+                            }
                         }
                     }
                 }
+
+                if (list != null) {
+                    for (com.m3.veil.model.Persona persona : list) {
+                        if (persona != null && persona.getId() != null && !com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID.equals(persona.getId())) {
+                            String pId = persona.getId();
+                            if (chatId != null && chatId.contains(pId)) return pId;
+                            if (peerOrReceiverId != null && (peerOrReceiverId.equals(persona.getKeyPairId()) || peerOrReceiverId.contains(pId))) {
+                                return pId;
+                            }
+                        }
+                    }
+                }
+                return pm.getActivePersonaId();
             }
         } catch (Exception ignored) {}
         return "persona_primary";

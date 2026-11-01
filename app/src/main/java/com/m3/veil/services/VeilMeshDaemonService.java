@@ -499,9 +499,12 @@ public class VeilMeshDaemonService extends Service {
             EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(ctx);
             String peerId = null;
             if (!isGroup && chatId.contains("_")) {
-                String[] parts = chatId.split("_");
-                if (parts.length == 2) {
-                    peerId = parts[0].equals(myUid) ? parts[1] : parts[0];
+                peerId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(chatId, myUid);
+                if (peerId == null || peerId.isEmpty()) {
+                    String[] parts = chatId.split("_");
+                    if (parts.length == 2) {
+                        peerId = parts[0].equals(myUid) ? parts[1] : parts[0];
+                    }
                 }
             }
             if (peerId != null && db.isPeerOrChatBlocked(chatId, peerId)) {
@@ -539,13 +542,12 @@ public class VeilMeshDaemonService extends Service {
                     if (title == null || title.trim().isEmpty()) {
                         title = msg.getSenderName() != null ? msg.getSenderName() : "Chat";
                     }
-                    @SuppressWarnings("unchecked")
-                    List<String> participants = (List<String>) chatDoc.get("participants");
+                    List<String> participants = com.m3.veil.utils.VeilFirestoreUtils.getSafeStringList(chatDoc, "participants");
                     localChat = new Chat(chatId, title, preview,
                             msg.getTimestamp() != null ? msg.getTimestamp() : com.google.firebase.Timestamp.now(),
                             chatDoc.getString("avatarUrl"), 1, isGroup, false,
                             isGroup ? "group" : "direct",
-                            participants != null ? participants : new java.util.ArrayList<>());
+                            participants);
                     boolean accepted = db.isDirectChatAcceptedByPeer(chatId, myUid, peerId);
                     if (!isGroup && peerId != null && !db.isExplicitContact(peerId) && !accepted) {
                         localChat.setRequest(true);
