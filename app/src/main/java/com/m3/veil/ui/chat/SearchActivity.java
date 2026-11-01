@@ -340,7 +340,7 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
                 SovereignIdentityAndDirectoryEngine.ClaimedUsernameBloomFilter bf =
                         SovereignIdentityAndDirectoryEngine.getInstance(this).getBloomFilter();
                 tvSearchBloomTelemetry.setText(String.format(Locale.US,
-                        "🔐 SQLCipher Vault (%d chats) • Bloom Filter (%d handles, k=7)",
+                        "Chats (%d) • Directory (%d users)",
                         allChats.size(), bf.getApproximateCount()));
             }
             return;
@@ -353,11 +353,11 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
         if (tvSearchBloomTelemetry != null) {
             if (bloomHit) {
                 tvSearchBloomTelemetry.setText(String.format(Locale.US,
-                        "⚡ Bloom Filter HIT (<0.02ms): @%s indexed • %d vault matches",
+                        "Found %2$d messages in chats",
                         cleanQuery, ftsMatches));
             } else {
                 tvSearchBloomTelemetry.setText(String.format(Locale.US,
-                        "🔍 Vault FTS: %d matches • Querying Blinded Directory for @%s…",
+                        "Searching chats and public directory…",
                         ftsMatches, cleanQuery));
             }
         }
@@ -397,7 +397,7 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
                                                 Chat directoryChat = new Chat(
                                                         chatId,
                                                         displayTitle,
-                                                        "⚡ Directory Peer • Tap to start E2EE P2P chat",
+                                                        "⚡ Contact • Tap to start chat",
                                                         null,
                                                         user.getAvatar(),
                                                         0,
@@ -414,8 +414,8 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
                                 }
                                 if (tvSearchBloomTelemetry != null) {
                                     tvSearchBloomTelemetry.setText(String.format(Locale.US,
-                                            "%s • %d vault matches • %d directory peers",
-                                            bloomHit ? "⚡ Bloom HIT (@" + cleanQuery + ")" : "🔍 Directory synced",
+                                            "%2$d messages • %3$d people found",
+                                            bloomHit ? "⚡ Found (@" + cleanQuery + ")" : "🔍 Directory synced",
                                             finalFtsMatches,
                                             addedCount));
                                 }
@@ -575,7 +575,7 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
 
         if (tvTitle != null) tvTitle.setText(chat.getName() != null ? chat.getName() : "@Anonymous");
         if (tvSubtitle != null) {
-            tvSubtitle.setText("👁️ Tap here to Peek Last 6 Messages without marking read");
+            tvSubtitle.setText("Tap here to Peek Last 6 Messages without marking read");
             tvSubtitle.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
             tvSubtitle.setOnClickListener(v -> {
                 sheet.dismiss();
@@ -588,7 +588,7 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
         if (actionClearChat != null) actionClearChat.setVisibility(View.GONE);
 
         if (actionMarkReadUnread != null) {
-            actionMarkReadUnread.setText(chat.getUnreadCount() > 0 ? "✓✓  Mark as read" : "🔵  Mark as unread");
+            actionMarkReadUnread.setText(chat.getUnreadCount() > 0 ? "Mark as read" : "Mark as unread");
             actionMarkReadUnread.setOnClickListener(v -> {
                 sheet.dismiss();
                 int next = chat.getUnreadCount() > 0 ? 0 : 1;
@@ -598,7 +598,7 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
         }
 
         if (actionPin != null) {
-            actionPin.setText(chat.isPinned() ? "📌  Unpin chat" : "📌  Pin to top");
+            actionPin.setText(chat.isPinned() ? "Unpin chat" : "Pin to top");
             actionPin.setOnClickListener(v -> {
                 sheet.dismiss();
                 boolean next = !chat.isPinned();
@@ -609,7 +609,7 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
         }
 
         if (actionMute != null) {
-            actionMute.setText(chat.isMuted() ? "🔔  Unmute notifications" : "🔕  Mute notifications");
+            actionMute.setText(chat.isMuted() ? "Unmute notifications" : "Mute notifications");
             actionMute.setOnClickListener(v -> {
                 sheet.dismiss();
                 boolean next = !chat.isMuted();
@@ -620,7 +620,7 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
         }
 
         if (actionSecretVault != null) {
-            actionSecretVault.setText(chat.isSecret() ? "👁️  Move out of Secret Vault" : "🕵️  Move to Secret Vault");
+            actionSecretVault.setText(chat.isSecret() ? "Move out of Secret Vault" : "Move to Secret Vault");
             actionSecretVault.setOnClickListener(v -> {
                 sheet.dismiss();
                 boolean next = !chat.isSecret();
@@ -631,7 +631,7 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
         }
 
         if (actionArchive != null) {
-            actionArchive.setText(chat.isArchived() ? "📤  Unarchive chat" : "📥  Archive chat");
+            actionArchive.setText(chat.isArchived() ? "Unarchive chat" : "Archive chat");
             actionArchive.setOnClickListener(v -> {
                 sheet.dismiss();
                 boolean next = !chat.isArchived();

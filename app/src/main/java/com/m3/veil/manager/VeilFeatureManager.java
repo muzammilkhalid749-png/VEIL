@@ -17,6 +17,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -137,26 +138,49 @@ public class VeilFeatureManager {
     }
 
     public void syncPrimaryPersonaWithUser(String username, String displayName, String bio, String mood) {
+        syncPrimaryPersonaWithUser(username, displayName, bio, mood, null);
+    }
+
+    public void syncPrimaryPersonaWithUser(String username, String displayName, String bio, String mood, String avatarUri) {
         try {
             PersonaManager pm = PersonaManager.getInstance(appContext);
             List<Persona> all = pm.getPersonas();
             for (Persona p : all) {
                 if (PersonaManager.PRIMARY_PERSONA_ID.equals(p.getPersonaId())) {
+                    boolean changed = false;
+                    String targetName = null;
                     if (!isShadowVeilOrGeneric(displayName)) {
-                        p.setDisplayName(displayName.trim());
+                        targetName = displayName.trim();
                     } else if (!isShadowVeilOrGeneric(username)) {
-                        p.setDisplayName(username.trim().startsWith("@") ? username.trim().substring(1) : username.trim());
+                        targetName = username.trim().startsWith("@") ? username.trim().substring(1) : username.trim();
+                    }
+                    if (targetName != null && !targetName.equals(p.getDisplayName())) {
+                        p.setDisplayName(targetName);
+                        changed = true;
                     }
                     if (!isShadowVeilOrGeneric(username)) {
-                        p.setUsername(Persona.normalizeUsername(username));
+                        String norm = Persona.normalizeUsername(username);
+                        if (!norm.equals(p.getUsername())) {
+                            p.setUsername(norm);
+                            changed = true;
+                        }
                     }
-                    if (bio != null && !bio.trim().isEmpty()) {
+                    if (bio != null && !bio.trim().isEmpty() && !bio.trim().equals(p.getBio())) {
                         p.setBio(bio.trim());
+                        changed = true;
                     }
-                    if (mood != null && !mood.trim().isEmpty()) {
+                    if (mood != null && !mood.trim().isEmpty() && !mood.trim().equals(p.getMood())) {
                         p.setMood(mood.trim());
+                        changed = true;
                     }
-                    pm.saveOrUpdatePersona(p);
+                    if (avatarUri != null && !avatarUri.equals(p.getAvatarUri())) {
+                        p.setAvatarUri(avatarUri);
+                        changed = true;
+                    }
+                    if (changed) {
+                        pm.saveOrUpdatePersona(p);
+                    }
+                    notifyStatusListeners();
                     break;
                 }
             }
@@ -228,6 +252,10 @@ public class VeilFeatureManager {
     }
 
     public Persona addPersona(String displayName, String bio, String mood, String bubbleColorHex, boolean isTemporary, long durationMillis) {
+        return addPersona(displayName, null, bio, mood, bubbleColorHex, isTemporary, durationMillis);
+    }
+
+    public Persona addPersona(String displayName, String customUsername, String bio, String mood, String bubbleColorHex, boolean isTemporary, long durationMillis) {
         try {
             PersonaManager pm = PersonaManager.getInstance(appContext);
             List<Persona> existing = pm.getPersonas();
@@ -235,8 +263,10 @@ public class VeilFeatureManager {
                 return pm.getActivePersona();
             }
             String id = "persona_" + UUID.randomUUID().toString().substring(0, 6);
-            String cleanDisplay = displayName != null ? displayName.trim().replaceFirst("^@", "") : "Masked Node";
-            String username = Persona.normalizeUsername(cleanDisplay);
+            String cleanDisplay = displayName != null && !displayName.trim().isEmpty() ? displayName.trim().replaceFirst("^@", "") : "Masked Node";
+            String username = (customUsername != null && !customUsername.trim().isEmpty())
+                    ? Persona.normalizeUsername(customUsername)
+                    : Persona.normalizeUsername(cleanDisplay);
             if (pm.isUsernameTaken(username, id)) {
                 username = username + "_" + id.substring(Math.max(0, id.length() - 4));
             }
@@ -250,10 +280,10 @@ public class VeilFeatureManager {
                     cleanDisplay,
                     username,
                     "",
-                    bio != null ? bio : "Zero-trace persona",
+                    bio != null && !bio.trim().isEmpty() ? bio : "Zero-trace persona",
                     keyPairId,
                     true,
-                    bubbleColorHex != null ? bubbleColorHex : "#0B57CF",
+                    bubbleColorHex != null ? bubbleColorHex : "#4F46E5",
                     mood != null && !mood.isEmpty() ? mood : "🎭 Masked",
                     isTemporary,
                     expiresAt
@@ -268,9 +298,10 @@ public class VeilFeatureManager {
     }
 
     /**
-     * Cryptographically shreds an expired temporary persona (#12):
-     * Zeroizes and deletes the persona's SQLCipher database vault file,
-     * resets active persona if matching, and purges it from configuration.
+     * Deletes a non-primary persona:
+     * Overwrites and removes the persona's encrypted database vault,
+     * deletes the persona from SQLite and PersonaManager,
+     * and resets active persona to PRIMARY_PERSONA_ID if matching.
      */
     public synchronized boolean shredAndRemovePersona(String personaId) {
         if (personaId == null || "persona_primary".equals(personaId) || "default".equals(personaId)) {
@@ -306,21 +337,11 @@ public class VeilFeatureManager {
             android.util.Log.w("VeilFeatureManager", "Notice during persona vault shred: " + t.getMessage());
         }
 
-        // 2. Remove persona from SQLite master table
-        try {
-            com.m3.veil.database.EncryptedChatDatabase.getMasterDatabase(appContext).deletePersonaFromDb(personaId);
-        } catch (Throwable t) {
-            android.util.Log.e("VeilFeatureManager", "Error deleting persona from DB", t);
-        }
+        // 2. Delegate database removal, active switch fallback, and directory sync to PersonaManager
+        boolean deleted = PersonaManager.getInstance(appContext).deletePersona(personaId);
 
-        // 3. If active persona was deleted, fall back to persona_primary
-        String activeId = PersonaManager.getInstance(appContext).getActivePersonaId();
-        if (personaId.equals(activeId)) {
-            PersonaManager.getInstance(appContext).switchPersona(PersonaManager.PRIMARY_PERSONA_ID);
-        }
-
-        android.util.Log.i("VeilFeatureManager", "Ephemeral persona @" + personaId + " vault cryptographically shredded.");
-        return true;
+        android.util.Log.i("VeilFeatureManager", "Persona @" + personaId + " vault deleted: " + deleted);
+        return deleted;
     }
 
     public String getActiveBubbleColorHex() {
@@ -411,6 +432,9 @@ public class VeilFeatureManager {
     public void restorePersonasJson(String personasJson) {
         if (personasJson != null && !personasJson.trim().isEmpty() && !personasJson.equals("[]")) {
             prefs.edit().putString("personas_json", personasJson).apply();
+            try {
+                PersonaManager.getInstance(appContext).restorePersonasFromJson(personasJson);
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -1365,6 +1389,57 @@ public class VeilFeatureManager {
         } catch (Exception ignored) {}
     }
 
+    public synchronized void removePeerStatus(String statusId) {
+        if (statusId == null || statusId.isEmpty()) return;
+        try {
+            JSONArray arr = new JSONArray(prefs.getString("peer_statuses_json", "[]"));
+            JSONArray kept = new JSONArray();
+            boolean changed = false;
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                if (statusId.equals(o.optString("id"))) {
+                    changed = true;
+                } else {
+                    kept.put(o);
+                }
+            }
+            if (changed) {
+                prefs.edit().putString("peer_statuses_json", kept.toString()).apply();
+            }
+
+            synchronized (remotePeerStatuses) {
+                Iterator<StatusUpdate> it = remotePeerStatuses.iterator();
+                while (it.hasNext()) {
+                    StatusUpdate su = it.next();
+                    if (statusId.equals(su.id)) {
+                        it.remove();
+                        changed = true;
+                    }
+                }
+            }
+
+            JSONArray myArr = new JSONArray(prefs.getString("my_statuses_json", "[]"));
+            JSONArray myKept = new JSONArray();
+            boolean myChanged = false;
+            for (int i = 0; i < myArr.length(); i++) {
+                JSONObject o = myArr.getJSONObject(i);
+                if (statusId.equals(o.optString("id"))) {
+                    myChanged = true;
+                } else {
+                    myKept.put(o);
+                }
+            }
+            if (myChanged) {
+                prefs.edit().putString("my_statuses_json", myKept.toString()).apply();
+                changed = true;
+            }
+
+            if (changed) {
+                notifyStatusListeners();
+            }
+        } catch (Exception ignored) {}
+    }
+
     public void startStatusSync(Runnable onUpdatedCallback) {
         // Pure P2P: prune expired peer statuses (> 24h) and notify UI
         long now = System.currentTimeMillis();
@@ -1522,15 +1597,87 @@ public class VeilFeatureManager {
         try {
             List<StatusUpdate> p2pList = StatusController.getInstance(appContext).toStatusUpdateList();
             for (StatusUpdate su : p2pList) {
-                boolean exists = false;
+                StatusUpdate matched = null;
                 for (StatusUpdate r : result) {
                     if (r.id != null && r.id.equals(su.id)) {
-                        exists = true;
+                        matched = r;
                         break;
                     }
+                    if (r.isMine && su.isMine && Math.abs(r.timestampMs - su.timestampMs) < 60_000L) {
+                        boolean rHasMedia = r.mediaUri != null && !r.mediaUri.isEmpty();
+                        boolean suHasMedia = su.mediaUri != null && !su.mediaUri.isEmpty();
+                        if (rHasMedia && suHasMedia && r.mediaUri.equals(su.mediaUri)) {
+                            matched = r;
+                            break;
+                        } else if (!rHasMedia && !suHasMedia
+                                && java.util.Objects.equals(r.contentText, su.contentText)) {
+                            matched = r;
+                            break;
+                        }
+                    }
                 }
-                if (!exists) {
+                if (matched == null) {
                     result.add(su);
+                } else if (su.viewers != null && !su.viewers.isEmpty() && matched.viewers != null) {
+                    for (StatusViewer sv : su.viewers) {
+                        boolean vExists = false;
+                        for (StatusViewer mv : matched.viewers) {
+                            if (mv.userId != null && mv.userId.equals(sv.userId)) {
+                                vExists = true;
+                                break;
+                            }
+                        }
+                        if (!vExists) matched.viewers.add(sv);
+                    }
+                    matched.viewCount = Math.max(matched.viewCount, matched.viewers.size());
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        // 4. Filter out statuses from blocked peers or privacy-restricted contacts
+        try {
+            com.m3.veil.database.EncryptedChatDatabase db =
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(appContext);
+            com.m3.veil.utils.UserPreferences uPrefs =
+                    com.m3.veil.utils.UserPreferences.getInstance(appContext);
+            String audType = uPrefs.getStatusAudienceType();
+            java.util.Set<String> excluded = uPrefs.getStatusAudienceExcluded();
+            java.util.Iterator<StatusUpdate> it = result.iterator();
+            while (it.hasNext()) {
+                StatusUpdate su = it.next();
+                if (su == null || su.isMine) continue;
+                boolean blockedOrHidden = false;
+                if (su.authorId != null && !su.authorId.isEmpty()) {
+                    if (db.isChatBlocked(su.authorId)) {
+                        blockedOrHidden = true;
+                    }
+                    if (!blockedOrHidden && "excluded".equalsIgnoreCase(audType)
+                            && excluded != null && excluded.contains(su.authorId)) {
+                        blockedOrHidden = true;
+                    }
+                }
+                if (!blockedOrHidden && localChats != null) {
+                    for (com.m3.veil.model.Chat c : localChats) {
+                        if (c == null) continue;
+                        boolean matchesPeer = (su.authorId != null && (su.authorId.equals(c.getId())
+                                || (c.getParticipants() != null && c.getParticipants().contains(su.authorId))))
+                                || (su.authorName != null && c.getName() != null
+                                && su.authorName.trim().equalsIgnoreCase(c.getName().trim()));
+                        if (matchesPeer) {
+                            if (c.isBlocked() || (c.getId() != null && db.isChatBlocked(c.getId()))) {
+                                blockedOrHidden = true;
+                                break;
+                            }
+                            if ("excluded".equalsIgnoreCase(audType) && excluded != null
+                                    && c.getId() != null && excluded.contains(c.getId())) {
+                                blockedOrHidden = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (blockedOrHidden) {
+                    it.remove();
                 }
             }
         } catch (Throwable ignored) {}
@@ -1542,10 +1689,25 @@ public class VeilFeatureManager {
         long now = System.currentTimeMillis();
         String id = "my_status_" + now;
 
-        // Post to StatusController (100% Pure P2P WebRTC Mesh)
+        // Post to StatusController if not already posted by caller
         try {
-            StatusController.getInstance(appContext).postTextStatus(
-                    text, bgColorHex, fontStyleIndex, StatusController.PrivacyAcl.ALL_CONTACTS, null);
+            boolean alreadyInSc = false;
+            List<StatusUpdate> p2p = StatusController.getInstance(appContext).toStatusUpdateList();
+            for (StatusUpdate s : p2p) {
+                if (s.isMine && Math.abs(now - s.timestampMs) < 10_000L
+                        && java.util.Objects.equals(text, s.contentText)) {
+                    alreadyInSc = true;
+                    break;
+                }
+            }
+            if (!alreadyInSc) {
+                StatusController.PrivacyAcl acl =
+                        com.m3.veil.ui.main.status.WhatsAppStatusUi.resolveConfiguredPrivacyAcl(appContext);
+                List<String> targets =
+                        com.m3.veil.ui.main.status.WhatsAppStatusUi.resolveConfiguredTargetPeers(appContext, null);
+                StatusController.getInstance(appContext).postTextStatus(
+                        text, bgColorHex, fontStyleIndex, acl, targets);
+            }
         } catch (Throwable ignored) {}
         try {
             JSONArray myArr = new JSONArray(prefs.getString("my_statuses_json", "[]"));
@@ -1579,13 +1741,35 @@ public class VeilFeatureManager {
     }
 
     public StatusUpdate addMyMediaStatus(String mediaUri, String caption, String bgColorHex) {
+        return addMyMediaStatus(mediaUri, caption, bgColorHex, null);
+    }
+
+    public StatusUpdate addMyMediaStatus(String mediaUri, String caption, String bgColorHex, List<String> mentionNames) {
         long now = System.currentTimeMillis();
         String id = "my_status_" + now;
 
-        // Post to StatusController (100% Pure P2P WebRTC Mesh)
+        // Post to StatusController if not already posted by caller
         try {
-            StatusController.getInstance(appContext).postPhotoStatus(
-                    mediaUri, caption, StatusController.PrivacyAcl.ALL_CONTACTS, null);
+            boolean alreadyInSc = false;
+            List<StatusUpdate> p2p = StatusController.getInstance(appContext).toStatusUpdateList();
+            for (StatusUpdate s : p2p) {
+                if (s.isMine && Math.abs(now - s.timestampMs) < 10_000L
+                        && java.util.Objects.equals(mediaUri, s.mediaUri)) {
+                    alreadyInSc = true;
+                    break;
+                }
+            }
+            if (!alreadyInSc && mediaUri != null && !mediaUri.isEmpty()) {
+                StatusController.PrivacyAcl acl =
+                        com.m3.veil.ui.main.status.WhatsAppStatusUi.resolveConfiguredPrivacyAcl(appContext);
+                List<String> targets =
+                        com.m3.veil.ui.main.status.WhatsAppStatusUi.resolveConfiguredTargetPeers(appContext, null);
+                if (com.m3.veil.ui.main.status.WhatsAppStatusUi.isVideoStatusUri(mediaUri)) {
+                    StatusController.getInstance(appContext).postVideoStatus(mediaUri, caption, acl, targets);
+                } else {
+                    StatusController.getInstance(appContext).postPhotoStatus(mediaUri, caption, acl, targets);
+                }
+            }
         } catch (Throwable ignored) {}
 
         try {
@@ -1600,6 +1784,9 @@ public class VeilFeatureManager {
             o.put("viewed", false);
             o.put("views", 0);
             o.put("viewers", new JSONArray());
+            if (mentionNames != null && !mentionNames.isEmpty()) {
+                o.put("mentions", new JSONArray(mentionNames));
+            }
             JSONArray nextArr = new JSONArray();
             nextArr.put(o);
             for (int i = 0; i < myArr.length(); i++) {
@@ -1609,10 +1796,13 @@ public class VeilFeatureManager {
             addXp(25);
         } catch (Exception ignored) {}
 
+        notifyStatusListeners();
+
         // Broadcast status over WebRTC Mesh DataChannels (ZERO cloud storage)
         new Thread(() -> {
             try {
-                String syncMedia = encodeImageUriToBase64(mediaUri);
+                String syncMedia = com.m3.veil.ui.main.status.WhatsAppStatusUi.isVideoStatusUri(mediaUri)
+                        ? mediaUri : encodeImageUriToBase64(mediaUri);
                 com.m3.veil.webrtc.WebRtcManager.getInstance(appContext)
                         .broadcastStatus(id, caption, syncMedia, bgColorHex != null ? bgColorHex : "#1E293B", 0);
             } catch (Exception ignored) {}
@@ -1701,21 +1891,40 @@ public class VeilFeatureManager {
     }
 
     public void deleteMyStatus(String statusId) {
-        try {
-            StatusController.getInstance(appContext).deleteStatusSegment(statusId);
-        } catch (Throwable ignored) {}
+        String removedMediaUri = null;
+        String removedText = null;
         try {
             JSONArray myArr = new JSONArray(prefs.getString("my_statuses_json", "[]"));
             JSONArray nextArr = new JSONArray();
             for (int i = 0; i < myArr.length(); i++) {
                 JSONObject o = myArr.getJSONObject(i);
-                if (!statusId.equals(o.optString("id"))) {
+                if (statusId != null && statusId.equals(o.optString("id"))) {
+                    removedMediaUri = o.optString("mediaUri", null);
+                    removedText = o.optString("text", null);
+                } else {
                     nextArr.put(o);
                 }
             }
             prefs.edit().putString("my_statuses_json", nextArr.toString()).apply();
-            notifyStatusListeners();
         } catch (Exception ignored) {}
+
+        try {
+            StatusController sc = StatusController.getInstance(appContext);
+            sc.deleteStatusSegment(statusId);
+            List<StatusUpdate> p2pList = sc.toStatusUpdateList();
+            for (StatusUpdate su : p2pList) {
+                if (su.isMine) {
+                    boolean mediaMatch = removedMediaUri != null && !removedMediaUri.isEmpty()
+                            && removedMediaUri.equals(su.mediaUri);
+                    boolean textMatch = (removedMediaUri == null || removedMediaUri.isEmpty())
+                            && removedText != null && removedText.equals(su.contentText);
+                    if (mediaMatch || textMatch) {
+                        sc.deleteStatusSegment(su.id);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        notifyStatusListeners();
     }
 
     public void markStatusViewed(String statusId) {

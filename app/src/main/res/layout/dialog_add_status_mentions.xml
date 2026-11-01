@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorBackground">
+
+    <!-- Top Container: Header Bar + Optional Search Bar in linear vertical sequence -->
+    <LinearLayout
+        android:id="@+id/topBarContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Top App Bar -->
+        <LinearLayout
+            android:id="@+id/mentionsHeaderBar"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="12dp"
+            android:background="@color/colorSurface">
+
+            <ImageButton
+                android:id="@+id/btnMentionsBack"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@color/textPrimary"
+                android:contentDescription="Back" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvMentionsHeaderTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Add mentions"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="18sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:id="@+id/tvMentionsCountSubtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 contacts"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12.5sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnMentionsSearch"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_search"
+                app:tint="@color/textPrimary"
+                android:contentDescription="Search" />
+        </LinearLayout>
+
+        <!-- Search Input Bar (Expandable on Search Click) -->
+        <LinearLayout
+            android:id="@+id/mentionsSearchContainer"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:visibility="gone"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:background="@color/colorSurface">
+
+            <EditText
+                android:id="@+id/etMentionsSearch"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@null"
+                android:hint="Search contacts..."
+                android:textColorHint="@color/textSecondary"
+                android:textColor="@color/textPrimary"
+                android:textSize="15sp"
+                android:imeOptions="actionSearch"
+                android:singleLine="true" />
+
+            <ImageView
+                android:id="@+id/btnClearMentionsSearch"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:src="@drawable/ic_close"
+                app:tint="@color/textSecondary"
+                android:padding="4dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Main Content Container: always anchored below topBarContainer -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/topBarContainer"
+        android:orientation="vertical">
+
+        <!-- Horizontal Selected Contacts Strip -->
+        <HorizontalScrollView
+            android:id="@+id/hsvSelectedMentions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:scrollbars="none"
+            android:paddingVertical="10dp"
+            android:paddingHorizontal="12dp"
+            android:background="@color/colorSurface">
+
+            <LinearLayout
+                android:id="@+id/llSelectedMentionsContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <View
+            android:id="@+id/dividerMentions"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:visibility="gone"
+            android:background="@color/colorOutline" />
+
+        <!-- Vertical Contact List -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:id="@+id/llMentionsContactsList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="88dp" />
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- Floating Action Button for Confirming Selection -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabConfirmMentions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="20dp"
+        android:src="@drawable/ic_check"
+        app:backgroundTint="@color/colorPrimary"
+        app:tint="@color/colorOnPrimary"
+        app:fabCustomSize="56dp"
+        app:maxImageSize="28dp"
+        android:contentDescription="Done" />
+
+</RelativeLayout>

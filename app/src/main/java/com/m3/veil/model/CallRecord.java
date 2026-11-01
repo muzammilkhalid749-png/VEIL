@@ -141,4 +141,17 @@ public class CallRecord {
 
     public List<String> getParticipants() { return participants; }
     public void setParticipants(List<String> participants) { this.participants = participants; }
+
+    public boolean isVideo() {
+        return "video".equalsIgnoreCase(callType);
+    }
+
+    public void setVideo(boolean video) {
+        this.callType = video ? "video" : "audio";
+    }
+
+    public boolean isGroup() {
+        return (peerId != null && (peerId.startsWith("group_") || peerId.startsWith("channel_")))
+                || (participants != null && participants.size() > 2);
+    }
 }

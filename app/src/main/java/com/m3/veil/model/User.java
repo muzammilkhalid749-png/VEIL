@@ -224,7 +224,7 @@ public class User {
         java.util.Calendar seenCal = java.util.Calendar.getInstance();
         seenCal.setTimeInMillis(effectiveMs);
 
-        java.text.SimpleDateFormat timeFmt = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+        java.text.SimpleDateFormat timeFmt = new java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault());
         String timeStr = timeFmt.format(new java.util.Date(effectiveMs));
 
         if (nowCal.get(java.util.Calendar.YEAR) == seenCal.get(java.util.Calendar.YEAR)
@@ -240,7 +240,7 @@ public class User {
 
         long days = diff / (24L * 3600_000L);
         if (days < 7) return "last seen " + Math.max(1, days) + "d ago at " + timeStr;
-        java.text.SimpleDateFormat dateFmt = new java.text.SimpleDateFormat("MMM dd 'at' HH:mm", java.util.Locale.getDefault());
+        java.text.SimpleDateFormat dateFmt = new java.text.SimpleDateFormat("MMM dd 'at' h:mm a", java.util.Locale.getDefault());
         return "last seen " + dateFmt.format(new java.util.Date(effectiveMs));
     }
 

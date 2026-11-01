@@ -1,17 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Modern Java UI Featherweight Palette (Dark) -->
+    <color name="white">#FFFFFF</color>
     <color name="colorBackground">#0B0F17</color>
     <color name="colorSurface">#151C28</color>
+    <color name="colorOnSurface">#F8FAFC</color>
     <color name="colorSurfaceVariant">#1E293B</color>
+    <color name="colorOnSurfaceVariant">#94A3B8</color>
+    <color name="colorSurfaceDim">#0B0F17</color>
+    <color name="colorSurfaceBright">#1E293B</color>
+    <color name="colorSurfaceContainerLowest">#070A0F</color>
+    <color name="colorSurfaceContainerLow">#0F172A</color>
+    <color name="colorSurfaceContainer">#151C28</color>
+    <color name="colorSurfaceContainerHigh">#1E293B</color>
+    <color name="colorSurfaceContainerHighest">#283548</color>
     <color name="surfaceVariant">#1E293B</color>
+    <color name="surfaceCard">@color/colorSurfaceContainerLow</color>
+    <color name="strokeDefault">@color/colorOutline</color>
     <color name="colorOutline">#222D3F</color>
     <color name="dividerColor">#222D3F</color>
     <color name="colorPrimary">#6366F1</color>
     <color name="colorOnPrimary">#FFFFFF</color>
-    <color name="colorSecondary">#2DD4BF</color>
     <color name="colorPrimaryContainer">#1E1B4B</color>
     <color name="colorOnPrimaryContainer">#E0E7FF</color>
+    <color name="colorSecondary">#2DD4BF</color>
+    <color name="colorOnSecondary">#042F2E</color>
+    <color name="colorSecondaryContainer">#1E293B</color>
+    <color name="colorOnSecondaryContainer">#E0E7FF</color>
+    <color name="colorTertiary">#22D3EE</color>
+    <color name="colorOnTertiary">#083344</color>
+    <color name="colorTertiaryContainer">#164E63</color>
+    <color name="colorOnTertiaryContainer">#CFFAFE</color>
     <color name="textPrimary">#F8FAFC</color>
     <color name="textSecondary">#94A3B8</color>
     <color name="textTertiary">#64748B</color>

@@ -16,7 +16,7 @@
         android:id="@+id/detailsHandleBar"
         android:layout_width="36dp"
         android:layout_height="4dp"
-        android:background="@color/colorOutline"
+        android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="16dp" />
 
@@ -34,7 +34,7 @@
         android:id="@+id/tvDetailsSubtitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="🔒 P2P End-to-End Encrypted (ChaCha20-Poly1305 + SQLCipher)"
+        android:text="End-to-End Encrypted"
         android:textColor="@color/textSecondary"
         android:textSize="12.5sp"
         android:layout_marginBottom="18dp" />
@@ -152,7 +152,7 @@
                     android:id="@+id/tvMessageIdLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Cryptographic Message ID"
+                    android:text="Message ID"
                     android:textColor="@color/textSecondary"
                     android:textSize="12sp"
                     android:layout_marginBottom="4dp" />

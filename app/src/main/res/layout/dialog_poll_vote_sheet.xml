@@ -14,7 +14,7 @@
     <View
         android:layout_width="36dp"
         android:layout_height="4dp"
-        android:background="@color/colorOutline"
+        android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="18dp" />
 
@@ -22,7 +22,7 @@
         android:id="@+id/tvPollSheetTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="📊 Anonymous Community Poll"
+        android:text="Community Poll"
         android:textColor="@color/textPrimary"
         android:textSize="18sp"
         android:fontFamily="sans-serif-medium"
@@ -50,7 +50,9 @@
         style="@style/Widget.Material3.Button.TonalButton"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:text="💬 View Anonymous Discussion"
+        android:text="View Anonymous Discussion"
+        app:icon="@drawable/ic_comment"
+        app:iconGravity="textStart"
         app:cornerRadius="12dp" />
 
 </LinearLayout>

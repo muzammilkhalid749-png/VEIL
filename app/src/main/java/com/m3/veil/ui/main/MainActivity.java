@@ -36,20 +36,55 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.appcompat.widget.PopupMenu;
+import android.animation.ObjectAnimator;
+import android.os.Handler;
+import android.os.Looper;
+import java.util.Locale;
+import com.m3.veil.calling.CallEngine;
+import com.m3.veil.calling.CallInfo;
+import com.m3.veil.calling.CallState;
+import com.m3.veil.calling.CallEndReason;
+import com.m3.veil.calling.CallNotificationHelper;
 
 public class MainActivity extends AppCompatActivity {
 
     private ViewPager2 viewPager;
     private BottomNavigationView bottomNavigation;
     private FloatingActionButton fabNewMessage;
+    private FloatingActionButton fabStatusPencil;
     private View bottomNavContainer;
     private boolean isBottomNavVisible = true;
+    private boolean isStatusFilterActiveOnHome = false;
 
     private View appLogo;
     private TextView toolbarTitle;
     private ImageView searchButton;
     private ImageView newChatButton;
     private ImageView moreButton;
+
+    private View appBarCallMicroPill;
+    private View pillPulseDot;
+    private TextView tvCallPillText;
+    private ObjectAnimator dotPulseAnimator;
+    private Handler callPillHandler;
+    private Runnable callPillTicker;
+
+    private final CallEngine.Listener callEngineListener = new CallEngine.Listener() {
+        @Override
+        public void onStateChanged(CallState state, CallInfo info) {
+            runOnUiThread(() -> updateCallMicroPill());
+        }
+
+        @Override
+        public void onCallInfoChanged(CallInfo info) {
+            runOnUiThread(() -> updateCallMicroPill());
+        }
+
+        @Override
+        public void onCallEnded(CallEndReason reason, CallInfo info) {
+            runOnUiThread(() -> updateCallMicroPill());
+        }
+    };
 
     private final WebRtcManager.P2PEventListener globalCallListener = new WebRtcManager.P2PEventListener() {
         @Override
@@ -114,6 +149,8 @@ public class MainActivity extends AppCompatActivity {
 
         // Defer P2P WebRTC & Auth Session initialization to a background worker after Frame 1 renders
         android.os.Looper.myQueue().addIdleHandler(() -> {
+            com.m3.veil.utils.VeilBatteryOptimizationHelper.promptExemptionIfNeeded(MainActivity.this);
+            com.m3.veil.utils.VeilMediaCacheManager.autoPruneCache(MainActivity.this);
             new Thread(() -> {
                 try {
                     com.m3.veil.ui.chat.adapters.MessagesAdapter.prewarmViewPool(MainActivity.this);
@@ -153,6 +190,10 @@ public class MainActivity extends AppCompatActivity {
                                 .update("fcmToken", token);
                     }
                 });
+
+        try {
+            CallEngine.getInstance(this).addListener(callEngineListener);
+        } catch (Throwable ignored) {}
     }
 
     private final com.m3.veil.manager.PersonaManager.PersonaSwitchListener personaSwitchListener = newActivePersona -> {
@@ -169,6 +210,13 @@ public class MainActivity extends AppCompatActivity {
             updateToolbarForTab(viewPager.getCurrentItem());
         }
         applyAppearancePreferences();
+        updateCallMicroPill();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        stopCallPillTicker();
     }
 
     private void applyAppearancePreferences() {
@@ -192,6 +240,10 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         com.m3.veil.manager.PersonaManager.getInstance(this).removePersonaSwitchListener(personaSwitchListener);
         WebRtcManager.getInstance(this).removeEventListener(globalCallListener);
+        try {
+            CallEngine.getInstance(this).removeListener(callEngineListener);
+        } catch (Throwable ignored) {}
+        stopCallPillTicker();
     }
 
     private void handleWindowInsets() {
@@ -221,6 +273,12 @@ public class MainActivity extends AppCompatActivity {
                 int fabSpacing = (int) (12 * getResources().getDisplayMetrics().density);
                 lp.bottomMargin = navHeight + fabSpacing + bottomInset;
                 fabNewMessage.setLayoutParams(lp);
+                if (fabStatusPencil != null && fabStatusPencil.getLayoutParams() instanceof androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams) {
+                    androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams pLp =
+                            (androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams) fabStatusPencil.getLayoutParams();
+                    pLp.bottomMargin = lp.bottomMargin + (int) (68 * getResources().getDisplayMetrics().density);
+                    fabStatusPencil.setLayoutParams(pLp);
+                }
             }
             return insets;
         });
@@ -231,11 +289,132 @@ public class MainActivity extends AppCompatActivity {
         bottomNavigation = findViewById(R.id.bottomNavigation);
         bottomNavContainer = findViewById(R.id.bottomNavContainer);
         fabNewMessage = findViewById(R.id.fabNewMessage);
+        fabStatusPencil = findViewById(R.id.fabStatusPencil);
+        if (fabStatusPencil != null) {
+            com.m3.veil.utils.UiAnimator.attachSpringPress(fabStatusPencil);
+        }
         appLogo = findViewById(R.id.appLogo);
         toolbarTitle = findViewById(R.id.toolbarTitle);
         searchButton = findViewById(R.id.searchButton);
         newChatButton = findViewById(R.id.newChatButton);
         moreButton = findViewById(R.id.moreButton);
+
+        appBarCallMicroPill = findViewById(R.id.appBarCallMicroPill);
+        pillPulseDot = findViewById(R.id.pillPulseDot);
+        tvCallPillText = findViewById(R.id.tvCallPillText);
+    }
+
+    private void updateCallMicroPill() {
+        if (isDestroyed() || isFinishing()) return;
+        CallEngine engine = CallEngine.getInstance(this);
+        if (engine == null || !engine.isInCall()) {
+            if (appBarCallMicroPill != null) {
+                appBarCallMicroPill.setVisibility(View.GONE);
+            }
+            stopCallPillTicker();
+            return;
+        }
+
+        CallInfo info = engine.getCallInfo();
+        if (info == null || info.getState() == null || info.getState().isEnded()) {
+            if (appBarCallMicroPill != null) {
+                appBarCallMicroPill.setVisibility(View.GONE);
+            }
+            stopCallPillTicker();
+            return;
+        }
+
+        if (appBarCallMicroPill != null) {
+            appBarCallMicroPill.setVisibility(View.VISIBLE);
+            appBarCallMicroPill.setOnClickListener(v -> {
+                CallNotificationHelper.launchCallActivity(MainActivity.this, engine.getCallInfo(), false);
+            });
+        }
+
+        renderCallPillText(info);
+        startCallPillTicker();
+    }
+
+    private void renderCallPillText(CallInfo info) {
+        if (tvCallPillText == null || info == null) return;
+        CallState st = info.getState();
+        if (st == null || st.isEnded()) return;
+
+        if (st == CallState.CALLING) {
+            long started = info.getStartedAtMs();
+            long elapsed = started > 0 ? (System.currentTimeMillis() - started) : 0L;
+            long sec = Math.max(0, elapsed / 1000L);
+            String timeStr = String.format(Locale.getDefault(), "%02d:%02d", sec / 60, sec % 60);
+            tvCallPillText.setText("Calling (" + timeStr + ")");
+        } else if (st == CallState.PRE_ACCEPT_RECEIVED) {
+            long started = info.getStartedAtMs();
+            long elapsed = started > 0 ? (System.currentTimeMillis() - started) : 0L;
+            long sec = Math.max(0, elapsed / 1000L);
+            String timeStr = String.format(Locale.getDefault(), "%02d:%02d", sec / 60, sec % 60);
+            tvCallPillText.setText("Ringing (" + timeStr + ")");
+        } else if (st == CallState.RECEIVED_CALL) {
+            long started = info.getStartedAtMs();
+            long elapsed = started > 0 ? (System.currentTimeMillis() - started) : 0L;
+            long sec = Math.max(0, elapsed / 1000L);
+            String timeStr = String.format(Locale.getDefault(), "%02d:%02d", sec / 60, sec % 60);
+            tvCallPillText.setText("Incoming (" + timeStr + ")");
+        } else if (st.isEstablished()) {
+            long connected = info.getConnectedAtMs();
+            long elapsed = connected > 0 ? (System.currentTimeMillis() - connected) : info.getDurationMs();
+            long sec = Math.max(0, elapsed / 1000L);
+            String timeStr = String.format(Locale.getDefault(), "%02d:%02d", sec / 60, sec % 60);
+            tvCallPillText.setText("Ongoing (" + timeStr + ")");
+        } else {
+            tvCallPillText.setText("Connecting\u2026");
+        }
+    }
+
+    private void startCallPillTicker() {
+        if (callPillHandler == null) {
+            callPillHandler = new Handler(Looper.getMainLooper());
+        }
+        if (callPillTicker == null) {
+            callPillTicker = new Runnable() {
+                @Override
+                public void run() {
+                    CallEngine engine = CallEngine.getInstance(MainActivity.this);
+                    if (engine != null && engine.isInCall()) {
+                        renderCallPillText(engine.getCallInfo());
+                        if (callPillHandler != null) {
+                            callPillHandler.postDelayed(this, 1000L);
+                        }
+                    } else {
+                        stopCallPillTicker();
+                        if (appBarCallMicroPill != null) {
+                            appBarCallMicroPill.setVisibility(View.GONE);
+                        }
+                    }
+                }
+            };
+            callPillHandler.postDelayed(callPillTicker, 1000L);
+        }
+
+        if (dotPulseAnimator == null && pillPulseDot != null) {
+            dotPulseAnimator = ObjectAnimator.ofFloat(pillPulseDot, "alpha", 1.0f, 0.25f, 1.0f);
+            dotPulseAnimator.setDuration(1200);
+            dotPulseAnimator.setRepeatCount(ObjectAnimator.INFINITE);
+            dotPulseAnimator.setRepeatMode(ObjectAnimator.RESTART);
+            dotPulseAnimator.start();
+        }
+    }
+
+    private void stopCallPillTicker() {
+        if (callPillHandler != null && callPillTicker != null) {
+            callPillHandler.removeCallbacks(callPillTicker);
+            callPillTicker = null;
+        }
+        if (dotPulseAnimator != null) {
+            dotPulseAnimator.cancel();
+            dotPulseAnimator = null;
+        }
+        if (pillPulseDot != null) {
+            pillPulseDot.setAlpha(1.0f);
+        }
     }
 
     private void setupViewPager() {
@@ -287,7 +466,29 @@ public class MainActivity extends AppCompatActivity {
     private void setupClickListeners() {
         updateFabForTab(0);
 
-        // Feature #107: Secret Inbox Gesture — Long-press toolbar opens Hidden Secret Vault
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (viewPager != null && viewPager.getCurrentItem() != 0) {
+                    viewPager.setCurrentItem(0, true);
+                    if (bottomNavigation != null) {
+                        bottomNavigation.setSelectedItemId(R.id.navigation_home);
+                    }
+                    return;
+                }
+                try {
+                    androidx.fragment.app.Fragment currentFragment = getSupportFragmentManager().findFragmentByTag("f0");
+                    if (currentFragment instanceof com.m3.veil.ui.main.fragments.HomeFragment) {
+                        if (((com.m3.veil.ui.main.fragments.HomeFragment) currentFragment).handleBackPressed()) {
+                            return;
+                        }
+                    }
+                } catch (Exception ignored) {}
+                moveTaskToBack(true);
+            }
+        });
+
+        // Feature #107: Secret Inbox Gesture â€” Long-press toolbar opens Hidden Secret Vault
         android.view.View toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
             toolbar.setOnLongClickListener(v -> {
@@ -354,24 +555,63 @@ public class MainActivity extends AppCompatActivity {
                         .start();
             }
         }
+        if (fabStatusPencil != null && isStatusFilterActiveOnHome && viewPager != null && viewPager.getCurrentItem() == 0) {
+            if (visible) {
+                fabStatusPencil.animate()
+                        .translationY(0f)
+                        .setDuration(220)
+                        .setInterpolator(new androidx.interpolator.view.animation.FastOutSlowInInterpolator())
+                        .withStartAction(fabStatusPencil::show)
+                        .start();
+            } else {
+                fabStatusPencil.animate()
+                        .translationY(targetY)
+                        .setDuration(220)
+                        .setInterpolator(new androidx.interpolator.view.animation.FastOutSlowInInterpolator())
+                        .withEndAction(fabStatusPencil::hide)
+                        .start();
+            }
+        }
     }
 
     public void updateFabForTab(int position) {
         if (fabNewMessage == null) return;
         switch (position) {
-            case 0: // Chats / Home
-                fabNewMessage.setImageResource(R.drawable.ic_edit);
-                fabNewMessage.setContentDescription("New Chat");
-                fabNewMessage.setOnClickListener(v -> startActivity(new Intent(this, NewChatActivity.class)));
-                fabNewMessage.show();
+            case 0: // Chats / Home (or Status when chipFilterStatus is active)
+                HomeFragment hf = getHomeFragment();
+                boolean statusActive = isStatusFilterActiveOnHome || (hf != null && "status".equals(hf.getActiveFilter()));
+                if (statusActive) {
+                    if (fabStatusPencil != null) {
+                        fabStatusPencil.setOnClickListener(v -> {
+                            HomeFragment h = getHomeFragment();
+                            if (h != null) h.openTextStatusComposer();
+                        });
+                        fabStatusPencil.show();
+                    }
+                    fabNewMessage.setImageResource(R.drawable.ic_camera);
+                    fabNewMessage.setContentDescription("Add Status");
+                    fabNewMessage.setOnClickListener(v -> {
+                        HomeFragment h = getHomeFragment();
+                        if (h != null) h.openStatusCreationChooser();
+                    });
+                    fabNewMessage.show();
+                } else {
+                    if (fabStatusPencil != null) fabStatusPencil.hide();
+                    fabNewMessage.setImageResource(R.drawable.ic_edit);
+                    fabNewMessage.setContentDescription("New Chat");
+                    fabNewMessage.setOnClickListener(v -> startActivity(new Intent(this, NewChatActivity.class)));
+                    fabNewMessage.show();
+                }
                 break;
             case 1: // Discover / Moments
+                if (fabStatusPencil != null) fabStatusPencil.hide();
                 fabNewMessage.setImageResource(R.drawable.ic_add);
                 fabNewMessage.setContentDescription("Create Moment");
                 fabNewMessage.setOnClickListener(v -> startActivity(new Intent(this, CreatePostActivity.class)));
                 fabNewMessage.show();
                 break;
             case 2: // Calls
+                if (fabStatusPencil != null) fabStatusPencil.hide();
                 fabNewMessage.setImageResource(R.drawable.ic_call);
                 fabNewMessage.setContentDescription("New Call");
                 fabNewMessage.setOnClickListener(v -> {
@@ -384,6 +624,7 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case 3: // Settings & Profile
             default:
+                if (fabStatusPencil != null) fabStatusPencil.hide();
                 fabNewMessage.hide();
                 break;
         }
@@ -467,17 +708,25 @@ public class MainActivity extends AppCompatActivity {
         androidx.appcompat.widget.PopupMenu popup = new androidx.appcompat.widget.PopupMenu(this, anchor);
         popup.getMenuInflater().inflate(R.menu.menu_main_chats, popup.getMenu());
         android.view.Menu menu = popup.getMenu();
-        // Secret Vault is already on the filter chip bar & toolbar long-press; Archived Chats has its own top row
         if (menu.findItem(R.id.action_secret_inbox) != null) {
             menu.findItem(R.id.action_secret_inbox).setVisible(false);
         }
         if (menu.findItem(R.id.action_archived_chats) != null) {
             menu.findItem(R.id.action_archived_chats).setVisible(false);
         }
+        popup.getMenu().add(0, 101, 3, "Change Vault Password");
         popup.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
-            if (id == R.id.action_new_group) {
-                startActivity(new Intent(this, NewGroupActivity.class));
+            if (id == R.id.action_notifications) {
+                startActivity(new Intent(this, com.m3.veil.ui.notifications.NotificationsActivity.class));
+                return true;
+            } else if (id == 101) {
+                HomeFragment hf = getHomeFragment();
+                if (hf != null) {
+                    hf.showChangeVaultPasswordDialog();
+                } else {
+                    startActivity(new Intent(this, com.m3.veil.ui.settings.PrivacySettingsActivity.class));
+                }
                 return true;
             } else if (id == R.id.action_archived_chats) {
                 Intent intent = new Intent(this, ArchivedChatsActivity.class);
@@ -501,25 +750,19 @@ public class MainActivity extends AppCompatActivity {
     private void showDiscoverTabMenu(android.view.View anchor) {
         androidx.appcompat.widget.PopupMenu popup = new androidx.appcompat.widget.PopupMenu(this, anchor);
         popup.getMenuInflater().inflate(R.menu.menu_main_discover, popup.getMenu());
-        android.view.Menu menu = popup.getMenu();
-        // Create Post is on the FAB and category filters are on the horizontal chip bar
-        if (menu.findItem(R.id.action_create_post) != null) menu.findItem(R.id.action_create_post).setVisible(false);
-        if (menu.findItem(R.id.action_filter_confessions) != null) menu.findItem(R.id.action_filter_confessions).setVisible(false);
-        if (menu.findItem(R.id.action_filter_polls) != null) menu.findItem(R.id.action_filter_polls).setVisible(false);
-        if (menu.findItem(R.id.action_filter_trending) != null) menu.findItem(R.id.action_filter_trending).setVisible(false);
         popup.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
             if (id == R.id.action_create_post) {
                 startActivity(new Intent(this, CreatePostActivity.class));
                 return true;
             } else if (id == R.id.action_filter_confessions) {
-                setDiscoverCategory("confession");
+                setDiscoverCategory("Confessions");
                 return true;
             } else if (id == R.id.action_filter_polls) {
-                setDiscoverCategory("poll");
+                setDiscoverCategory("Polls");
                 return true;
             } else if (id == R.id.action_filter_trending) {
-                setDiscoverCategory("trending");
+                setDiscoverCategory("Trending");
                 return true;
             } else if (id == R.id.action_refresh_discover) {
                 refreshDiscoverFeed();
@@ -530,38 +773,12 @@ public class MainActivity extends AppCompatActivity {
         popup.show();
     }
 
-    private void showDiscoverFilterMenu() {
-        if (searchButton == null) return;
-        androidx.appcompat.widget.PopupMenu popup = new androidx.appcompat.widget.PopupMenu(this, searchButton);
-        popup.getMenu().add(0, 1, 0, "🌐 All Moments");
-        popup.getMenu().add(0, 2, 1, "🤐 Anonymous Confessions");
-        popup.getMenu().add(0, 3, 2, "📊 Community Polls");
-        popup.getMenu().add(0, 4, 3, "🔥 Trending");
-        popup.setOnMenuItemClickListener(item -> {
-            switch (item.getItemId()) {
-                case 1: setDiscoverCategory("all"); return true;
-                case 2: setDiscoverCategory("confession"); return true;
-                case 3: setDiscoverCategory("poll"); return true;
-                case 4: setDiscoverCategory("trending"); return true;
-            }
-            return false;
-        });
-        popup.show();
-    }
-
     private void showCallsTabMenu(android.view.View anchor) {
         androidx.appcompat.widget.PopupMenu popup = new androidx.appcompat.widget.PopupMenu(this, anchor);
         popup.getMenuInflater().inflate(R.menu.menu_main_calls, popup.getMenu());
-        android.view.Menu menu = popup.getMenu();
-        // New Direct Call & Call Roulette are already in the Calls FAB hub
-        if (menu.findItem(R.id.action_new_direct_call) != null) menu.findItem(R.id.action_new_direct_call).setVisible(false);
-        if (menu.findItem(R.id.action_call_roulette) != null) menu.findItem(R.id.action_call_roulette).setVisible(false);
         popup.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
-            if (id == R.id.action_new_direct_call) {
-                startActivity(new Intent(this, NewChatActivity.class));
-                return true;
-            } else if (id == R.id.action_call_roulette) {
+            if (id == R.id.action_new_direct_call || id == R.id.action_call_roulette) {
                 showCallsHubSheet();
                 return true;
             } else if (id == R.id.action_clear_calls) {
@@ -579,44 +796,18 @@ public class MainActivity extends AppCompatActivity {
         popup.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
             ProfileFragment pf = getProfileFragment();
-            if (id == R.id.action_edit_profile) {
-                if (pf != null) {
-                    pf.openEditProfile();
-                } else {
-                    new com.m3.veil.ui.main.fragments.EditProfileBottomSheet().show(getSupportFragmentManager(), "edit_profile");
-                }
-                return true;
-            } else if (id == R.id.action_switch_persona) {
-                if (pf != null) {
-                    pf.openPersonaManager();
-                } else {
-                    HomeFragment homeFrag = getHomeFragment();
-                    if (homeFrag != null) homeFrag.showPersonaSwitcherDialog();
-                }
-                return true;
-            } else if (id == R.id.action_privacy_checkup) {
+            if (id == R.id.action_privacy_checkup) {
                 if (pf != null) {
                     pf.showPrivacyCheckupHub();
                 } else {
-                    Toast.makeText(this, "Privacy Checkup: All local data encrypted with AES-256-GCM & SQLCipher", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Privacy Checkup: All chats and media are securely encrypted", Toast.LENGTH_SHORT).show();
                 }
                 return true;
             } else if (id == R.id.action_security_console) {
                 if (pf != null) {
                     pf.openDeveloperAndSecurityConsole();
                 } else {
-                    Toast.makeText(this, "Security Console: P2P WebRTC Mesh Active • Zero Cloud Storage", Toast.LENGTH_LONG).show();
-                }
-                return true;
-            } else if (id == R.id.action_logout) {
-                if (pf != null) {
-                    pf.logout();
-                } else {
-                    com.m3.veil.manager.AuthManager.getInstance().signOut(this);
-                    Intent intent = new Intent(this, com.m3.veil.ui.auth.PhoneAuthActivity.class);
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                    startActivity(intent);
-                    finish();
+                    Toast.makeText(this, "Security Console: Direct Connection Active â€¢ Zero Cloud Storage", Toast.LENGTH_SHORT).show();
                 }
                 return true;
             }
@@ -631,8 +822,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void setStatusFilterActive(boolean isStatus) {
+        isStatusFilterActiveOnHome = isStatus;
         if (viewPager == null || viewPager.getCurrentItem() != 0) return;
+        updateFabForTab(0);
         if (isStatus) {
+            setBottomNavAndFabVisible(true);
             if (appLogo != null) appLogo.setVisibility(android.view.View.GONE);
             if (toolbarTitle != null) toolbarTitle.setText("Status");
             if (newChatButton != null) {
@@ -648,8 +842,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void showStatusTabMenu(android.view.View anchor) {
         androidx.appcompat.widget.PopupMenu popup = new androidx.appcompat.widget.PopupMenu(this, anchor);
-        popup.getMenu().add(0, 3, 0, "🛡️ Status Privacy & Stealth Mode");
-        popup.getMenu().add(0, 4, 1, "⚙️ Settings");
+        popup.getMenu().add(0, 3, 0, "Status privacy");
+        popup.getMenu().add(0, 4, 1, "Settings");
         popup.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
                 case 3:
@@ -665,135 +859,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showStatusPrivacySheet() {
-        com.google.android.material.bottomsheet.BottomSheetDialog sheet =
-                new com.google.android.material.bottomsheet.BottomSheetDialog(this, R.style.ModernBottomSheetDialogTheme);
-        float dp = getResources().getDisplayMetrics().density;
-
-        android.widget.LinearLayout root = new android.widget.LinearLayout(this);
-        root.setOrientation(android.widget.LinearLayout.VERTICAL);
-        root.setPadding((int) (24 * dp), (int) (20 * dp), (int) (24 * dp), (int) (28 * dp));
-        root.setBackgroundResource(R.drawable.bg_bottom_sheet_modern);
-
-        TextView title = new TextView(this);
-        title.setText("🛡️ P2P Status Privacy & ACL");
-        title.setTextSize(19f);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.textPrimary));
-        root.addView(title);
-
-        TextView subtitle = new TextView(this);
-        subtitle.setText("Control who receives your AES-256-GCM wrapped keys over the WebRTC mesh when you post a 24h status.");
-        subtitle.setTextSize(13f);
-        subtitle.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.textSecondary));
-        subtitle.setPadding(0, (int) (6 * dp), 0, (int) (16 * dp));
-        root.addView(subtitle);
-
-        com.m3.veil.manager.StatusController sc = com.m3.veil.manager.StatusController.getInstance(this);
-        com.m3.veil.manager.StatusController.PrivacyAcl currentAcl = sc.getDefaultPrivacyAcl();
-
-        com.m3.veil.manager.StatusController.PrivacyAcl[] acls = {
-                com.m3.veil.manager.StatusController.PrivacyAcl.ALL_CONTACTS,
-                com.m3.veil.manager.StatusController.PrivacyAcl.CLOSE_FRIENDS,
-                com.m3.veil.manager.StatusController.PrivacyAcl.PERSONA_ISOLATED,
-                com.m3.veil.manager.StatusController.PrivacyAcl.SELECTED_PEERS
-        };
-        String[] labels = {
-                "🌐 All P2P Contacts",
-                "💚 Close Friends Only",
-                "🎭 Active Persona Vault Only",
-                "🔒 Selected Peers (Strict)"
-        };
-        String[] descs = {
-                "Share status manifest with all verified contacts in your local database",
-                "Only wrap decryption keys for contacts marked as Close Friends",
-                "Isolate status updates strictly to the currently active Persona identity",
-                "Restrict key wrapping to explicitly whitelisted peer sessions"
-        };
-
-        for (int i = 0; i < acls.length; i++) {
-            final com.m3.veil.manager.StatusController.PrivacyAcl acl = acls[i];
-            final String label = labels[i];
-            boolean selected = (acl == currentAcl);
-
-            com.google.android.material.card.MaterialCardView card = new com.google.android.material.card.MaterialCardView(this);
-            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.bottomMargin = (int) (8 * dp);
-            card.setLayoutParams(lp);
-            card.setRadius(12 * dp);
-            card.setCardElevation(0);
-            card.setStrokeWidth((int) (1.2f * dp));
-            card.setStrokeColor(androidx.core.content.ContextCompat.getColor(this,
-                    selected ? R.color.colorPrimary : R.color.colorOutline));
-            card.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(this,
-                    selected ? R.color.surfaceVariant : android.R.color.transparent));
-
-            android.widget.LinearLayout row = new android.widget.LinearLayout(this);
-            row.setOrientation(android.widget.LinearLayout.VERTICAL);
-            row.setPadding((int) (14 * dp), (int) (12 * dp), (int) (14 * dp), (int) (12 * dp));
-
-            TextView tvLabel = new TextView(this);
-            tvLabel.setText(label + (selected ? "  ✓" : ""));
-            tvLabel.setTextSize(15f);
-            tvLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-            tvLabel.setTextColor(androidx.core.content.ContextCompat.getColor(this,
-                    selected ? R.color.colorPrimary : R.color.textPrimary));
-            row.addView(tvLabel);
-
-            TextView tvDesc = new TextView(this);
-            tvDesc.setText(descs[i]);
-            tvDesc.setTextSize(12.5f);
-            tvDesc.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.textSecondary));
-            tvDesc.setPadding(0, (int) (2 * dp), 0, 0);
-            row.addView(tvDesc);
-
-            card.addView(row);
-            card.setOnClickListener(v -> {
-                sc.setDefaultPrivacyAcl(acl);
-                Toast.makeText(this, "Status privacy updated: " + label, Toast.LENGTH_SHORT).show();
-                sheet.dismiss();
-            });
-            root.addView(card);
-        }
-
-        // Stealth Status Viewing toggle
-        android.widget.LinearLayout stealthRow = new android.widget.LinearLayout(this);
-        stealthRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        stealthRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        stealthRow.setPadding(0, (int) (12 * dp), 0, (int) (4 * dp));
-
-        android.widget.LinearLayout stealthTextCol = new android.widget.LinearLayout(this);
-        stealthTextCol.setOrientation(android.widget.LinearLayout.VERTICAL);
-        stealthTextCol.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-        TextView tvStealthTitle = new TextView(this);
-        tvStealthTitle.setText("👻 Ghost / Stealth Status View");
-        tvStealthTitle.setTextSize(15f);
-        tvStealthTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvStealthTitle.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.textPrimary));
-        stealthTextCol.addView(tvStealthTitle);
-
-        TextView tvStealthSub = new TextView(this);
-        tvStealthSub.setText("View contact statuses without sending signed P2P view receipts");
-        tvStealthSub.setTextSize(12.5f);
-        tvStealthSub.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.textSecondary));
-        stealthTextCol.addView(tvStealthSub);
-
-        androidx.appcompat.widget.SwitchCompat switchStealth = new androidx.appcompat.widget.SwitchCompat(this);
-        switchStealth.setChecked(sc.isStealthViewMode());
-        switchStealth.setOnCheckedChangeListener((btn, isChecked) -> {
-            sc.setStealthViewMode(isChecked);
-            Toast.makeText(this, isChecked ? "Ghost Status View enabled" : "Ghost Status View disabled", Toast.LENGTH_SHORT).show();
+        com.m3.veil.ui.main.status.WhatsAppStatusUi.showAudienceSelectorDialog(this, updatedAudience -> {
+            Toast.makeText(this, "Status privacy updated: " + updatedAudience, Toast.LENGTH_SHORT).show();
+            com.m3.veil.manager.VeilFeatureManager.getInstance(this).notifyStatusListeners();
         });
-
-        stealthRow.addView(stealthTextCol);
-        stealthRow.addView(switchStealth);
-        root.addView(stealthRow);
-
-        sheet.setContentView(root);
-        sheet.show();
     }
 
     private DiscoverFragment getDiscoverFragment() {
@@ -894,6 +963,21 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
+        if (viewPager != null && viewPager.getCurrentItem() != 0) {
+            viewPager.setCurrentItem(0, true);
+            if (bottomNavigation != null) {
+                bottomNavigation.setSelectedItemId(R.id.navigation_home);
+            }
+            return;
+        }
+        try {
+            androidx.fragment.app.Fragment currentFragment = getSupportFragmentManager().findFragmentByTag("f0");
+            if (currentFragment instanceof com.m3.veil.ui.main.fragments.HomeFragment) {
+                if (((com.m3.veil.ui.main.fragments.HomeFragment) currentFragment).handleBackPressed()) {
+                    return;
+                }
+            }
+        } catch (Exception ignored) {}
         moveTaskToBack(true);
     }
 }

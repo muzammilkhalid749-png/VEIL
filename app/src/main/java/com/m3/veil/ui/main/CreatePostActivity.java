@@ -422,9 +422,9 @@ public class CreatePostActivity extends AppCompatActivity {
                 "Toggle Collaborative Chain Post"
         };
         String[] descs = {
-                "Visible on global P2P feed",
+                "Visible to everyone",
                 "Zero-trace pseudonymized confession",
-                "Cryptographically shredded after 24 hours",
+                "Disappears automatically after 24 hours",
                 "Pick an expressive aura badge",
                 "Crowdsource anonymous votes or trivia quiz",
                 "Record voice with Ghost, Cyber, Deep, or Anon filter",

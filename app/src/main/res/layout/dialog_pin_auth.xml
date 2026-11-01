@@ -14,7 +14,7 @@
     <View
         android:layout_width="36dp"
         android:layout_height="4dp"
-        android:background="@color/colorOutline"
+        android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="16dp" />
 
@@ -31,7 +31,7 @@
         android:id="@+id/tvPinDialogTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="🔒 Security Verification"
+        android:text="Security Verification"
         android:textColor="@color/textPrimary"
         android:textSize="20sp"
         android:fontFamily="sans-serif-medium"
@@ -51,7 +51,7 @@
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/pinInputLayout"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="24dp"

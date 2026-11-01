@@ -14,6 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -46,7 +47,12 @@ public class RecoveryPhraseActivity extends AppCompatActivity {
     private boolean isWordsMasked = false;
     private final List<TextView> wordValueViews = new ArrayList<>();
     private TextView phraseText;
-    private TextView btnTogglePrivacyBlur;
+    private View btnTogglePrivacyBlur;
+    private ImageView ivPrivacyEye;
+    private TextView tvPrivacyToggleLabel;
+    private View btnToggleWordsInCard;
+    private ImageView ivInCardEye;
+    private TextView tvInCardEyeLabel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -119,12 +125,23 @@ public class RecoveryPhraseActivity extends AppCompatActivity {
         }
 
         btnTogglePrivacyBlur = findViewById(R.id.btnTogglePrivacyBlur);
+        ivPrivacyEye = findViewById(R.id.ivPrivacyEye);
+        tvPrivacyToggleLabel = findViewById(R.id.tvPrivacyToggleLabel);
+        btnToggleWordsInCard = findViewById(R.id.btnToggleWordsInCard);
+        ivInCardEye = findViewById(R.id.ivInCardEye);
+        tvInCardEyeLabel = findViewById(R.id.tvInCardEyeLabel);
+
+        View.OnClickListener toggleMaskListener = v -> {
+            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            isWordsMasked = !isWordsMasked;
+            applyWordMaskState();
+        };
+
         if (btnTogglePrivacyBlur != null) {
-            btnTogglePrivacyBlur.setOnClickListener(v -> {
-                v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-                isWordsMasked = !isWordsMasked;
-                applyWordMaskState();
-            });
+            btnTogglePrivacyBlur.setOnClickListener(toggleMaskListener);
+        }
+        if (btnToggleWordsInCard != null) {
+            btnToggleWordsInCard.setOnClickListener(toggleMaskListener);
         }
 
         Button copyButton = findViewById(R.id.copyButton);
@@ -202,8 +219,8 @@ public class RecoveryPhraseActivity extends AppCompatActivity {
         LinearLayout cell = new LinearLayout(this);
         cell.setOrientation(LinearLayout.HORIZONTAL);
         cell.setGravity(Gravity.CENTER_VERTICAL);
-        cell.setBackgroundResource(R.drawable.bg_filter_chip);
-        cell.setPadding((int) (12 * dp), (int) (9 * dp), (int) (12 * dp), (int) (9 * dp));
+        cell.setBackgroundResource(R.drawable.bg_recovery_word_cell);
+        cell.setPadding((int) (14 * dp), (int) (10 * dp), (int) (14 * dp), (int) (10 * dp));
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         if (isLeft) {
@@ -217,7 +234,7 @@ public class RecoveryPhraseActivity extends AppCompatActivity {
         tvNum.setText(String.format(Locale.US, "%02d.", number));
         tvNum.setTextSize(12f);
         tvNum.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        tvNum.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+        tvNum.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
         cell.addView(tvNum);
 
         TextView tvWord = new TextView(this);
@@ -225,7 +242,7 @@ public class RecoveryPhraseActivity extends AppCompatActivity {
         tvWord.setTag(word);
         tvWord.setTextSize(14f);
         tvWord.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        tvWord.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+        tvWord.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
         LinearLayout.LayoutParams wLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -239,25 +256,39 @@ public class RecoveryPhraseActivity extends AppCompatActivity {
     }
 
     private void applyWordMaskState() {
-        if (btnTogglePrivacyBlur != null) {
-            btnTogglePrivacyBlur.setText(isWordsMasked ? "👁️ Reveal Words" : "👁️ Hide Words");
+        if (ivPrivacyEye != null) {
+            ivPrivacyEye.setImageResource(isWordsMasked ? R.drawable.ic_visibility : R.drawable.ic_visibility_off);
         }
+        if (tvPrivacyToggleLabel != null) {
+            tvPrivacyToggleLabel.setText(isWordsMasked ? "Reveal Words" : "Hide Words");
+        }
+        if (ivInCardEye != null) {
+            ivInCardEye.setImageResource(isWordsMasked ? R.drawable.ic_visibility : R.drawable.ic_visibility_off);
+        }
+        if (tvInCardEyeLabel != null) {
+            tvInCardEyeLabel.setText(isWordsMasked ? "Reveal" : "Hide");
+        }
+
         for (TextView tv : wordValueViews) {
             String original = (String) tv.getTag();
             if (isWordsMasked) {
                 tv.setText("••••••");
-                tv.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+                tv.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
             } else {
                 tv.setText(original != null ? original : "");
-                tv.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+                tv.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
             }
         }
+
         if (phraseText != null) {
             if (isWordsMasked) {
-                phraseText.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-                phraseText.getPaint().setMaskFilter(new BlurMaskFilter(18f, BlurMaskFilter.Blur.NORMAL));
+                phraseText.setText("••••••••  ••••••••  ••••••••  ••••••••\n••••••••  ••••••••  ••••••••  ••••••••\n••••••••  ••••••••  ••••••••  ••••••••");
+                phraseText.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
+                phraseText.setTextIsSelectable(false);
             } else {
-                phraseText.getPaint().setMaskFilter(null);
+                phraseText.setText(recoveryPhrase);
+                phraseText.setTextColor(ContextCompat.getColor(this, R.color.veil_accent));
+                phraseText.setTextIsSelectable(true);
             }
             phraseText.invalidate();
         }

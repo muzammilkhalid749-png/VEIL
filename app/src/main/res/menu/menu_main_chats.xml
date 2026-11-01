@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:id="@+id/action_new_group"
-        android:icon="@drawable/ic_group"
-        android:title="New Group" />
+        android:id="@+id/action_notifications"
+        android:icon="@drawable/ic_notifications"
+        android:title="Notifications" />
     <item
         android:id="@+id/action_archived_chats"
         android:icon="@drawable/ic_archive"

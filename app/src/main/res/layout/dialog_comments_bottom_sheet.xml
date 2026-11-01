@@ -9,13 +9,12 @@
 
     <!-- Drag Handle -->
     <View
-        android:layout_width="40dp"
+        android:layout_width="36dp"
         android:layout_height="4dp"
         android:layout_gravity="center_horizontal"
         android:layout_marginTop="12dp"
         android:layout_marginBottom="12dp"
-        android:background="@drawable/bg_attach_item"
-        android:backgroundTint="@color/colorOutline" />
+        android:background="@drawable/bg_persona_drag_handle" />
 
     <!-- Sheet Header -->
     <LinearLayout

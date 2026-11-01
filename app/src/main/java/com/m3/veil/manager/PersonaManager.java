@@ -152,77 +152,53 @@ public class PersonaManager {
                         false,
                         0L
                 );
-                Persona p2 = new Persona(
-                        GHOST_PERSONA_ID,
-                        "Midnight Drifter",
-                        "midnight_drifter",
-                        "default_2",
-                        "Off the grid. Zero trace routing active.",
-                        baseUid + "_" + GHOST_PERSONA_ID,
-                        GHOST_PERSONA_ID.equals(savedActiveId),
-                        "Ghost Mode",
-                        0xFF00E5FF,
-                        true,
-                        System.currentTimeMillis() + 86400000L * 30L
-                );
-                Persona p3 = new Persona(
-                        NEON_PERSONA_ID,
-                        "Cyber Pulse",
-                        "cyber_pulse",
-                        "default_3",
-                        "High-frequency mesh relay identity.",
-                        baseUid + "_" + NEON_PERSONA_ID,
-                        NEON_PERSONA_ID.equals(savedActiveId),
-                        "Online",
-                        0xFFFF4081,
-                        false,
-                        0L
-                );
+                toSeed.add(p1);
 
-                // Preserve custom edits on legacy personas ONLY if they weren't corrupted duplicates of Persona 1
+                // Preserve custom edits on legacy personas ONLY if created by user (never auto-seed dummy personas)
                 if (legacyList != null) {
                     for (Persona legacy : legacyList) {
                         if (legacy == null || TextUtils.isEmpty(legacy.getId())) continue;
-                        if (GHOST_PERSONA_ID.equals(legacy.getId())) {
-                            if (!isDuplicateOfPrimary(legacy, primaryDisplayName, primaryUsername)) {
-                                if (!TextUtils.isEmpty(legacy.getDisplayName())) p2.setDisplayName(legacy.getDisplayName());
-                                if (!TextUtils.isEmpty(legacy.getUsername()) && !legacy.getUsername().equalsIgnoreCase(primaryUsername)) {
-                                    p2.setUsername(legacy.getUsername());
-                                }
-                                if (!TextUtils.isEmpty(legacy.getBio())) p2.setBio(legacy.getBio());
-                                if (!TextUtils.isEmpty(legacy.getAvatarUri())) p2.setAvatarUri(legacy.getAvatarUri());
-                            }
-                        } else if (NEON_PERSONA_ID.equals(legacy.getId())) {
-                            if (!isDuplicateOfPrimary(legacy, primaryDisplayName, primaryUsername)) {
-                                if (!TextUtils.isEmpty(legacy.getDisplayName())) p3.setDisplayName(legacy.getDisplayName());
-                                if (!TextUtils.isEmpty(legacy.getUsername()) && !legacy.getUsername().equalsIgnoreCase(primaryUsername)) {
-                                    p3.setUsername(legacy.getUsername());
-                                }
-                                if (!TextUtils.isEmpty(legacy.getBio())) p3.setBio(legacy.getBio());
-                                if (!TextUtils.isEmpty(legacy.getAvatarUri())) p3.setAvatarUri(legacy.getAvatarUri());
-                            }
-                        } else if (!PRIMARY_PERSONA_ID.equals(legacy.getId())) {
-                            // Additional user-created persona
-                            if (TextUtils.isEmpty(legacy.getUsername()) || legacy.getUsername().equalsIgnoreCase(primaryUsername)) {
-                                legacy.setUsername(Persona.normalizeUsername(legacy.getDisplayName()) + "_" + legacy.getId().substring(Math.max(0, legacy.getId().length() - 4)));
-                            }
-                            if (TextUtils.isEmpty(legacy.getKeyPairId())) {
-                                legacy.setKeyPairId(baseUid + "_" + legacy.getId());
-                            }
-                            legacy.setActive(legacy.getId().equals(savedActiveId));
-                            toSeed.add(legacy);
+                        if (PRIMARY_PERSONA_ID.equals(legacy.getId())) continue;
+                        // Skip unedited dummy seed personas
+                        if (GHOST_PERSONA_ID.equals(legacy.getId()) && "Midnight Drifter".equalsIgnoreCase(legacy.getDisplayName())) {
+                            continue;
                         }
+                        if (NEON_PERSONA_ID.equals(legacy.getId()) && "Cyber Pulse".equalsIgnoreCase(legacy.getDisplayName())) {
+                            continue;
+                        }
+                        // User-created persona
+                        if (TextUtils.isEmpty(legacy.getUsername()) || legacy.getUsername().equalsIgnoreCase(primaryUsername)) {
+                            legacy.setUsername(Persona.normalizeUsername(legacy.getDisplayName()) + "_" + legacy.getId().substring(Math.max(0, legacy.getId().length() - 4)));
+                        }
+                        if (TextUtils.isEmpty(legacy.getKeyPairId())) {
+                            legacy.setKeyPairId(baseUid + "_" + legacy.getId());
+                        }
+                        legacy.setActive(legacy.getId().equals(savedActiveId));
+                        toSeed.add(legacy);
                     }
                 }
 
-                masterDb.upsertPersonaInDb(p1);
-                masterDb.upsertPersonaInDb(p2);
-                masterDb.upsertPersonaInDb(p3);
-                for (Persona extra : toSeed) {
-                    masterDb.upsertPersonaInDb(extra);
+                for (Persona p : toSeed) {
+                    masterDb.upsertPersonaInDb(p);
                 }
                 dbPersonas = masterDb.getAllPersonasFromDb();
             }
+
+            // Prune any legacy unedited auto-seeded dummy personas (Midnight Drifter / Cyber Pulse)
+            List<Persona> filteredPersonas = new ArrayList<>();
+            for (Persona p : dbPersonas) {
+                if (p == null) continue;
+                if (GHOST_PERSONA_ID.equals(p.getId()) && "Midnight Drifter".equalsIgnoreCase(p.getDisplayName()) && "midnight_drifter".equalsIgnoreCase(p.getUsername())) {
+                    masterDb.deletePersonaFromDb(p.getId());
+                    continue;
+                }
+                if (NEON_PERSONA_ID.equals(p.getId()) && "Cyber Pulse".equalsIgnoreCase(p.getDisplayName()) && "cyber_pulse".equalsIgnoreCase(p.getUsername())) {
+                    masterDb.deletePersonaFromDb(p.getId());
+                    continue;
+                }
+                filteredPersonas.add(p);
+            }
+            dbPersonas = filteredPersonas;
 
             // Repair pass: guarantee Persona 2 and Persona 3 never duplicate Persona 1's display_name or username
             boolean modified = false;
@@ -250,38 +226,12 @@ public class PersonaManager {
                         p.setUsername(primaryUsername);
                         modified = true;
                     }
-                } else if (GHOST_PERSONA_ID.equals(p.getId())) {
-                    if (isDuplicateOfPrimary(p, primaryDisplayName, primaryUsername)) {
-                        p.setDisplayName("Midnight Drifter");
-                        p.setUsername("midnight_drifter");
-                        if (TextUtils.isEmpty(p.getBio()) || p.getBio().equals(primaryBio)) {
-                            p.setBio("Off the grid. Zero trace routing active.");
-                        }
-                        modified = true;
-                    }
-                    if (TextUtils.isEmpty(p.getKeyPairId()) || p.getKeyPairId().equals(baseUid)) {
-                        p.setKeyPairId(baseUid + "_" + GHOST_PERSONA_ID);
-                        modified = true;
-                    }
-                } else if (NEON_PERSONA_ID.equals(p.getId())) {
-                    if (isDuplicateOfPrimary(p, primaryDisplayName, primaryUsername)) {
-                        p.setDisplayName("Cyber Pulse");
-                        p.setUsername("cyber_pulse");
-                        if (TextUtils.isEmpty(p.getBio()) || p.getBio().equals(primaryBio)) {
-                            p.setBio("High-frequency mesh relay identity.");
-                        }
-                        modified = true;
-                    }
-                    if (TextUtils.isEmpty(p.getKeyPairId()) || p.getKeyPairId().equals(baseUid)) {
-                        p.setKeyPairId(baseUid + "_" + NEON_PERSONA_ID);
-                        modified = true;
-                    }
                 } else {
                     if (TextUtils.isEmpty(p.getKeyPairId()) || p.getKeyPairId().equals(baseUid)) {
                         p.setKeyPairId(baseUid + "_" + p.getId());
                         modified = true;
                     }
-                    if (p.getUsername().equalsIgnoreCase(primaryUsername)) {
+                    if (p.getUsername() != null && p.getUsername().equalsIgnoreCase(primaryUsername)) {
                         p.setUsername(Persona.normalizeUsername(p.getDisplayName()) + "_" + (i + 1));
                         modified = true;
                     }
@@ -411,6 +361,18 @@ public class PersonaManager {
     /**
      * Creates or updates a persona in the master SQLite table, enforcing unique username constraints.
      */
+    public synchronized Persona getPersona(String personaId) {
+        if (personaId == null) return null;
+        for (Persona p : getPersonas()) {
+            if (p != null && personaId.equals(p.getId())) return p;
+        }
+        return null;
+    }
+
+    public synchronized boolean updatePersona(Persona persona) {
+        return saveOrUpdatePersona(persona);
+    }
+
     public synchronized boolean saveOrUpdatePersona(Persona persona) {
         if (persona == null || TextUtils.isEmpty(persona.getId())) return false;
         EncryptedChatDatabase masterDb = EncryptedChatDatabase.getMasterDatabase(appContext);
@@ -449,10 +411,85 @@ public class PersonaManager {
         List<Persona> updated = masterDb.getAllPersonasFromDb();
         syncPrefsMirror(updated, getActivePersonaId());
 
-        if (persona.getId().equals(getActivePersonaId())) {
-            notifyPersonaListeners(persona);
-        }
+        // Auto-sync manifest to cloud so newly added/edited personas survive relogin with 12-phrase or phone
+        try {
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(appContext).ensureCurrentUserPublished();
+        } catch (Throwable ignored) {}
+
         return ok;
+    }
+
+    /**
+     * Permanently deletes a non-primary persona from SQLite and preferences.
+     * Prevents deletion of PRIMARY_PERSONA_ID.
+     * If the deleted persona is active, reverts active identity to PRIMARY_PERSONA_ID.
+     */
+    public synchronized boolean deletePersona(String personaId) {
+        if (personaId == null || PRIMARY_PERSONA_ID.equals(personaId) || "default".equals(personaId)) {
+            return false;
+        }
+        EncryptedChatDatabase masterDb = EncryptedChatDatabase.getMasterDatabase(appContext);
+        masterDb.deletePersonaFromDb(personaId);
+
+        String activeId = getActivePersonaId();
+        if (personaId.equals(activeId)) {
+            switchPersona(PRIMARY_PERSONA_ID);
+        } else {
+            List<Persona> remaining = masterDb.getAllPersonasFromDb();
+            syncPrefsMirror(remaining, getActivePersonaId());
+        }
+
+        try {
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(appContext).ensureCurrentUserPublished();
+        } catch (Throwable ignored) {}
+
+        return true;
+    }
+
+    /**
+     * Serializes all local personas into a JSON array for cloud backup in SovereignProfileManifest.
+     */
+    public synchronized String exportPersonasJson() {
+        List<Persona> list = getPersonas();
+        try {
+            return gson.toJson(list);
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    /**
+     * Re-hydrates personas when user relogins with 12-phrase word or phone number.
+     * Ensures all personas are restored to SQLite master table with proper isolated keyPairIds.
+     */
+    public synchronized void restorePersonasFromJson(String json) {
+        if (TextUtils.isEmpty(json) || "[]".equals(json.trim())) return;
+        try {
+            Type type = new TypeToken<ArrayList<Persona>>() {}.getType();
+            List<Persona> restored = gson.fromJson(json, type);
+            if (restored == null || restored.isEmpty()) return;
+
+            EncryptedChatDatabase masterDb = EncryptedChatDatabase.getMasterDatabase(appContext);
+            UserPreferences userPrefs = new UserPreferences(appContext);
+            String baseUid = userPrefs.getUserId();
+            if (TextUtils.isEmpty(baseUid)) baseUid = "sovereign_node";
+
+            for (Persona p : restored) {
+                if (p == null || TextUtils.isEmpty(p.getId())) continue;
+                if (TextUtils.isEmpty(p.getKeyPairId())) {
+                    if (PRIMARY_PERSONA_ID.equals(p.getId())) {
+                        p.setKeyPairId(baseUid);
+                    } else {
+                        p.setKeyPairId(baseUid + "_" + p.getId());
+                    }
+                }
+                masterDb.upsertPersonaInDb(p);
+            }
+            List<Persona> all = masterDb.getAllPersonasFromDb();
+            syncPrefsMirror(all, getActivePersonaId());
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to restore personas from JSON", e);
+        }
     }
 
     /**

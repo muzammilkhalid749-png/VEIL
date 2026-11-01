@@ -53,6 +53,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     public static final int VIEW_TYPE_SENT = 101;
     public static final int VIEW_TYPE_RECEIVED = 102;
     public static final int VIEW_TYPE_TYPING = 103;
+    public static final int VIEW_TYPE_SYSTEM = 104;
 
     private List<Message> messages;
     private String currentUserId;
@@ -375,6 +376,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         void onCallMessageClick(Message message);
     }
 
+    public interface OnSystemMessageClickListener {
+        void onSystemMessageClick(Message message);
+    }
+
     public interface OnMediaDownloadClickListener {
         void onMediaDownloadClick(Message message);
         void onMediaCancelClick(Message message);
@@ -403,8 +408,13 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     private OnBlinkOpenClickListener blinkOpenClickListener;
     private OnDoubleTapReactListener doubleTapReactListener;
     private OnCallMessageClickListener callMessageClickListener;
+    private OnSystemMessageClickListener systemMessageClickListener;
     private OnMediaDownloadClickListener mediaDownloadClickListener;
     private OnQuickForwardClickListener quickForwardClickListener;
+
+    public void setOnSystemMessageClickListener(OnSystemMessageClickListener listener) {
+        this.systemMessageClickListener = listener;
+    }
 
     public void setOnMediaDownloadClickListener(OnMediaDownloadClickListener listener) {
         this.mediaDownloadClickListener = listener;
@@ -531,7 +541,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     return;
                 }
 
-                String currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(context);
+                String currentUserId = com.m3.veil.manager.PersonaManager.getInstance(context).getActivePersonaPeerId();
+                if (currentUserId == null || currentUserId.isEmpty()) {
+                    currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(context);
+                }
                 if (currentUserId == null || currentUserId.isEmpty()) {
                     currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(context).getCurrentUserId();
                 }
@@ -738,7 +751,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                           .append("  <b>(").append(o.optInt("votes", 0)).append(")</b>");
                     }
                 }
-                sb.append("<br/><small><i>Tap to cast anonymous P2P vote</i></small>");
+                sb.append("<br/><small><i>Tap to vote anonymously</i></small>");
                 return androidx.core.text.HtmlCompat.fromHtml(sb.toString(), androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT);
             } catch (Exception ignored) {}
         }
@@ -830,7 +843,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         this.messages = messages;
         this.lastAnimatedPosition = messages != null ? messages.size() + 1 : 0;
         com.m3.veil.VeilApplication app = com.m3.veil.VeilApplication.getInstance();
-        this.currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(app);
+        if (app != null) {
+            this.currentUserId = com.m3.veil.manager.PersonaManager.getInstance(app).getActivePersonaPeerId();
+        }
+        if (this.currentUserId == null || this.currentUserId.isEmpty()) {
+            this.currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(app);
+        }
         if (this.currentUserId == null || this.currentUserId.isEmpty()) {
             this.currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null 
                     ? FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
@@ -845,7 +863,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 this.cachedTextSizeSp = appPrefs.getFloat("chat_text_size_sp", 15.5f);
             } catch (Exception ignored) {}
         }
-        this.timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+        this.timeFormat = new SimpleDateFormat("h:mm a", Locale.getDefault());
         this.longClickListener = longClickListener;
         this.reactionClickListener = reactionClickListener;
         VoicePlayerManager.getInstance().setOnVoiceCompletionQueueListener(this::handleVoiceNoteCompletedAutoPlayNext);
@@ -913,6 +931,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
         Message msg = messages.get(msgIndex);
         if (msg == null) return VIEW_TYPE_SENT;
+        String type = msg.getType();
+        if ("system".equalsIgnoreCase(type) || "system_block".equalsIgnoreCase(type) || "action_vanish".equalsIgnoreCase(type)) {
+            return VIEW_TYPE_SYSTEM;
+        }
         return isSenderMe(msg.getSenderId(), msg) ? VIEW_TYPE_SENT : VIEW_TYPE_RECEIVED;
     }
 
@@ -1033,6 +1055,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         } else if (viewType == VIEW_TYPE_TYPING) {
             View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_typing_indicator, parent, false);
             return new TypingIndicatorViewHolder(view);
+        } else if (viewType == VIEW_TYPE_SYSTEM) {
+            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_message_system, parent, false);
+            return new SystemMessageViewHolder(view);
         } else if (viewType == VIEW_TYPE_SENT) {
             View view = obtainPreinflatedView(parent, R.layout.item_message_sent, PREINFLATED_SENT_VIEWS);
             return new SentMessageViewHolder(view);
@@ -1065,6 +1090,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
         boolean showDate = shouldShowDateHeader(msgIndex);
         String dateLabel = showDate ? formatDateHeader(message.getTimestamp()) : "";
+
+        if (holder instanceof SystemMessageViewHolder) {
+            ((SystemMessageViewHolder) holder).bind(message, showDate, dateLabel, systemMessageClickListener);
+            return;
+        }
 
         String displayTime = time;
         if (message.isEdited()) {
@@ -1214,6 +1244,48 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
     }
 
+    static class SystemMessageViewHolder extends RecyclerView.ViewHolder {
+        final View dateHeaderContainer;
+        final TextView dateHeaderText;
+        final TextView tvText;
+        final ImageView ivIcon;
+        final View bubbleLayout;
+
+        public SystemMessageViewHolder(@NonNull View itemView) {
+            super(itemView);
+            dateHeaderContainer = itemView.findViewById(R.id.dateHeaderContainer);
+            dateHeaderText = itemView.findViewById(R.id.dateHeaderText);
+            tvText = itemView.findViewById(R.id.tvSystemMessageText);
+            ivIcon = itemView.findViewById(R.id.ivSystemMessageIcon);
+            bubbleLayout = itemView.findViewById(R.id.llSystemMessageBubble);
+        }
+
+        public void bind(Message message, boolean showDate, String dateLabel, OnSystemMessageClickListener listener) {
+            if (dateHeaderContainer != null && dateHeaderText != null) {
+                if (showDate && dateLabel != null && !dateLabel.isEmpty()) {
+                    dateHeaderContainer.setVisibility(View.VISIBLE);
+                    dateHeaderText.setText(dateLabel);
+                } else {
+                    dateHeaderContainer.setVisibility(View.GONE);
+                }
+            }
+            if (message == null) return;
+            if (tvText != null) {
+                tvText.setText(message.getText());
+            }
+            if (ivIcon != null) {
+                ivIcon.setVisibility(View.GONE);
+            }
+            if (bubbleLayout != null) {
+                bubbleLayout.setOnClickListener(v -> {
+                    if (listener != null) {
+                        listener.onSystemMessageClick(message);
+                    }
+                });
+            }
+        }
+    }
+
     private void updateStatusIcon(ImageView iconView, Message message) {
         updateStatusIcon(iconView, message, false);
     }
@@ -1300,15 +1372,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             android.graphics.drawable.GradientDrawable pill = new android.graphics.drawable.GradientDrawable();
             pill.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
             pill.setCornerRadius(11f * dp);
-            int pillBgColor;
-            int pillTextColor;
-            if (isOutgoing) {
-                pillBgColor = isNight ? 0xFF005C4B : 0xFFD9FDD3;
-                pillTextColor = isNight ? 0xB3FFFFFF : 0xFF667781;
-            } else {
-                pillBgColor = isNight ? 0xFF1F2C34 : 0xFFFFFFFF;
-                pillTextColor = isNight ? 0x99FFFFFF : 0xFF667781;
-            }
+            int pillBgColor = 0x66000000;
+            int pillTextColor = 0xFFFFFFFF;
             pill.setColor(pillBgColor);
             bubbleInfoContainer.setBackground(pill);
             bubbleInfoContainer.setElevation(1f * dp);
@@ -1325,16 +1390,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 statusIcon.setVisibility(View.VISIBLE);
                 if (message.isPending()) {
                     statusIcon.setImageResource(R.drawable.ic_timer);
-                    statusIcon.setColorFilter(pillTextColor);
+                    statusIcon.setColorFilter(0xCCFFFFFF);
                 } else if (message.isRead()) {
                     statusIcon.setImageResource(R.drawable.ic_check_double);
-                    statusIcon.setColorFilter(isNight ? 0xFF53BDEB : 0xFF25D366);
+                    statusIcon.setColorFilter(0xFF38BDF8);
                 } else if (message.isDelivered()) {
                     statusIcon.setImageResource(R.drawable.ic_check_double);
-                    statusIcon.setColorFilter(pillTextColor);
+                    statusIcon.setColorFilter(0xFFFFFFFF);
                 } else {
                     statusIcon.setImageResource(R.drawable.ic_check);
-                    statusIcon.setColorFilter(pillTextColor);
+                    statusIcon.setColorFilter(0xFFFFFFFF);
                 }
             }
         } else {
@@ -1408,6 +1473,81 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         return null;
     }
 
+    private void showChatStickerFavoriteDialog(Context ctx, Message stickerMessage) {
+        if (ctx == null || stickerMessage == null) return;
+        float dp = ctx.getResources().getDisplayMetrics().density;
+        com.m3.veil.manager.StickerRepository repo = com.m3.veil.manager.StickerRepository.getInstance(ctx);
+        boolean isFav = repo.isFavoriteStickerMessage(stickerMessage);
+
+        android.app.Dialog dialog = new android.app.Dialog(ctx);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        android.widget.LinearLayout card = new android.widget.LinearLayout(ctx);
+        card.setOrientation(android.widget.LinearLayout.VERTICAL);
+        card.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        android.graphics.drawable.GradientDrawable cardBg = new android.graphics.drawable.GradientDrawable();
+        cardBg.setColor(androidx.core.content.ContextCompat.getColor(ctx, R.color.colorSurface));
+        cardBg.setCornerRadius(20f * dp);
+        cardBg.setStroke(Math.max(1, Math.round(1f * dp)), androidx.core.content.ContextCompat.getColor(ctx, R.color.colorOutline));
+        card.setBackground(cardBg);
+        int pad = Math.round(20f * dp);
+        card.setPadding(pad, pad, pad, pad);
+
+        ImageView previewIv = new ImageView(ctx);
+        int previewPx = Math.round(148f * dp);
+        android.widget.LinearLayout.LayoutParams ivLp = new android.widget.LinearLayout.LayoutParams(previewPx, previewPx);
+        previewIv.setLayoutParams(ivLp);
+        previewIv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        com.m3.veil.utils.VeilStickerGifEngine.bindStickerToImageView(ctx, stickerMessage, previewIv);
+        card.addView(previewIv);
+
+        TextView tvTitle = new TextView(ctx);
+        tvTitle.setText(isFav ? "★ Saved in Favorite Stickers" : "Sticker");
+        tvTitle.setTextColor(androidx.core.content.ContextCompat.getColor(ctx, R.color.textPrimary));
+        tvTitle.setTextSize(14.5f);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvTitle.setPadding(0, Math.round(10f * dp), 0, Math.round(14f * dp));
+        card.addView(tvTitle);
+
+        com.google.android.material.button.MaterialButton btnFav = new com.google.android.material.button.MaterialButton(ctx);
+        btnFav.setAllCaps(false);
+        btnFav.setCornerRadius(Math.round(12f * dp));
+        btnFav.setText(isFav ? "Remove from Favorites" : "⭐ Add to Favorites");
+        btnFav.setBackgroundColor(androidx.core.content.ContextCompat.getColor(
+                ctx, isFav ? R.color.colorSurfaceContainerHighest : R.color.colorPrimary));
+        btnFav.setTextColor(androidx.core.content.ContextCompat.getColor(
+                ctx, isFav ? R.color.textPrimary : R.color.colorOnPrimary));
+        android.widget.LinearLayout.LayoutParams favLp = new android.widget.LinearLayout.LayoutParams(
+                Math.round(220f * dp), ViewGroup.LayoutParams.WRAP_CONTENT);
+        favLp.bottomMargin = Math.round(6f * dp);
+        btnFav.setLayoutParams(favLp);
+        btnFav.setOnClickListener(v -> {
+            boolean nowFav = repo.toggleFavoriteStickerMessage(stickerMessage);
+            android.widget.Toast.makeText(ctx,
+                    nowFav ? "⭐ Added to Favorite Stickers" : "Removed from Favorite Stickers",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+        });
+        card.addView(btnFav);
+
+        com.google.android.material.button.MaterialButton btnClose =
+                new com.google.android.material.button.MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnClose.setAllCaps(false);
+        btnClose.setCornerRadius(Math.round(12f * dp));
+        btnClose.setText("Cancel");
+        btnClose.setTextColor(androidx.core.content.ContextCompat.getColor(ctx, R.color.textSecondary));
+        btnClose.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                Math.round(220f * dp), ViewGroup.LayoutParams.WRAP_CONTENT));
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+        card.addView(btnClose);
+
+        dialog.setContentView(card);
+        dialog.show();
+    }
+
     /**
      * Renders a 2-column side-by-side sticker pair (sticker_second_Screenshot_9e6f15cb.jpg) when two
      * stickers are sent consecutively, or removes the pair overlay when rendering a single sticker.
@@ -1471,6 +1611,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 ivSticker.animate().scaleX(1.16f).scaleY(1.16f).setDuration(140)
                         .withEndAction(() -> ivSticker.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
                         .start();
+                showChatStickerFavoriteDialog(ctx, sMsg);
             });
             ivSticker.setOnLongClickListener(v -> {
                 if (longClickListener != null) {
@@ -1488,8 +1629,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             android.graphics.drawable.GradientDrawable pillBg = new android.graphics.drawable.GradientDrawable();
             pillBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
             pillBg.setCornerRadius(11f * dp);
-            int bgColor = isOutgoing ? (isNight ? 0xFF005C4B : 0xFFD9FDD3) : (isNight ? 0xFF1F2C34 : 0xFFFFFFFF);
-            int txtColor = isOutgoing ? (isNight ? 0xB3FFFFFF : 0xFF667781) : (isNight ? 0x99FFFFFF : 0xFF667781);
+            int bgColor = 0x66000000;
+            int txtColor = 0xFFFFFFFF;
             pillBg.setColor(bgColor);
             pillLayout.setBackground(pillBg);
             pillLayout.setElevation(1f * dp);
@@ -1520,16 +1661,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 ivTick.setLayoutParams(tickLp);
                 if (sMsg.isPending()) {
                     ivTick.setImageResource(R.drawable.ic_timer);
-                    ivTick.setColorFilter(txtColor);
+                    ivTick.setColorFilter(0xCCFFFFFF);
                 } else if (sMsg.isRead()) {
                     ivTick.setImageResource(R.drawable.ic_check_double);
-                    ivTick.setColorFilter(isNight ? 0xFF53BDEB : 0xFF25D366);
+                    ivTick.setColorFilter(0xFF38BDF8);
                 } else if (sMsg.isDelivered()) {
                     ivTick.setImageResource(R.drawable.ic_check_double);
-                    ivTick.setColorFilter(txtColor);
+                    ivTick.setColorFilter(0xFFFFFFFF);
                 } else {
                     ivTick.setImageResource(R.drawable.ic_check);
-                    ivTick.setColorFilter(txtColor);
+                    ivTick.setColorFilter(0xFFFFFFFF);
                 }
                 pillLayout.addView(ivTick);
             }
@@ -1989,8 +2130,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 File f = new File(itemPath);
                 if (f.exists()) {
                     if (isVideoTile) {
+                        android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
                         try {
-                            android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
                             mmr.setDataSource(f.getAbsolutePath());
                             loaded = mmr.getFrameAtTime();
                             String durMsStr = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);
@@ -2000,8 +2141,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                     albumTileDurationCache.put(cacheKey, VoicePlayerManager.formatDuration((int) dMs));
                                 }
                             }
-                            mmr.release();
-                        } catch (Throwable ignored) {}
+                        } catch (Throwable ignored) {
+                        } finally {
+                            try { mmr.release(); } catch (Throwable ignored) {}
+                        }
                     } else {
                         BitmapFactory.Options opts = new BitmapFactory.Options();
                         opts.inSampleSize = 2;
@@ -2162,6 +2305,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
         if (recipientId != null) {
             intent.putExtra(MediaViewerActivity.EXTRA_PEER_ID, recipientId);
+        }
+        if (recipientName != null && !recipientName.isEmpty()) {
+            intent.putExtra(MediaViewerActivity.EXTRA_RECIPIENT_NAME, recipientName);
         }
         if (caption != null && !caption.isEmpty()) {
             intent.putExtra(MediaViewerActivity.EXTRA_CAPTION, caption);
@@ -3453,9 +3599,24 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                             .withEndAction(() -> messageImage.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
                                             .start();
                                 }
+                                showChatStickerFavoriteDialog(itemView.getContext(), message);
+                            };
+                            View.OnLongClickListener stickerLongClick = v -> {
+                                if (longClickListener != null) {
+                                    longClickListener.onMessageLongClick(message, v);
+                                    return true;
+                                }
+                                return false;
                             };
                             imageMessageContainer.setOnClickListener(stickerBounce);
-                            if (imageCardView != null) imageCardView.setOnClickListener(stickerBounce);
+                            imageMessageContainer.setOnLongClickListener(stickerLongClick);
+                            if (imageCardView != null) {
+                                imageCardView.setOnClickListener(stickerBounce);
+                                imageCardView.setOnLongClickListener(stickerLongClick);
+                            }
+                            if (messageImage != null) {
+                                messageImage.setOnLongClickListener(stickerLongClick);
+                            }
                         }
                     }
                 } else if ("image".equals(message.getType()) || "gif".equals(message.getType())
@@ -4956,9 +5117,24 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                             .withEndAction(() -> messageImage.animate().scaleX(1f).scaleY(1f).setDuration(180).start())
                                             .start();
                                 }
+                                showChatStickerFavoriteDialog(itemView.getContext(), message);
+                            };
+                            View.OnLongClickListener stickerLongClick = v -> {
+                                if (longClickListener != null) {
+                                    longClickListener.onMessageLongClick(message, v);
+                                    return true;
+                                }
+                                return false;
                             };
                             imageMessageContainer.setOnClickListener(stickerBounce);
-                            if (imageCardView != null) imageCardView.setOnClickListener(stickerBounce);
+                            imageMessageContainer.setOnLongClickListener(stickerLongClick);
+                            if (imageCardView != null) {
+                                imageCardView.setOnClickListener(stickerBounce);
+                                imageCardView.setOnLongClickListener(stickerLongClick);
+                            }
+                            if (messageImage != null) {
+                                messageImage.setOnLongClickListener(stickerLongClick);
+                            }
                         }
                     }
                 } else if ("image".equals(message.getType()) || "gif".equals(message.getType())

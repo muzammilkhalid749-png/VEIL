@@ -14,7 +14,7 @@
     <View
         android:layout_width="36dp"
         android:layout_height="4dp"
-        android:background="@color/colorOutline"
+        android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="16dp" />
 
@@ -29,10 +29,10 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="📢 Public Groups &amp; Channels"
+            android:text="Public Groups &amp; Channels"
             android:textColor="@color/textPrimary"
             android:textSize="19sp"
-            android:textStyle="bold" />
+            android:fontFamily="sans-serif-medium" />
 
         <ProgressBar
             android:id="@+id/pbDirectoryLoading"
@@ -44,7 +44,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Explore public broadcast channels and discussion groups across the mesh:"
+        android:text="Explore public channels and community groups:"
         android:textColor="@color/textSecondary"
         android:textSize="13sp"
         android:layout_marginBottom="12dp" />

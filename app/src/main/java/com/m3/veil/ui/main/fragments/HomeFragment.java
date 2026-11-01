@@ -14,6 +14,7 @@ import android.os.Looper;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -75,11 +76,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     private final java.util.concurrent.ExecutorService homeExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
     private final Handler homeDebounceHandler = new Handler(Looper.getMainLooper());
     private final Runnable loadChatsRunnable = this::executeLoadLocalEncryptedChats;
-
-    private TextView btnActivePersona;
-    private TextView tvMeshStatusPill;
-    private ImageButton btnQuickNewGroup;
-    private ImageButton btnNotificationsBell;
+    private final java.util.Set<String> resolvedPeerLookups = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private EditText etSearchChats;
     private ImageView btnClearSearch;
 
@@ -121,8 +118,18 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                             String editedPath = data.getStringExtra(com.m3.veil.ui.chat.MediaEditActivity.RESULT_EDITED_FILE_PATH);
                             String mediaType = data.getStringExtra(com.m3.veil.ui.chat.MediaEditActivity.RESULT_MEDIA_TYPE);
                             String caption = data.getStringExtra(com.m3.veil.ui.chat.MediaEditActivity.RESULT_CAPTION);
-                            if (editedPath != null && !editedPath.isEmpty()) {
-                                publishMediaStatus(editedPath, mediaType != null ? mediaType : "image", caption);
+                            java.util.ArrayList<String> mentionIds = data.getStringArrayListExtra(com.m3.veil.ui.chat.MediaEditActivity.RESULT_MENTION_IDS);
+                            java.util.ArrayList<String> mentionNames = data.getStringArrayListExtra(com.m3.veil.ui.chat.MediaEditActivity.RESULT_MENTION_NAMES);
+                            java.util.ArrayList<String> batchPaths = data.getStringArrayListExtra(com.m3.veil.ui.chat.MediaEditActivity.RESULT_EDITED_BATCH_PATHS);
+                            java.util.ArrayList<String> batchTypes = data.getStringArrayListExtra(com.m3.veil.ui.chat.MediaEditActivity.RESULT_EDITED_BATCH_TYPES);
+                            if (batchPaths != null && batchPaths.size() > 1) {
+                                for (int i = 0; i < batchPaths.size(); i++) {
+                                    String bp = batchPaths.get(i);
+                                    String bt = (batchTypes != null && i < batchTypes.size()) ? batchTypes.get(i) : "image";
+                                    publishMediaStatus(bp, bt, i == 0 ? caption : "", mentionIds, mentionNames);
+                                }
+                            } else if (editedPath != null && !editedPath.isEmpty()) {
+                                publishMediaStatus(editedPath, mediaType != null ? mediaType : "image", caption, mentionIds, mentionNames);
                             }
                         }
                     });
@@ -316,17 +323,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             secretVaultDivider.setVisibility(View.GONE);
         }
 
-        btnActivePersona = view.findViewById(R.id.btnActivePersona);
-        tvMeshStatusPill = view.findViewById(R.id.tvMeshStatusPill);
-        btnQuickNewGroup = view.findViewById(R.id.btnQuickNewGroup);
-        if (btnQuickNewGroup != null) {
-            btnQuickNewGroup.setVisibility(View.VISIBLE);
-            btnQuickNewGroup.setOnClickListener(v -> startActivity(new Intent(getContext(), NewGroupActivity.class)));
-        }
-        btnNotificationsBell = view.findViewById(R.id.btnNotificationsBell);
-        if (btnNotificationsBell != null) {
-            btnNotificationsBell.setOnClickListener(v -> startActivity(new Intent(getContext(), com.m3.veil.ui.notifications.NotificationsActivity.class)));
-        }
+
+
         etSearchChats = view.findViewById(R.id.etSearchChats);
         btnClearSearch = view.findViewById(R.id.btnClearSearch);
 
@@ -343,10 +341,6 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         statusTilesContainer = view.findViewById(R.id.statusTilesContainer);
         statusFeedScrollView = view.findViewById(R.id.statusFeedScrollView);
         statusFeedContainer = view.findViewById(R.id.statusFeedContainer);
-        View btnAddMyStatusHeader = view.findViewById(R.id.btnAddMyStatusHeader);
-        if (btnAddMyStatusHeader != null) {
-            btnAddMyStatusHeader.setOnClickListener(v -> openStatusCreationChooser());
-        }
 
         archivedRow.setOnClickListener(v -> startActivity(new Intent(getContext(), ArchivedChatsActivity.class)));
         startChatButton = view.findViewById(R.id.startChatButton);
@@ -354,17 +348,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             startChatButton.setOnClickListener(v -> startActivity(new Intent(getContext(), NewChatActivity.class)));
         }
 
-        if (btnQuickNewGroup != null) {
-            btnQuickNewGroup.setOnClickListener(v -> startActivity(new Intent(getContext(), NewGroupActivity.class)));
-        }
 
-        if (btnActivePersona != null) {
-            btnActivePersona.setOnClickListener(v -> showPersonaSwitcherDialog());
-        }
 
-        if (tvMeshStatusPill != null) {
-            tvMeshStatusPill.setOnClickListener(v -> showQuickStealthAndMeshDialog());
-        }
+
     }
 
     private void setupRecyclerView() {
@@ -410,7 +396,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                     EncryptedChatDatabase.getInstance(requireContext()).updateChatArchiveStatus(chat.getId(), true);
                     loadLocalEncryptedChats();
                     if (getView() != null) {
-                        Snackbar.make(getView(), "📥 Chat archived in SQLCipher vault", Snackbar.LENGTH_LONG)
+                        Snackbar.make(getView(), "📥 Chat archived", Snackbar.LENGTH_LONG)
                                 .setAction("Undo", v -> {
                                     chat.setArchived(false);
                                     EncryptedChatDatabase.getInstance(requireContext()).updateChatArchiveStatus(chat.getId(), false);
@@ -536,11 +522,42 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         if (chipFilterStatus != null) chipFilterStatus.setOnClickListener(filterClickListener);
     }
 
+    public boolean handleBackPressed() {
+        if (etSearchChats != null && (!android.text.TextUtils.isEmpty(etSearchChats.getText()) || etSearchChats.hasFocus())) {
+            etSearchChats.setText("");
+            etSearchChats.clearFocus();
+            if (getContext() != null && getView() != null) {
+                android.view.inputmethod.InputMethodManager imm =
+                        (android.view.inputmethod.InputMethodManager) requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null) imm.hideSoftInputFromWindow(getView().getWindowToken(), 0);
+            }
+            return true;
+        }
+        if (activeFilter != null && !"all".equals(activeFilter)) {
+            if ("secret".equals(activeFilter)) {
+                isSecretVaultUnlocked = false;
+            }
+            activeFilter = "all";
+            updateFilterChipStyles();
+            applyFilterAndDisplay();
+            if (chipFilterAll != null && chipFilterAll.getParent() != null
+                    && chipFilterAll.getParent().getParent() instanceof android.widget.HorizontalScrollView) {
+                ((android.widget.HorizontalScrollView) chipFilterAll.getParent().getParent()).smoothScrollTo(0, 0);
+            }
+            return true;
+        }
+        return false;
+    }
+
     private interface OnPinEnteredListener {
         void onPinEntered(String pin, com.google.android.material.bottomsheet.BottomSheetDialog dialog, com.google.android.material.textfield.TextInputLayout layout);
     }
 
     private void showPinAuthModal(String title, String subtitle, String hint, OnPinEnteredListener listener) {
+        showPinAuthModal(title, subtitle, hint, null, listener);
+    }
+
+    private void showPinAuthModal(String title, String subtitle, String hint, @Nullable Runnable onChangePasswordRequested, OnPinEnteredListener listener) {
         if (getContext() == null) return;
         com.google.android.material.bottomsheet.BottomSheetDialog dialog =
                 new com.google.android.material.bottomsheet.BottomSheetDialog(requireContext(), R.style.ModernBottomSheetDialogTheme);
@@ -558,6 +575,24 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         tvSubtitle.setText(subtitle);
         if (hint != null) inputLayout.setHint(hint);
 
+        if (onChangePasswordRequested != null && view instanceof LinearLayout) {
+            TextView tvForgot = new TextView(requireContext());
+            tvForgot.setText("Change or Forgot Vault Password?");
+            tvForgot.setTextSize(13.5f);
+            tvForgot.setTextColor(ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+            tvForgot.setGravity(Gravity.CENTER);
+            tvForgot.setPadding(0, 0, 0, (int) (16 * getResources().getDisplayMetrics().density));
+            tvForgot.setOnClickListener(v -> {
+                dialog.dismiss();
+                onChangePasswordRequested.run();
+            });
+            LinearLayout layout = (LinearLayout) view;
+            int idx = layout.indexOfChild(inputLayout);
+            if (idx >= 0) {
+                layout.addView(tvForgot, idx + 1);
+            }
+        }
+
         btnCancel.setOnClickListener(v -> dialog.dismiss());
         btnConfirm.setOnClickListener(v -> {
             String entered = etPin.getText() != null ? etPin.getText().toString().trim() : "";
@@ -567,6 +602,45 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         dialog.show();
     }
 
+    public void showChangeVaultPasswordDialog() {
+        if (getContext() == null) return;
+        com.m3.veil.manager.VeilFeatureManager fm = com.m3.veil.manager.VeilFeatureManager.getInstance(requireContext());
+        boolean hasExisting = fm.hasSecretVaultPassword() || fm.hasMasterPin();
+
+        if (hasExisting) {
+            showPinAuthModal("🔒 Verify Identity", "Enter current Secret Vault password or Master PIN to verify ownership:", "Current Password or Master PIN", (entered, dialog, layout) -> {
+                if (fm.verifySecretVaultPassword(entered) || (fm.hasMasterPin() && entered.equals(fm.getMasterPin()))) {
+                    dialog.dismiss();
+                    promptSetNewVaultPassword(fm);
+                } else {
+                    layout.setError("Incorrect credentials. Please try again.");
+                }
+            });
+        } else {
+            promptSetNewVaultPassword(fm);
+        }
+    }
+
+    private void promptSetNewVaultPassword(com.m3.veil.manager.VeilFeatureManager fm) {
+        if (getContext() == null) return;
+        showPinAuthModal("🔑 Set New Vault Password", "Enter a new password (min 4 characters) for your Secret Vault:", "New Vault Password", (newPass, dialog, layout) -> {
+            if (newPass.length() < 4) {
+                layout.setError("Password must be at least 4 characters");
+                return;
+            }
+            dialog.dismiss();
+            showPinAuthModal("🔑 Confirm New Password", "Re-enter the new password to confirm:", "Confirm Password", (confirmPass, confirmDialog, confirmLayout) -> {
+                if (!newPass.equals(confirmPass)) {
+                    confirmLayout.setError("Passwords do not match");
+                    return;
+                }
+                fm.setSecretVaultPassword(newPass);
+                confirmDialog.dismiss();
+                Toast.makeText(getContext(), "✅ Secret Vault password updated successfully!", Toast.LENGTH_SHORT).show();
+            });
+        });
+    }
+
     private void promptSecretVaultUnlock() {
         com.m3.veil.manager.VeilFeatureManager fm = com.m3.veil.manager.VeilFeatureManager.getInstance(requireContext());
         boolean hasPassword = fm.hasSecretVaultPassword() || fm.hasMasterPin();
@@ -574,7 +648,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         String subtitle = hasPassword ? "Enter your Secret Vault password to reveal hidden conversations" : "Create a password (min 4 characters) for your Secret Vault";
         String hint = "Vault Password";
 
-        showPinAuthModal(title, subtitle, hint, (pin, dialog, layout) -> {
+        showPinAuthModal(title, subtitle, hint, hasPassword ? this::showChangeVaultPasswordDialog : null, (pin, dialog, layout) -> {
             if (!hasPassword) {
                 if (pin.length() < 4) {
                     layout.setError("Password must be at least 4 characters");
@@ -622,22 +696,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     }
 
     private void updatePersonaAndMeshHeader() {
-        if (getContext() == null) return;
-        VeilFeatureManager fm = VeilFeatureManager.getInstance(requireContext());
-        Persona active = fm.getActivePersona();
-        if (btnActivePersona != null && active != null) {
-            String handle = active.getDisplayName();
-            if (VeilFeatureManager.isShadowVeilOrGeneric(handle)) {
-                handle = fm.resolveRealUserHandle();
-            }
-            btnActivePersona.setText("🎭 " + handle + " • " + active.getMood());
-        }
-        if (tvMeshStatusPill != null) {
-            int peers = WebRtcManager.getInstance(requireContext()).getConnectedPeersCount();
-            int score = fm.calculatePrivacyScore();
-            boolean stealth = fm.isStealthTypingEnabled() || fm.isFakeOfflineEnabled();
-            tvMeshStatusPill.setText((stealth ? "👻 Stealth" : "⚡ " + peers + " P2P") + " • 🛡️ " + score + "%");
-        }
+        // Persona Switcher & Mesh Status Pill moved to ProfileFragment
     }
 
     public void showPersonaSwitcherDialog() {
@@ -653,6 +712,10 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         ViewGroup container = view.findViewById(R.id.personaListContainer);
         View btnAddNew = view.findViewById(R.id.btnAddNewPersona);
+        TextView tvSlotCount = view.findViewById(R.id.tvPersonaSlotCount);
+        if (tvSlotCount != null) {
+            tvSlotCount.setText(personas.size() + " Identities");
+        }
         float density = getResources().getDisplayMetrics().density;
 
         com.m3.veil.manager.BillingManager billingManager = com.m3.veil.manager.BillingManager.getInstance(requireContext());
@@ -663,47 +726,79 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             boolean isLocked = !billingManager.canAccessPersonaSlot(slotIndex);
             boolean isSelected = !isLocked && current != null && p.getPersonaId().equals(current.getPersonaId());
 
-            com.google.android.material.card.MaterialCardView card =
-                    new com.google.android.material.card.MaterialCardView(requireContext());
-            card.setCardElevation(0);
-            card.setStrokeWidth((int) (1.2f * density));
-            card.setStrokeColor(androidx.core.content.ContextCompat.getColor(requireContext(),
-                    isSelected ? R.color.colorPrimary : R.color.colorOutline));
-            card.setRadius(14 * density);
-            card.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(),
-                    isSelected ? R.color.colorSurfaceVariant : R.color.colorSurface));
+            View cardView = getLayoutInflater().inflate(R.layout.item_persona_card, container, false);
+            com.google.android.material.card.MaterialCardView card = cardView.findViewById(R.id.personaCardRoot);
+            TextView tvGlyph = cardView.findViewById(R.id.tvPersonaAvatarGlyph);
+            TextView tvName = cardView.findViewById(R.id.tvPersonaDisplayName);
+            TextView tvHandle = cardView.findViewById(R.id.tvPersonaHandle);
+            TextView tvSubtitle = cardView.findViewById(R.id.tvPersonaSubtitle);
+            View llActiveBadge = cardView.findViewById(R.id.llActiveBadge);
+            View llLockedBadge = cardView.findViewById(R.id.llLockedBadge);
+            View vInactiveIndicator = cardView.findViewById(R.id.vInactiveIndicator);
 
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.bottomMargin = (int) (10 * density);
-            card.setLayoutParams(lp);
+            String dName = p.getDisplayName() != null && !p.getDisplayName().isEmpty() ? p.getDisplayName() : "Persona";
+            tvName.setText(dName);
+            tvHandle.setText(p.getFormattedUsername());
 
-            LinearLayout itemLayout = new LinearLayout(requireContext());
-            itemLayout.setOrientation(LinearLayout.HORIZONTAL);
-            itemLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            itemLayout.setPadding((int) (16 * density), (int) (14 * density), (int) (16 * density), (int) (14 * density));
+            String firstChar = dName.substring(0, 1).toUpperCase(java.util.Locale.ROOT);
+            tvGlyph.setText(firstChar);
 
-            LinearLayout textCol = new LinearLayout(requireContext());
-            textCol.setOrientation(LinearLayout.VERTICAL);
-            textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            String subtitle = (p.getMood() != null && !p.getMood().isEmpty() ? p.getMood() : "")
+                    + (p.getBio() != null && !p.getBio().isEmpty() ? " • " + p.getBio() : "");
+            if (subtitle.isEmpty()) {
+                subtitle = p.isTemporary() ? "Temporary 24h persona" : "Anonymous identity";
+            }
+            tvSubtitle.setText(subtitle);
 
-            TextView tvName = new TextView(requireContext());
-            String prefix = isLocked ? "🔒 " : (isSelected ? "✅ " : "🎭 ");
-            String proSuffix = isLocked ? "  [PRO]" : (p.isTemporary() ? " [Temp 24h]" : "");
-            tvName.setText(prefix + p.getDisplayName() + " (" + p.getFormattedUsername() + ")" + proSuffix);
-            tvName.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
-            tvName.setTextSize(15);
-            tvName.setTypeface(null, android.graphics.Typeface.BOLD);
+            if (isSelected) {
+                card.setStrokeColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+                card.setStrokeWidth((int) (1.5f * density));
+                card.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorSecondaryContainer));
+                tvGlyph.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+                llActiveBadge.setVisibility(View.VISIBLE);
+                llLockedBadge.setVisibility(View.GONE);
+                vInactiveIndicator.setVisibility(View.GONE);
+            } else if (isLocked) {
+                card.setStrokeColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorOutline));
+                card.setStrokeWidth((int) (1.0f * density));
+                card.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorSurfaceContainerLow));
+                tvGlyph.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textTertiary));
+                llActiveBadge.setVisibility(View.GONE);
+                llLockedBadge.setVisibility(View.VISIBLE);
+                vInactiveIndicator.setVisibility(View.GONE);
+            } else {
+                card.setStrokeColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorOutline));
+                card.setStrokeWidth((int) (1.0f * density));
+                card.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorSurfaceContainerLow));
+                tvGlyph.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+                llActiveBadge.setVisibility(View.GONE);
+                llLockedBadge.setVisibility(View.GONE);
+                vInactiveIndicator.setVisibility(View.VISIBLE);
+            }
 
-            TextView tvMood = new TextView(requireContext());
-            tvMood.setText(p.getMood() + " • " + p.getBio());
-            tvMood.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
-            tvMood.setTextSize(12);
-
-            textCol.addView(tvName);
-            textCol.addView(tvMood);
-            itemLayout.addView(textCol);
-            card.addView(itemLayout);
+            View btnDelete = cardView.findViewById(R.id.btnDeletePersona);
+            if (btnDelete != null) {
+                if (com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID.equals(p.getPersonaId())) {
+                    btnDelete.setVisibility(View.GONE);
+                } else {
+                    btnDelete.setVisibility(View.VISIBLE);
+                    btnDelete.setOnClickListener(vDel -> {
+                        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                                .setTitle("Delete Persona")
+                                .setMessage("Are you sure you want to delete @" + p.getUsername() + "? All local chats and data in this persona vault will be permanently erased.")
+                                .setNegativeButton("Cancel", null)
+                                .setPositiveButton("Delete", (d, w) -> {
+                                    fm.shredAndRemovePersona(p.getPersonaId());
+                                    updatePersonaAndMeshHeader();
+                                    loadLocalEncryptedChats();
+                                    Toast.makeText(requireContext(), "Persona deleted", Toast.LENGTH_SHORT).show();
+                                    dialog.dismiss();
+                                    showPersonaSwitcherDialog();
+                                })
+                                .show();
+                    });
+                }
+            }
 
             card.setOnClickListener(vCard -> {
                 if (!billingManager.canAccessPersonaSlot(slotIndex)) {
@@ -725,7 +820,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                 dialog.dismiss();
             });
 
-            container.addView(card);
+            container.addView(cardView);
         }
 
         btnAddNew.setOnClickListener(v -> {
@@ -745,63 +840,10 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     }
 
     private void showCreatePersonaDialog() {
-        if (getContext() == null) return;
-        com.google.android.material.bottomsheet.BottomSheetDialog dialog =
-                new com.google.android.material.bottomsheet.BottomSheetDialog(requireContext(), R.style.ModernBottomSheetDialogTheme);
-        LinearLayout layout = new LinearLayout(getContext());
-        layout.setOrientation(LinearLayout.VERTICAL);
-        int pad = (int) (24 * getResources().getDisplayMetrics().density);
-        layout.setPadding(pad, pad, pad, pad);
-        layout.setBackgroundResource(R.drawable.bottom_sheet_background);
-
-        TextView tvTitle = new TextView(getContext());
-        tvTitle.setText("➕ Create New Anonymous Persona");
-        tvTitle.setTextSize(18);
-        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvTitle.setTextColor(ContextCompat.getColor(getContext(), R.color.textPrimary));
-        layout.addView(tvTitle);
-
-        TextView tvSub = new TextView(getContext());
-        tvSub.setText("Zero-trace identity for chatting and posting anonymously");
-        tvSub.setTextSize(13);
-        tvSub.setTextColor(ContextCompat.getColor(getContext(), R.color.textSecondary));
-        tvSub.setPadding(0, 4, 0, (int) (16 * getResources().getDisplayMetrics().density));
-        layout.addView(tvSub);
-
-        EditText etName = new EditText(getContext());
-        etName.setHint("Persona Handle (e.g. @GhostProtocol)");
-        etName.setTextColor(ContextCompat.getColor(getContext(), R.color.textPrimary));
-        layout.addView(etName);
-
-        EditText etMood = new EditText(getContext());
-        etMood.setHint("Mood Badge (e.g. 🌙 Incognito, ⚡ Hyped)");
-        etMood.setTextColor(ContextCompat.getColor(getContext(), R.color.textPrimary));
-        layout.addView(etMood);
-
-        com.google.android.material.button.MaterialButton btnCreate =
-                new com.google.android.material.button.MaterialButton(getContext());
-        btnCreate.setText("Create & Activate");
-        btnCreate.setCornerRadius((int) (12 * getResources().getDisplayMetrics().density));
-        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        btnLp.topMargin = (int) (16 * getResources().getDisplayMetrics().density);
-        btnCreate.setLayoutParams(btnLp);
-        btnCreate.setOnClickListener(v -> {
-            String name = etName.getText().toString().trim();
-            String mood = etMood.getText().toString().trim();
-            if (!name.isEmpty()) {
-                VeilFeatureManager.getInstance(requireContext()).addPersona(
-                        name, "Custom zero-trace persona", mood.isEmpty() ? "🎭 Masked" : mood, "#4F46E5", false);
-                updatePersonaAndMeshHeader();
-                Toast.makeText(getContext(), "Persona created & activated!", Toast.LENGTH_SHORT).show();
-                dialog.dismiss();
-            } else {
-                Toast.makeText(getContext(), "Please enter a handle", Toast.LENGTH_SHORT).show();
-            }
+        CreatePersonaBottomSheetDialog.show(getParentFragmentManager(), created -> {
+            updatePersonaAndMeshHeader();
+            loadLocalEncryptedChats();
         });
-        layout.addView(btnCreate);
-
-        dialog.setContentView(layout);
-        dialog.show();
     }
 
     private void showQuickStealthAndMeshDialog() {
@@ -856,20 +898,22 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
     private boolean isSelfId(Context ctx, String id) {
         if (id == null || id.isEmpty()) return false;
-        String authUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(ctx);
-        if (id.equals(authUid)) return true;
-        String userPrefUid = new com.m3.veil.utils.UserPreferences(ctx).getUserId();
-        if (id.equals(userPrefUid)) return true;
         try {
             com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(ctx);
-            if (id.equals(pm.getActivePersonaPeerId())) return true;
-            if (id.equals(pm.getActivePersonaId())) return true;
-            for (com.m3.veil.model.Persona p : pm.getPersonas()) {
-                if (p != null) {
-                    if (id.equals(p.getId()) || id.equals(p.getKeyPairId())) return true;
-                }
+            String activePeerId = pm.getActivePersonaPeerId();
+            if (id.equals(activePeerId)) return true;
+            String activePersonaId = pm.getActivePersonaId();
+            if (id.equals(activePersonaId)) return true;
+            if (com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID.equals(activePersonaId)) {
+                String authUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(ctx);
+                if (id.equals(authUid)) return true;
+                String userPrefUid = new com.m3.veil.utils.UserPreferences(ctx).getUserId();
+                if (id.equals(userPrefUid)) return true;
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            String authUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(ctx);
+            if (id.equals(authUid)) return true;
+        }
         return false;
     }
 
@@ -929,6 +973,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                         if (needsPeerLookup) {
                             String peerId = resolveDirectChatPeerId(ctx, c);
                             if (peerId != null && !peerId.isEmpty() && !isSelfId(ctx, peerId)) {
+                                if (!resolvedPeerLookups.add(peerId)) {
+                                    continue;
+                                }
                                 final String fChatId = c.getId();
                                 final String fPeerId = peerId;
                                 com.google.firebase.firestore.FirebaseFirestore.getInstance()
@@ -941,23 +988,33 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                     String pAvatar = uDoc.getString("avatar");
                                                     if (pName != null && !pName.isEmpty() && !pName.equals(myPersonaName)) {
                                                         Chat target = EncryptedChatDatabase.getInstance(ctx).getChat(fChatId);
-                                                        if (target != null && (!pName.equals(target.getName()) || (pAvatar != null && !pAvatar.isEmpty()))) {
-                                                            target.setName(pName);
-                                                            if (pAvatar != null && !pAvatar.isEmpty()) target.setAvatar(pAvatar);
-                                                            EncryptedChatDatabase.getInstance(ctx).saveOrUpdateChat(target);
-                                                            final String resolvedPName = pName;
-                                                            final String resolvedPAvatar = pAvatar;
-                                                            if (isAdded() && getActivity() != null) {
-                                                                requireActivity().runOnUiThread(() -> {
-                                                                    for (Chat dc : displayedChats) {
-                                                                        if (dc != null && fChatId.equals(dc.getId())) {
-                                                                            dc.setName(resolvedPName);
-                                                                            if (resolvedPAvatar != null && !resolvedPAvatar.isEmpty()) dc.setAvatar(resolvedPAvatar);
-                                                                            break;
+                                                        if (target != null) {
+                                                            boolean nameChanged = !pName.equals(target.getName());
+                                                            boolean avatarChanged = (pAvatar != null && !pAvatar.isEmpty() && !pAvatar.equals(target.getAvatar()));
+                                                            if (nameChanged || avatarChanged) {
+                                                                target.setName(pName);
+                                                                if (avatarChanged) target.setAvatar(pAvatar);
+                                                                EncryptedChatDatabase.getInstance(ctx).saveOrUpdateChat(target);
+                                                                final String resolvedPName = pName;
+                                                                final String resolvedPAvatar = pAvatar;
+                                                                if (isAdded() && getActivity() != null) {
+                                                                    requireActivity().runOnUiThread(() -> {
+                                                                        boolean found = false;
+                                                                        for (int i = 0; i < displayedChats.size(); i++) {
+                                                                            Chat dc = displayedChats.get(i);
+                                                                            if (dc != null && fChatId.equals(dc.getId())) {
+                                                                                dc.setName(resolvedPName);
+                                                                                if (resolvedPAvatar != null && !resolvedPAvatar.isEmpty()) dc.setAvatar(resolvedPAvatar);
+                                                                                if (chatsAdapter != null) chatsAdapter.notifyItemChanged(i);
+                                                                                found = true;
+                                                                                break;
+                                                                            }
                                                                         }
-                                                                    }
-                                                                    if (chatsAdapter != null) chatsAdapter.notifyDataSetChanged();
-                                                                });
+                                                                        if (!found && chatsAdapter != null) {
+                                                                            chatsAdapter.notifyDataSetChanged();
+                                                                        }
+                                                                    });
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -1113,6 +1170,12 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                 requireContext(), statusActionListener, this::launchPhotoStatusPicker);
     }
 
+    public void openTextStatusComposer() {
+        if (getContext() == null) return;
+        com.m3.veil.ui.main.status.WhatsAppStatusUi.showTextStatusComposer(
+                requireContext(), statusActionListener, this::launchPhotoStatusPicker);
+    }
+
     public void launchPhotoStatusPicker() {
         if (getContext() == null) return;
         com.m3.veil.ui.chat.sheets.MediaGalleryBottomSheet gallerySheet =
@@ -1135,6 +1198,22 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                 Intent editIntent = new Intent(getContext(), com.m3.veil.ui.chat.MediaEditActivity.class);
                 editIntent.putExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_MEDIA_URI, mediaUri);
                 editIntent.putExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_MEDIA_TYPE, mediaType != null ? mediaType : "image");
+                editIntent.putExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_IS_STATUS_MODE, true);
+                editIntent.putExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_RECIPIENT_NAME, "Status (Contacts)");
+                statusMediaLauncher.launch(editIntent);
+            }
+
+            @Override
+            public void onMultiMediaSelectedToEdit(java.util.ArrayList<Uri> uris, java.util.ArrayList<String> types) {
+                if (getContext() == null || uris == null || uris.isEmpty()) return;
+                Intent editIntent = new Intent(getContext(), com.m3.veil.ui.chat.MediaEditActivity.class);
+                editIntent.putExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_MEDIA_URI, uris.get(0));
+                editIntent.putExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_MEDIA_TYPE,
+                        types != null && !types.isEmpty() ? types.get(0) : "image");
+                editIntent.putParcelableArrayListExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_BATCH_URIS, uris);
+                editIntent.putStringArrayListExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_BATCH_TYPES, types);
+                editIntent.putExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_IS_STATUS_MODE, true);
+                editIntent.putExtra(com.m3.veil.ui.chat.MediaEditActivity.EXTRA_RECIPIENT_NAME, "Status (Contacts)");
                 statusMediaLauncher.launch(editIntent);
             }
 
@@ -1142,6 +1221,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             public void onCameraRequested() {
                 if (getContext() == null) return;
                 Intent camIntent = new Intent(getContext(), com.m3.veil.ui.chat.CameraGalleryActivity.class);
+                camIntent.putExtra(com.m3.veil.ui.chat.CameraGalleryActivity.EXTRA_IS_STATUS_MODE, true);
+                camIntent.putExtra(com.m3.veil.ui.chat.CameraGalleryActivity.EXTRA_RECIPIENT_NAME, "Status (Contacts)");
                 statusMediaLauncher.launch(camIntent);
             }
         });
@@ -1149,17 +1230,52 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     }
 
     private void publishMediaStatus(String localFilePath, String mediaType, String caption) {
+        publishMediaStatus(localFilePath, mediaType, caption, null, null);
+    }
+
+    private void publishMediaStatus(String localFilePath, String mediaType, String caption,
+                                    java.util.List<String> mentionIds, java.util.List<String> mentionNames) {
         if (getContext() == null || localFilePath == null) return;
         String safeCaption = caption != null ? caption : "";
+        com.m3.veil.utils.UserPreferences up = com.m3.veil.utils.UserPreferences.getInstance(requireContext());
+        String aType = up.getStatusAudienceType();
+        com.m3.veil.manager.StatusController.PrivacyAcl acl = com.m3.veil.manager.StatusController.PrivacyAcl.ALL_CONTACTS;
+        java.util.List<String> targetPeers = (mentionIds != null && !mentionIds.isEmpty()) ? new java.util.ArrayList<>(mentionIds) : null;
+        if ("included".equals(aType) || "close_friends".equals(aType)) {
+            acl = com.m3.veil.manager.StatusController.PrivacyAcl.SELECTED_PEERS;
+            java.util.Set<String> set = "close_friends".equals(aType) ? up.getStatusAudienceCloseFriends() : up.getStatusAudienceIncluded();
+            if (targetPeers == null) targetPeers = new java.util.ArrayList<>(set);
+            else targetPeers.addAll(set);
+        } else if ("excluded".equals(aType)) {
+            acl = com.m3.veil.manager.StatusController.PrivacyAcl.SELECTED_PEERS;
+            java.util.Set<String> excluded = up.getStatusAudienceExcluded();
+            java.util.List<com.m3.veil.model.Chat> allChats = com.m3.veil.database.EncryptedChatDatabase.getInstance(requireContext()).getAllChats();
+            java.util.List<String> allowed = new java.util.ArrayList<>();
+            if (allChats != null) {
+                for (com.m3.veil.model.Chat c : allChats) {
+                    if (c != null && c.getId() != null && !excluded.contains(c.getId())) {
+                        allowed.add(c.getId());
+                    }
+                }
+            }
+            if (targetPeers == null) targetPeers = allowed;
+            else {
+                for (String p : allowed) {
+                    if (!targetPeers.contains(p)) targetPeers.add(p);
+                }
+            }
+            // replaced
+        }
+
         if ("video".equalsIgnoreCase(mediaType)) {
             com.m3.veil.manager.StatusController.getInstance(requireContext())
-                    .postVideoStatus(localFilePath, safeCaption);
+                    .postVideoStatus(localFilePath, safeCaption, acl, targetPeers);
         } else {
             com.m3.veil.manager.StatusController.getInstance(requireContext())
-                    .postPhotoStatus(localFilePath, safeCaption);
+                    .postPhotoStatus(localFilePath, safeCaption, acl, targetPeers);
         }
         VeilFeatureManager.getInstance(requireContext())
-                .addMyMediaStatus(localFilePath, safeCaption, "#1E293B");
+                .addMyMediaStatus(localFilePath, safeCaption, "#1E293B", mentionNames);
         Toast.makeText(requireContext(), "✅ Status posted · visible for 24h", Toast.LENGTH_SHORT).show();
         renderStatusTray();
     }
@@ -1193,10 +1309,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     private void renderStatusTray() {
         if (getContext() == null || statusTilesContainer == null) return;
         List<VeilFeatureManager.StatusUpdate> statuses =
-                com.m3.veil.manager.StatusController.getInstance(requireContext()).getStatusUpdatesForUi();
-        if (statuses == null || statuses.isEmpty()) {
-            statuses = VeilFeatureManager.getInstance(requireContext()).getStatusUpdates(allLocalChats);
-        }
+                VeilFeatureManager.getInstance(requireContext()).getStatusUpdates(allLocalChats);
         com.m3.veil.ui.main.status.WhatsAppStatusUi.renderTray(
                 requireContext(), statusTilesContainer, statuses, statusActionListener, this::launchPhotoStatusPicker);
 
@@ -1214,15 +1327,15 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         if (chipFilterStatus != null) {
             chipFilterStatus.setText(unread > 0 ? "🟢 Status (" + unread + ")" : "🟢 Status");
         }
+        if (chatsAdapter != null) {
+            chatsAdapter.notifyDataSetChanged();
+        }
     }
 
     private void renderStatusFeedList() {
         if (getContext() == null || statusFeedContainer == null) return;
         List<VeilFeatureManager.StatusUpdate> statuses =
-                com.m3.veil.manager.StatusController.getInstance(requireContext()).getStatusUpdatesForUi();
-        if (statuses == null || statuses.isEmpty()) {
-            statuses = VeilFeatureManager.getInstance(requireContext()).getStatusUpdates(allLocalChats);
-        }
+                VeilFeatureManager.getInstance(requireContext()).getStatusUpdates(allLocalChats);
         com.m3.veil.ui.main.status.WhatsAppStatusUi.renderVerticalStatusList(
                 requireContext(), statusFeedContainer, statuses, statusActionListener,
                 this::launchPhotoStatusPicker, this::openStatusCreationChooser);
@@ -1312,6 +1425,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         updatePersonaAndMeshHeader();
         loadLocalEncryptedChats();
         renderStatusTray();
+        if (getContext() != null && com.m3.veil.manager.AuthManager.getInstance().isLoggedIn(requireContext())) {
+            setupRealtimeChatListeners(currentUserId);
+        }
     };
 
     @Override
@@ -1329,7 +1445,35 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             String uid = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
             final Context appCtx = requireContext().getApplicationContext();
             homeExecutor.execute(() -> WebRtcManager.getInstance(appCtx).fetchAndProcessOfflineInboxOnce(uid));
-            if (groupsListenerRegistration == null) {
+            setupRealtimeChatListeners(uid);
+        }
+        updatePersonaAndMeshHeader();
+        loadLocalEncryptedChats();
+        updateArchivedHeader();
+        renderStatusTray();
+        startVanishTicker();
+        if (getContext() != null) {
+            com.m3.veil.manager.StatusController.getInstance(requireContext()).addObserver(statusObserver);
+            VeilFeatureManager.getInstance(requireContext()).startStatusSync(() -> {
+                if (isAdded() && getActivity() != null) {
+                    requireActivity().runOnUiThread(this::renderStatusTray);
+                }
+            });
+        }
+    }
+
+    private void setupRealtimeChatListeners(String uid) {
+        if (!isAdded() || getContext() == null || uid == null || uid.isEmpty()) return;
+        final Context appCtx = requireContext().getApplicationContext();
+        if (groupsListenerRegistration != null) {
+            try { groupsListenerRegistration.remove(); } catch (Throwable ignored) {}
+            groupsListenerRegistration = null;
+        }
+        if (directChatsListenerRegistration != null) {
+            try { directChatsListenerRegistration.remove(); } catch (Throwable ignored) {}
+            directChatsListenerRegistration = null;
+        }
+
                 groupsListenerRegistration = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                         .collection("groups")
                         .whereArrayContains("participants", uid)
@@ -1393,7 +1537,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                         }
                                     }
 
-                                    Chat existing = EncryptedChatDatabase.getInstance(appCtx).getChat(gId);
+                                    EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(appCtx, gId, uid);
+                                    Chat existing = targetDb.getChat(gId);
                                     String myPersonaName = VeilFeatureManager.getInstance(appCtx).getActivePersona().getDisplayName();
                                     String chatTitle = gName;
                                     if (isDirectChat) {
@@ -1449,7 +1594,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                         if (description != null) newGroup.setDescription(description);
                                         if (isPublicObj != null) newGroup.setPublic(isPublicObj);
                                         if (handle != null) newGroup.setHandle(handle);
-                                        EncryptedChatDatabase.getInstance(appCtx).saveOrUpdateChat(newGroup);
+                                        targetDb.saveOrUpdateChat(newGroup);
                                         updated = true;
                                         shouldSyncMessages = true;
                                     } else {
@@ -1477,7 +1622,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                         existing.setType(chatType);
                                         existing.setGroup(!isDirectChat);
                                         if (changed) {
-                                            EncryptedChatDatabase.getInstance(appCtx).saveOrUpdateChat(existing);
+                                            targetDb.saveOrUpdateChat(existing);
                                             updated = true;
                                         }
                                     }
@@ -1494,7 +1639,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                         if (dName == null || dName.isEmpty()) dName = userDoc.getString("username");
                                                         String uAvatar = userDoc.getString("avatar");
                                                         if (dName != null && !dName.isEmpty()) {
-                                                            Chat c = EncryptedChatDatabase.getInstance(appCtx).getChat(fGId);
+                                                            Chat c = targetDb.getChat(fGId);
                                                             if (c != null) {
                                                                 boolean cChanged = false;
                                                                 if (!dName.equals(c.getName())) {
@@ -1506,7 +1651,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                     cChanged = true;
                                                                 }
                                                                 if (cChanged) {
-                                                                    EncryptedChatDatabase.getInstance(appCtx).saveOrUpdateChat(c);
+                                                                    targetDb.saveOrUpdateChat(c);
                                                                     if (isAdded() && getActivity() != null) {
                                                                         requireActivity().runOnUiThread(() -> {
                                                                             if (chatsAdapter != null) chatsAdapter.notifyDataSetChanged();
@@ -1548,7 +1693,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                         try {
                                                             String mId = mDoc.getString("id");
                                                             if (mId == null) mId = mDoc.getId();
-                                                            com.m3.veil.model.Message existingMsg = EncryptedChatDatabase.getInstance(appCtx).getMessageById(mId);
+                                                            com.m3.veil.model.Message existingMsg = targetDb.getMessageById(mId);
                                                             String mType = mDoc.getString("type");
                                                             String mText = mDoc.getString("text");
                                                             if (mText != null && mText.startsWith("ENC:v")) {
@@ -1602,7 +1747,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                     m.setDelivered(true);
                                                                     m.setRead(false);
                                                                 }
-                                                                EncryptedChatDatabase.getInstance(appCtx).saveMessage(finalGroupId, m);
+                                                                targetDb.saveMessage(finalGroupId, m);
                                                                 anyNewMsg = true;
 
                                                                 if (!isFromMe) {
@@ -1626,14 +1771,14 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                             appCtx, finalGroupId, existingMsg, () -> {
                                                                                 if (isAdded()) loadLocalEncryptedChats();
                                                                             });
-                                                                    EncryptedChatDatabase.getInstance(appCtx).saveMessage(finalGroupId, existingMsg);
+                                                                    targetDb.saveMessage(finalGroupId, existingMsg);
                                                                     if (decoded != null && decoded.exists()) {
                                                                         anyNewMsg = true;
                                                                     }
                                                                 }
                                                                 if (isFromMe) {
                                                                     if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
-                                                                        EncryptedChatDatabase.getInstance(appCtx)
+                                                                        targetDb
                                                                                 .updateMessageStatus(mId, docDelivered || docRead, docRead);
                                                                         com.m3.veil.manager.VeilMessagesController.getInstance(appCtx)
                                                                                 .onMessageStatusChanged(mId, docDelivered || docRead, docRead);
@@ -1641,7 +1786,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                     }
                                                                 } else if (!existingMsg.isDelivered() || !docDelivered) {
                                                                     existingMsg.setDelivered(true);
-                                                                    EncryptedChatDatabase.getInstance(appCtx)
+                                                                    targetDb
                                                                             .updateMessageStatus(mId, true, existingMsg.isRead());
                                                                     java.util.Map<String, Object> ack = new java.util.HashMap<>();
                                                                     ack.put("delivered", true);
@@ -1652,15 +1797,15 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                 }
                                                                 boolean msgChanged = false;
                                                                 if ("deleted".equals(mType) && !"deleted".equals(existingMsg.getType())) {
-                                                                    EncryptedChatDatabase.getInstance(appCtx).markMessageDeleted(finalGroupId, mId);
+                                                                    targetDb.markMessageDeleted(finalGroupId, mId);
                                                                     msgChanged = true;
                                                                 } else if ((Boolean.TRUE.equals(isEditedObj) || (existingMsg.getText() != null && existingMsg.getText().startsWith("ENC:v")))
                                                                         && mText != null && !mText.equals(existingMsg.getText())) {
-                                                                    EncryptedChatDatabase.getInstance(appCtx).updateMessageText(finalGroupId, mId, mText);
+                                                                    targetDb.updateMessageText(finalGroupId, mId, mText);
                                                                     msgChanged = true;
                                                                 }
                                                                 if (pollJson != null && !pollJson.equals(existingMsg.getPollJson())) {
-                                                                    EncryptedChatDatabase.getInstance(appCtx).updateMessagePollJson(finalGroupId, mId, pollJson);
+                                                                    targetDb.updateMessagePollJson(finalGroupId, mId, pollJson);
                                                                     msgChanged = true;
                                                                 }
                                                                 if (msgChanged) anyNewMsg = true;
@@ -1680,9 +1825,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                 }
                             });
                         });
-            }
 
-            if (directChatsListenerRegistration == null) {
                 directChatsListenerRegistration = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                         .collection("chats")
                         .whereArrayContains("participants", uid)
@@ -1718,7 +1861,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
                                     if (ts == null) ts = com.google.firebase.Timestamp.now();
 
-                                    Chat existing = EncryptedChatDatabase.getInstance(appCtx).getChat(cId);
+                                    EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(appCtx, cId, peerId);
+                                    Chat existing = targetDb.getChat(cId);
                                     boolean shouldSyncDirectMsgs = false;
                                     if (existing == null) {
                                         Chat newChat = new Chat(
@@ -1733,7 +1877,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 "direct",
                                                 parts != null ? parts : new java.util.ArrayList<>()
                                         );
-                                        EncryptedChatDatabase.getInstance(appCtx).saveOrUpdateChat(newChat);
+                                        targetDb.saveOrUpdateChat(newChat);
                                         updated = true;
                                         shouldSyncDirectMsgs = true;
                                     } else if (lastMsg != null && !lastMsg.equals(existing.getLastMessage())) {
@@ -1762,7 +1906,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                         try {
                                                             String mId = mDoc.getString("id");
                                                             if (mId == null) mId = mDoc.getId();
-                                                            com.m3.veil.model.Message existingMsg = EncryptedChatDatabase.getInstance(appCtx).getMessageById(mId);
+                                                            com.m3.veil.model.Message existingMsg = targetDb.getMessageById(mId);
                                                             String mType = mDoc.getString("type");
                                                             String mText = mDoc.getString("text");
                                                             if (mText != null && mText.startsWith("ENC:v")) {
@@ -1810,7 +1954,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                     m.setDelivered(true);
                                                                     m.setRead(false);
                                                                 }
-                                                                EncryptedChatDatabase.getInstance(appCtx).saveMessage(finalChatId, m);
+                                                                targetDb.saveMessage(finalChatId, m);
 
                                                                 if (!isFromMe && sId != null) {
                                                                     java.util.Map<String, Object> ack = new java.util.HashMap<>();
@@ -1833,19 +1977,19 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                             appCtx, finalChatId, existingMsg, () -> {
                                                                                 if (isAdded()) loadLocalEncryptedChats();
                                                                             });
-                                                                    EncryptedChatDatabase.getInstance(appCtx).saveMessage(finalChatId, existingMsg);
+                                                                    targetDb.saveMessage(finalChatId, existingMsg);
                                                                     if (decoded != null && decoded.exists()) {
                                                                         anyNew = true;
                                                                     }
                                                                 }
                                                                 if (existingMsg.getText() != null && existingMsg.getText().startsWith("ENC:v")
                                                                         && mText != null && !mText.startsWith("ENC:v")) {
-                                                                    EncryptedChatDatabase.getInstance(appCtx).updateMessageText(finalChatId, mId, mText);
+                                                                    targetDb.updateMessageText(finalChatId, mId, mText);
                                                                     anyNew = true;
                                                                 }
                                                                 if (isFromMe) {
                                                                     if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
-                                                                        EncryptedChatDatabase.getInstance(appCtx)
+                                                                        targetDb
                                                                                 .updateMessageStatus(mId, docDelivered || docRead, docRead);
                                                                         com.m3.veil.manager.VeilMessagesController.getInstance(appCtx)
                                                                                 .onMessageStatusChanged(mId, docDelivered || docRead, docRead);
@@ -1853,7 +1997,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                     }
                                                                 } else if (!existingMsg.isDelivered() || !docDelivered) {
                                                                     existingMsg.setDelivered(true);
-                                                                    EncryptedChatDatabase.getInstance(appCtx)
+                                                                    targetDb
                                                                             .updateMessageStatus(mId, true, existingMsg.isRead());
                                                                     java.util.Map<String, Object> ack = new java.util.HashMap<>();
                                                                     ack.put("delivered", true);
@@ -1877,21 +2021,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                 }
                             });
                         });
-            }
-        }
-        updatePersonaAndMeshHeader();
-        loadLocalEncryptedChats();
-        updateArchivedHeader();
-        startVanishTicker();
-        if (getContext() != null) {
-            com.m3.veil.manager.StatusController.getInstance(requireContext()).addObserver(statusObserver);
-            VeilFeatureManager.getInstance(requireContext()).startStatusSync(() -> {
-                if (isAdded() && getActivity() != null) {
-                    requireActivity().runOnUiThread(this::renderStatusTray);
-                }
-            });
-        }
+
     }
+
 
     @Override
     public void onPause() {
@@ -2105,11 +2237,11 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         if (tvTitle != null) tvTitle.setText(chat.getName() != null ? chat.getName() : "@Anonymous");
         if (tvSubtitle != null) {
-            tvSubtitle.setText("🛡️ Trust Score: " + chat.getTrustScore() + "% • SQLCipher 256-bit");
+            tvSubtitle.setText("Trust Score: " + chat.getTrustScore() + "% • End-to-End Encrypted");
         }
 
         if (actionMarkReadUnread != null) {
-            actionMarkReadUnread.setText(chat.getUnreadCount() > 0 ? "✓✓  Mark as read" : "🔵  Mark as unread");
+            actionMarkReadUnread.setText(chat.getUnreadCount() > 0 ? "Mark as read" : "Mark as unread");
             actionMarkReadUnread.setOnClickListener(v -> {
                 bottomSheetDialog.dismiss();
                 int nextCount = chat.getUnreadCount() > 0 ? 0 : 1;
@@ -2119,17 +2251,17 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             });
         }
 
-        actionPin.setText(chat.isPinned() ? "📌  Unpin chat" : "📌  Pin to top");
-        actionMute.setText(chat.isMuted() ? "🔔  Unmute notifications" : "🔕  Mute notifications");
-        actionArchive.setText(chat.isArchived() ? "📤  Unarchive chat" : "📥  Archive chat");
+        actionPin.setText(chat.isPinned() ? "Unpin chat" : "Pin to top");
+        actionMute.setText(chat.isMuted() ? "Unmute notifications" : "Mute notifications");
+        actionArchive.setText(chat.isArchived() ? "Unarchive chat" : "Archive chat");
 
         boolean isLocked = chat.getChatLockPin() != null && !chat.getChatLockPin().isEmpty();
         if (actionLockChat != null) {
-            actionLockChat.setText(isLocked ? "🔓  Remove / Change Chat PIN lock" : "🔒  Lock chat with PIN");
+            actionLockChat.setText(isLocked ? "Remove / Change Chat PIN lock" : "Lock chat with PIN");
             actionLockChat.setOnClickListener(v -> {
                 bottomSheetDialog.dismiss();
                 if (isLocked) {
-                    showPinAuthModal("🔒 Verify Current PIN", "Enter your current 4-digit PIN for " + chat.getName(), "Current PIN", (enteredPin, pinDialog, layout) -> {
+                    showPinAuthModal("Verify Current PIN", "Enter your current 4-digit PIN for " + chat.getName(), "Current PIN", (enteredPin, pinDialog, layout) -> {
                         if (chat.getChatLockPin().equals(enteredPin)) {
                             pinDialog.dismiss();
                             showChangeOrRemoveChatPinDialog(chat);
@@ -2145,8 +2277,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         if (actionSecretVault != null) {
             actionSecretVault.setText(chat.isSecret()
-                    ? "👁️  Move out of Secret Vault"
-                    : "🕵️  Move to Secret Vault folder");
+                    ? "Move out of Secret Vault"
+                    : "Move to Secret Vault folder");
             actionSecretVault.setOnClickListener(v -> {
                 bottomSheetDialog.dismiss();
                 if (isLocked) {
@@ -2291,7 +2423,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         root.addView(title);
 
         TextView sub = new TextView(requireContext());
-        sub.setText("Reading from local SQLCipher vault without sending read receipts or clearing unread count.");
+        sub.setText("Peek messages without sending read receipts or marking as read.");
         sub.setTextSize(12f);
         sub.setTextColor(ContextCompat.getColor(requireContext(), R.color.textSecondary));
         sub.setPadding(0, (int) (4 * dp), 0, (int) (12 * dp));
@@ -2312,7 +2444,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             msgBox.addView(empty);
         } else {
             int start = Math.max(0, msgs.size() - 6);
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", Locale.getDefault());
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("h:mm a", Locale.getDefault());
             for (int i = start; i < msgs.size(); i++) {
                 Message m = msgs.get(i);
                 if (m == null) continue;
@@ -2504,7 +2636,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         EncryptedChatDatabase.getInstance(requireContext()).updateChatArchiveStatus(chat.getId(), newArchived);
         loadLocalEncryptedChats();
         if (newArchived && getView() != null) {
-            Snackbar.make(getView(), "Chat archived in SQLCipher vault", Snackbar.LENGTH_LONG)
+            Snackbar.make(getView(), "Chat archived", Snackbar.LENGTH_LONG)
                     .setAction("Undo", undoView -> {
                         chat.setArchived(false);
                         EncryptedChatDatabase.getInstance(requireContext()).updateChatArchiveStatus(chat.getId(), false);
@@ -2524,10 +2656,10 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         if (tvConfirmTitle != null) tvConfirmTitle.setText("Clear Chat Messages?");
         if (tvMsg != null) {
-            tvMsg.setText("Are you sure you want to wipe all messages inside this conversation? The chat will remain open, but all existing messages will be shredded.");
+            tvMsg.setText("Are you sure you want to clear all messages in this conversation? The chat will remain open, but all existing messages will be deleted.");
         }
         if (btnConfirm != null) {
-            btnConfirm.setText("Clear & Shred");
+            btnConfirm.setText("Clear Messages");
             btnConfirm.setOnClickListener(cv -> {
                 confirmSheet.dismiss();
                 EncryptedChatDatabase.getInstance(requireContext()).clearChatMessages(chat.getId());

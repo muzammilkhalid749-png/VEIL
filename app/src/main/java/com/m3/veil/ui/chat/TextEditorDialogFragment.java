@@ -71,6 +71,7 @@ public class TextEditorDialogFragment extends DialogFragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         addTextEditText = view.findViewById(R.id.addTextEditText);
+        com.m3.veil.utils.UiAnimator.attachLargeEmojiInputWatcher(addTextEditText, 1.32f);
         colorPickerView = view.findViewById(R.id.colorPickerView);
         TextView btnDone = view.findViewById(R.id.btnDone);
 

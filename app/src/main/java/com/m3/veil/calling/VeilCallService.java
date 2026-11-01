@@ -263,7 +263,7 @@ public class VeilCallService extends Service implements CallEngine.Listener {
         }
 
         startForegroundWithNotification();
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
 
     private void startForegroundWithNotification() {
@@ -317,62 +317,24 @@ public class VeilCallService extends Service implements CallEngine.Listener {
     }
 
     private Notification buildNotification(@Nullable CallInfo info) {
-        String title = "Veil Call";
-        String statusText = "Call in progress";
-        long durationMs = 0L;
-        boolean isE2ee = false;
-
-        if (info != null) {
-            title = info.isGroup() && info.getGroupName() != null
-                    ? info.getGroupName() : (info.getPeerName() != null ? info.getPeerName() : "Veil Call");
-            durationMs = info.getDurationMs();
-            isE2ee = info.isE2eeEnabled();
-        } else if (engine != null && engine.getInfo() != null) {
-            CallInfo current = engine.getInfo();
-            title = current.isGroup() && current.getGroupName() != null
-                    ? current.getGroupName() : (current.getPeerName() != null ? current.getPeerName() : "Veil Call");
-            durationMs = current.getDurationMs();
-            isE2ee = current.isE2eeEnabled();
-        }
-
-        if (durationMs > 0) {
-            long seconds = durationMs / 1000L;
-            statusText = String.format(Locale.US, "%02d:%02d • %s",
-                    seconds / 60, seconds % 60, isE2ee ? "E2EE" : "Protected");
-        }
-
-        // Tap notification to return to CallActivity
-        Intent callIntent = new Intent(this, CallActivity.class);
-        callIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent contentPending = PendingIntent.getActivity(this, 201, callIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0));
-
-        // Action: Hang Up
-        Intent hangupIntent = new Intent(this, VeilCallService.class).setAction(ACTION_HANGUP);
-        PendingIntent hangupPending = PendingIntent.getService(this, 202, hangupIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0));
-
-        // Action: Toggle Mute
-        Intent muteIntent = new Intent(this, VeilCallService.class).setAction(ACTION_TOGGLE_MUTE);
-        PendingIntent mutePending = PendingIntent.getService(this, 203, muteIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0));
-
+        CallInfo target = info != null ? info : (engine != null ? engine.getInfo() : null);
         boolean isMuted = engine != null && engine.isMuted();
-
-        return new NotificationCompat.Builder(this, CallNotificationHelper.CHANNEL_ONGOING)
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(title)
-                .setContentText(statusText)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setCategory(NotificationCompat.CATEGORY_CALL)
-                .setOngoing(true)
-                .setContentIntent(contentPending)
-                .addAction(0, isMuted ? "Unmute" : "Mute", mutePending)
-                .addAction(0, "End Call", hangupPending)
-                .build();
+        return CallNotificationHelper.buildOngoingNotification(this, target, isMuted);
     }
 
+    private long lastNotificationPostMs = 0L;
+    private static final long MIN_NOTIFICATION_INTERVAL_MS = 1500L;
+
     public void updateOngoingNotification(CallInfo info) {
+        updateOngoingNotification(info, false);
+    }
+
+    public void updateOngoingNotification(CallInfo info, boolean force) {
+        long now = System.currentTimeMillis();
+        if (!force && (now - lastNotificationPostMs < MIN_NOTIFICATION_INTERVAL_MS)) {
+            return; // Throttle to prevent Android system_server notification shedding
+        }
+        lastNotificationPostMs = now;
         try {
             android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
             if (nm != null) {
@@ -381,18 +343,24 @@ public class VeilCallService extends Service implements CallEngine.Listener {
         } catch (Throwable ignored) { }
     }
 
-    private void updateNotificationFromEngine() {
+    private void updateNotificationFromEngine(boolean force) {
         if (engine != null) {
-            updateOngoingNotification(engine.getInfo());
+            updateOngoingNotification(engine.getInfo(), force);
         }
+    }
+
+    private void updateNotificationFromEngine() {
+        updateNotificationFromEngine(false);
     }
 
     private final Runnable tickerRunnable = new Runnable() {
         @Override
         public void run() {
             if (isTickerRunning) {
-                updateNotificationFromEngine();
-                mainHandler.postDelayed(this, 1000L);
+                // NotificationCompat uses Chronometer which updates client-side without re-posting.
+                // We only perform a lightweight 15s heartbeat update to avoid NotificationManager rate limits.
+                updateNotificationFromEngine(false);
+                mainHandler.postDelayed(this, 15000L);
             }
         }
     };
@@ -412,8 +380,17 @@ public class VeilCallService extends Service implements CallEngine.Listener {
 
     @Override
     public void onStateChanged(CallState state, CallInfo info) {
-        if (state == CallState.ACTIVE) {
+        if (state.isEstablished()) {
             startDurationTicker();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    boolean isVideo = (info != null ? info.getType() == CallType.VIDEO : (engine != null && engine.isVideoEnabled()));
+                    int type = computeForegroundServiceType(isVideo);
+                    startForeground(NOTIFICATION_ID, buildNotification(info), type);
+                } catch (Throwable ignored) { }
+            }
+        } else if (state == CallState.CALLING || state == CallState.PRE_ACCEPT_RECEIVED || state == CallState.PRECALLING || state == CallState.ACCEPT_SENT || state == CallState.ACCEPT_RECEIVED) {
+            stopDurationTicker();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 try {
                     boolean isVideo = (info != null ? info.getType() == CallType.VIDEO : (engine != null && engine.isVideoEnabled()));
@@ -425,12 +402,17 @@ public class VeilCallService extends Service implements CallEngine.Listener {
             stopDurationTicker();
             stopForegroundAndService();
         }
-        updateOngoingNotification(info);
+        updateOngoingNotification(info, true);
+    }
+
+    @Override
+    public void onAudioRouteChanged(CallAudioRoute route) {
+        updateNotificationFromEngine(true);
     }
 
     @Override
     public void onCallInfoChanged(CallInfo info) {
-        updateOngoingNotification(info);
+        updateOngoingNotification(info, false);
     }
 
     @Override
@@ -477,6 +459,17 @@ public class VeilCallService extends Service implements CallEngine.Listener {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+        if (engine != null && engine.isInCall()) {
+            Log.i(TAG, "onTaskRemoved: App task swiped away, but call is active. Keeping VeilCallService alive!");
+            updateNotificationFromEngine();
+        } else {
+            stopForegroundAndService();
+        }
     }
 
     @Override

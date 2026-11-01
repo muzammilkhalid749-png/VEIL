@@ -1108,7 +1108,7 @@ public class PostDetailActivity extends AppCompatActivity {
 
         String[][] awards = {
                 {"🥇 Sovereign Gold", "5 VeilCoins • Highlights exceptional insight", "5"},
-                {"🛡️ Cyber Guardian", "3 VeilCoins • Zero-knowledge privacy excellence", "3"},
+                {"🛡️ Privacy Guardian", "3 VeilCoins • Outstanding privacy contribution", "3"},
                 {"🤯 Mindblown", "3 VeilCoins • Perspective-shifting post", "3"},
                 {"🔥 Pure Fire", "2 VeilCoins • Trending community heat", "2"},
                 {"💎 Diamond Hands", "10 VeilCoins • Elite thread contribution", "10"}

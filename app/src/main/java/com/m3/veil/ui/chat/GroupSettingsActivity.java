@@ -393,7 +393,7 @@ public class GroupSettingsActivity extends AppCompatActivity {
         cryptoBox.addView(createSectionHeader("🔐 Cryptographic Group Security", dp));
 
         MaterialButton btnRotateKeys = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
-        btnRotateKeys.setText("🔄 Rotate Group Sender-Key Ratchet Now");
+        btnRotateKeys.setText("🔄 Update Encryption Keys");
         btnRotateKeys.setCornerRadius((int) (12 * dp));
         btnRotateKeys.setOnClickListener(v -> {
             int newEpoch = com.m3.veil.utils.EncryptionManager.rotateGroupSenderKeyEpoch(chatId);
@@ -561,7 +561,7 @@ public class GroupSettingsActivity extends AppCompatActivity {
         FirebaseFirestore.getInstance().collection("groups").document(chatId)
                 .set(updates, SetOptions.merge());
 
-        Toast.makeText(this, "✅ Group settings saved & synced to mesh!", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "✅ Group settings saved successfully!", Toast.LENGTH_SHORT).show();
         finish();
     }
 }

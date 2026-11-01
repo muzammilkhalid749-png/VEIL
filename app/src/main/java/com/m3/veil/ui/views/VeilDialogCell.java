@@ -457,13 +457,64 @@ public class VeilDialogCell extends View {
     private void resolveStoryState(@NonNull Chat chat) {
         mHasActiveStory = false;
         mHasUnreadStory = false;
-        if (chat.isGroup()) return;
+        if (chat.isGroup() || "channel".equalsIgnoreCase(chat.getType())) return;
+        if (chat.isBlocked()) return;
         try {
+            Context ctx = getContext();
+            String chatId = chat.getId();
             String peerId = extractPeerId(chat);
-            if (peerId != null && !peerId.isEmpty()) {
-                SharedPreferences sp = getContext().getSharedPreferences("veil_stories_cache", Context.MODE_PRIVATE);
+            com.m3.veil.database.EncryptedChatDatabase db =
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(ctx);
+            if ((chatId != null && db.isChatBlocked(chatId))
+                    || (peerId != null && !peerId.isEmpty() && db.isChatBlocked(peerId))) {
+                return;
+            }
+
+            // Respect user status privacy settings (Excluded / Only Share With)
+            com.m3.veil.utils.UserPreferences uPrefs =
+                    com.m3.veil.utils.UserPreferences.getInstance(ctx);
+            String audType = uPrefs.getStatusAudienceType();
+            java.util.Set<String> excluded = uPrefs.getStatusAudienceExcluded();
+            java.util.Set<String> included = uPrefs.getStatusAudienceIncluded();
+            if ("excluded".equalsIgnoreCase(audType) && excluded != null) {
+                if ((peerId != null && excluded.contains(peerId))
+                        || (chatId != null && excluded.contains(chatId))) {
+                    return;
+                }
+            } else if ("only".equalsIgnoreCase(audType) && included != null && !included.isEmpty()) {
+                boolean allowed = (peerId != null && included.contains(peerId))
+                        || (chatId != null && included.contains(chatId));
+                if (!allowed) return;
+            }
+
+            boolean isSelfChat = (peerId != null && peerId.equals(mCurrentUserId))
+                    || (chatId != null && (chatId.equals(mCurrentUserId) || chatId.startsWith("saved_")));
+            String chatName = chat.getName() != null ? chat.getName().trim() : "";
+
+            java.util.List<com.m3.veil.manager.VeilFeatureManager.StatusUpdate> statuses =
+                    com.m3.veil.manager.VeilFeatureManager.getInstance(ctx).getStatusUpdates(null);
+            long now = System.currentTimeMillis();
+            for (com.m3.veil.manager.VeilFeatureManager.StatusUpdate s : statuses) {
+                if (s == null || now - s.timestampMs >= 24 * 3600 * 1000L) continue;
+                if (isSelfChat && s.isMine) {
+                    mHasActiveStory = true;
+                    if (!s.viewed) mHasUnreadStory = true;
+                } else if (!isSelfChat && !s.isMine) {
+                    boolean matchId = (peerId != null && !peerId.isEmpty() && peerId.equalsIgnoreCase(s.authorId))
+                            || (chatId != null && !chatId.isEmpty() && chatId.equalsIgnoreCase(s.authorId));
+                    boolean matchName = !chatName.isEmpty() && s.authorName != null
+                            && chatName.equalsIgnoreCase(s.authorName.trim());
+                    if (matchId || matchName) {
+                        mHasActiveStory = true;
+                        if (!s.viewed) mHasUnreadStory = true;
+                    }
+                }
+            }
+
+            if (!mHasActiveStory && peerId != null && !peerId.isEmpty()) {
+                SharedPreferences sp = ctx.getSharedPreferences("veil_stories_cache", Context.MODE_PRIVATE);
                 long storyTs = sp.getLong("story_ts_" + peerId, 0L);
-                if (System.currentTimeMillis() - storyTs < 24 * 3600 * 1000L) {
+                if (now - storyTs < 24 * 3600 * 1000L) {
                     mHasActiveStory = true;
                     mHasUnreadStory = !sp.getBoolean("story_seen_" + peerId, false);
                 }
@@ -523,15 +574,82 @@ public class VeilDialogCell extends View {
         mStatusAnimator.start();
     }
 
+    private float mTouchDownX;
+    private float mTouchDownY;
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
+            mTouchDownX = event.getX();
+            mTouchDownY = event.getY();
             animatePressBounce(0.98f);
         } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
             animatePressBounce(1.0f);
+            if (action == MotionEvent.ACTION_UP && mHasActiveStory && mChat != null) {
+                float dx = Math.abs(event.getX() - mTouchDownX);
+                float dy = Math.abs(event.getY() - mTouchDownY);
+                if (dx < dp(12) && dy < dp(12) && event.getX() <= dp(CONTENT_LEFT_DP - 6)) {
+                    if (openStoryForCurrentChat()) {
+                        return true;
+                    }
+                }
+            }
         }
         return super.onTouchEvent(event);
+    }
+
+    private boolean openStoryForCurrentChat() {
+        if (mChat == null) return false;
+        try {
+            Context ctx = getContext();
+            String chatId = mChat.getId();
+            String peerId = extractPeerId(mChat);
+            boolean isSelfChat = (peerId != null && peerId.equals(mCurrentUserId))
+                    || (chatId != null && (chatId.equals(mCurrentUserId) || chatId.startsWith("saved_")));
+            String chatName = mChat.getName() != null ? mChat.getName().trim() : "";
+
+            java.util.List<com.m3.veil.manager.VeilFeatureManager.StatusUpdate> allStatuses =
+                    com.m3.veil.manager.VeilFeatureManager.getInstance(ctx).getStatusUpdates(null);
+            java.util.List<com.m3.veil.manager.VeilFeatureManager.StatusUpdate> peerStatuses =
+                    new java.util.ArrayList<>();
+            long now = System.currentTimeMillis();
+            for (com.m3.veil.manager.VeilFeatureManager.StatusUpdate s : allStatuses) {
+                if (s == null || now - s.timestampMs >= 24 * 3600 * 1000L) continue;
+                if (isSelfChat && s.isMine) {
+                    peerStatuses.add(s);
+                } else if (!isSelfChat && !s.isMine) {
+                    boolean matchId = (peerId != null && !peerId.isEmpty() && peerId.equalsIgnoreCase(s.authorId))
+                            || (chatId != null && !chatId.isEmpty() && chatId.equalsIgnoreCase(s.authorId));
+                    boolean matchName = !chatName.isEmpty() && s.authorName != null
+                            && chatName.equalsIgnoreCase(s.authorName.trim());
+                    if (matchId || matchName) {
+                        peerStatuses.add(s);
+                    }
+                }
+            }
+            if (peerStatuses.isEmpty()) return false;
+
+            com.m3.veil.ui.main.status.WhatsAppStatusUi.showViewer(
+                    ctx,
+                    peerStatuses,
+                    new com.m3.veil.ui.main.status.WhatsAppStatusUi.StatusActionListener() {
+                        @Override
+                        public void onReplyToStatus(com.m3.veil.manager.VeilFeatureManager.StatusUpdate status, String replyText) {
+                            performClick();
+                        }
+
+                        @Override
+                        public void onStatusesChanged() {
+                            resolveStoryState(mChat);
+                            invalidate();
+                        }
+                    }
+            );
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private void animatePressBounce(float targetScale) {
@@ -1327,7 +1445,7 @@ public class VeilDialogCell extends View {
 
         if (now.get(Calendar.YEAR) == msg.get(Calendar.YEAR)
                 && now.get(Calendar.DAY_OF_YEAR) == msg.get(Calendar.DAY_OF_YEAR)) {
-            return new SimpleDateFormat("HH:mm", Locale.getDefault()).format(date);
+            return new SimpleDateFormat("h:mm a", Locale.getDefault()).format(date);
         }
 
         long diffDays = (now.getTimeInMillis() - msg.getTimeInMillis()) / (24L * 3600L * 1000L);

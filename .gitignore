@@ -20,7 +20,12 @@ node_modules/
 .env
 app/google-services.json
 app/google-services.json.bak
-debug.keystore
+# Signing keys & release output
+KeyStore
+*.jks
+*.keystore
+app/release/
+release/
 .agents/
 web/dist/
 dist/

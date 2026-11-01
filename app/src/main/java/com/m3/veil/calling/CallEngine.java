@@ -367,6 +367,7 @@ public class CallEngine implements CallSignaling.Listener {
             if (peer.pc != null && isInCall()) {
                 try {
                     peer.pc.restartIce();
+                    negotiate(peer);
                 } catch (Throwable t) {
                     Log.w(TAG, "restartIce failed for " + peer.peerId + ": " + t.getMessage());
                 }
@@ -877,6 +878,10 @@ public class CallEngine implements CallSignaling.Listener {
         if (self != null) self.muted = value;
         broadcastControl(mutePayload(value), CallSignal.MUTE);
         notifyInfo();
+    }
+
+    public void toggleMute() {
+        setMuted(!muted);
     }
 
     public void setSpeakerOn(boolean speaker) {
@@ -1746,6 +1751,7 @@ public class CallEngine implements CallSignaling.Listener {
     }
 
     private void applyBitrate(Peer peer) {
+        if (peer == null || peer.pc == null || state.isEnded()) return;
         try {
             int videoBitrate = lowDataMode ? config.maxVideoBitrateLowData : config.maxVideoBitrate;
             if (peer.videoSender != null) {
@@ -1770,6 +1776,13 @@ public class CallEngine implements CallSignaling.Listener {
                     }
                     peer.audioSender.setParameters(params);
                 }
+            }
+        } catch (IllegalStateException e) {
+            // Normal WebRTC lifecycle behavior when sender is disposed during track removal or call teardown
+            if (e.getMessage() != null && e.getMessage().contains("disposed")) {
+                Log.d(TAG, "applyBitrate: RtpSender already disposed during peer transition");
+            } else {
+                Log.w(TAG, "applyBitrate failed: " + e.getMessage());
             }
         } catch (Throwable t) {
             Log.w(TAG, "applyBitrate failed: " + t.getMessage());
@@ -2126,13 +2139,16 @@ public class CallEngine implements CallSignaling.Listener {
                     case FAILED:
                         setState(CallState.REJOINING);
                         if (isInCall() && peer.pc != null) {
-                            try { peer.pc.restartIce(); } catch (Throwable ignored) { }
+                            try {
+                                peer.pc.restartIce();
+                                negotiate(peer);
+                            } catch (Throwable ignored) { }
                         }
                         main.postDelayed(() -> {
                             if (isInCall() && (peer.pc == null || peer.pc.iceConnectionState() == PeerConnection.IceConnectionState.FAILED)) {
                                 endCall(CallEndReason.CONNECTION_LOST, true);
                             }
-                        }, 4_000L);
+                        }, 8_000L);
                         break;
                     case CLOSED:
                         if (isInCall()) {
@@ -2256,7 +2272,9 @@ public class CallEngine implements CallSignaling.Listener {
     private void scheduleRingingTimeout() {
         cancelRingingTimeout();
         ringingTimeout = () -> {
-            if (state == CallState.CALLING || state == CallState.PRE_ACCEPT_RECEIVED) {
+            if (state == CallState.CALLING) {
+                hangup(CallEndReason.UNAVAILABLE);
+            } else if (state == CallState.PRE_ACCEPT_RECEIVED) {
                 hangup(CallEndReason.NO_ANSWER);
             }
         };
@@ -2353,7 +2371,10 @@ public class CallEngine implements CallSignaling.Listener {
             if (!anyConnected && isInCall()) {
                 for (Peer p : peers.values()) {
                     if (p.pc != null && isInCall()) {
-                        try { p.pc.restartIce(); } catch (Throwable ignored) { }
+                        try {
+                            p.pc.restartIce();
+                            negotiate(p);
+                        } catch (Throwable ignored) { }
                     }
                 }
                 main.postDelayed(() -> {
@@ -2371,7 +2392,7 @@ public class CallEngine implements CallSignaling.Listener {
                             endCall(CallEndReason.CONNECTION_LOST, true);
                         }
                     }
-                }, 3_000L);
+                }, 8_000L);
             }
         };
         main.postDelayed(reconnectTimeout, config.reconnectGraceMs);
@@ -2737,7 +2758,7 @@ public class CallEngine implements CallSignaling.Listener {
         if (newState == CallState.ACCEPT_SENT || newState == CallState.ACCEPT_RECEIVED || newState.isEstablished()) {
             VeilCallService.stopRingingAndDismissIncomingNotifications(context);
         }
-        if (newState.isEstablished()) {
+        if (newState.isEstablished() || newState == CallState.CALLING || newState == CallState.PRE_ACCEPT_RECEIVED) {
             VeilCallService.start(context);
         }
         for (Listener l : listeners) l.onStateChanged(newState, info);
@@ -2747,7 +2768,9 @@ public class CallEngine implements CallSignaling.Listener {
     private void notifyInfo() {
         if (!isInCall()) return;
         CallInfo info = buildInfo();
-        if (state.isEstablished()) CallNotificationHelper.showOngoingCall(context, info);
+        if (state.isEstablished() || state == CallState.CALLING || state == CallState.PRE_ACCEPT_RECEIVED) {
+            CallNotificationHelper.showOngoingCall(context, info);
+        }
         for (Listener l : listeners) l.onCallInfoChanged(info);
     }
 

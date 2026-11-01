@@ -7,18 +7,24 @@
     android:background="@drawable/splash_background">
 
     <!-- Top Navigation Bar -->
-    <ImageView
-        android:id="@+id/backButton"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_gravity="top|start"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="12dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/back"
-        android:padding="8dp"
-        android:src="@drawable/ic_arrow_back"
-        app:tint="@color/textPrimary" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_gravity="top"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp">
+
+        <ImageView
+            android:id="@+id/backButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/back"
+            android:padding="8dp"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="@color/colorTextPrimary" />
+    </LinearLayout>
 
     <!-- Main Scrollable Container -->
     <androidx.core.widget.NestedScrollView
@@ -31,22 +37,29 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
+            android:layout_gravity="center_horizontal"
             android:gravity="center_horizontal"
             android:maxWidth="440dp"
             android:orientation="vertical"
             android:paddingHorizontal="24dp"
-            android:paddingTop="56dp"
-            android:paddingBottom="32dp">
+            android:paddingTop="64dp"
+            android:paddingBottom="36dp">
 
-            <!-- Shield Icon Header -->
-            <ImageView
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:layout_marginBottom="16dp"
-                android:contentDescription="Restore Account"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_shield" />
+            <!-- Circular Shield Icon Badge -->
+            <FrameLayout
+                android:layout_width="68dp"
+                android:layout_height="68dp"
+                android:layout_marginBottom="18dp"
+                android:background="@drawable/bg_restore_icon_circle">
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Restore Account"
+                    android:src="@drawable/ic_shield_locked"
+                    app:tint="@color/veil_accent" />
+            </FrameLayout>
 
             <TextView
                 android:layout_width="wrap_content"
@@ -55,30 +68,81 @@
                 android:gravity="center"
                 android:letterSpacing="0.01"
                 android:text="Restore Account"
-                android:textColor="@color/textPrimary"
+                android:textColor="@color/colorTextPrimary"
                 android:textSize="22sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:layout_marginBottom="28dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="26dp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
-                android:text="Enter your 12-word recovery phrase"
-                android:textColor="@color/textSecondary"
-                android:textSize="14sp" />
+                android:lineSpacingExtra="2dp"
+                android:text="Enter your 12-word recovery phrase to decrypt and recover your sovereign account."
+                android:textColor="@color/colorTextSecondary"
+                android:textSize="13.5sp" />
 
-            <!-- Input Box -->
+            <!-- Input Card -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="24dp"
-                android:background="@drawable/input_background"
+                android:background="@drawable/bg_phrase_card"
                 android:orientation="vertical"
                 android:padding="16dp">
 
+                <!-- Card Header: Title & Paste Button -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.06"
+                        android:text="SECRET RECOVERY PHRASE"
+                        android:textColor="@color/colorTextSecondary"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold" />
+
+                    <!-- Paste Quick Action Pill -->
+                    <LinearLayout
+                        android:id="@+id/btnPastePhrase"
+                        android:layout_width="wrap_content"
+                        android:layout_height="28dp"
+                        android:background="@drawable/bg_paste_pill"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="10dp">
+
+                        <ImageView
+                            android:layout_width="13dp"
+                            android:layout_height="13dp"
+                            android:layout_marginEnd="5dp"
+                            android:src="@drawable/ic_copy"
+                            app:tint="@color/veil_accent" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
+                            android:text="Paste"
+                            android:textColor="@color/veil_accent"
+                            android:textSize="11.5sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Input EditText -->
                 <EditText
                     android:id="@+id/phraseEditText"
                     android:layout_width="match_parent"
@@ -86,14 +150,44 @@
                     android:background="@null"
                     android:fontFamily="sans-serif"
                     android:gravity="top|start"
-                    android:hint="e.g. apple banana cherry..."
+                    android:hint="apple banana cherry dragon..."
                     android:inputType="textMultiLine"
-                    android:lineSpacingExtra="4dp"
+                    android:lineSpacingExtra="5dp"
                     android:minLines="3"
                     android:padding="0dp"
-                    android:textColor="@color/textPrimary"
-                    android:textColorHint="@color/textSecondary"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textColorHint="@color/colorTextSecondary"
                     android:textSize="15sp" />
+
+                <!-- Card Footer: Word Counter & Clear Button -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvWordCount"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="0 / 12 words"
+                        android:textColor="@color/colorTextSecondary"
+                        android:textSize="11.5sp" />
+
+                    <ImageView
+                        android:id="@+id/btnClearPhrase"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Clear phrase"
+                        android:padding="6dp"
+                        android:src="@drawable/ic_close"
+                        android:visibility="gone"
+                        app:tint="@color/colorTextSecondary" />
+                </LinearLayout>
 
             </LinearLayout>
 
@@ -108,23 +202,38 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:letterSpacing="0.01"
-                    android:text="Restore"
+                    android:text="Restore Account"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     app:backgroundTint="@color/veil_accent"
-                    app:cornerRadius="14dp" />
+                    app:cornerRadius="16dp" />
 
                 <ProgressBar
                     android:id="@+id/progressBar"
-                    android:layout_width="26dp"
-                    android:layout_height="26dp"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
                     android:layout_gravity="center"
                     android:indeterminate="true"
                     android:indeterminateTint="@android:color/white"
                     android:visibility="gone" />
             </FrameLayout>
+
+            <!-- Privacy & Security Guarantee Footnote -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:drawableStart="@drawable/ic_shield"
+                android:drawablePadding="6dp"
+                android:fontFamily="sans-serif"
+                android:gravity="center"
+                android:lineSpacingExtra="2dp"
+                android:text="Offline derivation • Private keys never leave your device"
+                android:textColor="@color/colorTextSecondary"
+                android:textSize="11.5sp"
+                app:drawableTint="@color/colorTextSecondary" />
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

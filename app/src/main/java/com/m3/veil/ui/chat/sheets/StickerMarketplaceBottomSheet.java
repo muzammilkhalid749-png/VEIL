@@ -79,7 +79,7 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
         headerRow.setPadding(0, 0, 0, (int) (12 * dp));
 
         TextView tvTitle = new TextView(context);
-        tvTitle.setText("🛍️ P2P Sticker & Collectibles");
+        tvTitle.setText("🛍️ Sticker Marketplace");
         tvTitle.setTextSize(18f);
         tvTitle.setTypeface(null, Typeface.BOLD);
         tvTitle.setTextColor(ContextCompat.getColor(context, R.color.textPrimary));
@@ -317,7 +317,7 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
             btnRow.setOrientation(LinearLayout.HORIZONTAL);
 
             Button btnSeed = new Button(ctx);
-            btnSeed.setText("📡 P2P Share Pack");
+            btnSeed.setText("📡 Share Pack");
             btnSeed.setTextSize(12f);
             btnSeed.setBackgroundColor(ContextCompat.getColor(ctx, R.color.veil_primary));
             btnSeed.setTextColor(Color.WHITE);
@@ -325,7 +325,7 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
             blp.setMargins(0, 0, (int) (6 * dp), 0);
             btnSeed.setLayoutParams(blp);
             btnSeed.setOnClickListener(v -> {
-                Toast.makeText(ctx, "P2P Seeding: Shared " + pack.title + " over mesh swarms!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(ctx, "Shared: " + pack.title + " successfully!", Toast.LENGTH_SHORT).show();
             });
             btnRow.addView(btnSeed);
 
@@ -352,7 +352,7 @@ public class StickerMarketplaceBottomSheet extends BottomSheetDialogFragment {
         float dp = getResources().getDisplayMetrics().density;
 
         TextView info = new TextView(ctx);
-        info.setText("Create custom encrypted sticker packs that seed directly across local P2P WebRTC channels.");
+        info.setText("Create custom sticker packs that share directly with your contacts.");
         info.setTextColor(ContextCompat.getColor(ctx, R.color.textSecondary));
         info.setTextSize(13f);
         info.setPadding(0, 0, 0, (int) (12 * dp));

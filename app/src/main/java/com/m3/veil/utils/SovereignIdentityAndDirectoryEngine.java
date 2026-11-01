@@ -3,6 +3,10 @@ package com.m3.veil.utils;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
 import android.os.Environment;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -444,6 +448,25 @@ public class SovereignIdentityAndDirectoryEngine {
         for (int i = 0; i < BIP39_WORDLIST.length; i++) {
             mWordIndexMap.put(BIP39_WORDLIST[i], i);
         }
+
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                ConnectivityManager cm = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+                if (cm != null) {
+                    cm.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
+                        @Override
+                        public void onAvailable(@NonNull Network network) {
+                            mExecutor.execute(() -> {
+                                UserPreferences up = new UserPreferences(mContext);
+                                if (up.isPendingCloudUsernameSync()) {
+                                    ensureCurrentUserPublished();
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -786,6 +809,9 @@ public class SovereignIdentityAndDirectoryEngine {
         File savedAvatarFile = null;
         if (manifest.avatarBase64 != null && !manifest.avatarBase64.isEmpty()) {
             savedAvatarFile = saveAvatarBase64ToLocalFile(manifest.uid, manifest.avatarBase64);
+        } else if (manifest.avatarBase64 != null && manifest.avatarBase64.isEmpty()) {
+            deleteAvatarFile(manifest.uid);
+            savedAvatarFile = null;
         } else {
             File existingFile = getAvatarWebpFile(manifest.uid);
             if (existingFile.exists() && existingFile.length() > 0) {
@@ -828,9 +854,13 @@ public class SovereignIdentityAndDirectoryEngine {
                 user.setPhotoUrl(avatarPath);
             } else if (manifest.avatarBase64 != null && !manifest.avatarBase64.isEmpty()) {
                 user.setPhotoUrl(manifest.avatarBase64);
+            } else {
+                user.setPhotoUrl("");
             }
             if (manifest.avatarBase64 != null && !manifest.avatarBase64.isEmpty()) {
                 user.setAvatar(manifest.avatarBase64);
+            } else {
+                user.setAvatar("");
             }
             if (manifest.publicKeyBase64 != null && !manifest.publicKeyBase64.isEmpty()) {
                 user.setPublicKey(manifest.publicKeyBase64);
@@ -989,6 +1019,19 @@ public class SovereignIdentityAndDirectoryEngine {
         return new File(new File(mContext.getFilesDir(), "avatars"), "avatar_" + uid + ".webp");
     }
 
+    public boolean deleteAvatarFile(String uid) {
+        if (uid == null || uid.isEmpty()) return false;
+        try {
+            File f = getAvatarWebpFile(uid);
+            if (f.exists()) {
+                return f.delete();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to delete avatar WebP file for " + uid, e);
+        }
+        return false;
+    }
+
     /**
      * Compresses bitmap to 256x256 WebP and encodes as Base64 string.
      */
@@ -1032,6 +1075,9 @@ public class SovereignIdentityAndDirectoryEngine {
             if (manifest.avatarBase64 != null && !manifest.avatarBase64.isEmpty()) {
                 userMap.put("avatar", manifest.avatarBase64);
                 userMap.put("photoUrl", manifest.avatarBase64);
+            } else {
+                userMap.put("avatar", "");
+                userMap.put("photoUrl", "");
             }
             if (manifest.publicKeyBase64 != null && !manifest.publicKeyBase64.isEmpty()) {
                 userMap.put("publicKey", manifest.publicKeyBase64);
@@ -1052,6 +1098,45 @@ public class SovereignIdentityAndDirectoryEngine {
 
             if (manifest.username != null && !manifest.username.trim().isEmpty()) {
                 String cleanU = manifest.username.trim().replaceFirst("^@", "");
+                String docId = cleanU.toLowerCase(Locale.ROOT);
+                try {
+                    com.google.firebase.firestore.DocumentSnapshot existingDoc =
+                            com.google.android.gms.tasks.Tasks.await(
+                                    db.collection("usernames").document(docId).get(),
+                                    2500, TimeUnit.MILLISECONDS);
+                    if (existingDoc != null && existingDoc.exists()) {
+                        String existingOwner = existingDoc.getString("userId");
+                        if (existingOwner == null || existingOwner.isEmpty()) existingOwner = existingDoc.getString("uid");
+                        if (existingOwner != null && !existingOwner.isEmpty() && !existingOwner.equals(manifest.uid)) {
+                            // Offline conflict detected: handle was taken by another user while this client was offline!
+                            int suffix = 100 + new SecureRandom().nextInt(899);
+                            cleanU = cleanU + "_" + suffix;
+                            docId = cleanU.toLowerCase(Locale.ROOT);
+                            manifest.username = cleanU;
+                            userMap.put("username", cleanU);
+                            userMap.put("usernameLower", docId);
+                            final String resolvedHandle = cleanU;
+                            try {
+                                new UserPreferences(mContext).setUsername(resolvedHandle);
+                                new PreferenceManager(mContext).putString("username", resolvedHandle);
+                                EncryptedChatDatabase.getInstance(mContext).saveSovereignProfileManifest(manifest);
+                                com.m3.veil.model.Persona activeP = com.m3.veil.manager.PersonaManager.getInstance(mContext).getActivePersona();
+                                if (activeP != null && com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID.equals(activeP.getId())) {
+                                    activeP.setUsername(resolvedHandle);
+                                    EncryptedChatDatabase.getMasterDatabase(mContext).upsertPersonaInDb(activeP);
+                                }
+                                mMainHandler.post(() -> {
+                                    try {
+                                        android.widget.Toast.makeText(mContext,
+                                                "Offline handle claimed elsewhere. Assigned @" + resolvedHandle,
+                                                android.widget.Toast.LENGTH_LONG).show();
+                                    } catch (Throwable ignored) {}
+                                });
+                            } catch (Throwable ignored) {}
+                        }
+                    }
+                } catch (Throwable ignored) {}
+
                 Map<String, Object> unameDoc = new HashMap<>();
                 unameDoc.put("userId", manifest.uid);
                 unameDoc.put("uid", manifest.uid);
@@ -1060,14 +1145,19 @@ public class SovereignIdentityAndDirectoryEngine {
                 unameDoc.put("bio", manifest.bio != null ? manifest.bio : "");
                 if (manifest.avatarBase64 != null && !manifest.avatarBase64.isEmpty()) {
                     unameDoc.put("avatar", manifest.avatarBase64);
+                } else {
+                    unameDoc.put("avatar", "");
                 }
                 if (manifest.publicKeyBase64 != null && !manifest.publicKeyBase64.isEmpty()) {
                     unameDoc.put("publicKey", manifest.publicKeyBase64);
                 }
                 unameDoc.put("updatedAtTimestamp", manifest.updatedAtTimestamp);
                 db.collection("usernames")
-                        .document(cleanU.toLowerCase(Locale.ROOT))
+                        .document(docId)
                         .set(unameDoc, com.google.firebase.firestore.SetOptions.merge());
+                db.collection("users")
+                        .document(manifest.uid)
+                        .set(userMap, com.google.firebase.firestore.SetOptions.merge());
                 recordClaimedUsername(cleanU);
             }
         } catch (Exception e) {
@@ -1109,6 +1199,10 @@ public class SovereignIdentityAndDirectoryEngine {
                     if (karma != null) m.karma = karma;
                     Long coins = doc.getLong("veilCoins");
                     if (coins != null) m.veilCoins = coins;
+                    String personasArr = doc.getString("personasJsonArray");
+                    if (personasArr != null && !personasArr.trim().isEmpty() && !personasArr.equals("[]")) {
+                        m.personasJsonArray = personasArr;
+                    }
                     String sig = doc.getString("signature");
                     m.signature = sig != null ? sig : ("sig_" + m.updatedAtTimestamp);
                     return m;
@@ -1619,11 +1713,13 @@ public class SovereignIdentityAndDirectoryEngine {
                 if (manifest.uid == null || manifest.uid.isEmpty()) {
                     manifest.uid = getCurrentUid();
                 }
-                if ((manifest.avatarBase64 == null || manifest.avatarBase64.isEmpty()) && manifest.uid != null) {
+                if (manifest.avatarBase64 == null && manifest.uid != null) {
                     SovereignProfileManifest existing = getLocalManifest(manifest.uid);
                     if (existing != null && existing.avatarBase64 != null && !existing.avatarBase64.isEmpty()) {
                         manifest.avatarBase64 = existing.avatarBase64;
                     }
+                } else if (manifest.avatarBase64 != null && manifest.avatarBase64.isEmpty() && manifest.uid != null) {
+                    deleteAvatarFile(manifest.uid);
                 }
 
                 String phrase = loadRecoveryPhraseLocally(context);
@@ -2155,6 +2251,9 @@ public class SovereignIdentityAndDirectoryEngine {
                 if (pubKey != null && !pubKey.isEmpty()) {
                     manifest.publicKeyBase64 = pubKey;
                 }
+                try {
+                    manifest.personasJsonArray = com.m3.veil.manager.PersonaManager.getInstance(mContext).exportPersonasJson();
+                } catch (Throwable ignored) {}
                 if (manifest.updatedAtTimestamp <= 0) {
                     manifest.updatedAtTimestamp = now;
                 }
@@ -2165,6 +2264,9 @@ public class SovereignIdentityAndDirectoryEngine {
 
                 syncManifestToFirestore(manifest);
                 publishToNostrRelays(manifest, null);
+                try {
+                    new UserPreferences(mContext).setPendingCloudUsernameSync(false);
+                } catch (Throwable ignored) {}
             } catch (Throwable t) {
                 Log.w(TAG, "ensureCurrentUserPublished notice: " + t.getMessage());
             }
@@ -2717,6 +2819,25 @@ public class SovereignIdentityAndDirectoryEngine {
         }
     }
 
+    public boolean isNetworkOnline() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return false;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                Network net = cm.getActiveNetwork();
+                if (net == null) return false;
+                NetworkCapabilities caps = cm.getNetworkCapabilities(net);
+                if (caps == null) return false;
+                return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            } else {
+                NetworkInfo ni = cm.getActiveNetworkInfo();
+                return ni != null && ni.isConnected();
+            }
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     public void isUsernameTaken(String username, UsernameCheckCallback callback) {
         isUsernameTaken(username, getCurrentUserId(), callback);
     }
@@ -2741,6 +2862,7 @@ public class SovereignIdentityAndDirectoryEngine {
 
         final String myUid = excludeUid != null ? excludeUid : getCurrentUserId();
         final boolean bloomProbableHit = mUsernameBloomFilter.mightContain(clean);
+        final boolean isOnline = isNetworkOnline();
 
         mExecutor.execute(() -> {
             // 1. Check local SQLCipher DB first (0.2ms)
@@ -2756,6 +2878,13 @@ public class SovereignIdentityAndDirectoryEngine {
                     }
                 }
             } catch (Throwable ignored) {}
+
+            // Offline resilience: if device has no active internet connection,
+            // fast-path available status locally without blocking on remote Firestore timeout!
+            if (!isOnline) {
+                mMainHandler.post(() -> callback.onResult(false));
+                return;
+            }
 
             // 2. Authoritative Firebase Firestore check ("usernames/{clean}" & "users")
             long timeoutMs = 3500L;
@@ -2829,10 +2958,16 @@ public class SovereignIdentityAndDirectoryEngine {
             u.setAvatar(m.avatarBase64);
             File saved = saveAvatarBase64ToLocalFile(m.uid, m.avatarBase64);
             u.setPhotoUrl(saved != null ? saved.getAbsolutePath() : m.avatarBase64);
+        } else if (m.avatarBase64 != null && m.avatarBase64.isEmpty()) {
+            u.setAvatar("");
+            u.setPhotoUrl("");
         } else {
             File avatarFile = getAvatarWebpFile(m.uid);
             if (avatarFile.exists()) {
                 u.setPhotoUrl(avatarFile.getAbsolutePath());
+            } else {
+                u.setAvatar("");
+                u.setPhotoUrl("");
             }
         }
         return u;

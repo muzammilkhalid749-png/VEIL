@@ -189,6 +189,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     // Screenshot Detector
     private ScreenshotObserver mScreenshotObserver;
     private volatile String mActiveChatIdInForeground = null;
+    private volatile long mLastNetworkCapabilitiesFlushTime = 0L;
 
     // Observers / Listeners
     private final CopyOnWriteArrayList<MessagesObserver> mObservers = new CopyOnWriteArrayList<>();
@@ -422,7 +423,11 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                     public void onCapabilitiesChanged(@NonNull android.net.Network network, @NonNull android.net.NetworkCapabilities networkCapabilities) {
                         if (networkCapabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
                                 && networkCapabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
-                            flushPendingOfflineMessagesOnNetworkAvailable();
+                            long now = android.os.SystemClock.elapsedRealtime();
+                            if (now - mLastNetworkCapabilitiesFlushTime > 15000L) {
+                                mLastNetworkCapabilitiesFlushTime = now;
+                                flushPendingOfflineMessagesOnNetworkAvailable();
+                            }
                         }
                     }
 
@@ -639,8 +644,22 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         this.mDatabase = EncryptedChatDatabase.getInstance(mContext);
         reloadCurrentIdentity();
         clearStaticLayoutCache();
+        mDialogsDict.clear();
+        mSortedDialogsList.clear();
+        synchronized (mDialogs_dict) {
+            mDialogs_dict.clear();
+        }
+        synchronized (mMessagesByDialogs) {
+            mMessagesByDialogs.clear();
+        }
+        synchronized (mMessagesByIdLongSparse) {
+            mMessagesByIdLongSparse.clear();
+        }
         mDialogMessages.clear();
         mMessagesById.clear();
+        mUnreadCountByDialog.clear();
+        mPendingOutboxById.clear();
+        mActiveVanishTasks.clear();
         preloadDialogsCache();
     }
 
@@ -4024,6 +4043,23 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         .set(ack, com.google.firebase.firestore.SetOptions.merge());
             } catch (Throwable ignored) {}
         }
+    }
+
+    /**
+     * Formats a millisecond vanish timer into human-readable duration (e.g. 24 hours, 7 days, 1 minute).
+     */
+    public static String formatVanishDuration(long millis) {
+        if (millis <= 0) return "off";
+        if (millis == 10000) return "10 seconds";
+        if (millis == 60000) return "1 minute";
+        if (millis == 3600000) return "1 hour";
+        if (millis == 86400000L) return "24 hours";
+        if (millis == 604800000L) return "7 days";
+        if (millis == 2592000000L) return "30 days";
+        if (millis < 60000) return (millis / 1000) + " seconds";
+        if (millis < 3600000) return (millis / 60000) + " minutes";
+        if (millis < 86400000L) return (millis / 3600000) + " hours";
+        return (millis / 86400000L) + " days";
     }
 
     /**

@@ -13,7 +13,7 @@
         android:layout_gravity="top"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="12dp">
+        android:paddingHorizontal="14dp">
 
         <ImageView
             android:id="@+id/backButton"
@@ -23,28 +23,43 @@
             android:contentDescription="@string/back"
             android:padding="8dp"
             android:src="@drawable/ic_arrow_back"
-            app:tint="@color/textPrimary" />
+            app:tint="@color/colorTextPrimary" />
 
         <View
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_weight="1" />
 
-        <!-- Shoulder-Surfing Blur Toggle Pill -->
-        <TextView
+        <!-- Shoulder-Surfing Privacy Toggle Pill -->
+        <LinearLayout
             android:id="@+id/btnTogglePrivacyBlur"
             android:layout_width="wrap_content"
             android:layout_height="34dp"
-            android:background="@drawable/input_background"
+            android:background="@drawable/bg_paste_pill"
             android:clickable="true"
             android:focusable="true"
-            android:fontFamily="sans-serif-medium"
-            android:gravity="center"
-            android:paddingHorizontal="12dp"
-            android:text="👁️ Hide Words"
-            android:textColor="@color/veil_accent"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
+
+            <ImageView
+                android:id="@+id/ivPrivacyEye"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginEnd="6dp"
+                android:src="@drawable/ic_visibility_off"
+                app:tint="@color/veil_accent" />
+
+            <TextView
+                android:id="@+id/tvPrivacyToggleLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="Hide Words"
+                android:textColor="@color/veil_accent"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
     </LinearLayout>
 
@@ -64,17 +79,24 @@
             android:maxWidth="460dp"
             android:orientation="vertical"
             android:paddingHorizontal="20dp"
-            android:paddingTop="64dp"
-            android:paddingBottom="32dp">
+            android:paddingTop="68dp"
+            android:paddingBottom="36dp">
 
-            <!-- Security Key Icon -->
-            <ImageView
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:layout_marginBottom="12dp"
-                android:contentDescription="Recovery Phrase"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_shield_locked" />
+            <!-- Security Shield Icon Badge -->
+            <FrameLayout
+                android:layout_width="68dp"
+                android:layout_height="68dp"
+                android:layout_marginBottom="18dp"
+                android:background="@drawable/bg_restore_icon_circle">
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Recovery Phrase"
+                    android:src="@drawable/ic_shield_locked"
+                    app:tint="@color/veil_accent" />
+            </FrameLayout>
 
             <TextView
                 android:layout_width="wrap_content"
@@ -83,20 +105,20 @@
                 android:gravity="center"
                 android:letterSpacing="0.01"
                 android:text="12-Word Master Recovery Key"
-                android:textColor="@color/textPrimary"
+                android:textColor="@color/colorTextPrimary"
                 android:textSize="22sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:layout_marginBottom="14dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="18dp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
                 android:lineSpacingExtra="2dp"
-                android:text="These 12 BIP-39 words deterministically derive your Sovereign UID, secp256k1 identity keypair, and E2EE vault."
-                android:textColor="@color/textSecondary"
+                android:text="These 12 secret words allow you to restore your sovereign account, personas, and chats. Keep them safe and private."
+                android:textColor="@color/colorTextSecondary"
                 android:textSize="13.5sp" />
 
             <!-- Deterministic Identity Proof Badge -->
@@ -105,43 +127,101 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
-                android:background="@drawable/input_background"
+                android:background="@drawable/bg_recovery_word_cell"
                 android:fontFamily="monospace"
                 android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="8dp"
-                android:text="🔐 Derived UID: veil_..."
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="9dp"
+                android:text="🔐 Derived UID: veil_... • CRC: ..."
                 android:textColor="@color/veil_accent"
                 android:textSize="11.5sp"
                 android:textStyle="bold" />
 
-            <!-- 12-Word Numbered Grid Container -->
+            <!-- 12-Word Numbered Grid Container Card -->
             <LinearLayout
-                android:id="@+id/wordsGridContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="14dp"
-                android:background="@drawable/input_background"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/bg_phrase_card"
                 android:orientation="vertical"
-                android:padding="14dp" />
+                android:padding="16dp">
 
-            <!-- Raw Phrase Card (Maintained for backward compatibility and quick select) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.06"
+                        android:text="BIP-39 SEED WORDS"
+                        android:textColor="@color/colorTextSecondary"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold" />
+
+                    <!-- In-card toggle button -->
+                    <LinearLayout
+                        android:id="@+id/btnToggleWordsInCard"
+                        android:layout_width="wrap_content"
+                        android:layout_height="26dp"
+                        android:background="@drawable/bg_paste_pill"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="9dp">
+
+                        <ImageView
+                            android:id="@+id/ivInCardEye"
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_marginEnd="4dp"
+                            android:src="@drawable/ic_visibility_off"
+                            app:tint="@color/veil_accent" />
+
+                        <TextView
+                            android:id="@+id/tvInCardEyeLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
+                            android:text="Hide"
+                            android:textColor="@color/veil_accent"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/wordsGridContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+            </LinearLayout>
+
+            <!-- Raw Phrase Card (Selectable & Monospace) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="18dp"
-                android:background="@drawable/input_background"
+                android:background="@drawable/bg_phrase_card"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="4dp"
-                    android:text="RAW SEED PHRASE (BIP-39 STANDARD)"
-                    android:textColor="@color/textSecondary"
-                    android:textSize="10sp"
+                    android:layout_marginBottom="6dp"
+                    android:letterSpacing="0.06"
+                    android:text="RAW SECRET PHRASE"
+                    android:textColor="@color/colorTextSecondary"
+                    android:textSize="10.5sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -150,7 +230,7 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
                     android:gravity="center"
-                    android:lineSpacingExtra="5dp"
+                    android:lineSpacingExtra="6dp"
                     android:textColor="@color/veil_accent"
                     android:textIsSelectable="true"
                     android:textSize="14sp"
@@ -162,11 +242,11 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="18dp"
+                android:layout_marginBottom="20dp"
                 android:gravity="center"
                 android:lineSpacingExtra="2dp"
-                android:text="🛡️ FLAG_SECURE Active: Screenshots disabled. Never share these 12 words with anyone."
-                android:textColor="@color/textSecondary"
+                android:text="Screenshots are blocked for security. Never share these words with anyone."
+                android:textColor="@color/colorTextSecondary"
                 android:textSize="11.5sp" />
 
             <!-- Action Buttons: Copy & Continue -->
@@ -183,12 +263,12 @@
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
                     android:letterSpacing="0.01"
-                    android:text="Copy 12 Words"
+                    android:text="Copy Words"
                     android:textAllCaps="false"
-                    android:textColor="@color/textPrimary"
+                    android:textColor="@color/colorTextPrimary"
                     android:textSize="14sp"
                     android:textStyle="bold"
-                    app:cornerRadius="14dp" />
+                    app:cornerRadius="16dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/confirmButton"
@@ -203,8 +283,8 @@
                     android:textColor="@android:color/white"
                     android:textSize="14sp"
                     android:textStyle="bold"
-                    app:backgroundTint="@color/colorPrimary"
-                    app:cornerRadius="14dp" />
+                    app:backgroundTint="@color/veil_accent"
+                    app:cornerRadius="16dp" />
 
             </LinearLayout>
 

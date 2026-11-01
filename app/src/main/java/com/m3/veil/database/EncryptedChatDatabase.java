@@ -362,6 +362,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     private final Context context;
     private final String dbName;
+    private final String vaultPersonaId;
     private final byte[] passphrase;
     private final List<DatabaseChangeListener> listeners = new CopyOnWriteArrayList<>();
 
@@ -443,12 +444,64 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         return switchActiveVault(context, personaId, false);
     }
 
+    /**
+     * Resolves which persona vault database an incoming packet, message, or direct chat belongs to.
+     */
+    public static String resolvePersonaIdForTarget(Context context, String chatId, String peerOrReceiverId) {
+        if (chatId != null) {
+            String c = chatId.toLowerCase(java.util.Locale.ROOT);
+            if (c.contains("_persona_ghost")) return "persona_ghost";
+            if (c.contains("_persona_neon")) return "persona_neon";
+        }
+        if (peerOrReceiverId != null) {
+            String p = peerOrReceiverId.toLowerCase(java.util.Locale.ROOT);
+            if (p.contains("_persona_ghost")) return "persona_ghost";
+            if (p.contains("_persona_neon")) return "persona_neon";
+        }
+        try {
+            if (context != null) {
+                com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(context);
+                List<com.m3.veil.model.Persona> list = pm.getPersonas();
+                for (com.m3.veil.model.Persona persona : list) {
+                    if (persona != null && persona.getId() != null) {
+                        String pId = persona.getId();
+                        if (chatId != null && chatId.contains(pId)) return pId;
+                        if (peerOrReceiverId != null && (peerOrReceiverId.equals(persona.getKeyPairId()) || peerOrReceiverId.contains(pId))) {
+                            return pId;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return "persona_primary";
+    }
+
+    /**
+     * Obtains the isolated EncryptedChatDatabase vault instance matching the given chatId or peer/receiver ID,
+     * ensuring background packets and messages are never written into an active foreground persona's vault.
+     */
+    public static EncryptedChatDatabase getDatabaseForTarget(Context context, String chatId, String peerOrReceiverId) {
+        String targetPersonaId = resolvePersonaIdForTarget(context, chatId, peerOrReceiverId);
+        return getInstance(context, targetPersonaId, false);
+    }
+
     private EncryptedChatDatabase(Context context, String dbName) {
         super(context, dbName, null, DATABASE_VERSION);
         this.context = context;
         this.dbName = dbName;
+        if ("veil_vault_decoy.db".equals(dbName)) {
+            this.vaultPersonaId = "decoy";
+        } else if (dbName != null && dbName.startsWith("veil_vault_persona_") && dbName.endsWith(".db")) {
+            this.vaultPersonaId = dbName.substring("veil_vault_persona_".length(), dbName.length() - 3);
+        } else {
+            this.vaultPersonaId = "persona_primary";
+        }
         SQLiteDatabase.loadLibs(context);
         this.passphrase = DatabaseKeyManager.getDatabasePassphrase(context);
+    }
+
+    public String getVaultPersonaId() {
+        return vaultPersonaId != null ? vaultPersonaId : "persona_primary";
     }
 
     public synchronized net.sqlcipher.database.SQLiteStatement getOrCompileStatement(String sql) {
@@ -922,6 +975,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             ensureColumnExists(db, TABLE_CHATS, COL_CHAT_DESCRIPTION, "TEXT");
             ensureColumnExists(db, TABLE_CHATS, COL_CHAT_IS_PUBLIC, "INTEGER DEFAULT 0");
             ensureColumnExists(db, TABLE_CHATS, COL_CHAT_HANDLE, "TEXT");
+            ensureColumnExists(db, TABLE_CHATS, "owner_persona_id", "TEXT DEFAULT 'persona_primary'");
 
             // Messages columns
             ensureColumnExists(db, TABLE_MESSAGES, COL_MSG_CHAT_ID, "TEXT");
@@ -952,6 +1006,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             ensureColumnExists(db, TABLE_MESSAGES, COL_MSG_VANISH_MODE, "TEXT");
             ensureColumnExists(db, TABLE_MESSAGES, COL_MSG_VIEW_COUNT, "INTEGER DEFAULT 0");
             ensureColumnExists(db, TABLE_MESSAGES, COL_MSG_COMMENT_COUNT, "INTEGER DEFAULT 0");
+            ensureColumnExists(db, TABLE_MESSAGES, "owner_persona_id", "TEXT DEFAULT 'persona_primary'");
 
             // Calls columns
             ensureColumnExists(db, TABLE_CALLS, COL_CALL_CALLER_ID, "TEXT");
@@ -960,6 +1015,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             ensureColumnExists(db, TABLE_CALLS, COL_CALL_RECEIVER_NAME, "TEXT");
             ensureColumnExists(db, TABLE_CALLS, COL_CALL_STATUS, "TEXT");
             ensureColumnExists(db, TABLE_CALLS, COL_CALL_IS_OUTGOING, "INTEGER DEFAULT 0");
+            ensureColumnExists(db, TABLE_CALLS, "owner_persona_id", "TEXT DEFAULT 'persona_primary'");
 
             // Outbox & Mesh table safety check
             ensureColumnExists(db, TABLE_OUTBOX, COL_OUTBOX_ENVELOPE_ID, "TEXT");
@@ -1211,6 +1267,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             }
             cv.put(COL_CHAT_PARTICIPANTS, sb.toString());
         }
+        cv.put("owner_persona_id", getActivePersonaIdForDb());
 
         try {
             db.insertWithOnConflict(TABLE_CHATS, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
@@ -1249,13 +1306,78 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         return cached != null ? new ArrayList<>(cached) : null;
     }
 
+    public static class ChatCounts {
+        public final int direct;
+        public final int groups;
+        public final int channels;
+
+        public ChatCounts(int direct, int groups, int channels) {
+            this.direct = direct;
+            this.groups = groups;
+            this.channels = channels;
+        }
+    }
+
+    public synchronized ChatCounts getChatTypeCounts() {
+        int direct = 0, groups = 0, channels = 0;
+        SQLiteDatabase db = getEncryptedDb();
+        String activeVaultPersona = getActivePersonaIdForDb();
+        String selection;
+        String[] selectionArgs;
+        if (isPrimaryPersonaId(activeVaultPersona)) {
+            selection = "(owner_persona_id = ? OR owner_persona_id IS NULL OR owner_persona_id = 'default') AND (" + COL_CHAT_SECRET + " = 0)";
+            selectionArgs = new String[]{"persona_primary"};
+        } else {
+            selection = "owner_persona_id = ? AND (" + COL_CHAT_SECRET + " = 0)";
+            selectionArgs = new String[]{activeVaultPersona};
+        }
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_CHATS, new String[]{COL_CHAT_ID, COL_CHAT_TYPE, COL_CHAT_IS_GROUP},
+                    selection, selectionArgs, null, null, null);
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    String cid = cursor.getString(0);
+                    String type = cursor.getString(1);
+                    boolean isGroup = cursor.getInt(2) == 1;
+                    if (isPrimaryPersonaId(activeVaultPersona)) {
+                        if (cid != null && (cid.contains("_persona_ghost") || cid.contains("_persona_neon"))) {
+                            continue;
+                        }
+                    }
+                    if ("channel".equalsIgnoreCase(type)) channels++;
+                    else if (isGroup || "group".equalsIgnoreCase(type)) groups++;
+                    else direct++;
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return new ChatCounts(direct, groups, channels);
+    }
+
     public synchronized List<Chat> getAllChats(boolean includeSecret) {
         deleteExpiredVanishMessages();
         List<Chat> chats = new ArrayList<>();
         SQLiteDatabase db = getEncryptedDb();
         long now = System.currentTimeMillis();
 
-        Cursor cursor = db.query(TABLE_CHATS, null, null, null, null, null,
+        String selection;
+        String[] selectionArgs;
+        String activeVaultPersona = getActivePersonaIdForDb();
+        if (isPrimaryPersonaId(activeVaultPersona)) {
+            selection = "owner_persona_id = ? OR owner_persona_id IS NULL OR owner_persona_id = 'default'";
+            selectionArgs = new String[]{"persona_primary"};
+        } else {
+            selection = "owner_persona_id = ?";
+            selectionArgs = new String[]{activeVaultPersona};
+        }
+        if (!includeSecret) {
+            selection = "(" + selection + ") AND (" + COL_CHAT_SECRET + " = 0)";
+        }
+
+        Cursor cursor = db.query(TABLE_CHATS, null, selection, selectionArgs, null, null,
                 COL_CHAT_LAST_MESSAGE_TIME + " DESC");
 
         if (cursor != null) {
@@ -1267,12 +1389,35 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                             deleteChat(chat.getId());
                             continue;
                         }
+                        // Isolation filter: ensure Persona 1 never displays chats belonging to Persona 2/3
+                        if (isPrimaryPersonaId(activeVaultPersona)) {
+                            String cid = chat.getId();
+                            if (cid != null && (cid.contains("_persona_ghost") || cid.contains("_persona_neon"))) {
+                                continue;
+                            }
+                        } else {
+                            String cid = chat.getId();
+                            if (cid != null && !cid.contains(activeVaultPersona) && !chat.isGroup()) {
+                                List<String> parts = chat.getParticipants();
+                                boolean hasPart = false;
+                                if (parts != null) {
+                                    for (String p : parts) {
+                                        if (p != null && p.contains(activeVaultPersona)) {
+                                            hasPart = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (!hasPart) {
+                                    continue;
+                                }
+                            }
+                        }
+
                         if (chat.getId() != null) {
                             ramChatCache.put(chat.getId(), chat);
                         }
-                        if (includeSecret || !chat.isSecret()) {
-                            chats.add(chat);
-                        }
+                        chats.add(chat);
                     }
                 }
             } finally {
@@ -1288,7 +1433,18 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         SQLiteDatabase db = getEncryptedDb();
         long now = System.currentTimeMillis();
 
-        Cursor cursor = db.query(TABLE_CHATS, null, COL_CHAT_SECRET + "=1 AND " + COL_CHAT_ARCHIVED + "=0", null, null, null,
+        String selection;
+        String[] selectionArgs;
+        String activeVaultPersona = getActivePersonaIdForDb();
+        if (isPrimaryPersonaId(activeVaultPersona)) {
+            selection = COL_CHAT_SECRET + "=1 AND " + COL_CHAT_ARCHIVED + "=0 AND (owner_persona_id = ? OR owner_persona_id IS NULL OR owner_persona_id = 'default')";
+            selectionArgs = new String[]{"persona_primary"};
+        } else {
+            selection = COL_CHAT_SECRET + "=1 AND " + COL_CHAT_ARCHIVED + "=0 AND owner_persona_id = ?";
+            selectionArgs = new String[]{activeVaultPersona};
+        }
+
+        Cursor cursor = db.query(TABLE_CHATS, null, selection, selectionArgs, null, null,
                 COL_CHAT_LAST_MESSAGE_TIME + " DESC");
 
         if (cursor != null) {
@@ -1373,6 +1529,24 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         notifyChatsChanged();
     }
 
+    public boolean isChatBlocked(String chatIdOrPeerId) {
+        if (chatIdOrPeerId == null || chatIdOrPeerId.isEmpty()) return false;
+        try {
+            Chat direct = ramChatCache.get(chatIdOrPeerId);
+            if (direct != null && direct.isBlocked()) return true;
+            for (Chat c : ramChatCache.values()) {
+                if (c != null && c.isBlocked()) {
+                    if (chatIdOrPeerId.equals(c.getId())
+                            || (c.getParticipants() != null && c.getParticipants().contains(chatIdOrPeerId))) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
     public static String generateDirectChatId(String uid1, String uid2) {
         if (uid1 == null && uid2 == null) return "";
         if (uid1 == null) return uid2;
@@ -1400,6 +1574,32 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 }
             } finally {
                 cursor.close();
+            }
+        }
+
+        // Fallback for reversed direct chat IDs (e.g. userB_userA instead of userA_userB)
+        if (chatId.contains("_") && !chatId.startsWith("group_") && !chatId.startsWith("channel_")) {
+            String[] sp = chatId.split("_");
+            if (sp.length == 2) {
+                String revId = sp[1] + "_" + sp[0];
+                Chat revCached = ramChatCache.get(revId);
+                if (revCached != null) return revCached;
+                Cursor revCursor = db.query(TABLE_CHATS, null, COL_CHAT_ID + "=?",
+                        new String[]{revId}, null, null, null);
+                if (revCursor != null) {
+                    try {
+                        if (revCursor.moveToFirst()) {
+                            Chat c = cursorToChat(revCursor);
+                            if (c != null) {
+                                ramChatCache.put(chatId, c);
+                                ramChatCache.put(revId, c);
+                            }
+                            return c;
+                        }
+                    } finally {
+                        revCursor.close();
+                    }
+                }
             }
         }
         return null;
@@ -1521,6 +1721,25 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     null, null,
                     COL_MSG_TIMESTAMP + " DESC",
                     "1");
+
+            // Secondary fallback: if no direct chatId match, search by participants (sender & receiver)
+            if ((msgCursor == null || !msgCursor.moveToFirst()) && cid.contains("_") && !cid.startsWith("group_") && !cid.startsWith("channel_")) {
+                if (msgCursor != null) {
+                    msgCursor.close();
+                    msgCursor = null;
+                }
+                String[] sp = cid.split("_");
+                if (sp.length == 2) {
+                    msgCursor = db.query(TABLE_MESSAGES,
+                            new String[]{COL_MSG_SENDER_ID, COL_MSG_TEXT, COL_MSG_TYPE, COL_MSG_TIMESTAMP, COL_MSG_DELIVERED, COL_MSG_READ, COL_MSG_PENDING, COL_MSG_BLINK},
+                            "((" + COL_MSG_SENDER_ID + "=? AND " + COL_MSG_RECEIVER_ID + "=?) OR (" + COL_MSG_SENDER_ID + "=? AND " + COL_MSG_RECEIVER_ID + "=?)) AND ("
+                                    + COL_MSG_EXPIRES_AT + " IS NULL OR " + COL_MSG_EXPIRES_AT + "=0 OR " + COL_MSG_EXPIRES_AT + ">?)",
+                            new String[]{sp[0], sp[1], sp[1], sp[0], String.valueOf(now)},
+                            null, null,
+                            COL_MSG_TIMESTAMP + " DESC",
+                            "1");
+                }
+            }
 
             if (msgCursor != null && msgCursor.moveToFirst()) {
                 String senderId = msgCursor.getString(0);
@@ -1868,7 +2087,19 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         deleteExpiredVanishMessages();
         List<Chat> chats = new ArrayList<>();
         SQLiteDatabase db = getEncryptedDb();
-        Cursor cursor = db.query(TABLE_CHATS, null, COL_CHAT_ARCHIVED + "=1", null, null, null,
+
+        String selection;
+        String[] selectionArgs;
+        String activeVaultPersona = getActivePersonaIdForDb();
+        if (isPrimaryPersonaId(activeVaultPersona)) {
+            selection = COL_CHAT_ARCHIVED + "=1 AND (owner_persona_id = ? OR owner_persona_id IS NULL OR owner_persona_id = 'default')";
+            selectionArgs = new String[]{"persona_primary"};
+        } else {
+            selection = COL_CHAT_ARCHIVED + "=1 AND owner_persona_id = ?";
+            selectionArgs = new String[]{activeVaultPersona};
+        }
+
+        Cursor cursor = db.query(TABLE_CHATS, null, selection, selectionArgs, null, null,
                 COL_CHAT_LAST_MESSAGE_TIME + " DESC");
         if (cursor != null) {
             try {
@@ -2022,8 +2253,31 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         if (chatRowsUpdated == 0 && chatId.contains("_") && !chatId.startsWith("group_") && !chatId.startsWith("channel_")) {
             String[] sp = chatId.split("_");
             if (sp.length == 2) {
-                db.update(TABLE_CHATS, chatCv, COL_CHAT_ID + "=?", new String[]{sp[1] + "_" + sp[0]});
+                chatRowsUpdated = db.update(TABLE_CHATS, chatCv, COL_CHAT_ID + "=?", new String[]{sp[1] + "_" + sp[0]});
             }
+        }
+        if (chatRowsUpdated == 0) {
+            // Auto-create chat in TABLE_CHATS if not present so it immediately surfaces in chat list
+            String chatTitle = message.getSenderName() != null && !message.getSenderName().isEmpty() ? message.getSenderName() : "Direct Chat";
+            boolean isGroup = chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_");
+            List<String> participants = new ArrayList<>();
+            if (chatId.contains("_") && !isGroup) {
+                String[] sp = chatId.split("_");
+                Collections.addAll(participants, sp);
+            }
+            Chat autoChat = new Chat(
+                    chatId,
+                    chatTitle,
+                    summary,
+                    message.getTimestamp() != null ? message.getTimestamp() : Timestamp.now(),
+                    "avatar_1",
+                    0,
+                    isGroup,
+                    false,
+                    isGroup ? "group" : "direct",
+                    participants
+            );
+            saveOrUpdateChat(autoChat);
         }
 
         ramSingleMessageCache.put(message.getId(), message);

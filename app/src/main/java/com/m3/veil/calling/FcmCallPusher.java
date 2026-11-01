@@ -230,6 +230,10 @@ public final class FcmCallPusher {
             String targetToken,
             String blindMailboxHash,
             String ephemeralSignalId) {
+        String serverKey = com.m3.veil.BuildConfig.FCM_SERVER_KEY;
+        if (serverKey == null || serverKey.trim().isEmpty()) {
+            return;
+        }
         try {
             JSONObject root = new JSONObject();
             root.put("to", targetToken);
@@ -351,6 +355,10 @@ public final class FcmCallPusher {
             String senderId,
             String senderName,
             String callType) {
+        String serverKey = com.m3.veil.BuildConfig.FCM_SERVER_KEY;
+        if (serverKey == null || serverKey.trim().isEmpty()) {
+            return;
+        }
         try {
             JSONObject root = new JSONObject();
             root.put("to", targetToken);

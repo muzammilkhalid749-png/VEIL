@@ -178,14 +178,14 @@ public class P2PGameDrawerBottomSheet extends BottomSheetDialogFragment {
 
         // Title
         TextView title = new TextView(ctx);
-        title.setText("🎮 In-Chat P2P Minigames");
+        title.setText("🎮 In-Chat Minigames");
         title.setTextSize(18f);
         title.setTypeface(null, Typeface.BOLD);
         title.setTextColor(ContextCompat.getColor(ctx, R.color.textPrimary));
         root.addView(title);
 
         TextView sub = new TextView(ctx);
-        sub.setText("Zero-latency peer-to-peer gameplay synchronized over WebRTC DataChannel.");
+        sub.setText("Play games together directly in the chat with zero delay.");
         sub.setTextSize(12.5f);
         sub.setTextColor(ContextCompat.getColor(ctx, R.color.textSecondary));
         sub.setPadding(0, (int) (4 * dp), 0, (int) (12 * dp));
@@ -513,7 +513,7 @@ public class P2PGameDrawerBottomSheet extends BottomSheetDialogFragment {
         float dp = getResources().getDisplayMetrics().density;
 
         TextView info = new TextView(ctx);
-        info.setText("Tap to generate a synchronized P2P game challenge and send it directly to the chat.");
+        info.setText("Tap to challenge your friend to a game in this chat.");
         info.setTextSize(13f);
         info.setTextColor(ContextCompat.getColor(ctx, R.color.textSecondary));
         info.setPadding(0, 0, 0, (int) (14 * dp));

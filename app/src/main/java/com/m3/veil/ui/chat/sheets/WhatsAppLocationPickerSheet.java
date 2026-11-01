@@ -216,7 +216,7 @@ public class WhatsAppLocationPickerSheet extends BottomSheetDialogFragment {
         liveTextCol.addView(tvLiveTitle);
 
         TextView tvLiveSub = new TextView(ctx);
-        tvLiveSub.setText("Real-time P2P encrypted location updates");
+        tvLiveSub.setText("Real-time private location sharing");
         tvLiveSub.setTextSize(12f);
         tvLiveSub.setTextColor(ctx.getResources().getColor(R.color.textSecondary));
         liveTextCol.addView(tvLiveSub);
@@ -355,7 +355,7 @@ public class WhatsAppLocationPickerSheet extends BottomSheetDialogFragment {
         root.addView(tvTitle);
 
         TextView tvSub = new TextView(ctx);
-        tvSub.setText("Select duration to stream your real-time GPS coordinates over P2P mesh:");
+        tvSub.setText("Select how long to share your live location:");
         tvSub.setTextColor(ContextCompat.getColor(ctx, R.color.textSecondary));
         tvSub.setTextSize(13f);
         tvSub.setPadding(0, 0, 0, (int) (18 * dp));
@@ -365,7 +365,7 @@ public class WhatsAppLocationPickerSheet extends BottomSheetDialogFragment {
         String[] descriptions = {
                 "Quick meet-up or brief transit tracking",
                 "Standard session for commuting or city travel",
-                "Full day expedition with continuous encrypted P2P broadcast"
+                "Full day expedition with continuous location updates"
         };
         String[] icons = {"⚡", "⏱️", "🧭"};
 
@@ -424,7 +424,7 @@ public class WhatsAppLocationPickerSheet extends BottomSheetDialogFragment {
             card.setOnClickListener(v -> {
                 sheet.dismiss();
                 String geo = String.format(Locale.US,
-                        "geo:%.6f,%.6f?q=%.6f,%.6f(Live Location (%s) - Real-time P2P GPS)",
+                        "geo:%.6f,%.6f?q=%.6f,%.6f(Live Location (%s))",
                         currentLat, currentLng, currentLat, currentLng, dur);
                 if (listener != null) listener.onLocationSelectedToSend(geo);
                 dismiss();

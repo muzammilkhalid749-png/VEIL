@@ -291,7 +291,7 @@ public class NotificationsActivity extends AppCompatActivity {
                 tvEmptySubtitle.setText("Incoming voice and video call logs will appear here.");
             } else {
                 tvEmptyTitle.setText("No Notifications");
-                tvEmptySubtitle.setText("Mentions, replies, missed calls and zero-knowledge alerts will appear here.");
+                tvEmptySubtitle.setText("Mentions, replies, missed calls, and notifications will appear here.");
             }
         } else {
             layoutEmptyState.setVisibility(View.GONE);

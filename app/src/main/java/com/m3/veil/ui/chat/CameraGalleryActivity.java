@@ -109,6 +109,8 @@ public class CameraGalleryActivity extends AppCompatActivity {
     public static final String RESULT_MEDIA_TYPE = "result_media_type";
     public static final String RESULT_MEDIA_CAPTION = "result_media_caption";
     public static final String RESULT_BATCH_PATHS = "result_batch_paths";
+    public static final String EXTRA_IS_STATUS_MODE = "extra_is_status_mode";
+    public static final String EXTRA_RECIPIENT_NAME = "extra_recipient_name";
     public static final String RESULT_BATCH_TYPES = "result_batch_types";
     public static final String EXTRA_START_IN_GALLERY = "extra_start_in_gallery";
     private boolean startedDirectlyInGallery = false;
@@ -1062,6 +1064,8 @@ public class CameraGalleryActivity extends AppCompatActivity {
             } catch (Throwable ignored) {}
         }
         Intent intent = new Intent(this, MediaEditActivity.class);
+        intent.putExtra(MediaEditActivity.EXTRA_IS_STATUS_MODE, getIntent().getBooleanExtra(EXTRA_IS_STATUS_MODE, false));
+        intent.putExtra(MediaEditActivity.EXTRA_RECIPIENT_NAME, getIntent().getStringExtra(EXTRA_RECIPIENT_NAME));
         if (mediaUri != null) {
             intent.putExtra(MediaEditActivity.EXTRA_MEDIA_URI, mediaUri);
             intent.putExtra(MediaEditActivity.EXTRA_MEDIA_TYPE, mediaType);

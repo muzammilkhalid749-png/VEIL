@@ -112,7 +112,7 @@ public class LinkedDevicesBottomSheet extends BottomSheetDialogFragment {
 
         if (savedSessionId != null || savedWebPeerId != null) {
             tvDeviceTitle.setText("💻 VEIL Web Companion (Linked)");
-            String sub = "Active via WebRTC P2P DataChannels";
+            String sub = "Active Connection";
             if (savedWebPeerId != null) {
                 sub += "\nPeer ID: " + savedWebPeerId;
             }
@@ -365,7 +365,7 @@ public class LinkedDevicesBottomSheet extends BottomSheetDialogFragment {
                 .putLong("linkedAt", System.currentTimeMillis())
                 .apply();
 
-        Toast.makeText(ctx, "Desktop linked successfully! P2P channel established.", Toast.LENGTH_LONG).show();
+        Toast.makeText(ctx, "Desktop linked successfully!", Toast.LENGTH_LONG).show();
         refreshLinkedDeviceState();
     }
 

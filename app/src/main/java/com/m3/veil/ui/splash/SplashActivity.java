@@ -96,7 +96,10 @@ public class SplashActivity extends AppCompatActivity {
     private TextView appNameText;
     private TextView taglineText;
     private ImageView particlesView;
-    private TextView bootTelemetryChip;
+    private View layoutConnectionStatus;
+    private View viewStatusDot;
+    private TextView tvConnectionStatus;
+    private ObjectAnimator dotPulseAnimator;
 
     private PreferenceManager preferenceManager;
     private UserPreferences userPreferences;
@@ -168,30 +171,12 @@ public class SplashActivity extends AppCompatActivity {
             });
         }
 
-        if (textContainer != null) {
-            bootTelemetryChip = new TextView(this);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-            );
-            lp.topMargin = dp(20);
-            bootTelemetryChip.setLayoutParams(lp);
-            bootTelemetryChip.setGravity(Gravity.CENTER);
-            bootTelemetryChip.setPadding(dp(14), dp(6), dp(14), dp(6));
-            bootTelemetryChip.setTextColor(Color.parseColor("#B8A9FF"));
-            bootTelemetryChip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f);
-            bootTelemetryChip.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-            bootTelemetryChip.setText("⚡ Initializing SQLCipher WAL & Bloom Filter…");
-
-            GradientDrawable pillBg = new GradientDrawable();
-            pillBg.setShape(GradientDrawable.RECTANGLE);
-            pillBg.setCornerRadius(dp(18));
-            pillBg.setColor(Color.parseColor("#227C4DFF"));
-            pillBg.setStroke(dp(1), Color.parseColor("#557C4DFF"));
-            bootTelemetryChip.setBackground(pillBg);
-            bootTelemetryChip.setAlpha(0f);
-
-            textContainer.addView(bootTelemetryChip);
+        layoutConnectionStatus = findViewById(R.id.layout_connection_status);
+        viewStatusDot = findViewById(R.id.view_status_dot);
+        tvConnectionStatus = findViewById(R.id.tv_connection_status);
+        if (layoutConnectionStatus != null) {
+            layoutConnectionStatus.setTranslationY(dp(8));
+            layoutConnectionStatus.setAlpha(0f);
         }
 
         if (splashLogo != null) {
@@ -303,23 +288,45 @@ public class SplashActivity extends AppCompatActivity {
             drift.start();
         }
 
-        if (bootTelemetryChip != null) {
+        if (layoutConnectionStatus != null) {
             handler.postDelayed(() -> {
-                bootTelemetryChip.animate().alpha(1f).setDuration(240).start();
+                if (!isFinishing() && layoutConnectionStatus != null) {
+                    layoutConnectionStatus.animate()
+                            .alpha(1f)
+                            .translationY(0f)
+                            .setDuration(320)
+                            .start();
+
+                    if (viewStatusDot != null) {
+                        dotPulseAnimator = ObjectAnimator.ofFloat(viewStatusDot, "alpha", 0.35f, 1f);
+                        dotPulseAnimator.setDuration(600);
+                        dotPulseAnimator.setRepeatCount(ValueAnimator.INFINITE);
+                        dotPulseAnimator.setRepeatMode(ValueAnimator.REVERSE);
+                        dotPulseAnimator.start();
+                    }
+                }
             }, 450);
 
             String[] bootSteps = new String[]{
-                    "⚡ Hydrating k=7 Murmur3+SHA256 Bloom Filter…",
-                    "🔐 Mounting SQLCipher AES-256-GCM WAL Vault…",
-                    "🛰️ Synchronizing Zero-Knowledge P2P Mesh…"
+                    "Connecting to secure mesh…",
+                    "Synchronizing cryptographic state…",
+                    "Connected"
             };
             for (int i = 0; i < bootSteps.length; i++) {
                 final String step = bootSteps[i];
                 handler.postDelayed(() -> {
-                    if (!isFinishing() && bootTelemetryChip != null) {
-                        bootTelemetryChip.setText(step);
+                    if (!isFinishing() && tvConnectionStatus != null) {
+                        tvConnectionStatus.animate()
+                                .alpha(0f)
+                                .setDuration(120)
+                                .withEndAction(() -> {
+                                    if (!isFinishing() && tvConnectionStatus != null) {
+                                        tvConnectionStatus.setText(step);
+                                        tvConnectionStatus.animate().alpha(1f).setDuration(160).start();
+                                    }
+                                }).start();
                     }
-                }, 520L + (i * 550L));
+                }, 520L + (i * 600L));
             }
         }
     }
@@ -486,6 +493,10 @@ public class SplashActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (dotPulseAnimator != null) {
+            dotPulseAnimator.cancel();
+            dotPulseAnimator = null;
+        }
         if (whisperLogoDrawable != null) {
             whisperLogoDrawable.stopAnimations();
         }

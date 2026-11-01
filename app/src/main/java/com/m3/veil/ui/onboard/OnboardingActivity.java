@@ -69,7 +69,7 @@ public class OnboardingActivity extends AppCompatActivity {
                 getString(R.string.onboarding_title_1),
                 getString(R.string.onboarding_desc_1),
                 R.drawable.onboarding_secure,
-                "AES-256",
+                "Encrypted",
                 "Local Key"
         ));
 
@@ -77,7 +77,7 @@ public class OnboardingActivity extends AppCompatActivity {
                 getString(R.string.onboarding_title_2),
                 getString(R.string.onboarding_desc_2),
                 R.drawable.onboarding_connect,
-                "Serverless P2P",
+                "Private & Fast",
                 null
         ));
 

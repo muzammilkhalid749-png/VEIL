@@ -10,7 +10,6 @@ import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
@@ -45,12 +44,13 @@ import java.util.concurrent.Executors;
  *   <li>Asynchronous decoded loading for {@link ImageView} and {@link de.hdodenhof.circleimageview.CircleImageView}.</li>
  *   <li>Universal source support: Base64 strings, file:// paths, content:// URIs, and drawable resource keys.</li>
  *   <li>Telegram harmonic two-stop gradient circle with centered bold initials when no image exists.</li>
- *   <li>In-memory LRU bitmap cache for zero-jank 120 FPS scrolling.</li>
+ *   <li>In-memory LRU bitmap cache for zero-jank 120 FPS scrolling with file timestamp cache busting.</li>
  * </ul>
  */
 public final class VeilAvatarLoader {
 
-    private static final int CACHE_SIZE = 64;
+    private static final int CACHE_SIZE = 128;
+    private static final java.util.Set<String> sPendingAsyncLoads = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private static final LruCache<String, Bitmap> sAvatarCache = new LruCache<>(CACHE_SIZE);
     private static final ExecutorService sExecutor = Executors.newFixedThreadPool(3);
     private static final Handler sMainHandler = new Handler(Looper.getMainLooper());
@@ -74,6 +74,27 @@ public final class VeilAvatarLoader {
      */
     public static void clearCache() {
         sAvatarCache.evictAll();
+        sPendingAsyncLoads.clear();
+    }
+
+    private static boolean isPlaceholderSource(@Nullable String src) {
+        if (src == null) return true;
+        String s = src.trim();
+        return s.isEmpty() || "null".equalsIgnoreCase(s) || s.startsWith("default_");
+    }
+
+    @NonNull
+    private static String buildSourceCacheKey(@NonNull String cleanSource, int sizePx) {
+        if (cleanSource.startsWith("/") || cleanSource.startsWith("file://")) {
+            String path = cleanSource.startsWith("file://") ? Uri.parse(cleanSource).getPath() : cleanSource;
+            if (path != null) {
+                File f = new File(path);
+                if (f.exists()) {
+                    return cleanSource + "_" + f.lastModified() + "_" + f.length() + "_" + sizePx;
+                }
+            }
+        }
+        return cleanSource + "_" + sizePx;
     }
 
     /**
@@ -88,35 +109,40 @@ public final class VeilAvatarLoader {
                                   @Nullable String avatarSource,
                                   @Nullable String displayName,
                                   boolean isGroup) {
-        String safeName = displayName != null ? displayName : (isGroup ? "Group" : "User");
-        String cacheKey = (avatarSource != null ? avatarSource : safeName) + "_iv";
-        imageView.setTag(cacheKey);
+        String safeName = (displayName != null && !displayName.trim().isEmpty())
+                ? displayName.trim() : (isGroup ? "Group" : "User");
 
-        // 1. Immediately display Telegram harmonic initials/group placeholder
-        Bitmap placeholder = createInitialsBitmap(imageView.getContext(), safeName, 160, isGroup);
-        imageView.setImageBitmap(placeholder);
-
-        if (avatarSource == null || avatarSource.trim().isEmpty()) {
+        if (isPlaceholderSource(avatarSource)) {
+            imageView.setTag(safeName + "_iv");
+            Bitmap placeholder = createInitialsBitmap(imageView.getContext(), safeName, 160, isGroup);
+            imageView.setImageBitmap(placeholder);
             return;
         }
 
         final String cleanSource = avatarSource.trim();
+        final String sourceCacheKey = buildSourceCacheKey(cleanSource, 160);
+        final String tagKey = sourceCacheKey + "_iv";
+        imageView.setTag(tagKey);
 
-        // 2. Check LRU Cache
-        Bitmap cached = sAvatarCache.get(cleanSource + "_160");
+        // 1. Check LRU Cache first so cached avatars appear with 0ms flash
+        Bitmap cached = sAvatarCache.get(sourceCacheKey);
         if (cached != null && !cached.isRecycled()) {
             imageView.setImageBitmap(cached);
             return;
         }
+
+        // 2. Display Telegram harmonic initials/group placeholder while decoding
+        Bitmap placeholder = createInitialsBitmap(imageView.getContext(), safeName, 160, isGroup);
+        imageView.setImageBitmap(placeholder);
 
         // 3. Decode asynchronously
         Context appContext = imageView.getContext().getApplicationContext();
         sExecutor.execute(() -> {
             Bitmap decoded = decodeAvatarBitmap(appContext, cleanSource, 160, isGroup, safeName);
             if (decoded != null) {
-                sAvatarCache.put(cleanSource + "_160", decoded);
+                sAvatarCache.put(sourceCacheKey, decoded);
                 sMainHandler.post(() -> {
-                    if (cacheKey.equals(imageView.getTag())) {
+                    if (tagKey.equals(imageView.getTag())) {
                         imageView.setImageBitmap(decoded);
                     }
                 });
@@ -134,23 +160,38 @@ public final class VeilAvatarLoader {
                                          int sizePx,
                                          boolean isGroup) {
         if (sizePx <= 0) sizePx = 120;
-        String safeName = displayName != null ? displayName : (isGroup ? "Group" : "User");
+        String safeName = (displayName != null && !displayName.trim().isEmpty())
+                ? displayName.trim() : (isGroup ? "Group" : "User");
 
-        if (avatarSource == null || avatarSource.trim().isEmpty()) {
+        if (isPlaceholderSource(avatarSource)) {
             return getInitialsBitmapCached(context, safeName, sizePx, isGroup);
         }
 
         String cleanSource = avatarSource.trim();
-        String cacheKey = cleanSource + "_" + sizePx;
+        String cacheKey = buildSourceCacheKey(cleanSource, sizePx);
         Bitmap cached = sAvatarCache.get(cacheKey);
         if (cached != null && !cached.isRecycled()) {
             return cached;
         }
 
-        Bitmap decoded = decodeAvatarBitmap(context, cleanSource, sizePx, isGroup, safeName);
-        if (decoded != null) {
-            sAvatarCache.put(cacheKey, decoded);
-            return decoded;
+        // Return fast fallback initials immediately for zero-jank 120 FPS scrolling,
+        // and queue background asynchronous decoding if not already in-flight.
+        if (sPendingAsyncLoads.add(cacheKey)) {
+            final int targetSize = sizePx;
+            final Context appContext = context.getApplicationContext();
+            sExecutor.execute(() -> {
+                try {
+                    Bitmap decoded = decodeAvatarBitmap(appContext, cleanSource, targetSize, isGroup, safeName);
+                    if (decoded != null) {
+                        sAvatarCache.put(cacheKey, decoded);
+                    } else {
+                        Bitmap fallback = getInitialsBitmapCached(appContext, safeName, targetSize, isGroup);
+                        sAvatarCache.put(cacheKey, fallback);
+                    }
+                } finally {
+                    sPendingAsyncLoads.remove(cacheKey);
+                }
+            });
         }
 
         return getInitialsBitmapCached(context, safeName, sizePx, isGroup);
@@ -179,8 +220,21 @@ public final class VeilAvatarLoader {
         try {
             Bitmap raw = null;
 
-            // Case A: Base64 string
-            if (source.startsWith("data:image") || isLikelyBase64(source)) {
+            // Case A: Local file path or file:// URI (check before Base64 because paths also start with '/')
+            if (source.startsWith("/") || source.startsWith("file://")) {
+                String filePath = source.startsWith("file://") ? Uri.parse(source).getPath() : source;
+                if (filePath != null && new File(filePath).exists()) {
+                    BitmapFactory.Options opts = new BitmapFactory.Options();
+                    opts.inJustDecodeBounds = true;
+                    BitmapFactory.decodeFile(filePath, opts);
+                    opts.inSampleSize = calculateInSampleSize(opts, sizePx, sizePx);
+                    opts.inJustDecodeBounds = false;
+                    raw = BitmapFactory.decodeFile(filePath, opts);
+                }
+            }
+
+            // Case B: Base64 string
+            if (raw == null && (source.startsWith("data:image") || isLikelyBase64(source))) {
                 String cleanBase64 = source;
                 int commaIdx = cleanBase64.indexOf(",");
                 if (commaIdx != -1) {
@@ -191,19 +245,6 @@ public final class VeilAvatarLoader {
                 BitmapFactory.Options opts = new BitmapFactory.Options();
                 opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
                 raw = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
-            }
-
-            // Case B: Local file path or file:// URI
-            if (raw == null && (source.startsWith("/") || source.startsWith("file://"))) {
-                String filePath = source.startsWith("file://") ? Uri.parse(source).getPath() : source;
-                if (filePath != null && new File(filePath).exists()) {
-                    BitmapFactory.Options opts = new BitmapFactory.Options();
-                    opts.inJustDecodeBounds = true;
-                    BitmapFactory.decodeFile(filePath, opts);
-                    opts.inSampleSize = calculateInSampleSize(opts, sizePx, sizePx);
-                    opts.inJustDecodeBounds = false;
-                    raw = BitmapFactory.decodeFile(filePath, opts);
-                }
             }
 
             // Case C: Android Content URI (content://)
@@ -220,7 +261,7 @@ public final class VeilAvatarLoader {
             }
 
             // Case D: Resource Identifier (e.g. "avatar_1" or "ic_person")
-            if (raw == null) {
+            if (raw == null && source.length() < 64 && source.matches("^[a-zA-Z0-9_]+$")) {
                 int resId = context.getResources().getIdentifier(source, "drawable", context.getPackageName());
                 if (resId != 0) {
                     Drawable d = ContextCompat.getDrawable(context, resId);
@@ -248,7 +289,14 @@ public final class VeilAvatarLoader {
 
     private static boolean isLikelyBase64(String str) {
         if (str.length() < 30) return false;
-        return str.startsWith("/9j/") || str.startsWith("iVBOR") || str.startsWith("R0lGOD") || str.startsWith("UklGR");
+        if (str.startsWith("/9j/") || str.startsWith("iVBOR") || str.startsWith("R0lGOD") || str.startsWith("UklGR")) {
+            return true;
+        }
+        return str.length() > 100
+                && !str.startsWith("/")
+                && !str.startsWith("file://")
+                && !str.startsWith("content://")
+                && !str.startsWith("http");
     }
 
     private static int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {

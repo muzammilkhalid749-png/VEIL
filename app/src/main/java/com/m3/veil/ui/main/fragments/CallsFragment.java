@@ -187,7 +187,7 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
             btnGroupCall.setLayoutParams(grpLp);
 
             TextView tvGrpTitle = new TextView(requireContext());
-            tvGrpTitle.setText("👥 Start E2EE Group Mesh Call");
+            tvGrpTitle.setText("👥 Start Group Call");
             tvGrpTitle.setTextSize(15f);
             tvGrpTitle.setTypeface(null, android.graphics.Typeface.BOLD);
             tvGrpTitle.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
@@ -494,12 +494,52 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
 
     @Override
     public void onCallClick(CallRecord call) {
-        startCall(call);
+        showCallConfirmationDialog(call);
     }
 
     @Override
     public void onCallBackClick(CallRecord call) {
-        startCall(call);
+        showCallConfirmationDialog(call);
+    }
+
+    private void showCallConfirmationDialog(CallRecord call) {
+        if (call == null || getContext() == null) return;
+        String myUid = (currentUserId != null && !currentUserId.isEmpty() && !"local_user".equals(currentUserId))
+                ? currentUserId : (com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext()) != null
+                ? com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext()) : "local_user");
+
+        boolean isOutgoing = "outgoing".equalsIgnoreCase(call.getStatus())
+                || (call.getCallerId() != null && call.getCallerId().equals(myUid))
+                || isSelfName(call.getCallerName());
+
+        String targetId = call.getPeerId();
+        if (targetId == null || targetId.isEmpty() || targetId.equals(myUid) || "local_user".equals(targetId)) {
+            targetId = isOutgoing ? call.getReceiverId() : call.getCallerId();
+        }
+
+        String displayName = call.getPeerName();
+        if (displayName == null || displayName.trim().isEmpty() || isSelfName(displayName)) {
+            displayName = isOutgoing ? call.getReceiverName() : call.getCallerName();
+        }
+        if (displayName == null || displayName.trim().isEmpty() || isSelfName(displayName)) {
+            displayName = "Veil Contact";
+        }
+
+        String type = call.isVideo() ? "video" : "audio";
+        boolean isGrp = call.isGroup();
+
+        com.m3.veil.calling.ui.VeilCallConfirmationDialog.show(
+                requireContext(),
+                targetId,
+                displayName,
+                null,
+                type,
+                isGrp,
+                confirmedType -> {
+                    call.setCallType(confirmedType);
+                    startCall(call);
+                }
+        );
     }
 
     @Override

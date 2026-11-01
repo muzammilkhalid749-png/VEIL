@@ -94,25 +94,21 @@ public class PremiumUpgradeBottomSheetDialog extends BottomSheetDialogFragment {
 
         // Handle bar
         View handle = new View(context);
-        LinearLayout.LayoutParams handleLp = new LinearLayout.LayoutParams((int) (38 * dp), (int) (4 * dp));
+        LinearLayout.LayoutParams handleLp = new LinearLayout.LayoutParams((int) (36 * dp), (int) (4 * dp));
         handleLp.gravity = Gravity.CENTER_HORIZONTAL;
-        handleLp.bottomMargin = (int) (18 * dp);
+        handleLp.bottomMargin = (int) (16 * dp);
         handle.setLayoutParams(handleLp);
-        handle.setBackgroundColor(ContextCompat.getColor(context, R.color.colorOutline));
+        handle.setBackgroundResource(R.drawable.bg_persona_drag_handle);
         root.addView(handle);
 
         // Badge Pill
         TextView tvBadge = new TextView(context);
-        tvBadge.setText("💎 VEIL PRO • SOVEREIGN MULTI-VAULT");
-        tvBadge.setTextSize(11.5f);
+        tvBadge.setText("VEIL PRO • MULTI-VAULT");
+        tvBadge.setTextSize(11f);
         tvBadge.setTypeface(null, Typeface.BOLD);
-        tvBadge.setTextColor(Color.parseColor("#38BDF8"));
-        GradientDrawable badgeBg = new GradientDrawable();
-        badgeBg.setCornerRadius(14 * dp);
-        badgeBg.setColor(Color.parseColor("#1E293B"));
-        badgeBg.setStroke((int) (1 * dp), Color.parseColor("#0284C7"));
-        tvBadge.setBackground(badgeBg);
-        tvBadge.setPadding((int) (12 * dp), (int) (5 * dp), (int) (12 * dp), (int) (5 * dp));
+        tvBadge.setTextColor(ContextCompat.getColor(context, R.color.colorPrimary));
+        tvBadge.setBackgroundResource(R.drawable.bg_persona_active_pill);
+        tvBadge.setPadding((int) (10 * dp), (int) (4 * dp), (int) (10 * dp), (int) (4 * dp));
         LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         badgeLp.bottomMargin = (int) (12 * dp);
@@ -121,62 +117,78 @@ public class PremiumUpgradeBottomSheetDialog extends BottomSheetDialogFragment {
 
         // Title
         TextView tvTitle = new TextView(context);
-        tvTitle.setText("Unlock Persona 3+ & Unlimited Encrypted Vaults");
-        tvTitle.setTextSize(21f);
+        tvTitle.setText("Unlock Unlimited Personas & Vaults");
+        tvTitle.setTextSize(20f);
         tvTitle.setTypeface(null, Typeface.BOLD);
         tvTitle.setTextColor(ContextCompat.getColor(context, R.color.textPrimary));
         root.addView(tvTitle);
 
         // Subtitle
         TextView tvSub = new TextView(context);
-        tvSub.setText("Persona 1 (Main) and Persona 2 are included for free. Upgrade to Veil Pro to create and switch between 3 or more hardware-isolated cryptographic personas.");
-        tvSub.setTextSize(13.5f);
+        tvSub.setText("Upgrade to Veil Pro to create and switch between multiple personas with separate profiles.");
+        tvSub.setTextSize(13f);
         tvSub.setTextColor(ContextCompat.getColor(context, R.color.textSecondary));
-        tvSub.setPadding(0, (int) (6 * dp), 0, (int) (18 * dp));
+        tvSub.setPadding(0, (int) (4 * dp), 0, (int) (16 * dp));
         root.addView(tvSub);
 
         // Feature list
         String[][] features = {
-                {"🎭 Unlimited Isolated Personas", "Dedicated SQLCipher vault, unique @username, avatar, and ECDSA keypair per persona."},
-                {"🔑 Independent P2P Routing", "Separate WebRTC signaling endpoints and zero correlation between identities."},
-                {"⏳ Ephemeral Self-Destruct Personas", "Auto-shredding 1h / 24h / 7d burner identities with cryptographic zeroization."},
-                {"🛡️ Priority TURN Mesh & AR Masks", "High-bandwidth relay priority and studio-grade real-time call privacy filters."}
+                {"✨", "Unlimited Isolated Personas", "Dedicated private storage, unique @username, and separate identity per persona."},
+                {"🔒", "Independent Connection", "Separate WebRTC signaling endpoints and zero correlation between identities."},
+                {"🔥", "Ephemeral Burner Personas", "Auto-shredding burner identities with cryptographic zeroization."},
+                {"⚡", "Fast Relay Routing", "Fastest network speeds and priority media delivery."}
         };
 
         for (String[] feat : features) {
             LinearLayout row = new LinearLayout(context);
-            row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding((int) (14 * dp), (int) (10 * dp), (int) (14 * dp), (int) (10 * dp));
-            row.setBackgroundResource(R.drawable.bg_search_input);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding((int) (14 * dp), (int) (12 * dp), (int) (14 * dp), (int) (12 * dp));
+            row.setBackgroundResource(R.drawable.bg_premium_feature_card);
             LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             rowLp.bottomMargin = (int) (8 * dp);
             row.setLayoutParams(rowLp);
 
+            TextView fIcon = new TextView(context);
+            fIcon.setText(feat[0]);
+            fIcon.setTextSize(18f);
+            fIcon.setGravity(Gravity.CENTER);
+            fIcon.setBackgroundResource(R.drawable.bg_persona_avatar_circle);
+            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams((int) (38 * dp), (int) (38 * dp));
+            iconLp.setMarginEnd((int) (12 * dp));
+            fIcon.setLayoutParams(iconLp);
+            row.addView(fIcon);
+
+            LinearLayout textCol = new LinearLayout(context);
+            textCol.setOrientation(LinearLayout.VERTICAL);
+            textCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
             TextView fTitle = new TextView(context);
-            fTitle.setText(feat[0]);
+            fTitle.setText(feat[1]);
             fTitle.setTextSize(14f);
             fTitle.setTypeface(null, Typeface.BOLD);
             fTitle.setTextColor(ContextCompat.getColor(context, R.color.textPrimary));
-            row.addView(fTitle);
+            textCol.addView(fTitle);
 
             TextView fDesc = new TextView(context);
-            fDesc.setText(feat[1]);
+            fDesc.setText(feat[2]);
             fDesc.setTextSize(12f);
             fDesc.setTextColor(ContextCompat.getColor(context, R.color.textSecondary));
             fDesc.setPadding(0, (int) (2 * dp), 0, 0);
-            row.addView(fDesc);
+            textCol.addView(fDesc);
 
+            row.addView(textCol);
             root.addView(row);
         }
 
         // Plan Selector Section
         TextView tvPlansHeader = new TextView(context);
-        tvPlansHeader.setText("CHOOSE YOUR TIER");
-        tvPlansHeader.setTextSize(11.5f);
+        tvPlansHeader.setText("CHOOSE TIER");
+        tvPlansHeader.setTextSize(11f);
         tvPlansHeader.setTypeface(null, Typeface.BOLD);
-        tvPlansHeader.setTextColor(ContextCompat.getColor(context, R.color.textSecondary));
-        tvPlansHeader.setPadding(0, (int) (10 * dp), 0, (int) (8 * dp));
+        tvPlansHeader.setTextColor(ContextCompat.getColor(context, R.color.textTertiary));
+        tvPlansHeader.setPadding(0, (int) (8 * dp), 0, (int) (8 * dp));
         root.addView(tvPlansHeader);
 
         final String[] currentSelection = {BillingManager.PLAN_ANNUAL};
@@ -187,9 +199,9 @@ public class PremiumUpgradeBottomSheetDialog extends BottomSheetDialogFragment {
                 BillingManager.PLAN_LIFETIME
         };
         final String[] planTitles = {
-                "⚡ Veil Pro Annual (Save 45%)",
-                "🌙 Veil Pro Monthly",
-                "♾️ Sovereign Lifetime Vault"
+                "Annual Plan (Save 45%)",
+                "Monthly Plan",
+                "Lifetime Sovereign Vault"
         };
         final String[] planPrices = {
                 "$29.99 / year  •  $2.49/mo",
@@ -203,8 +215,8 @@ public class PremiumUpgradeBottomSheetDialog extends BottomSheetDialogFragment {
                 if (c == null) continue;
                 boolean sel = planIds[i].equals(currentSelection[0]);
                 c.setStrokeColor(ContextCompat.getColor(context, sel ? R.color.colorPrimary : R.color.colorOutline));
-                c.setStrokeWidth((int) ((sel ? 2.0f : 1.0f) * dp));
-                c.setCardBackgroundColor(ContextCompat.getColor(context, sel ? R.color.colorSurfaceVariant : R.color.colorSurface));
+                c.setStrokeWidth((int) ((sel ? 1.5f : 1.0f) * dp));
+                c.setCardBackgroundColor(ContextCompat.getColor(context, sel ? R.color.colorSecondaryContainer : R.color.colorSurfaceContainerLow));
             }
         };
 
@@ -247,12 +259,12 @@ public class PremiumUpgradeBottomSheetDialog extends BottomSheetDialogFragment {
 
         // Primary Upgrade CTA Button
         MaterialButton btnUpgrade = new MaterialButton(context);
-        btnUpgrade.setText("Unlock Veil Pro & Persona 3+");
+        btnUpgrade.setText("Unlock Veil Pro");
         btnUpgrade.setCornerRadius((int) (14 * dp));
         btnUpgrade.setTextSize(15f);
         btnUpgrade.setTypeface(null, Typeface.BOLD);
         LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, (int) (52 * dp));
+                ViewGroup.LayoutParams.MATCH_PARENT, (int) (50 * dp));
         btnLp.topMargin = (int) (12 * dp);
         btnUpgrade.setLayoutParams(btnLp);
         btnUpgrade.setOnClickListener(v -> {
@@ -260,7 +272,7 @@ public class PremiumUpgradeBottomSheetDialog extends BottomSheetDialogFragment {
                     ? 30L * 86400_000L
                     : (BillingManager.PLAN_ANNUAL.equals(currentSelection[0]) ? 365L * 86400_000L : 0L);
             BillingManager.getInstance(context).activatePremium(currentSelection[0], duration);
-            Toast.makeText(context, "💎 Veil Pro Activated! Unlimited Personas Unlocked.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "Veil Pro Activated! Unlimited Personas Unlocked.", Toast.LENGTH_SHORT).show();
             onDismiss.run();
             if (listener != null) {
                 listener.onUpgradeCompleted();

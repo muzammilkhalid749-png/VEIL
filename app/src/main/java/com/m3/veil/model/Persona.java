@@ -135,6 +135,10 @@ public class Persona {
         return avatarUri != null ? avatarUri : "";
     }
 
+    public void setAvatarUrl(String url) {
+        this.avatarUri = url;
+    }
+
     public void setAvatarUri(String avatarUri) {
         this.avatarUri = avatarUri;
     }

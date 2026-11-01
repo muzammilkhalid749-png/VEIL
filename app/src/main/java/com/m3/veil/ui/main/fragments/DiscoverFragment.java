@@ -265,7 +265,7 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
         LinearLayout tagsRow = new LinearLayout(requireContext());
         tagsRow.setOrientation(LinearLayout.HORIZONTAL);
         tagsRow.setPadding(0, 0, 0, (int) (14 * dp));
-        String[] quickTags = {"#confession", "#privacy", "#mesh", "#poll", "Clear Filter"};
+        String[] quickTags = {"#confession", "#privacy", "#trending", "#poll", "Clear Filter"};
         for (String tag : quickTags) {
             android.widget.TextView chip = new android.widget.TextView(requireContext());
             chip.setText(tag);
@@ -524,7 +524,7 @@ public class DiscoverFragment extends Fragment implements PostsAdapter.OnPostInt
         layout.addView(tvTitle);
 
         android.widget.TextView tvSub = new android.widget.TextView(requireContext());
-        tvSub.setText("Share @" + post.getAuthorUsername() + "'s post to your profile or the mesh");
+        tvSub.setText("Share @" + post.getAuthorUsername() + "'s post to your profile or feed");
         tvSub.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
         tvSub.setTextSize(13);
         tvSub.setPadding(0, 4, 0, (int) (16 * getResources().getDisplayMetrics().density));

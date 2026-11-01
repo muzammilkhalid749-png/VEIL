@@ -231,7 +231,7 @@ public class ChatSettingsActivity extends AppCompatActivity {
         privacyBox.addView(switchTypingIndicators);
 
         switchScreenshotShield = new SwitchMaterial(this);
-        switchScreenshotShield.setText("Block Screenshots & Recording (FLAG_SECURE)");
+        switchScreenshotShield.setText("Block Screenshots & Screen Recording");
         switchScreenshotShield.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
         switchScreenshotShield.setChecked(prefs.getBoolean("screenshot_shield_" + chatId, true));
         privacyBox.addView(switchScreenshotShield);

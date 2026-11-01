@@ -340,8 +340,51 @@ public class UsernameActivity extends AppCompatActivity {
         }
 
         if (skipForNowText != null) {
-            skipForNowText.setOnClickListener(v -> generateRandomCypherpunkHandle());
+            skipForNowText.setOnClickListener(v -> skipAndAssignRandomHandle());
         }
+    }
+
+    private void skipAndAssignRandomHandle() {
+        if (isSavingProfile) return;
+        setSavingState(true);
+
+        SecureRandom rng = new SecureRandom();
+        SovereignIdentityAndDirectoryEngine.ClaimedUsernameBloomFilter bloom =
+                sovereignEngine.getUsernameBloomFilter();
+
+        String handle = null;
+        for (int i = 0; i < 20; i++) {
+            String adj = CYPHER_ADJECTIVES[rng.nextInt(CYPHER_ADJECTIVES.length)];
+            String noun = CYPHER_NOUNS[rng.nextInt(CYPHER_NOUNS.length)];
+            int num = 100 + rng.nextInt(899);
+            String candidate = adj + "_" + noun + num;
+            if (!bloom.mightContain(candidate)) {
+                handle = candidate;
+                break;
+            }
+        }
+        if (handle == null) {
+            handle = "veil_anon_" + (1000 + rng.nextInt(8999));
+        }
+
+        final String finalHandle = handle;
+        final String display = "Anonymous";
+
+        if (usernameEditText != null) {
+            usernameEditText.setText(finalHandle);
+        }
+        if (displayNameEditText != null) {
+            displayNameEditText.setText(display);
+        }
+
+        sovereignEngine.isUsernameTaken(finalHandle, currentUserId, isTaken -> {
+            if (isTaken) {
+                String fallback = "anon_" + (System.currentTimeMillis() % 1000000L);
+                commitProfileEverywhere(fallback, display);
+            } else {
+                commitProfileEverywhere(finalHandle, display);
+            }
+        });
     }
 
     private void generateRandomCypherpunkHandle() {
@@ -418,6 +461,7 @@ public class UsernameActivity extends AppCompatActivity {
         boolean bloomMightContain = sovereignEngine.mightContainUsernameInBloom(normalized);
         long elapsedUs = Math.max(1L, (System.nanoTime() - t0) / 1000L);
 
+        boolean online = sovereignEngine.isNetworkOnline();
         if (!bloomMightContain) {
             // 0% False Negatives in Bloom Filter -> Immediately enable button & show fast O(1) pass,
             // while still performing authoritative background verification!
@@ -425,13 +469,25 @@ public class UsernameActivity extends AppCompatActivity {
             if (continueButton != null && !isSavingProfile) {
                 continueButton.setEnabled(true);
             }
-            updateStatusText(
-                    "⚡ Bloom Filter O(1) (" + elapsedUs + "µs): @" + normalized + " is available — syncing...",
-                    R.color.colorPrimary);
+            if (!online) {
+                updateStatusText(
+                        "✓ Offline Mode: @" + normalized + " is available locally",
+                        R.color.colorPrimary);
+            } else {
+                updateStatusText(
+                        "⚡ Instant Search (" + elapsedUs + "µs): @" + normalized + " is available — syncing...",
+                        R.color.colorPrimary);
+            }
         } else {
-            updateStatusText(
-                    "🔍 Bloom Filter hit (" + elapsedUs + "µs) — verifying @" + normalized + " in directory...",
-                    R.color.textSecondary);
+            if (!online) {
+                updateStatusText(
+                        "🔍 Checking local directory for @" + normalized + "...",
+                        R.color.textSecondary);
+            } else {
+                updateStatusText(
+                        "🔍 Username found (" + elapsedUs + "µs) — verifying @" + normalized + " in directory...",
+                        R.color.textSecondary);
+            }
         }
 
         checkUsernameRunnable = () -> checkUsernameAvailabilityAuthoritative(normalized, bloomMightContain);
@@ -461,8 +517,13 @@ public class UsernameActivity extends AppCompatActivity {
                 if (continueButton != null && !isSavingProfile) {
                     continueButton.setEnabled(true);
                 }
-                String bloomBadge = bloomHit ? "✓ Directory Verified (Bloom FP resolved): " : "✓ Bloom O(1) + Directory Verified: ";
-                updateStatusText(bloomBadge + "@" + normalizedUsername + " is available", R.color.colorPrimary);
+                boolean online = sovereignEngine.isNetworkOnline();
+                if (!online) {
+                    updateStatusText("✓ Offline Mode: @" + normalizedUsername + " is available locally", R.color.colorPrimary);
+                } else {
+                    String bloomBadge = bloomHit ? "✓ Username available: " : "✓ Username available: ";
+                    updateStatusText(bloomBadge + "@" + normalizedUsername + " is available", R.color.colorPrimary);
+                }
             }
         });
     }
@@ -518,6 +579,13 @@ public class UsernameActivity extends AppCompatActivity {
         }
         final String uid = currentUserId;
         final String unameLower = username.toLowerCase(Locale.ROOT);
+
+        if (!sovereignEngine.isNetworkOnline()) {
+            // Reserve locally in SQLCipher and queue pending cloud sync when network reconnects
+            userPreferences.setPendingCloudUsernameSync(true);
+            executeSaveProfile(username, displayName, uid);
+            return;
+        }
 
         // Pre-commit authoritative check on Firestore to guarantee zero username collision
         db.collection("usernames").document(unameLower).get()
@@ -649,6 +717,24 @@ public class UsernameActivity extends AppCompatActivity {
     private void onProfileSavedSuccess(SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest) {
         if (isFinishing() || isDestroyed()) return;
         setSavingState(false);
+
+        try {
+            com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(this);
+            pm.ensureInitializedAndRepaired();
+            com.m3.veil.model.Persona primary = pm.getPersona(com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID);
+            if (primary != null) {
+                if (manifest.displayName != null && !manifest.displayName.isEmpty()) {
+                    primary.setDisplayName(manifest.displayName);
+                }
+                if (manifest.username != null && !manifest.username.isEmpty()) {
+                    primary.setUsername(manifest.username);
+                }
+                if (manifest.bio != null && !manifest.bio.isEmpty()) {
+                    primary.setBio(manifest.bio);
+                }
+                pm.updatePersona(primary);
+            }
+        } catch (Exception ignored) {}
 
         AuthManager.getInstance().onSovereignSessionStarted(this, manifest);
 

@@ -70,7 +70,10 @@ public class NewGroupActivity extends AppCompatActivity {
         handleWindowInsets();
 
         db = FirebaseFirestore.getInstance();
-        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(this).getActivePersonaPeerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        }
         if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
         }
@@ -282,7 +285,7 @@ public class NewGroupActivity extends AppCompatActivity {
         groupDoc.put("creatorId", currentUserId);
         groupDoc.put("creatorName", currentUsername);
         groupDoc.put("participants", participants);
-        groupDoc.put("lastMessage", "🔒 " + (isChannelMode ? "Broadcast Channel created" : "P2P Encrypted Group created"));
+        groupDoc.put("lastMessage", "🔒 " + (isChannelMode ? "Broadcast Channel created" : "Encrypted Group created"));
         groupDoc.put("lastMessageSenderId", currentUserId);
         groupDoc.put("lastMessageSenderName", currentUsername);
         groupDoc.put("timestamp", Timestamp.now());
@@ -297,7 +300,7 @@ public class NewGroupActivity extends AppCompatActivity {
         }
         com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(groupChat, null, welcomeMsg);
 
-        Toast.makeText(this, isChannelMode ? "Broadcast Channel created!" : "P2P Encrypted Group created!", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, isChannelMode ? "Broadcast Channel created!" : "Encrypted Group created!", Toast.LENGTH_SHORT).show();
         Intent intent = new Intent(this, ChatActivity.class);
         intent.putExtra("chatId", groupId);
         intent.putExtra("recipientName", groupName);

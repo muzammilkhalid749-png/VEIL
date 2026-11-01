@@ -3,89 +3,80 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="24dp"
-    android:paddingEnd="24dp"
+    android:orientation="vertical"
+    android:paddingStart="22dp"
     android:paddingTop="12dp"
-    android:paddingBottom="28dp">
+    android:paddingEnd="22dp"
+    android:paddingBottom="26dp">
 
-    <!-- Handle Bar -->
+    <!-- Minimal Drag Handle -->
     <View
         android:layout_width="36dp"
         android:layout_height="4dp"
-        android:background="@color/colorOutline"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_persona_drag_handle" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="⏱️ Vanish Trigger Mode"
-        android:textColor="@color/textPrimary"
-        android:textSize="20sp"
         android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="4dp" />
+        android:text="Vanish Trigger Mode"
+        android:textColor="@color/textPrimary"
+        android:textSize="19sp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="16dp"
         android:text="Choose when the disappearing timer countdown begins:"
         android:textColor="@color/textSecondary"
-        android:textSize="13sp"
-        android:layout_marginBottom="18dp" />
+        android:textSize="13sp" />
 
     <!-- Option 1: After Read -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardVanishAfterRead"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="14dp"
-        app:cardElevation="0dp"
-        app:strokeWidth="1dp"
-        app:strokeColor="@color/colorOutline"
-        app:cardBackgroundColor="@color/surfaceVariant"
+        android:layout_marginBottom="10dp"
         android:clickable="true"
         android:focusable="true"
-        android:layout_marginBottom="12dp">
+        app:cardBackgroundColor="@color/colorSurfaceContainerLow"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:strokeColor="@color/colorOutline"
+        app:strokeWidth="1dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
             android:gravity="center_vertical"
+            android:orientation="horizontal"
             android:padding="16dp">
-
-            <TextView
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:gravity="center"
-                android:text="👁️"
-                android:textSize="20sp"
-                android:background="@drawable/bg_swatch_indigo" />
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginStart="14dp">
+                android:orientation="vertical">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="After Read (Ephemeral)"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="After Read"
                     android:textColor="@color/textPrimary"
-                    android:textSize="15.5sp"
-                    android:textStyle="bold" />
+                    android:textSize="15sp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="Countdown begins only after the recipient opens and views the message"
                     android:textColor="@color/textSecondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="2dp" />
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <RadioButton
@@ -102,51 +93,42 @@
         android:id="@+id/cardVanishAfterSend"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="14dp"
-        app:cardElevation="0dp"
-        app:strokeWidth="1dp"
-        app:strokeColor="@color/colorOutline"
-        app:cardBackgroundColor="@color/surfaceVariant"
         android:clickable="true"
-        android:focusable="true">
+        android:focusable="true"
+        app:cardBackgroundColor="@color/colorSurfaceContainerLow"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:strokeColor="@color/colorOutline"
+        app:strokeWidth="1dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
             android:gravity="center_vertical"
+            android:orientation="horizontal"
             android:padding="16dp">
-
-            <TextView
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:gravity="center"
-                android:text="⏱️"
-                android:textSize="20sp"
-                android:background="@drawable/bg_swatch_emerald" />
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginStart="14dp">
+                android:orientation="vertical">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
                     android:text="After Send"
                     android:textColor="@color/textPrimary"
-                    android:textSize="15.5sp"
-                    android:textStyle="bold" />
+                    android:textSize="15sp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="Countdown begins immediately from the instant message is dispatched"
                     android:textColor="@color/textSecondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="2dp" />
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <RadioButton

@@ -322,7 +322,7 @@ public class ChatsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         final TextView tvUnreadDot;
         final TextView tvTimestamp;
         final TextView tvSnippet;
-        private static final SimpleDateFormat TIME_FMT = new SimpleDateFormat("MMM d, HH:mm", Locale.getDefault());
+        private static final SimpleDateFormat TIME_FMT = new SimpleDateFormat("MMM d, h:mm a", Locale.getDefault());
 
         MessageSearchResultViewHolder(@NonNull View itemView, TextView tvChatName,
                                       TextView tvUnreadDot, TextView tvTimestamp, TextView tvSnippet) {

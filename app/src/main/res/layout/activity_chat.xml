@@ -84,6 +84,7 @@
                         android:singleLine="true" />
 
                     <LinearLayout
+                        android:id="@+id/layoutNormalStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
@@ -115,7 +116,83 @@
                             android:ellipsize="end"
                             android:singleLine="true" />
                     </LinearLayout>
+
+                    <!-- In-Call Subtitle Micro-Pill (Telegram / WhatsApp low-profile style) -->
+                    <LinearLayout
+                        android:id="@+id/chatCallSubtitlePill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:background="@drawable/bg_chat_call_pill"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="7dp"
+                        android:paddingEnd="8dp"
+                        android:paddingTop="2dp"
+                        android:paddingBottom="2dp"
+                        android:visibility="gone"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <View
+                            android:id="@+id/chatCallPillPulseDot"
+                            android:layout_width="6dp"
+                            android:layout_height="6dp"
+                            android:layout_marginEnd="5dp"
+                            android:background="@drawable/bg_green_pulse_dot" />
+
+                        <TextView
+                            android:id="@+id/tvChatCallSubtitleText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Calling 00:08"
+                            android:textColor="@color/colorPrimary"
+                            android:textSize="11.5sp"
+                            android:textStyle="bold"
+                            android:includeFontPadding="false" />
+                    </LinearLayout>
                 </LinearLayout>
+            </LinearLayout>
+
+            <!-- Call-Specific Quick Control Icons (swapped on right during active call) -->
+            <LinearLayout
+                android:id="@+id/layoutChatCallActions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:visibility="gone">
+
+                <!-- Mute Toggle Circular Button -->
+                <ImageView
+                    android:id="@+id/btnChatCallMute"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_chat_call_btn_neutral"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_mic"
+                    app:tint="@color/textPrimary"
+                    android:tint="@color/textPrimary"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Mute or unmute call" />
+
+                <!-- End Call Circular Button -->
+                <ImageView
+                    android:id="@+id/btnChatCallEnd"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="4dp"
+                    android:background="@drawable/bg_chat_call_btn_end"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_call_end"
+                    app:tint="@android:color/white"
+                    android:tint="@android:color/white"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="End active call" />
+
             </LinearLayout>
 
             <ImageView
@@ -500,16 +577,16 @@
 
     </FrameLayout>
 
-    <!-- Bottom Composer Container -->
+    <!-- Bottom Composer Container (Transparent so Chat Wallpaper flows uninterrupted below input & quick features) -->
     <LinearLayout
         android:id="@+id/bottomContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:orientation="vertical"
-        android:background="@color/veil_primary">
+        android:background="@android:color/transparent">
 
-        <!-- VeilChat Quick Action Strip (Blink, Poll, Doodle, Voice Mask, Icebreaker, Smart Reply) -->
+        <!-- VeilChat Quick Action Strip (Blink, Poll, Doodle, Voice Mask, Smart Reply) -->
         <HorizontalScrollView
             android:id="@+id/quickFeaturesScrollView"
             android:layout_width="match_parent"
@@ -519,7 +596,8 @@
             android:paddingEnd="10dp"
             android:paddingTop="6dp"
             android:paddingBottom="2dp"
-            android:clipToPadding="false">
+            android:clipToPadding="false"
+            android:background="@android:color/transparent">
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -583,20 +661,6 @@
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/chipQuickIcebreaker"
-                    android:layout_width="wrap_content"
-                    android:layout_height="28dp"
-                    android:gravity="center"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_filter_chip"
-                    android:text="🎲 Icebreaker"
-                    android:textColor="@color/textSecondary"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-
-                <TextView
                     android:id="@+id/chipQuickSmartReply"
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
@@ -609,19 +673,7 @@
                     android:textSize="11sp"
                     android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/chipQuickP2PGames"
-                    android:layout_width="wrap_content"
-                    android:layout_height="28dp"
-                    android:gravity="center"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp"
-                    android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_filter_chip"
-                    android:text="🎮 P2P Games"
-                    android:textColor="@color/textSecondary"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
+
             </LinearLayout>
         </HorizontalScrollView>
 

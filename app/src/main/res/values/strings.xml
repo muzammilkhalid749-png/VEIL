@@ -105,11 +105,11 @@
     <string name="search_desc">Search across all your conversations</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_title_1">Zero-Knowledge\nEncryption</string>
+    <string name="onboarding_title_1">Private &amp; Secure\nMessaging</string>
     <string name="onboarding_desc_1">All messages are fully encrypted on-device. Only you and your recipient hold the keys.</string>
 
-    <string name="onboarding_title_2">Direct P2P Speed</string>
-    <string name="onboarding_desc_2">Connect directly to peers over a serverless, end-to-end encrypted mesh network.</string>
+    <string name="onboarding_title_2">Fast &amp; Direct</string>
+    <string name="onboarding_desc_2">Send messages and make calls with complete end-to-end privacy.</string>
 
     <string name="onboarding_title_3">Absolute Anonymity</string>
     <string name="onboarding_desc_3">No phone number, email, or personal data required. Leave zero footprints.</string>

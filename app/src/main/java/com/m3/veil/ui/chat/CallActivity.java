@@ -1,226 +1,490 @@
 package com.m3.veil.ui.chat;
 
+
+
 import android.Manifest;
+
+import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
+
 import android.app.PictureInPictureParams;
+
 import android.content.Context;
+
 import android.content.Intent;
+
 import android.content.pm.PackageManager;
+
 import android.content.res.Configuration;
+
 import android.graphics.Color;
+
 import android.media.AudioManager;
+
 import android.media.MediaPlayer;
+
 import android.media.RingtoneManager;
+
 import android.media.ToneGenerator;
+
 import android.net.Uri;
+
 import android.os.Build;
+
 import android.os.Bundle;
+
 import android.os.Handler;
+
 import android.os.Looper;
+
 import android.os.PowerManager;
+
 import android.util.Rational;
+
 import android.view.View;
+
 import android.view.WindowManager;
+
 import android.widget.ImageView;
+
 import android.widget.HorizontalScrollView;
+
 import android.widget.TextView;
+
 import android.widget.Toast;
 
+
+
 import androidx.activity.result.ActivityResultLauncher;
+
 import androidx.activity.result.contract.ActivityResultContracts;
+
 import androidx.annotation.NonNull;
+
 import androidx.appcompat.app.AppCompatActivity;
+
 import androidx.cardview.widget.CardView;
+
 import androidx.core.app.ActivityCompat;
+
 import androidx.core.content.ContextCompat;
 
+
+
 import android.widget.LinearLayout;
+import android.widget.FrameLayout;
+
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+
 import com.google.android.material.button.MaterialButton;
+
 import com.google.firebase.Timestamp;
+
 import com.google.firebase.auth.FirebaseAuth;
+
 import com.m3.veil.R;
+
 import com.m3.veil.calling.CallAudioRoute;
+
 import com.m3.veil.calling.CallConfig;
+
 import com.m3.veil.calling.CallEndReason;
+
 import com.m3.veil.calling.CallEngine;
+
 import com.m3.veil.calling.CallFingerprints;
+
 import com.m3.veil.calling.CallInfo;
+
 import com.m3.veil.calling.CallParticipant;
+
 import com.m3.veil.calling.CallState;
+
 import com.m3.veil.calling.CallType;
+
 import com.m3.veil.calling.CallVideoDevice;
+
 import com.m3.veil.calling.VeilCallService;
+
 import com.m3.veil.database.EncryptedChatDatabase;
+
 import com.m3.veil.manager.VeilFeatureManager;
+
 import com.m3.veil.model.CallRecord;
+
 import com.m3.veil.model.Persona;
+
 import com.m3.veil.utils.UiAnimator;
+import com.m3.veil.utils.SovereignIdentityAndDirectoryEngine;
+import com.m3.veil.utils.VeilAvatarLoader;
+import java.io.File;
+
+
 
 import org.webrtc.SurfaceViewRenderer;
+
 import org.webrtc.VideoTrack;
 
+
+
 import java.util.ArrayList;
+
 import java.util.List;
+
 import java.util.Locale;
+
 import java.util.UUID;
 
+
+
 /**
+
  * Call screen backed by {@link CallEngine}. Handles 1:1 and group calls, real
+
  * screen sharing, mid-call video upgrade consent, verified call E2EE, live
+
  * duration and picture-in-picture.
+
  */
+
 public class CallActivity extends AppCompatActivity {
+
+
 
     public static volatile boolean isCallActive = false;
 
+
+
     public static final String EXTRA_CONTACT_ID = "extra_contact_id";
+
     public static final String EXTRA_CONTACT_NAME = "extra_contact_name";
+
     public static final String EXTRA_CALL_TYPE = "extra_call_type";
+
     public static final String EXTRA_CALL_ID = "extra_call_id";
+
     public static final String EXTRA_IS_INCOMING = "extra_is_incoming";
+
     public static final String EXTRA_FROM_NOTIFICATION = "extra_from_notification";
+
     public static final String EXTRA_DECLINE_ON_START = "extra_decline_on_start";
+
     public static final String EXTRA_AUTO_ANSWER = "extra_auto_answer";
+
     public static final String EXTRA_GROUP_ID = "extra_group_id";
+
     public static final String EXTRA_GROUP_NAME = "extra_group_name";
+
     public static final String EXTRA_PARTICIPANT_IDS = "extra_participant_ids";
+
+
 
     private static final int REQ_PERMISSIONS = 101;
 
+
+
     private String contactId;
+
     private String contactName;
+
     private String callType = "audio";
+
     private boolean isIncoming;
+
     private boolean isGroup;
+
     private String groupId;
+
     private String groupName;
+
     private String[] participantIds;
+
     private String callId;
+
     private String currentUserId = "local_user";
+
     private String currentUsername = null;
 
+
+
     public static boolean isSelfName(String name) {
+
         if (name == null) return true;
+
         String clean = name.trim();
+
         return clean.isEmpty() || "Me".equalsIgnoreCase(clean) || "You".equalsIgnoreCase(clean)
+
                 || "local_user".equalsIgnoreCase(clean) || "null".equalsIgnoreCase(clean);
+
     }
+
+
 
     private String getResolvedUsername() {
+
         if (currentUsername != null && !isSelfName(currentUsername)) return currentUsername;
+
         try {
+
             Persona persona = VeilFeatureManager.getInstance(this).getActivePersona();
+
             if (persona != null && persona.getDisplayName() != null && !isSelfName(persona.getDisplayName())) {
+
                 currentUsername = persona.getDisplayName().trim();
+
                 return currentUsername;
+
             }
+
         } catch (Throwable ignored) {}
+
         try {
+
             if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+
                 String fName = FirebaseAuth.getInstance().getCurrentUser().getDisplayName();
+
                 if (fName != null && !fName.trim().isEmpty() && !isSelfName(fName)) {
+
                     currentUsername = fName.trim();
+
                     return currentUsername;
+
                 }
+
             }
+
         } catch (Throwable ignored) {}
+
         return "Veil User";
+
     }
+
+
 
     private TextView tvContactName;
+
     private TextView tvStatus;
+
     private TextView tvSecurityBadge;
+
     private ImageView ivAvatar;
+
     private ImageView btnEndCall;
+
     private View pulseRing;
+    private View pulseRingMiddle;
+    private View pulseRingOuter;
+    private View avatarGlow;
+    private AnimatorSet pulseAnimatorSet;
+
     private View topCallInfo;
+
     private View callControlsContainer;
+
     private View btnToggleMic;
+
     private View btnToggleSpeaker;
+
     private View btnToggleVideo;
+
     private ImageView ivToggleMic;
+
     private ImageView ivToggleSpeaker;
+
     private ImageView ivToggleVideo;
+
     private TextView tvToggleMic;
+
     private TextView tvToggleSpeaker;
+
     private TextView tvToggleVideo;
+
     private View layoutAcceptCall;
+
     private ImageView btnAcceptCall;
+
     private TextView tvEndCallLabel;
+
     private View btnSwitchCamera;
+
     private View callEffectsRow;
+
     private TextView btnVideoMasking;
+
     private TextView btnVoiceMasking;
+
     private TextView btnScreenShare;
+
     private TextView btnCallMore;
+
     private boolean pendingVideoAcceptOnPermission = false;
 
+
+
     private SurfaceViewRenderer remoteVideoView;
+
     private SurfaceViewRenderer localVideoView;
+
     private CardView cardLocalVideo;
+
     private View videoScrimOverlay;
+
     private View avatarContainer;
 
+
+
+    // Right-Side Floating Vertical Dock
+
+    private View layoutSideDock;
+
+    private View btnDockReaction;
+
+    private View btnDockFlipCamera;
+
+    private View btnDockScreenShare;
+
+    private ImageView ivDockScreenShare;
+
+    private View btnDockVideoMask;
+    private ImageView ivDockVideoMask;
+    private View btnDockVoiceMask;
+    private ImageView ivDockVoiceMask;
+    private View dotDockVoiceMaskActive;
+    private View btnDockRaiseHand;
+    private ImageView ivDockRaiseHand;
+
+    private View btnDockOptions;
+
+
+
+    // Floating Quick Reactions Bar & Canvas
+
+    private LinearLayout reactionsFloatingBar;
+
+    private FrameLayout reactionsOverlayContainer;
+
+
+
     private boolean isMuted;
+
     private boolean isSpeakerOn;
+
     private boolean isVideoActive;
+
     private boolean isConnected;
+
     private boolean accepted;
+
     private boolean finishingCall;
 
+
+
     private CallEngine engine;
+
     private CallState lastState = CallState.NONE;
+
     private VideoTrack attachedRemoteTrack;
+
     private VideoTrack attachedLocalTrack;
+
     private boolean isVideoFeedsSwapped = false;
 
+
+
     private long callStartedAtMs;
+
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
+
     private Runnable timerRunnable;
+
     private ObjectAnimator pulseAnimator;
 
+
+
     private MediaPlayer ringtonePlayer;
+
     private ToneGenerator ringbackTone;
+
     private Runnable ringbackLoop;
+
     private PowerManager.WakeLock proximityWakeLock;
+
     private BottomSheetDialog activeSheet;
+
     private boolean pendingVideoToggleOnPermission;
 
+
+
     private void showSheetSafely(BottomSheetDialog sheet) {
+
         if (sheet == null || isFinishing() || isDestroyed()) return;
+
         dismissActiveSheet();
+
         activeSheet = sheet;
+
         try {
+
             sheet.show();
+
         } catch (Throwable ignored) { }
+
     }
+
+
 
     private void dismissActiveSheet() {
+
         if (activeSheet != null) {
+
             try {
+
                 if (activeSheet.isShowing()) {
+
                     activeSheet.dismiss();
+
                 }
+
             } catch (Throwable ignored) { }
+
             activeSheet = null;
+
         }
+
     }
 
+
+
     private final ActivityResultLauncher<Intent> screenShareLauncher = registerForActivityResult(
+
             new ActivityResultContracts.StartActivityForResult(),
+
             result -> {
+
                 if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+
                     if (engine != null && engine.startScreenShare(result.getData())) {
+
                         toast("Screen sharing started");
+
                     } else {
+
                         toast("Screen sharing unavailable");
+
                     }
+
                 } else {
+
                     toast("Screen sharing cancelled");
+
                 }
+
             });
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -228,1590 +492,3676 @@ public class CallActivity extends AppCompatActivity {
         isCallActive = true;
         applyLockScreenFlags();
 
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                handleUserLeaveOrBack();
+            }
+        });
+
         UiAnimator.enableEdgeToEdge(this, findViewById(android.R.id.content));
-        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK));
-        setContentView(R.layout.activity_call);
 
         readExtras(getIntent());
+
         resolveIdentity();
+
+
+
+        boolean isVideoCall = "video".equalsIgnoreCase(callType);
+
+        int initialBg = isVideoCall ? Color.BLACK : ContextCompat.getColor(this, R.color.colorSurface);
+
+        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(initialBg));
+
+        setContentView(R.layout.activity_call);
+
+
+
         initializeViews();
 
+        updateCallThemeForVideoMode(isVideoCall);
+
+
+
         if (engine == null) {
+
             engine = CallEngine.getInstance(this);
+
             engine.init(currentUserId);
+
             engine.setDisplayName(currentUsername);
+
             engine.addListener(engineListener);
+
         }
 
+
+
         registerCallActionReceiver();
+
         VeilCallService.start(this);
+
+
 
         ensurePermissions();
 
+
+
         if (getIntent().getBooleanExtra(EXTRA_DECLINE_ON_START, false)) {
+
             VeilCallService.stopRingingAndDismissIncomingNotifications(this);
+
             engine.decline(CallEndReason.DECLINED);
+
             finish();
+
             return;
+
         }
+
+
 
         startPulseAnimation();
 
-        boolean autoAnswer = getIntent().getBooleanExtra(EXTRA_AUTO_ANSWER, false)
-                || (engine.getState() == CallState.ACCEPT_SENT
-                    || engine.getState() == CallState.ACCEPT_RECEIVED
-                    || engine.getState().isEstablished());
-        if (isIncoming) {
-            if (engine.getState() == CallState.NONE && contactId != null) {
-                engine.onExternalInvite(contactId, callId, contactName, callType);
+
+
+        if (engine != null && engine.isInCall()) {
+            CallInfo liveInfo = engine.getCallInfo();
+            if (liveInfo != null) {
+                isIncoming = !liveInfo.isCaller();
             }
-            if (autoAnswer) {
-                acceptCall();
-            } else {
-                showIncomingUi();
-            }
-        } else {
-            showOutgoingUi();
-            startOutgoingCall();
         }
+
+        boolean autoAnswer = getIntent().getBooleanExtra(EXTRA_AUTO_ANSWER, false)
+
+                || (engine.getState() == CallState.ACCEPT_SENT
+
+                    || engine.getState() == CallState.ACCEPT_RECEIVED
+
+                    || engine.getState().isEstablished());
+
+        if (isIncoming) {
+
+            if (engine.getState() == CallState.NONE && contactId != null) {
+
+                engine.onExternalInvite(contactId, callId, contactName, callType);
+
+            }
+
+            if (autoAnswer) {
+
+                acceptCall();
+
+            } else {
+
+                showIncomingUi();
+
+            }
+
+        } else {
+
+            showOutgoingUi();
+
+            if (engine.getState() == CallState.NONE) {
+
+                startOutgoingCall();
+
+            }
+
+        }
+
         updateUiFromEngine(engine.getCallInfo());
+
         startTimerLoop();
+
     }
+
+
 
     private boolean isReceiverRegistered = false;
+
     private final android.content.BroadcastReceiver callActionReceiver = new android.content.BroadcastReceiver() {
+
         @Override
+
         public void onReceive(Context context, Intent intent) {
+
             if (intent == null || intent.getAction() == null) return;
+
             String action = intent.getAction();
+
             if (VeilCallService.BROADCAST_CALL_ANSWERED_FROM_NOTIFICATION.equals(action)) {
+
                 runOnUiThread(() -> {
+
                     accepted = true;
+
                     stopRingtone();
+
                     if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
+
                     if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
+
                     if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
+
                     if (tvStatus != null && !isConnected) tvStatus.setText("Connecting\u2026");
+
                     if (engine != null) updateUiFromEngine(engine.getCallInfo());
+
                 });
+
             } else if (VeilCallService.BROADCAST_CALL_TERMINATED.equals(action)) {
+
                 runOnUiThread(() -> {
+
                     stopRingtoneAndRingback();
+
                     if (!isFinishing()) {
+
                         finish();
+
                     }
+
                 });
+
             }
+
         }
+
     };
 
+
+
     private void registerCallActionReceiver() {
+
         if (isReceiverRegistered) return;
+
         try {
+
             android.content.IntentFilter filter = new android.content.IntentFilter();
+
             filter.addAction(VeilCallService.BROADCAST_CALL_ANSWERED_FROM_NOTIFICATION);
+
             filter.addAction(VeilCallService.BROADCAST_CALL_TERMINATED);
+
             ContextCompat.registerReceiver(this, callActionReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
+
             isReceiverRegistered = true;
+
         } catch (Throwable ignored) { }
+
     }
+
+
 
     private void unregisterCallActionReceiver() {
+
         if (!isReceiverRegistered) return;
+
         try {
+
             unregisterReceiver(callActionReceiver);
+
         } catch (Throwable ignored) { }
+
         isReceiverRegistered = false;
+
     }
+
+
 
     private void applyLockScreenFlags() {
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+
             setShowWhenLocked(true);
+
             setTurnScreenOn(true);
+
         } else {
+
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+
                     | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+
         }
+
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
         try {
+
             android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+
             if (km != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
                 km.requestDismissKeyguard(this, null);
+
             }
+
         } catch (Throwable ignored) { }
+
     }
+
+
 
     private void readExtras(Intent intent) {
+
         contactId = intent.getStringExtra(EXTRA_CONTACT_ID);
+
         contactName = intent.getStringExtra(EXTRA_CONTACT_NAME);
+
         if (contactName == null || isSelfName(contactName)) {
+
             if (contactId != null && !contactId.isEmpty() && !contactId.equals(currentUserId)) {
+
                 try {
+
                     com.m3.veil.model.Chat c = EncryptedChatDatabase.getInstance(this).getChat(contactId);
+
                     if (c != null && c.getName() != null && !isSelfName(c.getName())) {
+
                         contactName = c.getName().trim();
+
                     }
+
                 } catch (Throwable ignored) {}
+
+            }
+
+        }
+
+        if (contactName == null || isSelfName(contactName)) contactName = "Veil Contact";
+
+        String type = intent.getStringExtra(EXTRA_CALL_TYPE);
+
+        if (type != null) callType = type;
+
+        isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false);
+        if (engine != null && engine.isInCall()) {
+            CallInfo liveInfo = engine.getCallInfo();
+            if (liveInfo != null) {
+                isIncoming = !liveInfo.isCaller();
             }
         }
-        if (contactName == null || isSelfName(contactName)) contactName = "Veil Contact";
-        String type = intent.getStringExtra(EXTRA_CALL_TYPE);
-        if (type != null) callType = type;
-        isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false);
+
         groupId = intent.getStringExtra(EXTRA_GROUP_ID);
+
         groupName = intent.getStringExtra(EXTRA_GROUP_NAME);
+
         participantIds = intent.getStringArrayExtra(EXTRA_PARTICIPANT_IDS);
+
         isGroup = groupId != null || participantIds != null;
+
         String passed = intent.getStringExtra(EXTRA_CALL_ID);
+
         callId = (passed != null && !passed.isEmpty()) ? passed : UUID.randomUUID().toString();
+
     }
+
+
 
     private void resolveIdentity() {
+
         currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+
         if (currentUserId == null || currentUserId.isEmpty()) {
+
             currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
+
         }
+
         if (currentUserId == null || currentUserId.isEmpty()) {
+
             currentUserId = "local_user";
+
         }
+
         currentUsername = getResolvedUsername();
+
     }
 
+
+
     private void initializeViews() {
+
         tvContactName = findViewById(R.id.callContactName);
+
         tvStatus = findViewById(R.id.callStatusText);
+
         tvSecurityBadge = findViewById(R.id.tvCallSecurityBadge);
+
         ivAvatar = findViewById(R.id.callAvatar);
+
         btnEndCall = findViewById(R.id.btnEndCall);
+
         pulseRing = findViewById(R.id.avatarPulseRing);
+        pulseRingMiddle = findViewById(R.id.avatarPulseRingMiddle);
+        pulseRingOuter = findViewById(R.id.avatarPulseRingOuter);
+        avatarGlow = findViewById(R.id.avatarGlow);
+        loadCallAvatar();
+
         topCallInfo = findViewById(R.id.topCallInfo);
+
         callControlsContainer = findViewById(R.id.callControlsContainer);
+
         btnToggleMic = findViewById(R.id.btnToggleMic);
+
         btnToggleSpeaker = findViewById(R.id.btnToggleSpeaker);
+
         btnToggleVideo = findViewById(R.id.btnToggleVideo);
+
         ivToggleMic = findViewById(R.id.ivToggleMic);
+
         ivToggleSpeaker = findViewById(R.id.ivToggleSpeaker);
+
         ivToggleVideo = findViewById(R.id.ivToggleVideo);
+
         tvToggleMic = findViewById(R.id.tvToggleMic);
+
         tvToggleSpeaker = findViewById(R.id.tvToggleSpeaker);
+
         tvToggleVideo = findViewById(R.id.tvToggleVideo);
+
         layoutAcceptCall = findViewById(R.id.layoutAcceptCall);
+
         btnAcceptCall = findViewById(R.id.btnAcceptCall);
+
         tvEndCallLabel = findViewById(R.id.tvEndCallLabel);
+
         remoteVideoView = findViewById(R.id.remoteVideoView);
+
         localVideoView = findViewById(R.id.localVideoView);
+
         cardLocalVideo = findViewById(R.id.cardLocalVideo);
+
         videoScrimOverlay = findViewById(R.id.videoScrimOverlay);
+
         avatarContainer = findViewById(R.id.avatarContainer);
+
         btnSwitchCamera = findViewById(R.id.btnSwitchCamera);
+
         callEffectsRow = findViewById(R.id.callEffectsRow);
+
         btnVideoMasking = findViewById(R.id.btnVideoMasking);
+
         btnVoiceMasking = findViewById(R.id.btnVoiceMasking);
+
         btnScreenShare = findViewById(R.id.btnScreenShare);
+
         btnCallMore = findViewById(R.id.btnCallMore);
 
+
+
         if (remoteVideoView != null) {
+
             remoteVideoView.setZOrderMediaOverlay(false);
+
             remoteVideoView.setEnableHardwareScaler(true);
+
             remoteVideoView.setMirror(false);
+
         }
+
         if (localVideoView != null) {
+
             localVideoView.setZOrderMediaOverlay(true);
+
             localVideoView.setEnableHardwareScaler(true);
+
             localVideoView.setMirror(true);
+
         }
+
         if ("video".equalsIgnoreCase(callType)) {
+
             if (remoteVideoView != null) {
+
                 remoteVideoView.setVisibility(View.VISIBLE);
+
             }
+
             if (cardLocalVideo != null) {
+
                 cardLocalVideo.setVisibility(View.VISIBLE);
+
             }
+
             if (btnVideoMasking != null) {
+
                 btnVideoMasking.setVisibility(View.VISIBLE);
+
             }
+
         }
+
+
 
         tvContactName.setText(isGroup && groupName != null ? groupName : contactName);
 
+
+
         btnEndCall.setOnClickListener(v -> onEndClicked());
+
         if (btnAcceptCall != null) btnAcceptCall.setOnClickListener(v -> acceptCall());
+
         if (btnToggleMic != null) {
+
             btnToggleMic.setOnClickListener(v -> toggleMute());
+
         }
+
         if (btnToggleSpeaker != null) {
+
             btnToggleSpeaker.setOnClickListener(v -> toggleSpeaker());
+
             btnToggleSpeaker.setOnLongClickListener(v -> {
+
                 showAudioRoutePickerSheet();
+
                 return true;
+
             });
+
         }
+
         if (cardLocalVideo != null) {
+
             cardLocalVideo.setOnClickListener(v -> toggleSwapVideoFeeds());
+
         }
+
         if (localVideoView != null) {
+
             localVideoView.setOnClickListener(v -> toggleSwapVideoFeeds());
+
         }
+
         if (btnToggleVideo != null) {
+
             btnToggleVideo.setOnClickListener(v -> toggleVideo());
+
         }
+
         if (btnSwitchCamera != null) btnSwitchCamera.setOnClickListener(v -> {
             if (engine != null) engine.switchCamera();
         });
+
+        View btnMinimizeCall = findViewById(R.id.btnMinimizeCall);
+        if (btnMinimizeCall != null) {
+            btnMinimizeCall.setOnClickListener(v -> handleUserLeaveOrBack());
+        }
+
         if (btnVideoMasking != null) {
+
             btnVideoMasking.setOnClickListener(v -> showTrustRevealDialog());
+
         }
+
         if (btnVoiceMasking != null) {
+
             btnVoiceMasking.setOnClickListener(v -> showVoiceFilterDialog());
+
         }
+
         if (btnScreenShare != null) {
+
             btnScreenShare.setOnClickListener(v -> {
+
                 if (engine != null && engine.isScreenSharing()) {
+
                     engine.stopScreenShare();
+
                 } else {
+
                     requestScreenShare();
+
+                }
+
+            });
+
+        }
+
+        if (btnCallMore != null) {
+
+            btnCallMore.setOnClickListener(v -> showVideoOptions());
+
+        }
+
+        if (tvSecurityBadge != null) tvSecurityBadge.setOnClickListener(v -> showE2eeDialog());
+
+
+
+        // Right-Side Floating Vertical Dock wiring
+
+        layoutSideDock = findViewById(R.id.layoutSideDock);
+
+        btnDockReaction = findViewById(R.id.btnDockReaction);
+
+        btnDockFlipCamera = findViewById(R.id.btnDockFlipCamera);
+
+        btnDockScreenShare = findViewById(R.id.btnDockScreenShare);
+
+        ivDockScreenShare = findViewById(R.id.ivDockScreenShare);
+
+        btnDockVideoMask = findViewById(R.id.btnDockVideoMask);
+        ivDockVideoMask = findViewById(R.id.ivDockVideoMask);
+
+        btnDockVoiceMask = findViewById(R.id.btnDockVoiceMask);
+        ivDockVoiceMask = findViewById(R.id.ivDockVoiceMask);
+        dotDockVoiceMaskActive = findViewById(R.id.dotDockVoiceMaskActive);
+
+        btnDockRaiseHand = findViewById(R.id.btnDockRaiseHand);
+        ivDockRaiseHand = findViewById(R.id.ivDockRaiseHand);
+
+        btnDockOptions = findViewById(R.id.btnDockOptions);
+
+
+
+        reactionsFloatingBar = findViewById(R.id.reactionsFloatingBar);
+
+        reactionsOverlayContainer = findViewById(R.id.reactionsOverlayContainer);
+
+
+
+        if (btnDockReaction != null) {
+
+            btnDockReaction.setOnClickListener(v -> toggleReactionsFloatingBar());
+
+        }
+
+        if (btnDockFlipCamera != null) {
+
+            btnDockFlipCamera.setOnClickListener(v -> {
+
+                if (engine != null) engine.switchCamera();
+
+            });
+
+        }
+
+        if (btnDockScreenShare != null) {
+
+            btnDockScreenShare.setOnClickListener(v -> {
+
+                if (engine != null && engine.isScreenSharing()) {
+
+                    engine.stopScreenShare();
+
+                } else {
+
+                    requestScreenShare();
+
+                }
+
+            });
+
+        }
+
+        if (btnDockVideoMask != null) {
+
+            btnDockVideoMask.setOnClickListener(v -> showTrustRevealDialog());
+
+        }
+
+        if (btnDockVoiceMask != null) {
+
+            btnDockVoiceMask.setOnClickListener(v -> showVoiceFilterDialog());
+
+        }
+
+        if (btnDockRaiseHand != null) {
+            btnDockRaiseHand.setOnClickListener(v -> {
+                if (engine != null) {
+                    CallParticipant self = engine.getParticipant(currentUserId);
+                    boolean next = self == null || !self.handRaised;
+                    engine.setRaiseHand(next);
+                    toast(next ? "Hand raised" : "Hand lowered");
+                    btnDockRaiseHand.setBackgroundResource(next ? R.drawable.bg_call_dock_item_active : R.drawable.bg_call_dock_item);
+                    if (ivDockRaiseHand != null) {
+                        ivDockRaiseHand.setColorFilter(ContextCompat.getColor(this,
+                                next ? R.color.colorPrimary : R.color.colorTextPrimary));
+                    }
                 }
             });
+
         }
-        if (btnCallMore != null) {
-            btnCallMore.setOnClickListener(v -> showVideoOptions());
+
+        if (btnDockOptions != null) {
+
+            btnDockOptions.setOnClickListener(v -> showCallOptionsSheet());
+
         }
-        if (tvSecurityBadge != null) tvSecurityBadge.setOnClickListener(v -> showE2eeDialog());
+
+
+
+        setupFloatingReactionsBar();
+
     }
 
+
+
     private void ensurePermissions() {
+
         List<String> missing = new ArrayList<>();
+
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+
                 != PackageManager.PERMISSION_GRANTED) {
+
             missing.add(Manifest.permission.RECORD_AUDIO);
+
         }
+
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+
                 != PackageManager.PERMISSION_GRANTED) {
+
             missing.add(Manifest.permission.CAMERA);
+
         }
+
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this,
+
                 "android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+
             missing.add("android.permission.POST_NOTIFICATIONS");
+
         }
+
         if (Build.VERSION.SDK_INT >= 31 && ContextCompat.checkSelfPermission(this,
+
                 "android.permission.BLUETOOTH_CONNECT") != PackageManager.PERMISSION_GRANTED) {
+
             missing.add("android.permission.BLUETOOTH_CONNECT");
+
         }
+
         if (!missing.isEmpty()) {
+
             ActivityCompat.requestPermissions(this, missing.toArray(new String[0]), REQ_PERMISSIONS);
+
         }
+
     }
+
+
 
     // ---- call entry ----------------------------------------------------------
 
+
+
     private void startOutgoingCall() {
+
         CallType type = "video".equalsIgnoreCase(callType) ? CallType.VIDEO : CallType.AUDIO;
+
         if (isGroup && participantIds != null && participantIds.length > 0) {
+
             List<CallEngine.Target> targets = new ArrayList<>();
+
             for (String id : participantIds) {
+
                 if (id == null || id.equals(contactId)) continue;
+
                 targets.add(new CallEngine.Target(id, id));
+
             }
+
             targets.add(0, new CallEngine.Target(contactId, contactName));
+
             engine.startGroupCall(targets, groupId, groupName, type, callId);
+
         } else {
+
             engine.startCall(contactId, contactName, type, callId);
+
         }
-        playRingback();
+
+        // Note: Ringback tone is postponed until the remote device explicitly acknowledges and rings (PRE_ACCEPT_RECEIVED)
+
     }
+
+
 
     private void acceptCall() {
+
         accepted = true;
+
         stopRingtone();
+
         VeilCallService.stopRingingAndDismissIncomingNotifications(this);
+
         if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
+
         if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
+
         if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
+
         if (tvStatus != null && !isConnected) tvStatus.setText("Connecting\u2026");
+
         if (engine != null) {
+
             if (engine.getState() == CallState.RECEIVED_CALL) {
+
                 engine.accept();
+
             }
+
             updateUiFromEngine(engine.getCallInfo());
+
         }
+
     }
 
+
+
     private void onEndClicked() {
+
         if (finishingCall) return;
+
         finishingCall = true;
+
         stopRingtoneAndRingback();
+
         VeilCallService.stopRingingAndDismissIncomingNotifications(this);
+
         if (layoutAcceptCall != null && layoutAcceptCall.getVisibility() == View.VISIBLE) {
+
             if (engine != null) engine.decline(CallEndReason.DECLINED);
+
         } else if (engine != null) {
+
             engine.hangup(CallEndReason.LOCAL_HANGUP);
+
         }
+
         finish();
+
     }
+
+
 
     // ---- engine listener -----------------------------------------------------
 
+
+
     private final CallEngine.Listener engineListener = new CallEngine.Listener() {
+
         @Override public void onStateChanged(CallState state, CallInfo info) {
+
             runOnUiThread(() -> {
+
                 lastState = state;
-                if (state == CallState.ACCEPT_SENT || state == CallState.ACCEPT_RECEIVED) {
+
+                if (state == CallState.PRE_ACCEPT_RECEIVED) {
+
+                    if (!isIncoming && ringbackTone == null) {
+
+                        playRingback();
+
+                    }
+
+                } else if (state == CallState.ACCEPT_SENT || state == CallState.ACCEPT_RECEIVED) {
+
                     accepted = true;
-                    stopRingtone();
-                    VeilCallService.stopRingingAndDismissIncomingNotifications(CallActivity.this);
-                    if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
-                    if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
-                    if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
-                } else if (state == CallState.CONNECTED_LONELY || state == CallState.ACTIVE
-                        || state == CallState.REJOINING) {
-                    if (!isConnected) onConnected();
-                } else if (state.isEnded()) {
+
                     stopRingtoneAndRingback();
+
+                    VeilCallService.stopRingingAndDismissIncomingNotifications(CallActivity.this);
+
+                    if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
+
+                    if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
+
+                    if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
+
+                } else if (state == CallState.CONNECTED_LONELY || state == CallState.ACTIVE
+
+                        || state == CallState.REJOINING) {
+
+                    stopRingtoneAndRingback();
+
+                    if (!isConnected) onConnected();
+
+                } else if (state.isEnded()) {
+
+                    stopRingtoneAndRingback();
+
                     if (!isFinishing()) finish();
+
                     return;
+
                 }
+
                 updateUiFromEngine(info);
+
             });
+
         }
+
+
 
         @Override public void onCallInfoChanged(CallInfo info) {
+
             runOnUiThread(() -> updateUiFromEngine(info));
+
         }
+
+
 
         @Override public void onParticipantChanged(CallParticipant participant) {
+
             runOnUiThread(() -> {
+
                 if (participant != null && participant.reaction != null
-                        && System.currentTimeMillis() - participant.reactionAtMs < 2500L) {
-                    String who = (participant.self || (participant.peerId != null && participant.peerId.equals(currentUserId)))
-                            ? "You" : (participant.name != null ? participant.name : "Peer");
-                    toast(who + " reacted " + participant.reaction);
+
+                        && System.currentTimeMillis() - participant.reactionAtMs < 3000L) {
+
+                    spawnFloatingReaction(participant.reaction, participant.self);
+
                 }
+
                 updateUiFromEngine(engine.getCallInfo());
+
             });
+
         }
+
+
 
         @Override public void onRemoteVideoTrack(String peerId, VideoTrack track, boolean screen) {
+
             runOnUiThread(() -> attachRemoteVideo(track));
+
         }
+
+
 
         @Override public void onRemoteVideoTrackRemoved(String peerId, boolean screen) {
+
             runOnUiThread(() -> {
+
                 if (attachedRemoteTrack != null && remoteVideoView != null) {
+
                     com.m3.veil.calling.CallVideoDevice.removeSink(remoteVideoView, attachedRemoteTrack);
+
                     attachedRemoteTrack = null;
+
                 }
+
                 if (remoteVideoView != null) remoteVideoView.setVisibility(View.GONE);
+
                 if (videoScrimOverlay != null) videoScrimOverlay.setVisibility(View.GONE);
+
                 if (avatarContainer != null) avatarContainer.setVisibility(View.VISIBLE);
+
             });
+
         }
 
+
+
         @Override public void onTopologyChanged(CallEngine.CallTopology topology) {
+
             runOnUiThread(() -> {
+
                 if (topology == CallEngine.CallTopology.SFRAME_RELAY_OVERLAY) {
-                    toast("Scaled to E2EE SFrame Group Mesh (5+ peers)");
+
+                    toast("Group Call Connected (5+ participants)");
+
                 }
+
             });
+
         }
+
+
 
         @Override public void onActiveSpeakerChanged(String peerId, float audioLevel) {
             runOnUiThread(() -> {
-                if (pulseRing != null && isCallActive) {
+                if (pulseRing != null && isCallActive && !isVideoActive) {
                     if (peerId != null && audioLevel > 0.04f) {
                         pulseRing.setVisibility(View.VISIBLE);
-                        float s = 1.0f + Math.min(0.35f, audioLevel * 1.5f);
-                        pulseRing.setScaleX(s);
-                        pulseRing.setScaleY(s);
-                        pulseRing.setAlpha(0.6f);
+                        float sInner = 1.0f + Math.min(0.22f, audioLevel * 1.1f);
+                        float sMid = 1.0f + Math.min(0.35f, audioLevel * 1.6f);
+                        float sOuter = 1.0f + Math.min(0.48f, audioLevel * 2.2f);
+
+                        pulseRing.animate().scaleX(sInner).scaleY(sInner).alpha(0.95f).setDuration(80).start();
+                        if (pulseRingMiddle != null) {
+                            pulseRingMiddle.setVisibility(View.VISIBLE);
+                            pulseRingMiddle.animate().scaleX(sMid).scaleY(sMid).alpha(0.85f).setDuration(100).start();
+                        }
+                        if (pulseRingOuter != null) {
+                            pulseRingOuter.setVisibility(View.VISIBLE);
+                            pulseRingOuter.animate().scaleX(sOuter).scaleY(sOuter).alpha(0.65f).setDuration(120).start();
+                        }
                     } else {
-                        pulseRing.setScaleX(1.0f);
-                        pulseRing.setScaleY(1.0f);
-                        pulseRing.setVisibility(View.GONE);
+                        pulseRing.animate().scaleX(1.0f).scaleY(1.0f).alpha(0.8f).setDuration(300).start();
+                        if (pulseRingMiddle != null) pulseRingMiddle.animate().scaleX(1.0f).scaleY(1.0f).alpha(0.5f).setDuration(350).start();
+                        if (pulseRingOuter != null) pulseRingOuter.animate().scaleX(1.0f).scaleY(1.0f).alpha(0.25f).setDuration(400).start();
                     }
                 }
+
                 // Dynamically switch main remote video feed to the active speaker in group video calls
+
                 if (isCallActive && engine != null && peerId != null && !peerId.equals(currentUserId) && audioLevel > 0.05f) {
+
                     VideoTrack speakerTrack = engine.getRemoteVideoTrack(peerId);
+
                     if (speakerTrack != null && speakerTrack != attachedRemoteTrack) {
+
                         attachRemoteVideo(speakerTrack);
+
                     }
+
                 }
+
             });
+
         }
+
+
 
         @Override public void onVideoUpgradeRequested(String peerId, String peerName) {
+
             runOnUiThread(() -> showVideoUpgradeConsentSheet(peerName));
+
         }
+
+
 
         @Override public void onVideoUpgradeResponded(String peerId, String peerName, boolean accepted) {
+
             runOnUiThread(() -> {
+
                 String who = (peerName != null && !peerName.trim().isEmpty()) ? peerName : "Peer";
+
                 if (accepted) {
+
                     callType = "video";
+
                     isVideoActive = true;
+
                     updateToggle(btnToggleVideo, ivToggleVideo, tvToggleVideo, true, "Video");
+
                     toast(who + " accepted video call");
+
                 } else {
+
                     isVideoActive = false;
+
                     updateToggle(btnToggleVideo, ivToggleVideo, tvToggleVideo, false, "Video");
+
                     toast(who + " declined video call request");
+
                 }
+
                 if (engine != null) updateUiFromEngine(engine.getCallInfo());
+
             });
+
         }
+
+
 
         @Override public void onCallEnded(CallEndReason reason, CallInfo info) {
+
             runOnUiThread(() -> {
+
                 if (remoteVideoView != null) {
+
                     CallVideoDevice.detachRenderer(remoteVideoView, attachedRemoteTrack);
+
                     attachedRemoteTrack = null;
+
                 }
+
                 if (localVideoView != null) {
+
                     CallVideoDevice.detachRenderer(localVideoView, attachedLocalTrack);
+
                     attachedLocalTrack = null;
+
                 }
+
                 stopRingtoneAndRingback();
-                toast(reason != null ? reason.label : "Call ended");
+
+                String endMsg;
+                if (reason == CallEndReason.UNAVAILABLE) {
+                    endMsg = "User is unavailable";
+                } else if (reason == CallEndReason.NO_ANSWER) {
+                    endMsg = "No answer";
+                } else if (reason == CallEndReason.DECLINED) {
+                    endMsg = "Call declined";
+                } else if (reason == CallEndReason.BUSY) {
+                    endMsg = "User is busy";
+                } else {
+                    endMsg = reason != null ? reason.label : "Call ended";
+                }
+                toast(endMsg);
+
                 saveCallRecord(info, reason);
+
                 finish();
+
             });
+
         }
+
+
 
         @Override public void onAudioRouteChanged(CallAudioRoute route) {
+
             runOnUiThread(() -> {
+
                 isSpeakerOn = route == CallAudioRoute.SPEAKER;
+
                 updateToggle(btnToggleSpeaker, ivToggleSpeaker, tvToggleSpeaker, isSpeakerOn, "Speaker");
+
                 applyProximityPolicy();
+
             });
+
         }
+
+
 
         @Override public void onE2eeChanged(boolean enabled, String safetyNumber) {
+
             runOnUiThread(() -> updateSecurityBadge(enabled, safetyNumber));
+
         }
+
+
 
         @Override public void onE2eeFingerprintChanged(String peerId, String safetyNumber) {
+
             runOnUiThread(() -> {
+
                 if (isFinishing()) return;
+
                 BottomSheetDialog sheet = new BottomSheetDialog(CallActivity.this);
+
                 float dp = getResources().getDisplayMetrics().density;
+
                 LinearLayout root = new LinearLayout(CallActivity.this);
+
                 root.setOrientation(LinearLayout.VERTICAL);
+
                 root.setPadding((int) (24 * dp), (int) (20 * dp), (int) (24 * dp), (int) (24 * dp));
 
+
+
                 TextView tvTitle = new TextView(CallActivity.this);
-                tvTitle.setText("⚠️ Security Code Changed");
+
+                tvTitle.setText("âš ï¸ Security Code Changed");
+
                 tvTitle.setTextSize(18f);
+
                 tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+
                 tvTitle.setTextColor(ContextCompat.getColor(CallActivity.this, R.color.textPrimary));
+
                 root.addView(tvTitle);
 
+
+
                 TextView tvMsg = new TextView(CallActivity.this);
+
                 tvMsg.setText("The end-to-end call security code for this peer has changed. Verify the safety number to rule out interception.");
+
                 tvMsg.setTextSize(14f);
+
                 tvMsg.setTextColor(ContextCompat.getColor(CallActivity.this, R.color.textSecondary));
+
                 tvMsg.setPadding(0, (int) (8 * dp), 0, (int) (20 * dp));
+
                 root.addView(tvMsg);
 
+
+
                 MaterialButton btnReview = new MaterialButton(CallActivity.this);
+
                 btnReview.setText("Review Security Code");
+
                 btnReview.setCornerRadius((int) (12 * dp));
+
                 btnReview.setOnClickListener(v -> {
+
                     sheet.dismiss();
+
                     showE2eeDialog();
+
                 });
+
                 root.addView(btnReview);
 
+
+
                 MaterialButton btnDismiss = new MaterialButton(CallActivity.this);
+
                 btnDismiss.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+
                 btnDismiss.setElevation(0);
+
                 btnDismiss.setStrokeWidth(0);
+
                 btnDismiss.setText("Dismiss");
+
                 btnDismiss.setTextColor(ContextCompat.getColor(CallActivity.this, R.color.textSecondary));
+
                 btnDismiss.setOnClickListener(v -> sheet.dismiss());
+
                 root.addView(btnDismiss);
 
+
+
                 sheet.setContentView(root);
+
                 showSheetSafely(sheet);
+
             });
+
         }
+
+
 
         @Override public void onError(String message) {
+
             runOnUiThread(() -> toast(message));
+
         }
+
     };
 
+
+
     private void onConnected() {
+
         isConnected = true;
+
         accepted = true;
+
         callStartedAtMs = System.currentTimeMillis();
+
         stopRingtoneAndRingback();
+
         if (pulseRing != null) pulseRing.setVisibility(View.GONE);
+
         if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
+
         if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
+
         applyProximityPolicy();
+
         if (engine != null) {
+
             updateSecurityBadge(engine.isE2eeEnabled(), engine.getSafetyNumber());
+
             String peerToLookup = contactId != null ? contactId : engine.getPrimaryPeerId();
+
             if (peerToLookup != null) {
+
                 VideoTrack remoteTrack = engine.getRemoteVideoTrack(peerToLookup);
+
                 if (remoteTrack != null) {
+
                     attachRemoteVideo(remoteTrack);
+
                 }
+
             }
+
         }
+
     }
 
+
+
     private void updateUiFromEngine(CallInfo info) {
+
         if (info == null) return;
+
         isMuted = info.isMuted();
+
         isSpeakerOn = info.isSpeakerOn();
+
         isVideoActive = info.isVideoEnabled() || info.isScreenSharing();
 
+
+
         if (info.getState() != CallState.NONE) {
+
             tvContactName.setText(info.isGroup() && info.getGroupName() != null
+
                     ? info.getGroupName() : info.getPeerName());
+
         }
+
+
 
         updateToggle(btnToggleMic, ivToggleMic, tvToggleMic, isMuted, "Mute");
+
         updateToggle(btnToggleSpeaker, ivToggleSpeaker, tvToggleSpeaker, isSpeakerOn, "Speaker");
+
         updateToggle(btnToggleVideo, ivToggleVideo, tvToggleVideo, isVideoActive, "Video");
 
+
+
         if (info.isVideoEnabled() && cardLocalVideo != null) {
+
             cardLocalVideo.setVisibility(View.VISIBLE);
+
             attachLocalVideo(engine.getParticipant(currentUserId));
+
         } else if (cardLocalVideo != null) {
+
             cardLocalVideo.setVisibility(View.GONE);
+
             if (attachedLocalTrack != null && localVideoView != null) {
+
                 com.m3.veil.calling.CallVideoDevice.removeSink(localVideoView, attachedLocalTrack);
+
                 attachedLocalTrack = null;
+
             }
+
         }
+
+
 
         String peerToLookup = contactId != null ? contactId : (engine != null ? engine.getPrimaryPeerId() : null);
+
         com.m3.veil.calling.CallParticipant remoteParticipant = (engine != null && peerToLookup != null) ? engine.getParticipant(peerToLookup) : null;
+
         boolean remoteHasVideo = remoteParticipant != null && remoteParticipant.hasVideo();
 
+
+
         if (remoteHasVideo && engine != null) {
+
             org.webrtc.VideoTrack remoteTrack = remoteParticipant.renderTrack();
+
             if (remoteTrack == null) remoteTrack = engine.getRemoteVideoTrack(peerToLookup);
+
             if (remoteTrack != null) {
+
                 attachRemoteVideo(remoteTrack);
+
             }
+
         } else if (!remoteHasVideo) {
+
             if (attachedRemoteTrack != null && remoteVideoView != null) {
+
                 com.m3.veil.calling.CallVideoDevice.removeSink(remoteVideoView, attachedRemoteTrack);
+
                 attachedRemoteTrack = null;
+
             }
+
             if (remoteVideoView != null) {
+
                 remoteVideoView.setVisibility(View.GONE);
+
             }
+
             if (videoScrimOverlay != null) {
+
                 videoScrimOverlay.setVisibility(View.GONE);
+
             }
+
             if (avatarContainer != null) {
+
                 avatarContainer.setVisibility(View.VISIBLE);
+
             }
+
         }
 
+
+
         if (btnSwitchCamera != null) {
+
             btnSwitchCamera.setVisibility(isVideoActive && !info.isScreenSharing() ? View.VISIBLE : View.GONE);
+
         }
+
+        if (btnDockFlipCamera != null) {
+
+            btnDockFlipCamera.setVisibility(isVideoActive && !info.isScreenSharing() ? View.VISIBLE : View.GONE);
+
+        }
+
         if (btnVideoMasking != null) {
+
             btnVideoMasking.setVisibility(isVideoActive ? View.VISIBLE : View.GONE);
+
             boolean maskActive = engine != null && (engine.isVideoBlurEnabled()
+
                     || engine.isVideoSilhouetteMode()
+
                     || engine.getArMaskMode() != com.m3.veil.utils.VeilArMaskRenderer.MASK_NONE);
+
             btnVideoMasking.setBackgroundResource(maskActive ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+
             btnVideoMasking.setTextColor(ContextCompat.getColor(this,
+
                     maskActive ? R.color.colorPrimary : R.color.colorTextPrimary));
+
         }
+
+        if (btnDockVideoMask != null) {
+
+            btnDockVideoMask.setVisibility(isVideoActive ? View.VISIBLE : View.GONE);
+
+        }
+
+        if (btnDockVoiceMask != null && engine != null) {
+            boolean voiceActive = engine.getVoiceFilter() != com.m3.veil.calling.VoiceMaskingDsp.VoiceFilter.NATURAL;
+            btnDockVoiceMask.setBackgroundResource(voiceActive ? R.drawable.bg_call_dock_item_active : R.drawable.bg_call_dock_item);
+            if (ivDockVoiceMask != null) {
+                ivDockVoiceMask.setColorFilter(ContextCompat.getColor(this,
+                        voiceActive ? R.color.colorPrimary : R.color.colorTextPrimary));
+            }
+            if (dotDockVoiceMaskActive != null) {
+                dotDockVoiceMaskActive.setVisibility(voiceActive ? View.VISIBLE : View.GONE);
+            }
+            androidx.appcompat.widget.TooltipCompat.setTooltipText(btnDockVoiceMask,
+                    voiceActive ? ("Voice FX: " + engine.getVoiceFilter().title) : "Voice FX");
+        }
+
         if (btnVoiceMasking != null && engine != null) {
             boolean voiceActive = engine.getVoiceFilter() != com.m3.veil.calling.VoiceMaskingDsp.VoiceFilter.NATURAL;
             btnVoiceMasking.setBackgroundResource(voiceActive ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
             btnVoiceMasking.setTextColor(ContextCompat.getColor(this,
                     voiceActive ? R.color.colorPrimary : R.color.colorTextPrimary));
-            btnVoiceMasking.setText(voiceActive ? "🎙️ " + engine.getVoiceFilter().title : "🎙️ Voice FX");
+            btnVoiceMasking.setText(voiceActive ? ("Voice FX: " + engine.getVoiceFilter().title) : "Voice FX");
         }
+
         if (btnScreenShare != null) {
             boolean sharing = info.isScreenSharing();
             btnScreenShare.setBackgroundResource(sharing ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
             btnScreenShare.setTextColor(ContextCompat.getColor(this,
                     sharing ? R.color.colorPrimary : R.color.colorTextPrimary));
-            btnScreenShare.setText(sharing ? "📱 Stop Share" : "📱 Share Screen");
+            btnScreenShare.setText(sharing ? "Stop Share" : "Share Screen");
+        }
+
+        if (ivDockScreenShare != null) {
+            ivDockScreenShare.setColorFilter(ContextCompat.getColor(this,
+                    info.isScreenSharing() ? R.color.colorPrimary : R.color.colorTextPrimary));
+        }
+
+        if (btnDockRaiseHand != null) {
+            btnDockRaiseHand.setVisibility(info.isGroup() ? View.VISIBLE : View.GONE);
+            if (info.isGroup() && engine != null) {
+                CallParticipant self = engine.getParticipant(currentUserId);
+                boolean handRaised = self != null && self.handRaised;
+                btnDockRaiseHand.setBackgroundResource(handRaised ? R.drawable.bg_call_dock_item_active : R.drawable.bg_call_dock_item);
+                if (ivDockRaiseHand != null) {
+                    ivDockRaiseHand.setColorFilter(ContextCompat.getColor(this,
+                            handRaised ? R.color.colorPrimary : R.color.colorTextPrimary));
+                }
+            }
         }
 
         int participantCount = info.getParticipantCount();
+
         if (info.getState() == CallState.REJOINING) {
+
             tvStatus.setText("Reconnecting\u2026");
+
         } else if (info.isGroup() && isConnected) {
+
             tvStatus.setText(participantCount + " in call");
+
         } else if (!isConnected) {
+
             switch (info.getState()) {
+
                 case CALLING:
-                    tvStatus.setText("Ringing\u2026");
+
+                    tvStatus.setText("Calling\u2026");
+
                     break;
+
                 case PRE_ACCEPT_RECEIVED:
-                    tvStatus.setText("Ringing (delivered)\u2026");
+
+                    tvStatus.setText("Ringing\u2026");
+
+                    if (!isIncoming && ringbackTone == null) {
+
+                        playRingback();
+
+                    }
+
                     break;
+
                 case RECEIVED_CALL:
+
                     tvStatus.setText("Incoming " + (info.getType() == CallType.VIDEO ? "video call" : "call"));
+
                     break;
+
                 case ACCEPT_SENT:
+
                 case ACCEPT_RECEIVED:
+
                     tvStatus.setText("Connecting\u2026");
+
                     break;
+
                 case REJOINING:
+
                     tvStatus.setText("Reconnecting\u2026");
+
                     break;
+
                 default:
+
                     break;
+
             }
+
         } else {
+
             updateDurationText(info);
+
         }
+
+
 
         if (info.isVideoUpgradePending() && engine != null) {
+
             tvStatus.setText(engine.isLocalVideoUpgradeRequested()
+
                     ? "Waiting for video approval\u2026" : "Video request received");
+
         }
+
         updateSecurityBadge(info.isE2eeEnabled(), info.getSafetyNumber());
+
     }
+
+
 
     private void updateDurationText(CallInfo info) {
+
         long seconds = info.getDurationMs() / 1000L;
+
         String suffix = info.isScreenSharing() ? " \u2022 sharing screen"
+
                 : info.isLowDataMode() ? " \u2022 low data" : "";
+
         tvStatus.setText(String.format(Locale.US, "%02d:%02d%s", seconds / 60, seconds % 60, suffix));
+
     }
+
+
 
     private void updateToggle(View button, ImageView icon, TextView label, boolean active, String name) {
+
         if (label != null) label.setTextColor(ContextCompat.getColor(this,
+
                 active ? R.color.colorPrimary : R.color.colorTextPrimary));
+
         if (icon != null) icon.setColorFilter(ContextCompat.getColor(this,
+
                 active ? R.color.colorPrimary : R.color.colorTextPrimary));
+
         if (button != null) button.setAlpha(active ? 1f : 0.85f);
+
     }
+
+
 
     private void updateSecurityBadge(boolean enabled, String safetyNumber) {
+
         if (tvSecurityBadge == null) return;
+
         if (enabled) {
+
             tvSecurityBadge.setVisibility(View.VISIBLE);
+
             String emojis = engine != null ? engine.getSafetyEmojis() : null;
+
             boolean verified = engine != null && engine.isFingerprintVerified();
+
             if (emojis != null && !emojis.isEmpty()) {
+
                 tvSecurityBadge.setText(emojis);
+
             } else {
+
                 tvSecurityBadge.setText(verified ? "\uD83D\uDD12 Verified" : "\uD83D\uDD12 E2EE");
+
             }
+
             tvSecurityBadge.setTextColor(ContextCompat.getColor(this,
+
                     verified ? R.color.colorPrimary : R.color.colorTextPrimary));
+
         } else if (safetyNumber != null) {
+
             tvSecurityBadge.setVisibility(View.VISIBLE);
+
             tvSecurityBadge.setText("\u26A0 Verify");
+
             tvSecurityBadge.setTextColor(ContextCompat.getColor(this, R.color.colorError));
+
         } else {
+
             tvSecurityBadge.setVisibility(View.GONE);
+
         }
+
     }
+
+
 
     private void showE2eeDialog() {
+
         if (engine == null) return;
+
         boolean encrypted = engine.isE2eeEnabled();
+
         String safetyNumber = engine.getSafetyNumber();
+
         String safetyEmojis = engine.getSafetyEmojis();
+
         boolean verified = engine.isFingerprintVerified();
+
         CallFingerprints.Status status = engine.getFingerprintStatus();
 
+
+
         StringBuilder body = new StringBuilder();
+
         if (encrypted) {
+
             if (safetyEmojis != null && !safetyEmojis.isEmpty()) {
+
                 body.append("Encryption Key Emoji:\n")
+
                         .append(safetyEmojis)
+
                         .append("\n\n")
+
                         .append("These 4 emoji are derived from the encryption key for this call. If they match the emoji on ")
+
                         .append(contactName != null ? contactName : "your contact")
+
                         .append("'s screen, this call is 100% secure.\n\n");
+
             }
+
             body.append("Safety number:\n")
+
                     .append(safetyNumber != null ? safetyNumber : "\u2026")
+
                     .append("\n\n")
+
                     .append(verified ? "\u2705 Marked as verified." : "\u26A0 Not verified yet.");
+
             if (status == CallFingerprints.Status.CHANGED) {
+
                 body.append("\n\u26A0 This code differs from the previously stored one.");
+
             }
+
             body.append("\n\nCompare this with your contact out-of-band to rule out interception.");
+
         } else {
+
             body.append("This call is protected by transport encryption only (DTLS-SRTP). ")
+
                     .append("Frame-level E2EE is unavailable on this build.");
+
         }
+
+
 
         BottomSheetDialog sheet = new BottomSheetDialog(this);
+
         float dp = getResources().getDisplayMetrics().density;
+
         LinearLayout root = new LinearLayout(this);
+
         root.setOrientation(LinearLayout.VERTICAL);
+
         root.setPadding((int) (24 * dp), (int) (18 * dp), (int) (24 * dp), (int) (24 * dp));
 
+
+
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("🔒 End-to-End Call Security");
+
+        tvTitle.setText("ðŸ”’ End-to-End Call Security");
+
         tvTitle.setTextSize(18f);
+
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+
         tvTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+
         root.addView(tvTitle);
 
+
+
         if (encrypted && safetyEmojis != null && !safetyEmojis.isEmpty()) {
+
             TextView tvEmoji = new TextView(this);
+
             tvEmoji.setText(safetyEmojis);
+
             tvEmoji.setTextSize(32f);
+
             tvEmoji.setGravity(android.view.Gravity.CENTER);
+
             tvEmoji.setPadding(0, (int) (14 * dp), 0, (int) (10 * dp));
+
             root.addView(tvEmoji);
+
         }
+
+
 
         if (safetyNumber != null) {
+
             TextView tvNum = new TextView(this);
+
             tvNum.setText(safetyNumber);
+
             tvNum.setTextSize(15f);
+
             tvNum.setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD);
+
             tvNum.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
+
             tvNum.setGravity(android.view.Gravity.CENTER);
+
             tvNum.setPadding(0, (int) (10 * dp), 0, (int) (14 * dp));
+
             root.addView(tvNum);
+
         }
+
+
 
         TextView tvBody = new TextView(this);
+
         tvBody.setText(body.toString());
+
         tvBody.setTextSize(13f);
+
         tvBody.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+
         tvBody.setPadding(0, 0, 0, (int) (16 * dp));
+
         root.addView(tvBody);
 
+
+
         if (encrypted && safetyNumber != null) {
+
             MaterialButton btnVerify = new MaterialButton(this);
+
             btnVerify.setText(verified ? "Clear Verification" : "Mark as Verified");
+
             btnVerify.setCornerRadius((int) (12 * dp));
+
             btnVerify.setOnClickListener(v -> {
+
                 sheet.dismiss();
+
                 engine.setFingerprintVerified(!verified);
+
                 toast(verified ? "Verification cleared" : "Marked as verified");
+
             });
+
             root.addView(btnVerify);
+
         }
 
+
+
         MaterialButton btnClose = new MaterialButton(this);
+
         btnClose.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+
         btnClose.setElevation(0);
+
         btnClose.setStrokeWidth(0);
+
         btnClose.setText("Close");
+
         btnClose.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+
         btnClose.setOnClickListener(v -> sheet.dismiss());
+
         root.addView(btnClose);
 
+
+
         sheet.setContentView(root);
+
         showSheetSafely(sheet);
+
     }
+
+
 
     // ---- controls ------------------------------------------------------------
 
+
+
     private void toggleMute() {
+
         if (engine == null) return;
+
         engine.setMuted(!isMuted);
+
         isMuted = !isMuted;
+
         updateToggle(btnToggleMic, ivToggleMic, tvToggleMic, isMuted, "Mute");
+
     }
+
+
 
     private void toggleSpeaker() {
+
         if (engine == null) return;
+
         engine.setSpeakerOn(!isSpeakerOn);
+
         isSpeakerOn = !isSpeakerOn;
+
         updateToggle(btnToggleSpeaker, ivToggleSpeaker, tvToggleSpeaker, isSpeakerOn, "Speaker");
+
         applyProximityPolicy();
+
     }
+
+
 
     private void toggleVideo() {
+
         if (engine == null) return;
+
         CallInfo info = engine.getCallInfo();
+
         boolean isCurrentlyAudioOnly = (info != null && info.getType() == CallType.AUDIO) && !engine.isVideoEnabled();
+
         if (isCurrentlyAudioOnly) {
+
             if (engine.isLocalVideoUpgradeRequested()) {
+
                 engine.setVideoEnabled(false);
+
                 updateToggle(btnToggleVideo, ivToggleVideo, tvToggleVideo, false, "Video");
+
                 toast("Cancelled video call request");
+
                 return;
+
             }
+
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+
                     != PackageManager.PERMISSION_GRANTED) {
+
                 pendingVideoToggleOnPermission = true;
+
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, REQ_PERMISSIONS);
+
                 return;
+
             }
+
             engine.setVideoEnabled(true);
-            updateToggle(btnToggleVideo, ivToggleVideo, tvToggleVideo, true, "Requesting…");
+
+            updateToggle(btnToggleVideo, ivToggleVideo, tvToggleVideo, true, "Requestingâ€¦");
+
             toast("Requesting video from " + (contactName != null ? contactName : "peer") + "\u2026");
+
             return;
+
         }
+
+
 
         boolean enable = !isVideoActive;
+
         if (enable && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+
                 != PackageManager.PERMISSION_GRANTED) {
+
             pendingVideoToggleOnPermission = true;
+
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, REQ_PERMISSIONS);
+
             return;
+
         }
+
         engine.setVideoEnabled(enable);
+
         isVideoActive = enable;
+
         updateToggle(btnToggleVideo, ivToggleVideo, tvToggleVideo, isVideoActive, "Video");
+
         updateUiFromEngine(engine.getCallInfo());
+
     }
+
+
 
     private void showVideoUpgradeConsentSheet(String peerName) {
+
         if (isFinishing() || isDestroyed() || engine == null) return;
+
         String who = (peerName != null && !peerName.trim().isEmpty()) ? peerName
+
                 : (contactName != null ? contactName : "Your contact");
 
+
+
         BottomSheetDialog sheet = new BottomSheetDialog(this);
+
         sheet.setCancelable(false);
+
         float dp = getResources().getDisplayMetrics().density;
+
         LinearLayout root = new LinearLayout(this);
+
         root.setOrientation(LinearLayout.VERTICAL);
+
         root.setPadding((int) (24 * dp), (int) (20 * dp), (int) (24 * dp), (int) (24 * dp));
 
+
+
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("📹 Video Call Request");
+
+        tvTitle.setText("ðŸ“¹ Video Call Request");
+
         tvTitle.setTextSize(19f);
+
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+
         tvTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+
         root.addView(tvTitle);
 
+
+
         TextView tvMsg = new TextView(this);
+
         tvMsg.setText(who + " wants to switch this audio call to a video call. Your camera will only turn on if you accept.");
+
         tvMsg.setTextSize(14f);
+
         tvMsg.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+
         tvMsg.setPadding(0, (int) (8 * dp), 0, (int) (20 * dp));
+
         root.addView(tvMsg);
 
+
+
         MaterialButton btnAccept = new MaterialButton(this);
+
         btnAccept.setText("Accept & Turn On Camera");
+
         btnAccept.setCornerRadius((int) (12 * dp));
+
         btnAccept.setOnClickListener(v -> {
+
             sheet.dismiss();
+
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+
                     != PackageManager.PERMISSION_GRANTED) {
+
                 pendingVideoAcceptOnPermission = true;
+
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, REQ_PERMISSIONS);
+
                 return;
+
             }
+
             callType = "video";
+
             isVideoActive = true;
+
             if (engine != null) {
+
                 engine.respondVideoUpgrade(true);
+
                 updateUiFromEngine(engine.getCallInfo());
+
             }
+
         });
+
         root.addView(btnAccept);
 
+
+
         MaterialButton btnDecline = new MaterialButton(this);
+
         btnDecline.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+
         btnDecline.setElevation(0);
+
         btnDecline.setStrokeWidth(0);
+
         btnDecline.setText("Decline (Stay on Audio)");
+
         btnDecline.setTextColor(ContextCompat.getColor(this, R.color.colorError));
+
         btnDecline.setOnClickListener(v -> {
+
             sheet.dismiss();
+
             if (engine != null) {
+
                 engine.respondVideoUpgrade(false);
+
                 updateUiFromEngine(engine.getCallInfo());
+
             }
+
         });
+
         root.addView(btnDecline);
 
+
+
         sheet.setContentView(root);
+
         showSheetSafely(sheet);
+
     }
+
+
 
     private void showVideoOptions() {
-        BottomSheetDialog sheet = new BottomSheetDialog(this);
-        float dp = getResources().getDisplayMetrics().density;
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
 
-        TextView title = new TextView(this);
-        title.setText("Reactions & Call Options");
-        title.setTextSize(18f);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
-        title.setPadding(0, 0, 0, (int) (14 * dp));
-        root.addView(title);
+        showCallOptionsSheet();
 
-        // Quick Emoji Reactions Row
-        LinearLayout reactionsRow = new LinearLayout(this);
-        reactionsRow.setOrientation(LinearLayout.HORIZONTAL);
-        reactionsRow.setGravity(android.view.Gravity.CENTER);
-        reactionsRow.setPadding(0, 0, 0, (int) (16 * dp));
-        String[] emojis = {"👍", "❤️", "😂", "🔥", "👏", "🎉"};
-        for (String emoji : emojis) {
-            TextView tvEmoji = new TextView(this);
-            tvEmoji.setText(emoji);
-            tvEmoji.setTextSize(26f);
-            tvEmoji.setPadding((int) (12 * dp), (int) (8 * dp), (int) (12 * dp), (int) (8 * dp));
-            tvEmoji.setBackgroundResource(R.drawable.bg_filter_chip);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.setMargins((int) (4 * dp), 0, (int) (4 * dp), 0);
-            tvEmoji.setLayoutParams(lp);
-            tvEmoji.setOnClickListener(v -> {
-                sheet.dismiss();
-                if (engine != null) engine.sendReaction(emoji);
-            });
-            reactionsRow.addView(tvEmoji);
+    }
+
+
+
+    private void updateCallThemeForVideoMode(boolean isVideo) {
+
+        View root = findViewById(R.id.call_root);
+
+        if (isVideo) {
+
+            if (root != null) root.setBackgroundColor(Color.BLACK);
+
+            getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.BLACK));
+
+            if (videoScrimOverlay != null) videoScrimOverlay.setVisibility(View.VISIBLE);
+
+            if (avatarContainer != null) avatarContainer.setVisibility(View.GONE);
+
+            if (tvContactName != null) tvContactName.setTextColor(Color.WHITE);
+
+            if (tvStatus != null) tvStatus.setTextColor(0xCCFFFFFF);
+
+        } else {
+
+            if (root != null) root.setBackgroundResource(R.drawable.bg_call_screen);
+
+            int surfColor = ContextCompat.getColor(this, R.color.colorSurface);
+
+            getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(surfColor));
+
+            if (videoScrimOverlay != null) videoScrimOverlay.setVisibility(View.GONE);
+
+            if (avatarContainer != null) avatarContainer.setVisibility(View.VISIBLE);
+
+            if (tvContactName != null) tvContactName.setTextColor(ContextCompat.getColor(this, R.color.colorTextPrimary));
+
+            if (tvStatus != null) tvStatus.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
+
         }
-        root.addView(reactionsRow);
 
-        String[] itemIcons = {"👥", "💬", "🔊", "🔄", "📶", "✋"};
-        String[] itemTitles = {
-                "Group Call Participants & Stage Roster",
-                "In-Call Encrypted Quick Chat",
-                "Select Audio Output (Speaker / Bluetooth / Earpiece)",
-                "Swap Local & Remote Video Feeds",
-                engine != null && engine.isLowDataMode() ? "Disable Low-Data Mode" : "Enable Low-Data Mode (Bandwidth Saver)",
-                "Raise / Lower Hand"
+    }
+
+
+
+    private void setupFloatingReactionsBar() {
+
+        if (reactionsFloatingBar == null) return;
+
+        int[] rxIds = {
+
+                R.id.rxHeart, R.id.rxFire, R.id.rxClap,
+
+                R.id.rxLaugh, R.id.rxParty, R.id.rxThumbsUp, R.id.rxMindBlown
+
         };
 
-        for (int i = 0; i < itemTitles.length; i++) {
-            final int actionIndex = i;
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            row.setPadding((int) (12 * dp), (int) (12 * dp), (int) (12 * dp), (int) (12 * dp));
+        for (int id : rxIds) {
 
-            TextView icon = new TextView(this);
-            icon.setText(itemIcons[i]);
-            icon.setTextSize(20f);
-            icon.setPadding(0, 0, (int) (14 * dp), 0);
-            row.addView(icon);
+            TextView tv = findViewById(id);
 
-            TextView text = new TextView(this);
-            text.setText(itemTitles[i]);
-            text.setTextSize(15.5f);
-            text.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
-            text.setTypeface(null, android.graphics.Typeface.BOLD);
-            row.addView(text);
+            if (tv != null) {
 
-            row.setOnClickListener(v -> {
-                sheet.dismiss();
-                if (actionIndex == 0) {
-                    showGroupCallParticipantsSheet();
-                } else if (actionIndex == 1) {
-                    showInCallQuickChatSheet();
-                } else if (actionIndex == 2) {
-                    showAudioRoutePickerSheet();
-                } else if (actionIndex == 3) {
-                    toggleSwapVideoFeeds();
-                } else if (actionIndex == 4) {
-                    if (engine != null) {
-                        boolean next = !engine.isLowDataMode();
-                        engine.setLowDataMode(next);
-                        toast(next ? "Low-data mode enabled" : "Low-data mode disabled");
-                    }
-                } else if (actionIndex == 5) {
-                    if (engine != null) {
-                        CallParticipant self = engine.getParticipant(currentUserId);
-                        boolean next = self == null || !self.handRaised;
-                        engine.setRaiseHand(next);
-                        toast(next ? "✋ Hand raised" : "Hand lowered");
-                    }
-                }
-            });
+                tv.setOnClickListener(v -> {
 
-            root.addView(row);
+                    String emoji = tv.getText().toString();
+
+                    sendCallReaction(emoji);
+
+                    hideReactionsFloatingBar();
+
+                });
+
+            }
+
         }
 
-        sheet.setContentView(root);
-        showSheetSafely(sheet);
     }
+
+
+
+    private void toggleReactionsFloatingBar() {
+
+        if (reactionsFloatingBar == null) return;
+
+        if (reactionsFloatingBar.getVisibility() == View.VISIBLE) {
+
+            hideReactionsFloatingBar();
+
+        } else {
+
+            showReactionsFloatingBar();
+
+        }
+
+    }
+
+
+
+    private void showReactionsFloatingBar() {
+
+        if (reactionsFloatingBar == null) return;
+
+        reactionsFloatingBar.setVisibility(View.VISIBLE);
+
+        reactionsFloatingBar.setAlpha(0f);
+
+        reactionsFloatingBar.setScaleX(0.7f);
+
+        reactionsFloatingBar.setScaleY(0.7f);
+
+        reactionsFloatingBar.animate()
+
+                .alpha(1f)
+
+                .scaleX(1f)
+
+                .scaleY(1f)
+
+                .setDuration(220)
+
+                .setInterpolator(new android.view.animation.OvershootInterpolator(1.2f))
+
+                .start();
+
+    }
+
+
+
+    private void hideReactionsFloatingBar() {
+
+        if (reactionsFloatingBar == null || reactionsFloatingBar.getVisibility() != View.VISIBLE) return;
+
+        reactionsFloatingBar.animate()
+
+                .alpha(0f)
+
+                .scaleX(0.7f)
+
+                .scaleY(0.7f)
+
+                .setDuration(160)
+
+                .withEndAction(() -> reactionsFloatingBar.setVisibility(View.GONE))
+
+                .start();
+
+    }
+
+
+
+    private void sendCallReaction(String emoji) {
+
+        if (engine != null) {
+
+            engine.sendReaction(emoji);
+
+        }
+
+        spawnFloatingReaction(emoji, true);
+
+    }
+
+
+
+    private void spawnFloatingReaction(String emoji, boolean isSelf) {
+
+        if (reactionsOverlayContainer == null || isFinishing() || isDestroyed()) return;
+
+        runOnUiThread(() -> {
+
+            float dp = getResources().getDisplayMetrics().density;
+
+            TextView tvEmoji = new TextView(this);
+
+            tvEmoji.setText(emoji);
+
+            tvEmoji.setTextSize(36f);
+
+            tvEmoji.setGravity(android.view.Gravity.CENTER);
+
+
+
+            int screenW = getResources().getDisplayMetrics().widthPixels;
+
+            int screenH = getResources().getDisplayMetrics().heightPixels;
+
+
+
+            float startX = (float) (screenW * (0.35 + Math.random() * 0.45));
+
+            float startY = screenH - (140f * dp) - (float) (Math.random() * 40f * dp);
+
+
+
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+
+                    FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+
+            tvEmoji.setLayoutParams(lp);
+
+            tvEmoji.setX(startX);
+
+            tvEmoji.setY(startY);
+
+            tvEmoji.setAlpha(0f);
+
+            tvEmoji.setScaleX(0.4f);
+
+            tvEmoji.setScaleY(0.4f);
+
+
+
+            reactionsOverlayContainer.addView(tvEmoji);
+
+
+
+            float targetY = startY - (380f * dp) - (float) (Math.random() * 120f * dp);
+
+            float wobbleX = (float) ((Math.random() - 0.5) * 80f * dp);
+
+
+
+            tvEmoji.animate()
+
+                    .alpha(1f)
+
+                    .scaleX(1.25f)
+
+                    .scaleY(1.25f)
+
+                    .setDuration(240)
+
+                    .withEndAction(() -> {
+
+                        tvEmoji.animate()
+
+                                .scaleX(1f)
+
+                                .scaleY(1f)
+
+                                .translationY(targetY)
+
+                                .translationXBy(wobbleX)
+
+                                .alpha(0f)
+
+                                .setDuration(1800)
+
+                                .setInterpolator(new android.view.animation.DecelerateInterpolator())
+
+                                .withEndAction(() -> reactionsOverlayContainer.removeView(tvEmoji))
+
+                                .start();
+
+                    })
+
+                    .start();
+
+        });
+
+    }
+
+
+
+    private void showCallOptionsSheet() {
+
+        if (engine == null || isFinishing() || isDestroyed()) return;
+
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+
+        View root = getLayoutInflater().inflate(R.layout.dialog_call_options_sheet, null);
+
+
+
+        TextView tvSubtitle = root.findViewById(R.id.tvCallOptionsSubtitle);
+
+        if (tvSubtitle != null) {
+
+            String contact = isGroup && groupName != null ? groupName : (contactName != null ? contactName : "Peer");
+
+            tvSubtitle.setText(contact + " â€¢ " + (engine.isE2eeEnabled() ? "ðŸ”’ E2EE Direct Mesh" : "P2P WebRTC"));
+
+        }
+
+
+
+        // Sheet quick reactions row
+
+        int[] sheetRxIds = {
+
+                R.id.sheetRxHeart, R.id.sheetRxFire, R.id.sheetRxClap,
+
+                R.id.sheetRxLaugh, R.id.sheetRxParty, R.id.sheetRxThumbsUp
+
+        };
+
+        for (int id : sheetRxIds) {
+
+            TextView tv = root.findViewById(id);
+
+            if (tv != null) {
+
+                tv.setOnClickListener(v -> {
+
+                    sheet.dismiss();
+
+                    sendCallReaction(tv.getText().toString());
+
+                });
+
+            }
+
+        }
+
+
+
+        // Audio Output Routing
+
+        View optEarpiece = root.findViewById(R.id.optRouteEarpiece);
+
+        View optSpeaker = root.findViewById(R.id.optRouteSpeaker);
+
+        View optBluetooth = root.findViewById(R.id.optRouteBluetooth);
+
+        ImageView ivCheckEarpiece = root.findViewById(R.id.ivCheckEarpiece);
+
+        ImageView ivCheckSpeaker = root.findViewById(R.id.ivCheckSpeaker);
+
+        ImageView ivCheckBluetooth = root.findViewById(R.id.ivCheckBluetooth);
+
+
+
+        CallAudioRoute currentRoute = engine.getAudioRoute();
+
+        if (ivCheckEarpiece != null) ivCheckEarpiece.setVisibility(currentRoute == CallAudioRoute.EARPIECE ? View.VISIBLE : View.GONE);
+
+        if (ivCheckSpeaker != null) ivCheckSpeaker.setVisibility(currentRoute == CallAudioRoute.SPEAKER ? View.VISIBLE : View.GONE);
+
+        if (ivCheckBluetooth != null) ivCheckBluetooth.setVisibility(currentRoute == CallAudioRoute.BLUETOOTH ? View.VISIBLE : View.GONE);
+
+
+
+        if (optEarpiece != null) {
+
+            optEarpiece.setOnClickListener(v -> {
+
+                engine.setAudioRoute(CallAudioRoute.EARPIECE);
+
+                toast("Audio routed to Phone Earpiece");
+
+                sheet.dismiss();
+
+                isSpeakerOn = false;
+
+                updateToggle(btnToggleSpeaker, ivToggleSpeaker, tvToggleSpeaker, false, "Speaker");
+
+            });
+
+        }
+
+        if (optSpeaker != null) {
+
+            optSpeaker.setOnClickListener(v -> {
+
+                engine.setAudioRoute(CallAudioRoute.SPEAKER);
+
+                toast("Audio routed to Speakerphone");
+
+                sheet.dismiss();
+
+                isSpeakerOn = true;
+
+                updateToggle(btnToggleSpeaker, ivToggleSpeaker, tvToggleSpeaker, true, "Speaker");
+
+            });
+
+        }
+
+        if (optBluetooth != null) {
+
+            optBluetooth.setOnClickListener(v -> {
+
+                engine.setAudioRoute(CallAudioRoute.BLUETOOTH);
+
+                toast("Audio routed to Bluetooth");
+
+                sheet.dismiss();
+
+                isSpeakerOn = false;
+
+                updateToggle(btnToggleSpeaker, ivToggleSpeaker, tvToggleSpeaker, true, "Bluetooth");
+
+            });
+
+        }
+
+
+
+        // Low Data Mode Switch
+
+        com.google.android.material.switchmaterial.SwitchMaterial switchLowData =
+
+                root.findViewById(R.id.switchLowData);
+
+        if (switchLowData != null) {
+
+            switchLowData.setChecked(engine.isLowDataMode());
+
+            switchLowData.setOnCheckedChangeListener((btn, isChecked) -> {
+
+                engine.setLowDataMode(isChecked);
+
+                toast(isChecked ? "Low-Data Mode enabled" : "Low-Data Mode disabled");
+
+            });
+
+        }
+
+
+
+        // In-Call Chat
+
+        View optChat = root.findViewById(R.id.optInCallChat);
+
+        if (optChat != null) {
+
+            optChat.setOnClickListener(v -> {
+
+                sheet.dismiss();
+
+                showInCallQuickChatSheet();
+
+            });
+
+        }
+
+
+
+        // Group Call Participants
+
+        View optParticipants = root.findViewById(R.id.optParticipants);
+
+        if (optParticipants != null) {
+
+            optParticipants.setOnClickListener(v -> {
+
+                sheet.dismiss();
+
+                showGroupCallParticipantsSheet();
+
+            });
+
+        }
+
+
+
+        // Verify E2EE Fingerprint
+
+        View optVerify = root.findViewById(R.id.optVerifyE2ee);
+
+        if (optVerify != null) {
+
+            optVerify.setOnClickListener(v -> {
+
+                sheet.dismiss();
+
+                showE2eeDialog();
+
+            });
+
+        }
+
+
+
+        sheet.setContentView(root);
+
+        showSheetSafely(sheet);
+
+    }
+
+
 
     private void showGroupCallParticipantsSheet() {
+
         if (engine == null) return;
+
         BottomSheetDialog sheet = new BottomSheetDialog(this);
+
         float dp = getResources().getDisplayMetrics().density;
+
         LinearLayout root = new LinearLayout(this);
+
         root.setOrientation(LinearLayout.VERTICAL);
+
         root.setBackgroundResource(R.drawable.bottom_sheet_background);
+
         root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
+
+
 
         CallInfo info = engine.getCallInfo();
+
         java.util.List<CallParticipant> list = (info != null && info.getParticipants() != null)
+
                 ? new java.util.ArrayList<>(info.getParticipants().values()) : engine.getParticipants();
+
         String activeSpeaker = engine.getActiveSpeakerId();
 
+
+
         TextView title = new TextView(this);
+
         String topoName = engine.getTopology() == CallEngine.CallTopology.SFRAME_RELAY_OVERLAY
-                ? "SFrame E2EE Mesh" : (engine.getTopology() == CallEngine.CallTopology.CASCADED_P2P_TREE ? "Cascaded P2P Tree" : "Direct P2P Mesh");
-        title.setText("👥 Call Participants (" + (list != null ? list.size() : 1) + ") • " + topoName);
+
+                ? "Encrypted Group Call" : (engine.getTopology() == CallEngine.CallTopology.CASCADED_P2P_TREE ? "Direct Connection" : "Direct Call Connection");
+
+        title.setText("ðŸ‘¥ Call Participants (" + (list != null ? list.size() : 1) + ") â€¢ " + topoName);
+
         title.setTextSize(17.5f);
+
         title.setTypeface(null, android.graphics.Typeface.BOLD);
+
         title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+
         title.setPadding(0, 0, 0, (int) (6 * dp));
+
         root.addView(title);
+
+
 
         TextView sub = new TextView(this);
+
         sub.setText("Tap any participant with active video to pin their stream to the main stage.");
+
         sub.setTextSize(12.5f);
+
         sub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+
         sub.setPadding(0, 0, 0, (int) (14 * dp));
+
         root.addView(sub);
 
+
+
         android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+
         LinearLayout container = new LinearLayout(this);
+
         container.setOrientation(LinearLayout.VERTICAL);
 
+
+
         if (list != null) {
+
             for (CallParticipant p : list) {
+
                 if (p == null) continue;
+
                 LinearLayout row = new LinearLayout(this);
+
                 row.setOrientation(LinearLayout.HORIZONTAL);
+
                 row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
                 row.setPadding((int) (10 * dp), (int) (10 * dp), (int) (10 * dp), (int) (10 * dp));
 
+
+
                 boolean isSpeaking = p.peerId != null && p.peerId.equals(activeSpeaker) && engine.getActiveSpeakerLevel() > 0.04f;
+
                 String nameLabel = p.self ? (p.name + " (You)") : (p.name != null ? p.name : "Peer");
-                if (p.handRaised) nameLabel += " ✋";
-                if (isSpeaking) nameLabel += " 🔊";
+
+                if (p.handRaised) nameLabel += " âœ‹";
+
+                if (isSpeaking) nameLabel += " ðŸ”Š";
+
+
 
                 TextView tvName = new TextView(this);
+
                 tvName.setText(nameLabel);
+
                 tvName.setTextSize(15f);
+
                 tvName.setTypeface(null, android.graphics.Typeface.BOLD);
+
                 tvName.setTextColor(isSpeaking ? 0xFF10B981 : ContextCompat.getColor(this, R.color.textPrimary));
+
                 LinearLayout.LayoutParams lpName = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+
                 tvName.setLayoutParams(lpName);
+
                 row.addView(tvName);
 
+
+
                 StringBuilder statusBadges = new StringBuilder();
-                if (p.screenSharing) statusBadges.append("🖥️ Screen ");
-                else if (p.videoEnabled) statusBadges.append("📹 Video ");
-                statusBadges.append(p.muted ? "🔇 Muted" : "🎙️ Live");
+
+                if (p.screenSharing) statusBadges.append("ðŸ–¥ï¸ Screen ");
+
+                else if (p.videoEnabled) statusBadges.append("ðŸ“¹ Video ");
+
+                statusBadges.append(p.muted ? "ðŸ”‡ Muted" : "ðŸŽ™ï¸ Live");
+
                 boolean isPeerConnected = "connected".equalsIgnoreCase(p.connectionState) || "completed".equalsIgnoreCase(p.connectionState);
-                if (!p.self && !isPeerConnected) statusBadges.append(" • Ringing...");
+
+                if (!p.self && !isPeerConnected) statusBadges.append(" â€¢ Ringing...");
+
+
 
                 TextView tvStatus = new TextView(this);
+
                 tvStatus.setText(statusBadges.toString());
+
                 tvStatus.setTextSize(12.5f);
+
                 tvStatus.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+
                 row.addView(tvStatus);
 
+
+
                 row.setOnClickListener(v -> {
+
                     if (!p.self && p.peerId != null) {
+
                         VideoTrack vt = engine.getRemoteVideoTrack(p.peerId);
+
                         if (vt != null) {
+
                             attachRemoteVideo(vt);
+
                             toast("Pinned " + (p.name != null ? p.name : "Peer") + "'s video stream");
+
                             sheet.dismiss();
+
                         } else {
+
                             toast((p.name != null ? p.name : "Peer") + " has no active video stream");
+
                         }
+
                     }
+
                 });
+
                 container.addView(row);
+
             }
+
         }
 
+
+
         scroll.addView(container);
+
         root.addView(scroll);
+
         sheet.setContentView(root);
+
         showSheetSafely(sheet);
+
     }
+
+
 
     private void toggleSwapVideoFeeds() {
+
         if (remoteVideoView == null || localVideoView == null) return;
+
         isVideoFeedsSwapped = !isVideoFeedsSwapped;
+
         try {
+
             if (attachedRemoteTrack != null) {
+
                 attachedRemoteTrack.removeSink(remoteVideoView);
+
                 attachedRemoteTrack.removeSink(localVideoView);
+
             }
+
             if (attachedLocalTrack != null) {
+
                 attachedLocalTrack.removeSink(localVideoView);
+
                 attachedLocalTrack.removeSink(remoteVideoView);
+
             }
+
             if (isVideoFeedsSwapped) {
+
                 if (attachedLocalTrack != null) {
+
                     CallVideoDevice.attachRenderer(remoteVideoView, attachedLocalTrack, com.m3.veil.calling.CallMediaFactory.eglBase());
+
                 }
+
                 if (attachedRemoteTrack != null) {
+
                     CallVideoDevice.attachRenderer(localVideoView, attachedRemoteTrack, com.m3.veil.calling.CallMediaFactory.eglBase());
+
                 }
-                toast("🔄 Swapped: Your camera is full-screen");
+
+                toast("ðŸ”„ Swapped: Your camera is full-screen");
+
             } else {
+
                 if (attachedRemoteTrack != null) {
+
                     CallVideoDevice.attachRenderer(remoteVideoView, attachedRemoteTrack, com.m3.veil.calling.CallMediaFactory.eglBase());
+
                 }
+
                 if (attachedLocalTrack != null) {
+
                     CallVideoDevice.attachRenderer(localVideoView, attachedLocalTrack, com.m3.veil.calling.CallMediaFactory.eglBase());
+
                 }
-                toast("🔄 Swapped: Peer camera is full-screen");
+
+                toast("ðŸ”„ Swapped: Peer camera is full-screen");
+
             }
+
         } catch (Throwable ignored) {}
+
     }
 
+
+
     private void showAudioRoutePickerSheet() {
+
         BottomSheetDialog sheet = new BottomSheetDialog(this);
+
         float dp = getResources().getDisplayMetrics().density;
+
         LinearLayout root = new LinearLayout(this);
+
         root.setOrientation(LinearLayout.VERTICAL);
+
         root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
 
+
+
         TextView title = new TextView(this);
-        title.setText("🔊 Audio Output Route");
+
+        title.setText("ðŸ”Š Audio Output Route");
+
         title.setTextSize(18f);
+
         title.setTypeface(null, android.graphics.Typeface.BOLD);
+
         title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+
         title.setPadding(0, 0, 0, (int) (12 * dp));
+
         root.addView(title);
 
+
+
         String[] labels = {
-                "🔈 Speakerphone",
-                "📱 Handset Earpiece",
-                "🎧 Bluetooth Audio Device",
-                "🔌 Wired Headset"
+
+                "ðŸ”ˆ Speakerphone",
+
+                "ðŸ“± Handset Earpiece",
+
+                "ðŸŽ§ Bluetooth Audio Device",
+
+                "ðŸ”Œ Wired Headset"
+
         };
+
+
 
         AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
+
+
         for (int i = 0; i < labels.length; i++) {
+
             final int routeIdx = i;
+
             TextView row = new TextView(this);
+
             row.setText(labels[i]);
+
             row.setTextSize(15.5f);
+
             row.setTypeface(null, android.graphics.Typeface.BOLD);
+
             row.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+
             row.setPadding((int) (12 * dp), (int) (14 * dp), (int) (12 * dp), (int) (14 * dp));
+
             row.setOnClickListener(v -> {
+
                 sheet.dismiss();
+
                 if (engine == null) return;
+
                 if (routeIdx == 0) {
+
                     engine.setSpeakerOn(true);
+
                     isSpeakerOn = true;
+
                     if (am != null) am.stopBluetoothSco();
+
                     if (tvToggleSpeaker != null) tvToggleSpeaker.setText("Speaker");
+
                 } else if (routeIdx == 1) {
+
                     engine.setSpeakerOn(false);
+
                     isSpeakerOn = false;
+
                     if (am != null) am.stopBluetoothSco();
+
                     if (tvToggleSpeaker != null) tvToggleSpeaker.setText("Earpiece");
+
                 } else if (routeIdx == 2) {
+
                     engine.setSpeakerOn(false);
+
                     isSpeakerOn = false;
+
                     if (am != null) {
+
                         try {
+
                             am.startBluetoothSco();
+
                             am.setBluetoothScoOn(true);
+
                         } catch (Throwable ignored) {}
+
                     }
+
                     if (tvToggleSpeaker != null) tvToggleSpeaker.setText("Bluetooth");
+
                 } else if (routeIdx == 3) {
+
                     engine.setSpeakerOn(false);
+
                     isSpeakerOn = false;
+
                     if (am != null) am.stopBluetoothSco();
+
                     if (tvToggleSpeaker != null) tvToggleSpeaker.setText("Headset");
+
                 }
+
                 updateToggle(btnToggleSpeaker, ivToggleSpeaker, tvToggleSpeaker, isSpeakerOn || routeIdx == 2,
+
                         tvToggleSpeaker != null ? tvToggleSpeaker.getText().toString() : "Audio");
+
                 applyProximityPolicy();
+
                 toast("Audio routed to: " + labels[routeIdx]);
+
             });
+
             root.addView(row);
+
         }
 
+
+
         sheet.setContentView(root);
+
         showSheetSafely(sheet);
+
     }
+
+
 
     private void showInCallQuickChatSheet() {
+
         BottomSheetDialog sheet = new BottomSheetDialog(this);
+
         float dp = getResources().getDisplayMetrics().density;
+
         LinearLayout root = new LinearLayout(this);
+
         root.setOrientation(LinearLayout.VERTICAL);
+
         root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
 
+
+
         TextView title = new TextView(this);
-        title.setText("💬 In-Call Encrypted Chat (" + (contactName != null ? contactName : "Peer") + ")");
+
+        title.setText("ðŸ’¬ In-Call Encrypted Chat (" + (contactName != null ? contactName : "Peer") + ")");
+
         title.setTextSize(17.5f);
+
         title.setTypeface(null, android.graphics.Typeface.BOLD);
+
         title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+
         title.setPadding(0, 0, 0, (int) (10 * dp));
+
         root.addView(title);
+
+
 
         String peerId = contactId != null ? contactId : (engine != null ? engine.getPrimaryPeerId() : null);
+
         String chatId = (peerId != null && !peerId.isEmpty())
+
                 ? com.m3.veil.webrtc.WebRtcManager.getChatId(currentUserId, peerId)
+
                 : ("call_chat_" + callId);
 
+
+
         LinearLayout historyBox = new LinearLayout(this);
+
         historyBox.setOrientation(LinearLayout.VERTICAL);
+
         historyBox.setBackgroundResource(R.drawable.bg_search_input);
+
         int pad = (int) (12 * dp);
+
         historyBox.setPadding(pad, pad, pad, pad);
+
         root.addView(historyBox);
 
+
+
         List<com.m3.veil.model.Message> msgs = EncryptedChatDatabase.getInstance(this).getMessagesForChat(chatId);
+
         if (msgs == null || msgs.isEmpty()) {
+
             TextView empty = new TextView(this);
+
             empty.setText("Send a quick encrypted note or link without leaving the call.");
+
             empty.setTextSize(13f);
+
             empty.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+
             historyBox.addView(empty);
+
         } else {
+
             int start = Math.max(0, msgs.size() - 4);
+
             for (int i = start; i < msgs.size(); i++) {
+
                 com.m3.veil.model.Message m = msgs.get(i);
+
                 TextView row = new TextView(this);
+
                 boolean mine = currentUserId.equals(m.getSenderId());
+
                 row.setText((mine ? "You: " : (contactName + ": ")) + m.getContent());
+
                 row.setTextSize(13.5f);
+
                 row.setTextColor(ContextCompat.getColor(this, mine ? R.color.colorPrimary : R.color.textPrimary));
+
                 row.setPadding(0, (int) (3 * dp), 0, (int) (3 * dp));
+
                 historyBox.addView(row);
+
             }
+
         }
 
+
+
         android.widget.EditText etMsg = new android.widget.EditText(this);
+
         etMsg.setHint("Type encrypted in-call message...");
+
         etMsg.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+
         etMsg.setHintTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+
         etMsg.setPadding(0, (int) (12 * dp), 0, (int) (12 * dp));
+
         root.addView(etMsg);
 
+
+
         MaterialButton btnSend = new MaterialButton(this);
-        btnSend.setText("Send Over P2P DataChannel");
+
+        btnSend.setText("Send Message");
+
         btnSend.setCornerRadius((int) (12 * dp));
+
         btnSend.setOnClickListener(v -> {
+
             String text = etMsg.getText().toString().trim();
+
             if (text.isEmpty()) return;
+
             com.m3.veil.model.Message msg = new com.m3.veil.model.Message(
+
                     UUID.randomUUID().toString(),
+
                     currentUserId,
+
                     peerId != null ? peerId : "",
+
                     text,
+
                     Timestamp.now(),
+
                     "text"
+
             );
+
             msg.setChatId(chatId);
+
             msg.setSenderName(currentUsername != null ? currentUsername : "You");
+
             EncryptedChatDatabase.getInstance(this).saveMessage(chatId, msg);
+
             if (peerId != null) {
+
                 com.m3.veil.model.Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
+
                 com.m3.veil.webrtc.WebRtcManager.getInstance(this).sendChatMessageToChat(chat, peerId, msg);
+
             }
+
             sheet.dismiss();
-            toast("💬 Sent encrypted in-call message");
+
+            toast("ðŸ’¬ Sent encrypted in-call message");
+
         });
+
         root.addView(btnSend);
 
+
+
         sheet.setContentView(root);
+
         showSheetSafely(sheet);
+
     }
 
+
+
     private void showVoiceFilterDialog() {
+
         BottomSheetDialog sheet = new BottomSheetDialog(this);
+
         float dp = getResources().getDisplayMetrics().density;
+
         LinearLayout root = new LinearLayout(this);
+
         root.setOrientation(LinearLayout.VERTICAL);
+
         root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
 
+
+
         TextView title = new TextView(this);
+
         title.setText("Real-Time Voice Masking DSP");
+
         title.setTextSize(18f);
+
         title.setTypeface(null, android.graphics.Typeface.BOLD);
+
         title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+
         title.setPadding(0, 0, 0, (int) (6 * dp));
+
         root.addView(title);
 
+
+
         TextView sub = new TextView(this);
+
         sub.setText("Hardware PCM pitch/formant shifting before Opus wire encoding");
+
         sub.setTextSize(13f);
+
         sub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+
         sub.setPadding(0, 0, 0, (int) (16 * dp));
+
         root.addView(sub);
 
+
+
         com.m3.veil.calling.VoiceMaskingDsp.VoiceFilter currentFilter =
+
                 engine != null ? engine.getVoiceFilter() : com.m3.veil.calling.VoiceMaskingDsp.VoiceFilter.NATURAL;
 
+
+
         com.m3.veil.calling.VoiceMaskingDsp.VoiceFilter[] filters = com.m3.veil.calling.VoiceMaskingDsp.VoiceFilter.values();
-        String[] icons = {"🎙️", "🕶️", "🤖", "🐿️", "👻"};
+
+        String[] icons = {"\uD83C\uDF99\uFE0F", "\uD83D\uDD76\uFE0F", "\uD83E\uDD16", "\uD83D\uDC3F\uFE0F", "\uD83D\uDC7B"};
+
         String[] descs = {
+
                 "Natural voice without DSP processing",
+
                 "Deep 0.7x pitch shift with 160Hz low-pass filter",
+
                 "85Hz ring-modulation & bit-crushing effect",
+
                 "1.55x high pitch transposition with formant boost",
+
                 "1200Hz high-pass filter with spectral whisper noise"
+
         };
 
+
+
         for (int i = 0; i < filters.length; i++) {
+
             final com.m3.veil.calling.VoiceMaskingDsp.VoiceFilter filter = filters[i];
+
             boolean selected = (filter == currentFilter);
 
+
+
             LinearLayout row = new LinearLayout(this);
+
             row.setOrientation(LinearLayout.HORIZONTAL);
+
             row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
             row.setPadding((int) (12 * dp), (int) (12 * dp), (int) (12 * dp), (int) (12 * dp));
 
+
+
             TextView icon = new TextView(this);
+
             icon.setText(icons[i % icons.length]);
+
             icon.setTextSize(22f);
+
             icon.setPadding(0, 0, (int) (14 * dp), 0);
+
             row.addView(icon);
 
+
+
             LinearLayout textCol = new LinearLayout(this);
+
             textCol.setOrientation(LinearLayout.VERTICAL);
+
             textCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f));
 
+
+
             TextView name = new TextView(this);
-            name.setText(filter.title + (selected ? "  ✓" : ""));
+
+            name.setText(filter.title + (selected ? "  \u2713" : ""));
+
             name.setTextSize(15.5f);
+
             name.setTextColor(selected ? ContextCompat.getColor(this, R.color.colorPrimary) : ContextCompat.getColor(this, R.color.textPrimary));
+
             name.setTypeface(null, android.graphics.Typeface.BOLD);
+
             textCol.addView(name);
 
+
+
             TextView desc = new TextView(this);
+
             desc.setText(filter.description);
+
             desc.setTextSize(12.5f);
+
             desc.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+
             desc.setPadding(0, (int) (2 * dp), 0, 0);
+
             textCol.addView(desc);
+
+
 
             row.addView(textCol);
 
+
+
             row.setOnClickListener(v -> {
+
                 if (engine != null) {
+
                     engine.setVoiceFilter(filter);
+
                     updateUiFromEngine(engine.getCallInfo());
+
                 }
+
                 toast("Voice Mask: " + filter.title);
+
                 sheet.dismiss();
+
             });
+
+
 
             root.addView(row);
+
         }
 
+
+
         sheet.setContentView(root);
+
         showSheetSafely(sheet);
+
     }
+
+
 
     private void showTrustRevealDialog() {
+
         BottomSheetDialog sheet = new BottomSheetDialog(this);
+
         float dp = getResources().getDisplayMetrics().density;
+
         LinearLayout root = new LinearLayout(this);
+
         root.setOrientation(LinearLayout.VERTICAL);
+
         root.setPadding((int) (20 * dp), (int) (18 * dp), (int) (20 * dp), (int) (24 * dp));
 
+
+
         TextView title = new TextView(this);
+
         title.setText("Video Privacy & Trust Reveal");
+
         title.setTextSize(18f);
+
         title.setTypeface(null, android.graphics.Typeface.BOLD);
+
         title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+
         title.setPadding(0, 0, 0, (int) (6 * dp));
+
         root.addView(title);
 
+
+
         TextView sub = new TextView(this);
+
         sub.setText("Real-time separable box blur & cyberpunk silhouette mask");
+
         sub.setTextSize(13f);
+
         sub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+
         sub.setPadding(0, 0, 0, (int) (16 * dp));
+
         root.addView(sub);
 
+
+
         // Slider: Trust Reveal
+
         TextView sliderLabel = new TextView(this);
+
         com.google.android.material.slider.Slider slider = new com.google.android.material.slider.Slider(this);
+
         slider.setValueFrom(0.0f);
+
         slider.setValueTo(1.0f);
+
         slider.setStepSize(0.05f);
 
+
+
         // Toggle 1: Blur
+
         com.google.android.material.switchmaterial.SwitchMaterial blurSwitch =
+
                 new com.google.android.material.switchmaterial.SwitchMaterial(this);
+
         blurSwitch.setText("Enable Real-Time Face Blur");
+
         blurSwitch.setTextSize(15.5f);
+
         blurSwitch.setChecked(engine != null && engine.isVideoBlurEnabled());
+
         blurSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
+
             if (engine != null) {
+
                 engine.setVideoBlurEnabled(isChecked);
+
                 float nextVal = engine.getTrustRevealLevel();
+
                 slider.setValue(Math.round(nextVal * 20f) / 20f);
+
                 updateUiFromEngine(engine.getCallInfo());
+
             }
+
         });
+
         root.addView(blurSwitch);
 
+
+
         // Toggle 2: Silhouette
+
         com.google.android.material.switchmaterial.SwitchMaterial silSwitch =
+
                 new com.google.android.material.switchmaterial.SwitchMaterial(this);
+
         silSwitch.setText("Cyberpunk Silhouette Mode");
+
         silSwitch.setTextSize(15.5f);
+
         silSwitch.setChecked(engine != null && engine.isVideoSilhouetteMode());
+
         silSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
+
             if (engine != null) {
+
                 engine.setVideoSilhouetteMode(isChecked);
+
                 updateUiFromEngine(engine.getCallInfo());
+
             }
+
         });
+
         root.addView(silSwitch);
 
+
+
         int curPct = Math.round((engine != null ? engine.getTrustRevealLevel() : 1.0f) * 100f);
+
         sliderLabel.setText("Trust Reveal Slider: " + curPct + "% (" + (curPct >= 99 ? "Clear" : "Masked") + ")");
+
         sliderLabel.setTextSize(14f);
+
         sliderLabel.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+
         sliderLabel.setPadding(0, (int) (14 * dp), 0, (int) (4 * dp));
+
         root.addView(sliderLabel);
 
+
+
         slider.setValue(Math.round((engine != null ? engine.getTrustRevealLevel() : 1.0f) * 20f) / 20f);
+
         slider.addOnChangeListener((s, value, fromUser) -> {
+
             if (engine != null) {
+
                 engine.setTrustRevealLevel(value);
+
                 updateUiFromEngine(engine.getCallInfo());
+
             }
+
             int pct = Math.round(value * 100f);
+
             sliderLabel.setText("Trust Reveal Slider: " + pct + "% (" + (pct >= 99 ? "Clear" : "Masked") + ")");
+
         });
+
         root.addView(slider);
 
+
+
         // AR Anonymous Camera Masks (#211)
+
         TextView arTitle = new TextView(this);
+
         arTitle.setText("AR Anonymous Face Masks");
+
         arTitle.setTextSize(15f);
+
         arTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+
         arTitle.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+
         arTitle.setPadding(0, (int) (14 * dp), 0, (int) (6 * dp));
+
         root.addView(arTitle);
 
+
+
         HorizontalScrollView arScroll = new HorizontalScrollView(this);
+
         arScroll.setHorizontalScrollBarEnabled(false);
+
         LinearLayout arContainer = new LinearLayout(this);
+
         arContainer.setOrientation(LinearLayout.HORIZONTAL);
 
+
+
         int curArMask = engine != null ? engine.getArMaskMode() : com.m3.veil.utils.VeilArMaskRenderer.MASK_NONE;
+
         for (int i = 0; i < com.m3.veil.utils.VeilArMaskRenderer.MASK_NAMES.length; i++) {
+
             final int mode = i;
+
             TextView chip = new TextView(this);
+
             chip.setText(com.m3.veil.utils.VeilArMaskRenderer.MASK_ICONS[i] + " " + com.m3.veil.utils.VeilArMaskRenderer.MASK_NAMES[i]);
+
             chip.setTextSize(12.5f);
+
             chip.setPadding((int) (12 * dp), (int) (6 * dp), (int) (12 * dp), (int) (6 * dp));
+
             chip.setBackgroundResource(curArMask == mode ? R.drawable.bg_filter_chip_selected : R.drawable.bg_filter_chip);
+
             chip.setTextColor(curArMask == mode ? Color.WHITE : ContextCompat.getColor(this, R.color.textPrimary));
 
+
+
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+
                     LinearLayout.LayoutParams.WRAP_CONTENT,
+
                     LinearLayout.LayoutParams.WRAP_CONTENT
+
             );
+
             lp.setMargins(0, 0, (int) (6 * dp), 0);
+
             chip.setLayoutParams(lp);
 
+
+
             chip.setOnClickListener(v -> {
+
                 if (engine != null) {
+
                     engine.setArMaskMode(mode);
+
                     updateUiFromEngine(engine.getCallInfo());
+
                 }
+
                 sheet.dismiss();
+
                 toast("AR Mask: " + com.m3.veil.utils.VeilArMaskRenderer.MASK_NAMES[mode]);
+
             });
 
+
+
             arContainer.addView(chip);
+
         }
+
         arScroll.addView(arContainer);
+
         root.addView(arScroll);
 
+
+
         sheet.setContentView(root);
+
         showSheetSafely(sheet);
+
     }
 
+
+
     private void requestScreenShare() {
+
         try {
+
             android.media.projection.MediaProjectionManager manager =
+
                     (android.media.projection.MediaProjectionManager)
+
                             getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+
             if (manager == null) {
+
                 toast("Screen capture unavailable");
+
                 return;
+
             }
+
             screenShareLauncher.launch(manager.createScreenCaptureIntent());
+
         } catch (Throwable t) {
+
             toast("Screen capture unavailable");
+
         }
+
     }
+
+
 
     // ---- video rendering -----------------------------------------------------
 
+
+
     private void attachRemoteVideo(VideoTrack track) {
+
         if (track == null || remoteVideoView == null || isFinishing() || isDestroyed()) return;
+
         try {
+
             if (track.state() == org.webrtc.MediaStreamTrack.State.ENDED) return;
+
         } catch (Throwable ignored) {
+
             return;
+
         }
+
         if (attachedRemoteTrack != track) {
+
             if (attachedRemoteTrack != null) {
+
                 try { attachedRemoteTrack.removeSink(remoteVideoView); } catch (Throwable ignored) { }
+
             }
+
             boolean attached = CallVideoDevice.attachRenderer(remoteVideoView, track,
+
                     com.m3.veil.calling.CallMediaFactory.eglBase());
+
             if (attached) {
+
                 attachedRemoteTrack = track;
+
                 remoteVideoView.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL);
+
                 remoteVideoView.setMirror(false);
+
             }
+
         }
+
         try { track.setEnabled(true); } catch (Throwable ignored) { }
+
         remoteVideoView.setVisibility(View.VISIBLE);
-        if (videoScrimOverlay != null) videoScrimOverlay.setVisibility(View.VISIBLE);
-        if (avatarContainer != null) avatarContainer.setVisibility(View.GONE);
-        View root = findViewById(R.id.call_root);
-        if (root != null) root.setBackground(null);
+
+        updateCallThemeForVideoMode(true);
+
         if (isVideoActive) enterPipIfPossible();
+
     }
 
+
+
     private void attachLocalVideo(CallParticipant self) {
+
         if (localVideoView == null || engine == null || isFinishing() || isDestroyed()) return;
+
         VideoTrack track = engine.getLocalVideoTrack();
+
         if (track == null) return;
+
         try {
+
             if (track.state() == org.webrtc.MediaStreamTrack.State.ENDED) return;
+
         } catch (Throwable ignored) {
+
             return;
+
         }
+
         if (attachedLocalTrack != track) {
+
             if (attachedLocalTrack != null) {
+
                 try { attachedLocalTrack.removeSink(localVideoView); } catch (Throwable ignored) { }
+
             }
+
             boolean attached = CallVideoDevice.attachRenderer(localVideoView, track,
+
                     com.m3.veil.calling.CallMediaFactory.eglBase());
+
             if (attached) {
+
                 attachedLocalTrack = track;
+
                 localVideoView.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL);
+
                 localVideoView.setMirror(true);
+
             }
+
         }
+
         localVideoView.setVisibility(View.VISIBLE);
+
     }
+
+
 
     private void enterPipIfPossible() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         try {
-            PictureInPictureParams params = new PictureInPictureParams.Builder()
-                    .setAspectRatio(new Rational(9, 16))
-                    .build();
-            setPictureInPictureParams(params);
+            PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder()
+                    .setAspectRatio(new Rational(9, 16));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                boolean canAutoPip = isVideoActive && (isConnected || accepted || (engine != null && engine.isInCall()));
+                builder.setAutoEnterEnabled(canAutoPip);
+            }
+            setPictureInPictureParams(builder.build());
         } catch (Throwable ignored) { }
+    }
+
+
+
+    @Override
+    public void onBackPressed() {
+        handleUserLeaveOrBack();
+    }
+
+    private void handleUserLeaveOrBack() {
+        if (activeSheet != null && activeSheet.isShowing()) {
+            dismissActiveSheet();
+            return;
+        }
+
+        // If ringing incoming call not yet accepted, declining on back is standard
+        if (isIncoming && !accepted) {
+            if (engine != null && engine.isInCall()) {
+                engine.decline(CallEndReason.DECLINED);
+            }
+            finish();
+            return;
+        }
+
+        // Ongoing or outgoing call: NEVER drop the call on back press!
+        if (engine != null && engine.isInCall()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isVideoActive) {
+                try {
+                    PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder()
+                            .setAspectRatio(new Rational(9, 16));
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        builder.setAutoEnterEnabled(true);
+                    }
+                    if (enterPictureInPictureMode(builder.build())) {
+                        return;
+                    }
+                } catch (Throwable ignored) { }
+            }
+
+            // Audio call or PiP fallback: move task to back so call stays active in background!
+            moveTaskToBack(true);
+            return;
+        }
+
+        finish();
     }
 
     @Override
     public void onUserLeaveHint() {
         super.onUserLeaveHint();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isVideoActive && isConnected) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isVideoActive && (isConnected || accepted || (engine != null && engine.isInCall()))) {
             try {
-                PictureInPictureParams params = new PictureInPictureParams.Builder()
-                        .setAspectRatio(new Rational(9, 16))
-                        .build();
-                enterPictureInPictureMode(params);
+                PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder()
+                        .setAspectRatio(new Rational(9, 16));
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    builder.setAutoEnterEnabled(true);
+                }
+                enterPictureInPictureMode(builder.build());
             } catch (Throwable ignored) { }
         }
     }
@@ -1819,23 +4169,54 @@ public class CallActivity extends AppCompatActivity {
     @Override
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+
+        View btnMinimizeCall = findViewById(R.id.btnMinimizeCall);
+        if (btnMinimizeCall != null) {
+            btnMinimizeCall.setVisibility(isInPictureInPictureMode ? View.GONE : View.VISIBLE);
+        }
+
+        View sideDock = findViewById(R.id.layoutSideDock);
+        View reactionsBar = findViewById(R.id.reactionsFloatingBar);
+        View reactionsOverlay = findViewById(R.id.reactionsOverlayContainer);
+        View callEffectsRow = findViewById(R.id.callEffectsRow);
+
         if (isInPictureInPictureMode) {
             if (topCallInfo != null) topCallInfo.setVisibility(View.GONE);
             if (callControlsContainer != null) callControlsContainer.setVisibility(View.GONE);
             if (cardLocalVideo != null) cardLocalVideo.setVisibility(View.GONE);
             if (videoScrimOverlay != null) videoScrimOverlay.setVisibility(View.GONE);
+            if (sideDock != null) sideDock.setVisibility(View.GONE);
+            if (reactionsBar != null) reactionsBar.setVisibility(View.GONE);
+            if (reactionsOverlay != null) reactionsOverlay.setVisibility(View.GONE);
+            if (callEffectsRow != null) callEffectsRow.setVisibility(View.GONE);
+            if (avatarContainer != null) avatarContainer.setVisibility(View.GONE);
+            if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
+            if (btnEndCall != null) btnEndCall.setVisibility(View.GONE);
         } else {
             if (topCallInfo != null) topCallInfo.setVisibility(View.VISIBLE);
             if (callControlsContainer != null) callControlsContainer.setVisibility(View.VISIBLE);
             if (cardLocalVideo != null && isVideoActive) cardLocalVideo.setVisibility(View.VISIBLE);
             if (videoScrimOverlay != null) videoScrimOverlay.setVisibility(View.VISIBLE);
+            if (sideDock != null && (isConnected || accepted || isCallActive)) sideDock.setVisibility(View.VISIBLE);
+            if (avatarContainer != null) avatarContainer.setVisibility(isVideoActive ? View.GONE : View.VISIBLE);
+            if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
         }
     }
 
+
+
     // ---- proximity -----------------------------------------------------------
 
+
+
     private void applyProximityPolicy() {
-        boolean shouldHold = isConnected && !isSpeakerOn && !isVideoActive;
+        boolean isCallingOrActive = engine != null && (engine.getState() == CallState.CALLING
+                || engine.getState() == CallState.ACTIVE
+                || engine.getState() == CallState.ACCEPT_RECEIVED
+                || engine.getState() == CallState.ACCEPT_SENT
+                || engine.getState() == CallState.PRE_ACCEPT_RECEIVED
+                || engine.getState() == CallState.REJOINING);
+        boolean shouldHold = (isConnected || accepted || isCallingOrActive) && !isSpeakerOn && !isVideoActive;
         try {
             if (shouldHold) {
                 if (proximityWakeLock == null) {
@@ -1848,213 +4229,471 @@ public class CallActivity extends AppCompatActivity {
                     proximityWakeLock.acquire(60 * 60 * 1000L);
                 }
             } else if (proximityWakeLock != null && proximityWakeLock.isHeld()) {
-                proximityWakeLock.release();
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                    proximityWakeLock.release(PowerManager.RELEASE_FLAG_WAIT_FOR_NO_PROXIMITY);
+                } else {
+                    proximityWakeLock.release();
+                }
             }
         } catch (Throwable ignored) { }
     }
 
     private void releaseProximity() {
         try {
-            if (proximityWakeLock != null && proximityWakeLock.isHeld()) proximityWakeLock.release();
+            if (proximityWakeLock != null && proximityWakeLock.isHeld()) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                    proximityWakeLock.release(PowerManager.RELEASE_FLAG_WAIT_FOR_NO_PROXIMITY);
+                } else {
+                    proximityWakeLock.release();
+                }
+            }
         } catch (Throwable ignored) { }
         proximityWakeLock = null;
     }
 
+
+
     // ---- ringtones -----------------------------------------------------------
 
+
+
     private void playRingback() {
+
         try {
+
             ringbackTone = new ToneGenerator(AudioManager.STREAM_VOICE_CALL, 60);
+
             ringbackLoop = new Runnable() {
+
                 @Override public void run() {
+
                     try {
+
                         if (ringbackTone != null) {
+
                             ringbackTone.startTone(ToneGenerator.TONE_SUP_RINGTONE, 1500);
+
                         }
+
                     } catch (Throwable ignored) { }
+
                     uiHandler.postDelayed(this, 3000);
+
                 }
+
             };
+
             uiHandler.post(ringbackLoop);
+
         } catch (Throwable ignored) { }
+
     }
+
+
 
     private void playRingtone() {
+
         if (engine != null && engine.getCallInfo() != null) {
+
             VeilCallService.startIncomingRinging(this, engine.getCallInfo());
+
         } else {
+
             VeilCallService.startIncomingRinging(this, null);
+
         }
+
     }
+
+
 
     private void stopRingtone() {
+
         try {
+
             if (ringtonePlayer != null) {
+
                 ringtonePlayer.stop();
+
                 ringtonePlayer.release();
+
             }
+
         } catch (Throwable ignored) { }
+
         ringtonePlayer = null;
+
         VeilCallService.stopRingingAndDismissIncomingNotifications(this);
+
     }
 
+
+
     private void stopRingtoneAndRingback() {
+
         stopRingtone();
+
         if (ringbackLoop != null) uiHandler.removeCallbacks(ringbackLoop);
+
         ringbackLoop = null;
+
         try {
+
             if (ringbackTone != null) ringbackTone.release();
+
         } catch (Throwable ignored) { }
+
         ringbackTone = null;
+
     }
+
+
 
     // ---- ui helpers ----------------------------------------------------------
 
+
+
     private void showIncomingUi() {
+
         if (accepted || (engine != null && (engine.getState() == CallState.ACCEPT_SENT
+
                 || engine.getState() == CallState.ACCEPT_RECEIVED
+
                 || engine.getState().isEstablished()))) {
+
             if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
+
             if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
+
             if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
+
             stopRingtone();
+
             return;
+
         }
+
         if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.VISIBLE);
+
         if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
+
         if (tvEndCallLabel != null) tvEndCallLabel.setText("Decline");
+
         tvStatus.setText("Incoming " + ("video".equalsIgnoreCase(callType) ? "video call" : "call"));
+
         if ("video".equalsIgnoreCase(callType) && avatarContainer != null) {
+
             avatarContainer.setVisibility(View.VISIBLE);
+
         }
+
         playRingtone();
+
     }
 
+
+
     private void showOutgoingUi() {
+
         if (layoutAcceptCall != null) layoutAcceptCall.setVisibility(View.GONE);
+
         if (btnEndCall != null) btnEndCall.setVisibility(View.VISIBLE);
+
         if (tvEndCallLabel != null) tvEndCallLabel.setText("End");
-        tvStatus.setText("Calling\u2026");
+
+        if (engine != null && engine.getState() == CallState.PRE_ACCEPT_RECEIVED) {
+            tvStatus.setText("Ringing\u2026");
+        } else if (engine != null && engine.getState().isEstablished()) {
+            updateDurationText(engine.getCallInfo());
+        } else {
+            tvStatus.setText("Calling\u2026");
+        }
+
+    }
+
+
+
+    private void loadCallAvatar() {
+        if (ivAvatar == null) return;
+        String name = isGroup && groupName != null ? groupName : contactName;
+        if (name == null || name.isEmpty()) name = "User";
+
+        String avatarSource = null;
+        if (contactId != null && !contactId.isEmpty()) {
+            File webpFile = SovereignIdentityAndDirectoryEngine.getInstance(this).getAvatarWebpFile(contactId);
+            if (webpFile != null && webpFile.exists() && webpFile.length() > 0) {
+                avatarSource = webpFile.getAbsolutePath();
+            }
+        }
+        if (avatarSource == null && getIntent() != null) {
+            avatarSource = getIntent().getStringExtra("extra_avatar_url");
+        }
+        VeilAvatarLoader.loadAvatar(ivAvatar, avatarSource, name, isGroup);
     }
 
     private void startPulseAnimation() {
         if (pulseRing == null) return;
-        pulseAnimator = ObjectAnimator.ofPropertyValuesHolder(pulseRing,
-                PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.15f),
-                PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.15f),
-                PropertyValuesHolder.ofFloat(View.ALPHA, 0.6f, 0f));
-        pulseAnimator.setDuration(1500);
-        pulseAnimator.setRepeatCount(ObjectAnimator.INFINITE);
-        pulseAnimator.start();
+        if (pulseAnimatorSet != null) {
+            pulseAnimatorSet.cancel();
+            pulseAnimatorSet = null;
+        }
+
+        pulseRing.setVisibility(View.VISIBLE);
+        if (pulseRingMiddle != null) pulseRingMiddle.setVisibility(View.VISIBLE);
+        if (pulseRingOuter != null) pulseRingOuter.setVisibility(View.VISIBLE);
+
+        ObjectAnimator animInner = ObjectAnimator.ofPropertyValuesHolder(pulseRing,
+                PropertyValuesHolder.ofFloat(View.SCALE_X, 1.0f, 1.15f, 1.0f),
+                PropertyValuesHolder.ofFloat(View.SCALE_Y, 1.0f, 1.15f, 1.0f),
+                PropertyValuesHolder.ofFloat(View.ALPHA, 0.95f, 0.5f, 0.95f));
+        animInner.setDuration(2400);
+        animInner.setRepeatCount(ObjectAnimator.INFINITE);
+
+        ObjectAnimator animMid = null;
+        if (pulseRingMiddle != null) {
+            animMid = ObjectAnimator.ofPropertyValuesHolder(pulseRingMiddle,
+                    PropertyValuesHolder.ofFloat(View.SCALE_X, 1.0f, 1.22f, 1.0f),
+                    PropertyValuesHolder.ofFloat(View.SCALE_Y, 1.0f, 1.22f, 1.0f),
+                    PropertyValuesHolder.ofFloat(View.ALPHA, 0.85f, 0.3f, 0.85f));
+            animMid.setDuration(2400);
+            animMid.setStartDelay(380);
+            animMid.setRepeatCount(ObjectAnimator.INFINITE);
+        }
+
+        ObjectAnimator animOuter = null;
+        if (pulseRingOuter != null) {
+            animOuter = ObjectAnimator.ofPropertyValuesHolder(pulseRingOuter,
+                    PropertyValuesHolder.ofFloat(View.SCALE_X, 1.0f, 1.30f, 1.0f),
+                    PropertyValuesHolder.ofFloat(View.SCALE_Y, 1.0f, 1.30f, 1.0f),
+                    PropertyValuesHolder.ofFloat(View.ALPHA, 0.65f, 0.15f, 0.65f));
+            animOuter.setDuration(2400);
+            animOuter.setStartDelay(760);
+            animOuter.setRepeatCount(ObjectAnimator.INFINITE);
+        }
+
+        pulseAnimatorSet = new AnimatorSet();
+        pulseAnimatorSet.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        if (animMid != null && animOuter != null) {
+            pulseAnimatorSet.playTogether(animInner, animMid, animOuter);
+        } else {
+            pulseAnimatorSet.play(animInner);
+        }
+        pulseAnimatorSet.start();
     }
+
+
 
     private void startTimerLoop() {
+
         timerRunnable = new Runnable() {
+
             @Override public void run() {
+
                 CallInfo info = engine != null ? engine.getCallInfo() : null;
+
                 if (isConnected && info != null) updateDurationText(info);
+
                 uiHandler.postDelayed(this, 1000);
+
             }
+
         };
+
         uiHandler.postDelayed(timerRunnable, 1000);
+
     }
+
+
 
     private void saveCallRecord(CallInfo info, CallEndReason reason) {
-        try {
-            long durationSeconds = info != null ? info.getDurationMs() / 1000L : 0;
-            String status = reason != null ? reason.logStatus() : "completed";
-            String selfName = getResolvedUsername();
-            String safeContact = (contactName != null && !isSelfName(contactName)) ? contactName.trim() : "Veil Contact";
-            String callerId = isIncoming ? contactId : currentUserId;
-            String callerName = isIncoming ? safeContact : selfName;
-            String receiverId = isIncoming ? currentUserId : contactId;
-            String receiverName = isIncoming ? selfName : safeContact;
-            String peerId = (contactId != null && !contactId.equals(currentUserId)) ? contactId : (isIncoming ? callerId : receiverId);
-            String peerName = safeContact;
-            CallRecord record = new CallRecord(callId, peerId, peerName, callerId, callerName, receiverId, receiverName,
-                    callType, status, (int) durationSeconds, Timestamp.now());
-            EncryptedChatDatabase.getInstance(this).saveCallRecord(record);
+        final Context appContext = getApplicationContext();
+        android.os.AsyncTask.THREAD_POOL_EXECUTOR.execute(() -> {
+            try {
+                long durationSeconds = info != null ? info.getDurationMs() / 1000L : 0;
+                String status = reason != null ? reason.logStatus() : "completed";
+                String selfName = getResolvedUsername();
+                String safeContact = (contactName != null && !isSelfName(contactName)) ? contactName.trim() : "Veil Contact";
+                String callerId = isIncoming ? contactId : currentUserId;
+                String callerName = isIncoming ? safeContact : selfName;
+                String receiverId = isIncoming ? currentUserId : contactId;
+                String receiverName = isIncoming ? selfName : safeContact;
+                String peerId = (contactId != null && !contactId.equals(currentUserId)) ? contactId : (isIncoming ? callerId : receiverId);
+                String peerName = safeContact;
 
-            if (!isIncoming && contactId != null && !contactId.isEmpty()) {
-                String chatId = com.m3.veil.webrtc.WebRtcManager.getChatId(currentUserId, contactId);
-                com.m3.veil.model.Message callMsg = EncryptedChatDatabase.getInstance(this).getMessageById("call_" + callId);
-                if (callMsg != null) {
-                    try {
-                        com.m3.veil.model.Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
-                        com.m3.veil.webrtc.WebRtcManager.getInstance(this).sendChatMessageToChat(chat, contactId, callMsg);
-                    } catch (Throwable ignored) {}
+                CallRecord record = new CallRecord(callId, peerId, peerName, callerId, callerName, receiverId, receiverName,
+                        callType, status, (int) durationSeconds, Timestamp.now());
+                EncryptedChatDatabase.getInstance(appContext).saveCallRecord(record);
+
+                if (!isIncoming && contactId != null && !contactId.isEmpty()) {
+                    String chatId = com.m3.veil.webrtc.WebRtcManager.getChatId(currentUserId, contactId);
+                    com.m3.veil.model.Message callMsg = EncryptedChatDatabase.getInstance(appContext).getMessageById("call_" + callId);
+                    if (callMsg != null) {
+                        try {
+                            com.m3.veil.model.Chat chat = EncryptedChatDatabase.getInstance(appContext).getChat(chatId);
+                            com.m3.veil.webrtc.WebRtcManager.getInstance(appContext).sendChatMessageToChat(chat, contactId, callMsg);
+                        } catch (Throwable ignored) {}
+                    }
                 }
-            }
-        } catch (Throwable ignored) { }
+            } catch (Throwable ignored) { }
+        });
     }
+
+
 
     private void toast(String message) {
+
         if (message == null || isFinishing()) return;
+
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+
     }
 
+
+
     @Override
+
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+
                                            @NonNull int[] grantResults) {
+
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
         if (requestCode == REQ_PERMISSIONS) {
+
             boolean cameraGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+
                     == PackageManager.PERMISSION_GRANTED;
+
             for (int i = 0; i < permissions.length && i < grantResults.length; i++) {
+
                 if (grantResults[i] != PackageManager.PERMISSION_GRANTED
+
                         && Manifest.permission.RECORD_AUDIO.equals(permissions[i])) {
+
                     toast("Microphone permission is required for calls");
+
                 }
+
             }
+
             if (engine != null) {
+
                 engine.onPermissionsGranted();
+
                 if (pendingVideoAcceptOnPermission && cameraGranted) {
+
                     pendingVideoAcceptOnPermission = false;
+
                     callType = "video";
+
                     isVideoActive = true;
+
                     engine.respondVideoUpgrade(true);
+
                 } else if (pendingVideoToggleOnPermission && cameraGranted) {
+
                     pendingVideoToggleOnPermission = false;
+
                     toggleVideo();
+
                 }
+
                 updateUiFromEngine(engine.getCallInfo());
+
             }
+
+        }
+
+    }
+
+
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (isVideoActive) {
+            enterPipIfPossible();
         }
     }
 
     @Override
     protected void onNewIntent(@NonNull Intent intent) {
+
         super.onNewIntent(intent);
+
         setIntent(intent);
+
         if (intent.getBooleanExtra(EXTRA_DECLINE_ON_START, false)) {
+
             VeilCallService.stopRingingAndDismissIncomingNotifications(this);
+
             if (engine != null) engine.decline(CallEndReason.DECLINED);
+
             finish();
+
             return;
+
         }
+
         readExtras(intent);
-        if (intent.getBooleanExtra(EXTRA_AUTO_ANSWER, false)
-                || (engine != null && (engine.getState() == CallState.ACCEPT_SENT
-                    || engine.getState() == CallState.ACCEPT_RECEIVED
-                    || engine.getState().isEstablished()))) {
-            acceptCall();
-            return;
+
+        if (engine != null && engine.isInCall()) {
+            CallInfo ci = engine.getCallInfo();
+            if (ci != null) {
+                isIncoming = !ci.isCaller();
+            }
         }
-        if (isIncoming) showIncomingUi();
+
+        if (isIncoming) {
+            if (intent.getBooleanExtra(EXTRA_AUTO_ANSWER, false)
+
+                    || (engine != null && (engine.getState() == CallState.ACCEPT_SENT
+
+                        || engine.getState() == CallState.ACCEPT_RECEIVED
+
+                        || engine.getState().isEstablished()))) {
+
+                acceptCall();
+
+                return;
+
+            }
+
+            showIncomingUi();
+        } else {
+            showOutgoingUi();
+            if (engine != null && engine.getCallInfo() != null) {
+                updateUiFromEngine(engine.getCallInfo());
+            }
+        }
+
     }
 
+
+
     @Override
+
     protected void onDestroy() {
+
         unregisterCallActionReceiver();
+
         dismissActiveSheet();
+
         super.onDestroy();
+
         isCallActive = false;
+
         stopRingtoneAndRingback();
+
         releaseProximity();
+
         if (timerRunnable != null) uiHandler.removeCallbacks(timerRunnable);
+
         if (pulseAnimator != null) pulseAnimator.cancel();
+        if (pulseAnimatorSet != null) pulseAnimatorSet.cancel();
+
         if (engine != null) {
-            if (isFinishing() && engine.isInCall()) {
+            if (finishingCall && engine.isInCall()) {
                 if (isIncoming && !accepted) {
                     engine.decline(CallEndReason.DECLINED);
                 } else {
@@ -2063,13 +4702,24 @@ public class CallActivity extends AppCompatActivity {
             }
             engine.removeListener(engineListener);
         }
+
         if (remoteVideoView != null) {
+
             CallVideoDevice.detachRenderer(remoteVideoView, attachedRemoteTrack);
+
             attachedRemoteTrack = null;
+
         }
+
         if (localVideoView != null) {
+
             CallVideoDevice.detachRenderer(localVideoView, attachedLocalTrack);
+
             attachedLocalTrack = null;
+
         }
+
     }
+
 }
+

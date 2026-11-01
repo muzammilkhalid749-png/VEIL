@@ -167,9 +167,12 @@ public class P2PFileTransferHelper {
             Bitmap thumb = null;
             if (mediaType != null && (mediaType.startsWith("video") || mediaType.contains("video"))) {
                 MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-                mmr.setDataSource(file.getAbsolutePath());
-                thumb = mmr.getFrameAtTime(1000000);
-                mmr.release();
+                try {
+                    mmr.setDataSource(file.getAbsolutePath());
+                    thumb = mmr.getFrameAtTime(1000000);
+                } finally {
+                    try { mmr.release(); } catch (Throwable ignored) {}
+                }
             } else if (mediaType != null && (mediaType.startsWith("image") || mediaType.contains("image"))) {
                 BitmapFactory.Options opts = new BitmapFactory.Options();
                 opts.inSampleSize = 4;

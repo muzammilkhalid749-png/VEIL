@@ -1,169 +1,509 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/statusSheetRoot"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="24dp"
-    android:paddingEnd="24dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="28dp">
+    android:layout_height="match_parent"
+    android:background="@drawable/bottom_sheet_background">
 
-    <!-- Handle Bar -->
-    <View
-        android:layout_width="36dp"
-        android:layout_height="4dp"
-        android:background="@color/colorOutline"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Create Status Update"
-        android:textColor="@color/textPrimary"
-        android:textSize="18sp"
-        android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="4dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Visible to your contacts · Auto-expires in 24 hours"
-        android:textColor="@color/textSecondary"
-        android:textSize="13sp"
-        android:layout_marginBottom="18dp" />
-
-    <!-- Option 1: Text Status Card -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardTextStatusOption"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="0dp"
-        app:strokeWidth="1dp"
-        app:strokeColor="@color/colorOutline"
-        app:cardBackgroundColor="@color/surfaceVariant"
-        android:clickable="true"
-        android:focusable="true"
-        android:layout_marginBottom="12dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingTop="10dp">
 
+        <!-- Modern Drag Handle -->
+        <View
+            android:layout_width="36dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_persona_drag_handle" />
+
+        <!-- Top Header Row: Close (X) on Left + Centered Title ("Add status" / "Start layout") -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
+            android:layout_height="46dp"
             android:gravity="center_vertical"
-            android:padding="16dp">
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
 
             <FrameLayout
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_swatch_indigo">
+                android:id="@+id/btnCloseStatusChoice"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
                     android:layout_gravity="center"
-                    android:text="✏️"
-                    android:textSize="20sp" />
+                    android:contentDescription="Close"
+                    android:src="@drawable/ic_close"
+                    app:tint="@color/colorTextPrimary" />
             </FrameLayout>
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/tvStatusSheetTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginStart="14dp">
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:text="Add status"
+                android:textColor="@color/colorTextPrimary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <!-- Symmetry Spacer -->
+            <View
+                android:layout_width="38dp"
+                android:layout_height="38dp" />
+        </LinearLayout>
+
+        <!-- Layout Mode Subtitle ("Choose up to 6 photos for your layout.") -->
+        <TextView
+            android:id="@+id/tvLayoutModeSubtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="10dp"
+            android:gravity="center"
+            android:text="Choose up to 6 photos for your layout."
+            android:textColor="@color/colorTextSecondary"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+        <!-- 4 Quick Creation Mode Pills Row (Text, Music, Layout, Voice) -->
+        <LinearLayout
+            android:id="@+id/layoutQuickStatusModes"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="14dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
+
+            <!-- 1. Text -->
+            <LinearLayout
+                android:id="@+id/btnQuickText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:layout_width="68dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_status_quick_btn">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_edit"
+                        app:tint="@color/colorTextPrimary" />
+                </FrameLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Text Status"
-                    android:textColor="@color/textPrimary"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Text"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textSize="12.5sp" />
+            </LinearLayout>
+
+            <!-- 2. Music / Audio Vibe -->
+            <LinearLayout
+                android:id="@+id/btnQuickMusic"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:layout_width="68dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_status_quick_btn">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_music_note"
+                        app:tint="@color/colorTextPrimary" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Music"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textSize="12.5sp" />
+            </LinearLayout>
+
+            <!-- 3. Layout (Collage up to 6 photos) -->
+            <LinearLayout
+                android:id="@+id/btnQuickLayout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:layout_width="68dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_status_quick_btn">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_status_layout"
+                        app:tint="@color/colorTextPrimary" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Layout"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textSize="12.5sp" />
+            </LinearLayout>
+
+            <!-- 4. Voice -->
+            <LinearLayout
+                android:id="@+id/btnQuickVoice"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:layout_width="68dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_status_quick_btn">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_mic"
+                        app:tint="@color/colorTextPrimary" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Voice"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textSize="12.5sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Album Selector Row ("Recents ▼") -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <LinearLayout
+                android:id="@+id/layoutStatusAlbumSelector"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="4dp"
+                android:paddingEnd="10dp">
+
+                <TextView
+                    android:id="@+id/tvStatusCurrentAlbum"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Recents"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:id="@+id/ivStatusAlbumChevron"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="6dp"
+                    android:src="@drawable/ic_chevron_down"
+                    app:tint="@color/colorTextPrimary" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/tvStatusSelectionHint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/colorTextSecondary"
+                android:textSize="12.5sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Gallery Grid & Floating Album Dropdown Container -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <!-- 3-Column Gallery Grid (Item 0 = Camera Tile, 1..N = Photos/Videos/GIFs) -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvStatusGalleryGrid"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:padding="2dp"
+                android:paddingBottom="80dp" />
+
+            <ProgressBar
+                android:id="@+id/statusGalleryProgressBar"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="center"
+                android:indeterminateTint="@color/veil_accent"
+                android:visibility="gone" />
+
+            <!-- Permission / Empty Fallback Card -->
+            <LinearLayout
+                android:id="@+id/layoutStatusGalleryPermission"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="32dp"
+                android:visibility="gone">
+
+                <FrameLayout
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:background="@drawable/bg_persona_avatar_circle"
+                    android:backgroundTint="@color/colorSurfaceVariant">
+
+                    <ImageView
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_camera"
+                        app:tint="@color/veil_accent" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/tvStatusPermTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Allow Access to Photos &amp; Videos"
+                    android:textColor="@color/colorTextPrimary"
                     android:textSize="16sp"
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/tvStatusPermSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Type with custom typography and color palettes"
-                    android:textColor="@color/textSecondary"
-                    android:textSize="12.5sp"
-                    android:layout_marginTop="2dp" />
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:text="Select photos and videos from your albums or capture a new moment with the camera."
+                    android:textColor="@color/colorTextSecondary"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnStatusBrowseSystemFiles"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="16dp"
+                    android:text="Browse Photos &amp; Files"
+                    android:textColor="@android:color/white"
+                    app:backgroundTint="@color/veil_accent"
+                    app:cornerRadius="22dp" />
             </LinearLayout>
 
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_arrow_forward"
-                android:tint="@color/textSecondary" />
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
+            <!-- Scrim when Album Dropdown is open -->
+            <View
+                android:id="@+id/viewAlbumDropdownScrim"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#26000000"
+                android:clickable="true"
+                android:focusable="true"
+                android:visibility="gone" />
 
-    <!-- Option 2: Photo / Gallery Status Card -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardPhotoStatusOption"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="0dp"
-        app:strokeWidth="1dp"
-        app:strokeColor="@color/colorOutline"
-        app:cardBackgroundColor="@color/surfaceVariant"
-        android:clickable="true"
-        android:focusable="true">
+            <!-- Floating Album Dropdown Menu Card (Screenshots 4.jpg & 5.jpg) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStatusAlbumDropdown"
+                android:layout_width="268dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="14dp"
+                android:layout_marginTop="4dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="@color/colorSurface"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="12dp"
+                app:strokeColor="@color/colorOutline"
+                app:strokeWidth="1dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:padding="16dp">
-
-            <FrameLayout
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_swatch_emerald">
-
-                <TextView
-                    android:layout_width="wrap_content"
+                <androidx.core.widget.NestedScrollView
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="📷"
-                    android:textSize="20sp" />
-            </FrameLayout>
+                    android:maxHeight="360dp"
+                    android:overScrollMode="never">
 
-            <LinearLayout
+                    <LinearLayout
+                        android:id="@+id/llAlbumDropdownContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp" />
+                </androidx.core.widget.NestedScrollView>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Floating Bottom-Right Folder / Multi-Select Button (Screenshots 2.jpg, 3.jpg, 4.jpg, 5.jpg) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/fabStatusMultiOrFolder"
+                android:layout_width="54dp"
+                android:layout_height="54dp"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="18dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardBackgroundColor="@color/colorSurface"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="8dp"
+                app:strokeColor="@color/colorOutline"
+                app:strokeWidth="1dp">
+
+                <ImageView
+                    android:id="@+id/ivStatusMultiOrFolderIcon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_folder_multi"
+                    app:tint="@color/colorTextPrimary" />
+            </com.google.android.material.card.MaterialCardView>
+        </FrameLayout>
+
+        <!-- Bottom Selected Photos Strip & Confirm Checkmark FAB (Screenshot 6.jpg) -->
+        <LinearLayout
+            android:id="@+id/layoutStatusBottomSelectionBar"
+            android:layout_width="match_parent"
+            android:layout_height="76dp"
+            android:background="@color/colorSurface"
+            android:elevation="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="16dp"
+            android:visibility="gone">
+
+            <HorizontalScrollView
+                android:id="@+id/hsvStatusSelectedThumbs"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginStart="14dp">
+                android:scrollbars="none">
 
-                <TextView
+                <LinearLayout
+                    android:id="@+id/llStatusSelectedThumbs"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Photo Status"
-                    android:textColor="@color/textPrimary"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Pick from gallery or take a picture with caption"
-                    android:textColor="@color/textSecondary"
-                    android:textSize="12.5sp"
-                    android:layout_marginTop="2dp" />
-            </LinearLayout>
+            <FrameLayout
+                android:id="@+id/fabStatusConfirmSelection"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_marginStart="12dp"
+                android:clickable="true"
+                android:focusable="true">
 
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_arrow_forward"
-                android:tint="@color/textSecondary" />
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_check"
+                    app:tint="@android:color/white" />
+            </FrameLayout>
         </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
 
-</LinearLayout>
+        <!-- Hidden legacy IDs kept for backward safety -->
+        <View
+            android:id="@+id/btnQuickCamera"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <View
+            android:id="@+id/btnQuickGallery"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <View
+            android:id="@+id/cardPhotoStatusOption"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <View
+            android:id="@+id/cardCameraStatusOption"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <View
+            android:id="@+id/cardTextStatusOption"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <View
+            android:id="@+id/cardVoiceStatusOption"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+    </LinearLayout>
+</FrameLayout>

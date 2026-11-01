@@ -14,14 +14,14 @@
     <View
         android:layout_width="36dp"
         android:layout_height="4dp"
-        android:background="@color/colorOutline"
+        android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="16dp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="⏱️ Disappearing Messages Timer"
+        android:text="Disappearing Messages Timer"
         android:textColor="@color/textPrimary"
         android:textSize="20sp"
         android:fontFamily="sans-serif-medium"
@@ -30,7 +30,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Select how long messages persist before zero-trace shredding:"
+        android:text="Set how long messages stay before disappearing:"
         android:textColor="@color/textSecondary"
         android:textSize="13sp"
         android:layout_marginBottom="16dp" />

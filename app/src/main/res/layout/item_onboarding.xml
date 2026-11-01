@@ -60,7 +60,7 @@
                     android:letterSpacing="0.01"
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="6dp"
-                    android:text="AES-256"
+                    android:text="Encrypted"
                     android:textColor="#1F2433"
                     android:textSize="12sp" />
             </com.google.android.material.card.MaterialCardView>
@@ -104,7 +104,7 @@
             android:gravity="center"
             android:letterSpacing="-0.01"
             android:lineSpacingExtra="3dp"
-            android:text="Zero-Knowledge\nEncryption"
+            android:text="Private &amp; Secure\nMessaging"
             android:textColor="#161925"
             android:textSize="26sp"
             android:textStyle="bold" />

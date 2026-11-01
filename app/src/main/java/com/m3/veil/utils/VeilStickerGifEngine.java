@@ -1259,30 +1259,133 @@ public class VeilStickerGifEngine {
         BUILTIN_ANIMATED_STICKERS.add(new StickerPreset("[STICKER:crown_king]", "👑", "LEGEND", 0xFFEAB308, 0xFFCA8A04, 0, 186, 162));
 
         // Built-in Animated GIFs with Portrait, Landscape, and Square aspect ratios!
-        BUILTIN_GIFS.add(new GifPreset("[GIF:mind_blown_16_9]", "Mind Blown Galaxy", "Reactions", "🤯", "MIND BLOWN",
-                0xFF0F172A, 0xFF4C1D95, 0xFFE879F9, 480, 270, 0)); // 16:9 Landscape
-        BUILTIN_GIFS.add(new GifPreset("[GIF:party_vibes_16_9]", "Party Confetti Vibe", "Celebrate", "🥳", "LET'S GOOO!",
-                0xFF1E1B4B, 0xFF831843, 0xFFF472B6, 480, 270, 1)); // 16:9 Landscape
+        // Massive Curated Collection: Trending, Reactions, Memes, Celebrate, Love, Tech, Crypto, Gaming, Anime
+
+        // 1. TRENDING
         BUILTIN_GIFS.add(new GifPreset("[GIF:rocket_launch_3_4]", "Rocket Launch", "Trending", "🚀", "TO THE MOON",
                 0xFF090D16, 0xFF1E3A8A, 0xFF38BDF8, 360, 480, 2)); // 3:4 Portrait
-        BUILTIN_GIFS.add(new GifPreset("[GIF:neon_matrix_16_9]", "Cyber Matrix Pulse", "Tech", "⚡", "SYSTEM ONLINE",
-                0xFF022C22, 0xFF0F172A, 0xFF34D399, 480, 270, 3)); // 16:9 Landscape
-        BUILTIN_GIFS.add(new GifPreset("[GIF:popcorn_drama_4_3]", "Grabbing Popcorn", "Reactions", "🍿", "THIS IS GOOD",
-                0xFF450A0A, 0xFF1E293B, 0xFFFBBF24, 420, 315, 0)); // 4:3 Landscape
-        BUILTIN_GIFS.add(new GifPreset("[GIF:heart_burst_1_1]", "Heart Beat Burst", "Love", "💖", "SENDING LOVE",
-                0xFF500724, 0xFF881337, 0xFFFB7185, 380, 380, 1)); // 1:1 Square
         BUILTIN_GIFS.add(new GifPreset("[GIF:fire_hype_3_4]", "Maximum Hype Fire", "Trending", "🔥", "STRAIGHT FIRE",
                 0xFF431407, 0xFF7C2D12, 0xFFFB923C, 360, 480, 2)); // 3:4 Portrait
-        BUILTIN_GIFS.add(new GifPreset("[GIF:applause_clap_16_9]", "Standing Ovation", "Reactions", "👏", "BRAVO! 10/10",
-                0xFF172554, 0xFF0F172A, 0xFFFACC15, 480, 270, 1)); // 16:9 Landscape
-        BUILTIN_GIFS.add(new GifPreset("[GIF:deal_with_it_16_9]", "Deal With It", "Meme", "🕶️", "DEAL WITH IT",
-                0xFF0F172A, 0xFF1E293B, 0xFF60A5FA, 480, 270, 3)); // 16:9 Landscape
         BUILTIN_GIFS.add(new GifPreset("[GIF:chill_wave_3_4]", "Sunset Synthwave", "Trending", "🌊", "CHILL VIBES",
                 0xFF2E1065, 0xFF701A75, 0xFF2DD4BF, 360, 480, 2)); // 3:4 Portrait
-        BUILTIN_GIFS.add(new GifPreset("[GIF:lol_tears_1_1]", "Rolling Laughing", "Meme", "🤣", "I CAN'T EVEN",
+        BUILTIN_GIFS.add(new GifPreset("[GIF:diamond_hands_1_1]", "Diamond Hands", "Trending", "💎", "DIAMOND HANDS",
+                0xFF0F172A, 0xFF1E3A8A, 0xFF67E8F9, 380, 380, 0)); // 1:1 Square
+        BUILTIN_GIFS.add(new GifPreset("[GIF:lightning_pulse_16_9]", "Thunder Strike", "Trending", "⚡", "HIGH VOLTAGE",
+                0xFF18181B, 0xFF3F3F46, 0xFFFACC15, 480, 270, 3)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:golden_crown_4_3]", "Golden Royalty", "Trending", "👑", "ABSOLUTE KING",
+                0xFF451A03, 0xFF78350F, 0xFFFDE047, 420, 315, 1)); // 4:3 Landscape
+
+        // 2. REACTIONS
+        BUILTIN_GIFS.add(new GifPreset("[GIF:mind_blown_16_9]", "Mind Blown Galaxy", "Reactions", "🤯", "MIND BLOWN",
+                0xFF0F172A, 0xFF4C1D95, 0xFFE879F9, 480, 270, 0)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:popcorn_drama_4_3]", "Grabbing Popcorn", "Reactions", "🍿", "THIS IS GOOD",
+                0xFF450A0A, 0xFF1E293B, 0xFFFBBF24, 420, 315, 0)); // 4:3 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:applause_clap_16_9]", "Standing Ovation", "Reactions", "👏", "BRAVO! 10/10",
+                0xFF172554, 0xFF0F172A, 0xFFFACC15, 480, 270, 1)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:facepalm_reaction_1_1]", "Epic Facepalm", "Reactions", "🤦", "NO WAY...",
+                0xFF1E293B, 0xFF334155, 0xFFF87171, 380, 380, 0)); // 1:1 Square
+        BUILTIN_GIFS.add(new GifPreset("[GIF:shocked_eyes_3_4]", "Eyes Popping", "Reactions", "👀", "EXCUSE ME?!",
+                0xFF09090B, 0xFF27272A, 0xFF38BDF8, 360, 480, 1)); // 3:4 Portrait
+        BUILTIN_GIFS.add(new GifPreset("[GIF:salute_respect_16_9]", "Maximum Respect", "Reactions", "🫡", "RESPECT",
+                0xFF14532D, 0xFF166534, 0xFF86EFAC, 480, 270, 0)); // 16:9 Landscape
+
+        // 3. MEMES
+        BUILTIN_GIFS.add(new GifPreset("[GIF:deal_with_it_16_9]", "Deal With It", "Memes", "🕶️", "DEAL WITH IT",
+                0xFF0F172A, 0xFF1E293B, 0xFF60A5FA, 480, 270, 3)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:lol_tears_1_1]", "Rolling Laughing", "Memes", "🤣", "I CAN'T EVEN",
                 0xFF422006, 0xFF713F12, 0xFFFDE047, 380, 380, 0)); // 1:1 Square
+        BUILTIN_GIFS.add(new GifPreset("[GIF:doge_wow_4_3]", "Much Wow Doge", "Memes", "🐕", "SUCH WOW",
+                0xFF78350F, 0xFFB45309, 0xFFFDE68A, 420, 315, 1)); // 4:3 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:this_is_fine_16_9]", "This Is Fine", "Memes", "☕", "THIS IS FINE",
+                0xFF7C2D12, 0xFF9A3412, 0xFFFDBA74, 480, 270, 2)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:galaxy_brain_3_4]", "Galaxy Brain", "Memes", "🧠", "EXPAND BRAIN",
+                0xFF3B0764, 0xFF581C87, 0xFFD8B4FE, 360, 480, 0)); // 3:4 Portrait
+        BUILTIN_GIFS.add(new GifPreset("[GIF:spiderman_point_16_9]", "Pointing At You", "Memes", "👉", "YOU!",
+                0xFF7F1D1D, 0xFF1E3A8A, 0xFF93C5FD, 480, 270, 1)); // 16:9 Landscape
+
+        // 4. CELEBRATE
+        BUILTIN_GIFS.add(new GifPreset("[GIF:party_vibes_16_9]", "Party Confetti Vibe", "Celebrate", "🥳", "LET'S GOOO!",
+                0xFF1E1B4B, 0xFF831843, 0xFFF472B6, 480, 270, 1)); // 16:9 Landscape
         BUILTIN_GIFS.add(new GifPreset("[GIF:victory_trophy_4_3]", "Champion Win", "Celebrate", "🏆", "FLAWLESS WIN",
                 0xFF1E1B4B, 0xFF312E81, 0xFFFBBF24, 420, 315, 1)); // 4:3 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:fireworks_boom_3_4]", "Fireworks Fiesta", "Celebrate", "🎆", "BOOM!",
+                0xFF090D16, 0xFF311042, 0xFFF43F5E, 360, 480, 0)); // 3:4 Portrait
+        BUILTIN_GIFS.add(new GifPreset("[GIF:champagne_pop_1_1]", "Champagne Toast", "Celebrate", "🍾", "CHEERS!",
+                0xFF14532D, 0xFF15803D, 0xFFFEF08A, 380, 380, 1)); // 1:1 Square
+        BUILTIN_GIFS.add(new GifPreset("[GIF:confetti_blast_16_9]", "Confetti Rain", "Celebrate", "🎉", "CELEBRATION TIME",
+                0xFF581C87, 0xFF7E22CE, 0xFFFBCFE8, 480, 270, 2)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:birthday_spark_4_3]", "Sparkler Cake", "Celebrate", "🎂", "HAPPY BIRTHDAY!",
+                0xFF831843, 0xFF9D174D, 0xFFFBCFE8, 420, 315, 1)); // 4:3 Landscape
+
+        // 5. LOVE
+        BUILTIN_GIFS.add(new GifPreset("[GIF:heart_burst_1_1]", "Heart Beat Burst", "Love", "💖", "SENDING LOVE",
+                0xFF500724, 0xFF881337, 0xFFFB7185, 380, 380, 1)); // 1:1 Square
+        BUILTIN_GIFS.add(new GifPreset("[GIF:kiss_sparkle_4_3]", "Sweet Kiss", "Love", "😘", "MUAH!",
+                0xFF701A75, 0xFF86198F, 0xFFF0ABFC, 420, 315, 1)); // 4:3 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:warm_hug_3_4]", "Warm Hug", "Love", "🤗", "BIG HUG",
+                0xFF3B0764, 0xFF4A044E, 0xFFF472B6, 360, 480, 0)); // 3:4 Portrait
+        BUILTIN_GIFS.add(new GifPreset("[GIF:heart_eyes_16_9]", "Heart Eyes Stare", "Love", "😍", "OBSESSED",
+                0xFF831843, 0xFFBE185D, 0xFFFDA4AF, 480, 270, 1)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:rose_bloom_1_1]", "Crimson Rose", "Love", "🌹", "FOR YOU",
+                0xFF450A0A, 0xFF7F1D1D, 0xFFFCA5A5, 380, 380, 0)); // 1:1 Square
+        BUILTIN_GIFS.add(new GifPreset("[GIF:sparkling_heart_4_3]", "Two Hearts Glow", "Love", "💕", "ALWAYS & FOREVER",
+                0xFF4C0519, 0xFF9F1239, 0xFFFECDD3, 420, 315, 1)); // 4:3 Landscape
+
+        // 6. TECH
+        BUILTIN_GIFS.add(new GifPreset("[GIF:neon_matrix_16_9]", "Cyber Matrix Pulse", "Tech", "⚡", "SYSTEM ONLINE",
+                0xFF022C22, 0xFF0F172A, 0xFF34D399, 480, 270, 3)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:cyber_terminal_16_9]", "Root Terminal", "Tech", "💻", "ACCESS GRANTED",
+                0xFF030712, 0xFF111827, 0xFF22C55E, 480, 270, 3)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:ai_robot_1_1]", "AI Neural Engine", "Tech", "🤖", "COMPUTING...",
+                0xFF0F172A, 0xFF1E293B, 0xFF38BDF8, 380, 380, 0)); // 1:1 Square
+        BUILTIN_GIFS.add(new GifPreset("[GIF:quantum_chip_4_3]", "Quantum Core", "Tech", "🔬", "QUANTUM SYNC",
+                0xFF1E1B4B, 0xFF2E1065, 0xFFA78BFA, 420, 315, 3)); // 4:3 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:satellite_mesh_3_4]", "Orbital Mesh", "Tech", "🛰️", "NODE BROADCAST",
+                0xFF082F49, 0xFF0369A1, 0xFF7DD3FC, 360, 480, 2)); // 3:4 Portrait
+        BUILTIN_GIFS.add(new GifPreset("[GIF:dark_hacker_16_9]", "Stealth Ghost Mode", "Tech", "🕵️", "ZERO TRACE",
+                0xFF0A0A0A, 0xFF171717, 0xFF10B981, 480, 270, 3)); // 16:9 Landscape
+
+        // 7. CRYPTO
+        BUILTIN_GIFS.add(new GifPreset("[GIF:bitcoin_bull_16_9]", "Bitcoin Bull Run", "Crypto", "🐂", "BULL MARKET",
+                0xFF451A03, 0xFF78350F, 0xFFF59E0B, 480, 270, 1)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:crypto_hodl_1_1]", "HODL Strong", "Crypto", "📈", "HODL THE LINE",
+                0xFF064E3B, 0xFF047857, 0xFF6EE7B7, 380, 380, 0)); // 1:1 Square
+        BUILTIN_GIFS.add(new GifPreset("[GIF:crypto_whale_4_3]", "Whale In The Deep", "Crypto", "🐋", "WHALE ALERT",
+                0xFF0C4A6E, 0xFF0284C7, 0xFF38BDF8, 420, 315, 2)); // 4:3 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:blockchain_cube_3_4]", "Decentralized Block", "Crypto", "⛓️", "BLOCK MINED",
+                0xFF18181B, 0xFF27272A, 0xFFE4E4E7, 360, 480, 3)); // 3:4 Portrait
+        BUILTIN_GIFS.add(new GifPreset("[GIF:moon_bag_16_9]", "Bag Secured", "Crypto", "💰", "BAG SECURED",
+                0xFF14532D, 0xFF166534, 0xFF4ADE80, 480, 270, 1)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:gas_fees_1_1]", "Zero Gas Fees", "Crypto", "⛽", "0 GAS P2P",
+                0xFF312E81, 0xFF4338CA, 0xFFC7D2FE, 380, 380, 0)); // 1:1 Square
+
+        // 8. GAMING
+        BUILTIN_GIFS.add(new GifPreset("[GIF:level_up_16_9]", "Level Up!", "Gaming", "🎮", "LEVEL UP!",
+                0xFF3B0764, 0xFF6B21A8, 0xFFF472B6, 480, 270, 1)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:gg_wp_4_3]", "Good Game Well Played", "Gaming", "🏆", "GG WP",
+                0xFF1E293B, 0xFF0F172A, 0xFFFBBF24, 420, 315, 0)); // 4:3 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:pixel_sword_3_4]", "Hero's Quest", "Gaming", "⚔️", "CRITICAL HIT",
+                0xFF1E1B4B, 0xFF312E81, 0xFF60A5FA, 360, 480, 2)); // 3:4 Portrait
+        BUILTIN_GIFS.add(new GifPreset("[GIF:arcade_joystick_1_1]", "Retro Arcade", "Gaming", "🕹️", "INSERT COIN",
+                0xFF4A044E, 0xFF701A75, 0xFFE879F9, 380, 380, 3)); // 1:1 Square
+        BUILTIN_GIFS.add(new GifPreset("[GIF:power_up_16_9]", "Super Power Up", "Gaming", "🍄", "POWER UP 100%",
+                0xFF7F1D1D, 0xFF991B1B, 0xFFFCA5A5, 480, 270, 1)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:respawn_timer_4_3]", "Instant Respawn", "Gaming", "⏱️", "RESPAWNED",
+                0xFF042F2E, 0xFF115E59, 0xFF2DD4BF, 420, 315, 0)); // 4:3 Landscape
+
+        // 9. ANIME
+        BUILTIN_GIFS.add(new GifPreset("[GIF:anime_sparkle_16_9]", "Anime Starlight", "Anime", "✨", "KAWAII VIBES",
+                0xFF701A75, 0xFF4A044E, 0xFFF472B6, 480, 270, 0)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:speed_dash_16_9]", "Sonic Speed Dash", "Anime", "💨", "NANI?!",
+                0xFF0C4A6E, 0xFF075985, 0xFF38BDF8, 480, 270, 3)); // 16:9 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:power_aura_3_4]", "Super Saiyan Aura", "Anime", "🔥", "OVER 9000!",
+                0xFF451A03, 0xFF78350F, 0xFFFBBF24, 360, 480, 2)); // 3:4 Portrait
+        BUILTIN_GIFS.add(new GifPreset("[GIF:anime_tears_1_1]", "Dramatic Anime Cry", "Anime", "😭", "SO BEAUTIFUL",
+                0xFF082F49, 0xFF0369A1, 0xFF7DD3FC, 380, 380, 0)); // 1:1 Square
+        BUILTIN_GIFS.add(new GifPreset("[GIF:magic_circle_4_3]", "Summoning Circle", "Anime", "🔮", "SPELL CAST",
+                0xFF3B0764, 0xFF581C87, 0xFFC084FC, 420, 315, 0)); // 4:3 Landscape
+        BUILTIN_GIFS.add(new GifPreset("[GIF:ninja_shadow_16_9]", "Ninja Teleport", "Anime", "🥷", "SUBSTITUTION JUTSU",
+                0xFF18181B, 0xFF27272A, 0xFFA1A1AA, 480, 270, 3)); // 16:9 Landscape
     }
 
     public static List<StickerPreset> getBuiltinAnimatedStickers() {
@@ -1394,6 +1497,86 @@ public class VeilStickerGifEngine {
         }
     }
 
+    @Nullable
+    public static String extractFilePathFromCode(@Nullable String code) {
+        if (code == null) return null;
+        String clean = code.trim();
+        if (clean.startsWith("[STICKER_FILE:") && clean.endsWith("]")) {
+            return clean.substring(14, clean.length() - 1).trim();
+        }
+        if (clean.startsWith("[GIF_FILE:") && clean.endsWith("]")) {
+            return clean.substring(10, clean.length() - 1).trim();
+        }
+        if (clean.startsWith("[FILE:") && clean.endsWith("]")) {
+            return clean.substring(6, clean.length() - 1).trim();
+        }
+        return null;
+    }
+
+    @NonNull
+    public static Bitmap renderStickerToBitmap(@NonNull Context context, @NonNull String stickerCode, int widthPx, int heightPx) {
+        String filePath = extractFilePathFromCode(stickerCode);
+        if (filePath != null) {
+            File f = new File(filePath);
+            if (f.exists() && f.length() > 16) {
+                Bitmap decoded = decodePhotoPreservingAspectRatio(f, Math.max(widthPx, heightPx));
+                if (decoded != null) {
+                    return stripSolidBorderBackgroundIfPresent(decoded);
+                }
+            }
+        }
+        try {
+            com.m3.veil.manager.StickerRepository.StickerItem item =
+                    com.m3.veil.manager.StickerRepository.getInstance(context).findCatalogOrDbStickerByCode(stickerCode);
+            if (item != null && item.localFilePath != null) {
+                File f = new File(item.localFilePath);
+                if (f.exists() && f.length() > 16) {
+                    Bitmap decoded = decodePhotoPreservingAspectRatio(f, Math.max(widthPx, heightPx));
+                    if (decoded != null) {
+                        return stripSolidBorderBackgroundIfPresent(decoded);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        int w = Math.max(128, widthPx);
+        int h = Math.max(128, heightPx);
+        Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bmp);
+        StickerPreset preset = resolveStickerPreset(stickerCode);
+        AnimatedStickerDrawable drawable = new AnimatedStickerDrawable(context, preset);
+        drawable.setBounds(0, 0, w, h);
+        drawable.draw(canvas);
+        return bmp;
+    }
+
+    @NonNull
+    public static Bitmap renderGifPreviewToBitmap(@NonNull Context context, @NonNull String gifCode, int widthPx, int heightPx) {
+        String filePath = extractFilePathFromCode(gifCode);
+        if (filePath != null) {
+            File f = new File(filePath);
+            if (f.exists() && f.length() > 16) {
+                Bitmap decoded = decodePhotoPreservingAspectRatio(f, Math.max(widthPx, heightPx));
+                if (decoded != null) return decoded;
+            }
+        }
+        GifPreset preset = findGifPresetByCode(gifCode);
+        int w = widthPx > 0 ? widthPx : (preset != null ? preset.intrinsicWidth : 480);
+        int h = heightPx > 0 ? heightPx : (preset != null ? preset.intrinsicHeight : 320);
+        Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bmp);
+        if (preset != null) {
+            AnimatedGifSceneDrawable scene = new AnimatedGifSceneDrawable(context, preset);
+            scene.setBounds(0, 0, w, h);
+            scene.draw(canvas);
+        } else {
+            StickerPreset sp = resolveStickerPreset(gifCode);
+            AnimatedStickerDrawable sd = new AnimatedStickerDrawable(context, sp);
+            sd.setBounds(0, 0, w, h);
+            sd.draw(canvas);
+        }
+        return bmp;
+    }
+
     // =========================================================================
     // 5. TELEGRAM/WHATSAPP-STYLE ANIMATED STICKER DRAWABLE (PLAYS 3 CYCLES THEN STOPS)
     // =========================================================================
@@ -1473,14 +1656,61 @@ public class VeilStickerGifEngine {
             canvas.drawText("♪", cx - minDim * 0.30f, cy - minDim * 0.08f + noteBounce, labelPaint);
             canvas.drawText("♫", cx + minDim * 0.30f, cy - minDim * 0.12f - noteBounce, labelPaint);
 
-            // 2. Central sticker character (animates 3 cycles then settles cleanly at upright resting pose)
+            // 2. Central sticker character: distinct physics per preset.styleType (0 to 5)
+            float bounceY = 0f;
+            float scaleX = 1.0f;
+            float scaleY = 1.0f;
+            float tiltDeg = 0f;
+
+            if (running) {
+                switch (preset.styleType) {
+                    case 1: // Heartbeat pulse
+                        float pulse = (float) Math.max(0.0, Math.sin(angleRad * 2.0));
+                        scaleX = 0.98f + pulse * 0.18f;
+                        scaleY = scaleX;
+                        bounceY = (float) -pulse * (minDim * 0.04f);
+                        break;
+                    case 2: // Wobble/jiggle squash & stretch
+                        scaleX = 1.0f + 0.13f * (float) Math.sin(angleRad * 3.0);
+                        scaleY = 1.0f - 0.13f * (float) Math.sin(angleRad * 3.0);
+                        tiltDeg = (float) Math.sin(angleRad * 2.0) * 12.0f;
+                        bounceY = (float) Math.abs(Math.sin(angleRad * 3.0)) * (minDim * 0.025f);
+                        break;
+                    case 3: // 360 Spin & Dynamic Tilt
+                        tiltDeg = (float) Math.sin(angleRad) * 26.0f;
+                        bounceY = (float) Math.sin(angleRad * 2.0) * (minDim * 0.05f);
+                        scaleX = 0.94f + 0.10f * (float) Math.cos(angleRad * 2.0);
+                        scaleY = scaleX;
+                        break;
+                    case 4: // Celebration Hop & Pop
+                        float jumpPhase = (phase * 3.0f) % 1.0f;
+                        bounceY = -4.0f * jumpPhase * (1.0f - jumpPhase) * (minDim * 0.16f);
+                        scaleX = 1.0f + (float) Math.sin(jumpPhase * Math.PI) * 0.14f;
+                        scaleY = 1.0f - (float) Math.sin(jumpPhase * Math.PI) * 0.08f;
+                        tiltDeg = (float) Math.sin(angleRad * 3.0) * 7.0f;
+                        break;
+                    case 5: // Cyber neon glitch jitter
+                        float jitterX = (float) (Math.sin(angleRad * 14.0) * 4f * dp);
+                        bounceY = (float) (Math.cos(angleRad * 16.0) * 3f * dp);
+                        tiltDeg = (float) Math.sin(angleRad * 10.0) * 6.0f;
+                        scaleX = 0.96f + 0.08f * (float) Math.sin(angleRad * 6.0);
+                        scaleY = scaleX;
+                        cx += jitterX;
+                        break;
+                    case 0: // Sine float & glow (default)
+                    default:
+                        bounceY = (float) Math.sin(angleRad) * (minDim * 0.055f);
+                        scaleX = 0.96f + 0.07f * (float) Math.sin(angleRad * 2.0);
+                        scaleY = scaleX;
+                        tiltDeg = (float) Math.sin(angleRad) * 5.0f;
+                        break;
+                }
+            }
+
             canvas.save();
-            float bounceY = running ? (float) Math.sin(angleRad) * (minDim * 0.035f) : 0f;
-            float scale = running ? (0.96f + 0.07f * (float) Math.sin(angleRad * 2f)) : 1.0f;
-            float tiltDeg = running ? ((float) Math.sin(angleRad) * 4.5f) : 0f;
             canvas.translate(cx, cy + bounceY);
             canvas.rotate(tiltDeg);
-            canvas.scale(scale, scale);
+            canvas.scale(scaleX, scaleY);
 
             emojiPaint.setTextSize(minDim * 0.52f);
             Paint.FontMetrics fm = emojiPaint.getFontMetrics();

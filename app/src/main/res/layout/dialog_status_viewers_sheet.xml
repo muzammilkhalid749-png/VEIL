@@ -4,17 +4,17 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@drawable/bottom_sheet_background"
+    android:background="@drawable/bg_bottom_sheet_modern"
     android:paddingStart="20dp"
     android:paddingEnd="20dp"
     android:paddingTop="12dp"
     android:paddingBottom="24dp">
 
-    <!-- Handle Bar -->
+    <!-- Drag Handle Bar -->
     <View
         android:layout_width="36dp"
         android:layout_height="4dp"
-        android:background="@color/colorOutline"
+        android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="16dp" />
 
@@ -26,6 +26,20 @@
         android:gravity="center_vertical"
         android:layout_marginBottom="12dp">
 
+        <FrameLayout
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/bg_status_quick_btn">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_visibility"
+                app:tint="@color/veil_accent" />
+        </FrameLayout>
+
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -36,51 +50,52 @@
                 android:id="@+id/tvStatusViewersTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="👁 Viewed by 0"
-                android:textColor="@color/textPrimary"
-                android:textSize="18sp"
-                android:fontFamily="sans-serif-medium" />
+                android:text="Viewed by 0"
+                android:textColor="@color/colorTextPrimary"
+                android:textSize="17sp"
+                android:fontFamily="sans-serif-medium"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvStatusViewersSubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="Seen receipts • Disappears after 24 hours"
-                android:textColor="@color/textSecondary"
+                android:text="0 contacts viewed this update"
+                android:textColor="@color/colorTextSecondary"
                 android:textSize="12.5sp" />
         </LinearLayout>
 
         <ImageView
             android:id="@+id/btnShareStatusSheet"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
-            android:padding="7dp"
+            android:padding="8dp"
             android:src="@drawable/ic_share"
-            android:tint="@color/textSecondary"
-            android:contentDescription="Forward Status"
-            android:layout_marginEnd="6dp" />
+            app:tint="@color/colorTextSecondary"
+            android:contentDescription="Share Status"
+            android:layout_marginEnd="4dp" />
 
         <ImageView
             android:id="@+id/btnDeleteStatusSheet"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
-            android:padding="7dp"
+            android:padding="8dp"
             android:src="@drawable/ic_delete"
-            android:tint="#EF4444"
+            app:tint="#EF4444"
             android:contentDescription="Delete Status" />
     </LinearLayout>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="@color/dividerColor"
+        android:background="@color/colorOutline"
         android:layout_marginBottom="12dp" />
 
     <!-- Viewers List Container inside ScrollView -->
@@ -105,28 +120,30 @@
                 android:paddingBottom="28dp"
                 android:visibility="gone">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="👀"
-                    android:textSize="36sp"
-                    android:layout_marginBottom="8dp" />
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_visibility"
+                    app:tint="@color/colorTextSecondary"
+                    android:alpha="0.6"
+                    android:layout_marginBottom="10dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="No views yet"
-                    android:textColor="@color/textPrimary"
-                    android:textSize="15sp"
+                    android:textColor="@color/colorTextPrimary"
+                    android:textSize="15.5sp"
+                    android:fontFamily="sans-serif-medium"
                     android:textStyle="bold"
                     android:layout_marginBottom="4dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="When contacts or P2P peers view your status,\ntheir names and view times will appear here."
-                    android:textColor="@color/textSecondary"
-                    android:textSize="12.5sp"
+                    android:text="When contacts view your status,\ntheir names and view times will appear here."
+                    android:textColor="@color/colorTextSecondary"
+                    android:textSize="13sp"
                     android:gravity="center" />
             </LinearLayout>
 

@@ -210,7 +210,7 @@ public class NearbyRadarBottomSheet extends BottomSheetDialogFragment implements
             item.addView(header);
 
             // Channel tag (BLE vs Wi-Fi Direct)
-            String transport = peer.isWifiDirectCapable ? "Wi-Fi Direct P2P" : "Bluetooth Low Energy";
+            String transport = peer.isWifiDirectCapable ? "Direct Connection" : "Bluetooth Low Energy";
             TextView tvTransport = new TextView(requireContext());
             tvTransport.setText("Signal: " + peer.rssi + " dBm • Transport: " + transport);
             tvTransport.setTextColor(ContextCompat.getColor(requireContext(), R.color.textSecondary));
@@ -230,7 +230,7 @@ public class NearbyRadarBottomSheet extends BottomSheetDialogFragment implements
             card.addView(item);
             card.setOnClickListener(v -> {
                 dismiss();
-                Toast.makeText(requireContext(), "Opening P2P channel with " + peer.alias, Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), "Connecting with " + peer.alias, Toast.LENGTH_SHORT).show();
                 Intent chatIntent = new Intent(requireContext(), ChatActivity.class);
                 chatIntent.putExtra("recipientId", peer.id);
                 chatIntent.putExtra("recipientName", peer.alias);
@@ -265,7 +265,7 @@ public class NearbyRadarBottomSheet extends BottomSheetDialogFragment implements
     @Override
     public void onLocalMeshRoomConnected(int peerCount) {
         if (mTvStatus != null) {
-            mTvStatus.setText("Connected to off-grid mesh: " + peerCount + " active nodes");
+            mTvStatus.setText("Connected: " + peerCount + " active nodes");
         }
     }
 

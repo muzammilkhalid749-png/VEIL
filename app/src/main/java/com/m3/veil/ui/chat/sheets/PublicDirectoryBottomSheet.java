@@ -221,9 +221,9 @@ public class PublicDirectoryBottomSheet extends BottomSheetDialogFragment {
         if (allItems.isEmpty()) {
             allItems.add(new DirectoryItem(
                     "channel_veil_announcements",
-                    "📢 VEIL Sovereign Mesh Broadcast",
+                    "📢 VEIL Official Broadcast",
                     "veil_official",
-                    "Official zero-knowledge protocol updates, security advisories & P2P tips",
+                    "Official updates, tips, and security announcements",
                     null,
                     "channel",
                     new ArrayList<>(Collections.singletonList("system")),
@@ -232,9 +232,9 @@ public class PublicDirectoryBottomSheet extends BottomSheetDialogFragment {
             ));
             allItems.add(new DirectoryItem(
                     "group_cyber_privacy_lounge",
-                    "🛡️ Zero-Knowledge & Cryptography Lounge",
+                    "🛡️ Security & Privacy Lounge",
                     "zk_privacy",
-                    "Public discussion group for E2EE, WebRTC P2P, and decentralized tech",
+                    "Public discussion group for privacy, encryption, and open technology",
                     null,
                     "group",
                     new ArrayList<>(Collections.singletonList("system")),

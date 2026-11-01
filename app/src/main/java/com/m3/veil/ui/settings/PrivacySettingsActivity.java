@@ -189,7 +189,7 @@ public class PrivacySettingsActivity extends AppCompatActivity {
         rowAutoLock.setPadding((int) (16 * dp), (int) (12 * dp), (int) (16 * dp), (int) (12 * dp));
 
         TextView tvAutoLockTitle = new TextView(this);
-        tvAutoLockTitle.setText("⏱️ Biometric / PIN Auto-Lock Timeout");
+        tvAutoLockTitle.setText("Auto-Lock Timeout");
         tvAutoLockTitle.setTextSize(15f);
         tvAutoLockTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         tvAutoLockTitle.setTextColor(getColor(R.color.textPrimary));
@@ -204,7 +204,7 @@ public class PrivacySettingsActivity extends AppCompatActivity {
         rowAutoLock.setOnClickListener(v -> {
             String[] opts = {"Immediate", "1 Minute", "5 Minutes", "15 Minutes", "30 Minutes"};
             new MaterialAlertDialogBuilder(this)
-                    .setTitle("⏱️ Auto-Lock Timeout")
+                    .setTitle("Auto-Lock Timeout")
                     .setItems(opts, (d, which) -> {
                         prefs.edit().putString("auto_lock_timeout_label", opts[which]).apply();
                         tvAutoLockSub.setText("Lock after: " + opts[which]);
@@ -218,14 +218,14 @@ public class PrivacySettingsActivity extends AppCompatActivity {
         rowDeadMan.setPadding((int) (16 * dp), (int) (12 * dp), (int) (16 * dp), (int) (12 * dp));
 
         TextView tvDeadManTitle = new TextView(this);
-        tvDeadManTitle.setText("💀 Dead-Man's Switch (Inactivity Auto-Shred)");
+        tvDeadManTitle.setText("Self-Destruct if Inactive");
         tvDeadManTitle.setTextSize(15f);
         tvDeadManTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         tvDeadManTitle.setTextColor(getColor(R.color.textPrimary));
         rowDeadMan.addView(tvDeadManTitle);
 
         TextView tvDeadManSub = new TextView(this);
-        tvDeadManSub.setText("Auto-wipe local vault if app not unlocked for: " + prefs.getString("dead_man_switch_label", "Off"));
+        tvDeadManSub.setText("Erase local data if not opened for: " + prefs.getString("dead_man_switch_label", "Off"));
         tvDeadManSub.setTextSize(13f);
         tvDeadManSub.setTextColor(getColor(R.color.textSecondary));
         rowDeadMan.addView(tvDeadManSub);
@@ -236,7 +236,7 @@ public class PrivacySettingsActivity extends AppCompatActivity {
                     .setTitle("💀 Dead-Man's Switch")
                     .setItems(opts, (d, which) -> {
                         prefs.edit().putString("dead_man_switch_label", opts[which]).apply();
-                        tvDeadManSub.setText("Auto-wipe local vault if app not unlocked for: " + opts[which]);
+                        tvDeadManSub.setText("Erase local data if not opened for: " + opts[which]);
                         Toast.makeText(this, "Dead-Man's Switch: " + opts[which], Toast.LENGTH_SHORT).show();
                     })
                     .show();
@@ -253,11 +253,11 @@ public class PrivacySettingsActivity extends AppCompatActivity {
         pbPrivacyScore.setProgress(score.totalScore);
 
         StringBuilder summary = new StringBuilder();
-        if (score.hardwareKeystoreActive) summary.append("Keystore ✓ ");
-        if (score.pinConfigured) summary.append("Master PIN ✓ ");
-        if (score.decoyConfigured) summary.append("Decoy ✓ ");
-        if (score.torRelayActive) summary.append("Tor/Relay ✓ ");
-        if (score.flagSecureActive) summary.append("FLAG_SECURE ✓ ");
+        if (score.hardwareKeystoreActive) summary.append("Device Security ✓ ");
+        if (score.pinConfigured) summary.append("Passcode ✓ ");
+        if (score.decoyConfigured) summary.append("Decoy Account ✓ ");
+        if (score.torRelayActive) summary.append("Proxy Shield ✓ ");
+        if (score.flagSecureActive) summary.append("Screen Security ✓ ");
         if (summary.length() == 0) summary.append("Standard Protection");
         tvPrivacyScoreSummary.setText(summary.toString());
 
@@ -403,7 +403,7 @@ public class PrivacySettingsActivity extends AppCompatActivity {
     private void handleDecoyPinClick() {
         String existing = featureManager.getDecoyPin();
         if (existing == null || existing.isEmpty()) {
-            promptSetNewPin("Set Decoy PIN", "Enter Decoy PIN (opens fake harmless session under duress):", pin -> {
+            promptSetNewPin("Set Decoy PIN", "Enter a Decoy PIN (opens an empty decoy account if unlocked under pressure):", pin -> {
                 if (pin.equals(featureManager.getMasterPin())) {
                     Toast.makeText(this, "Decoy PIN must differ from your Master PIN", Toast.LENGTH_LONG).show();
                     return;
@@ -452,7 +452,7 @@ public class PrivacySettingsActivity extends AppCompatActivity {
         MaterialButton btnConfirm = dialogView.findViewById(R.id.btnConfirmPin);
 
         tvTitle.setText("🚨 Panic Safe-Word Trigger");
-        tvSubtitle.setText("Typing this exact string in any chat immediately executes a multi-pass cryptographic zero-wipe of the local database:");
+        tvSubtitle.setText("Sending this secret word in any chat will erase all local data on this device:");
         etPin.setInputType(InputType.TYPE_CLASS_TEXT);
         etPin.setLetterSpacing(0f);
         etPin.setText(featureManager.getSafeWord());
@@ -589,12 +589,12 @@ public class PrivacySettingsActivity extends AppCompatActivity {
 
     private void showInstantSecureWipeDialog() {
         new MaterialAlertDialogBuilder(this)
-                .setTitle("🚨 Cryptographic Instant Wipe")
-                .setMessage("DANGER: This action is completely IRREVERSIBLE.\n\nAll encrypted chats, vault keys, media files, and local credentials will be immediately shredded and purged using multi-pass zero-wipe.")
-                .setPositiveButton("I UNDERSTAND, WIPE ALL", (d, w) -> {
+                .setTitle("🚨 Erase All Data")
+                .setMessage("This will permanently delete all your chats, media, secret keys, and personal settings from this device. This action cannot be undone.")
+                .setPositiveButton("Erase Everything", (d, w) -> {
                     // Double check with PIN if configured
                     if (featureManager.hasMasterPin()) {
-                        promptVerifyPin("Authorize Wipe", "Enter Master PIN to authorize destructive shredding:", () -> executeTotalWipe());
+                        promptVerifyPin("Confirm Erase", "Enter your passcode to confirm erasing all data:", () -> executeTotalWipe());
                     } else {
                         executeTotalWipe();
                     }
@@ -620,7 +620,7 @@ public class PrivacySettingsActivity extends AppCompatActivity {
             }
         } catch (Throwable ignored) {}
 
-        Toast.makeText(this, "All cryptographic local data has been shredded.", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "All local data has been erased.", Toast.LENGTH_LONG).show();
 
         Intent intent = new Intent(this, PhoneAuthActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);

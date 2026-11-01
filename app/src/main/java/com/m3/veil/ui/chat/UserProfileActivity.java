@@ -64,7 +64,10 @@ public class UserProfileActivity extends AppCompatActivity {
         androidx.activity.EdgeToEdge.enable(this);
         setContentView(R.layout.activity_user_profile);
 
-        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(this).getActivePersonaPeerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        }
         if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
         }
@@ -171,11 +174,11 @@ public class UserProfileActivity extends AppCompatActivity {
         android.view.View btnVideo = findViewById(R.id.btnProfileVideoCall);
         if (btnAudio != null) {
             UiAnimator.attachSpringPress(btnAudio);
-            btnAudio.setOnClickListener(v -> startCall("audio"));
+            btnAudio.setOnClickListener(v -> showCallConfirmationDialog("audio"));
         }
         if (btnVideo != null) {
             UiAnimator.attachSpringPress(btnVideo);
-            btnVideo.setOnClickListener(v -> startCall("video"));
+            btnVideo.setOnClickListener(v -> showCallConfirmationDialog("video"));
         }
 
         if (isGroup) {
@@ -251,6 +254,19 @@ public class UserProfileActivity extends AppCompatActivity {
                 EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
             }
         }
+    }
+
+    private void showCallConfirmationDialog(String type) {
+        String name = peerUserName != null ? peerUserName : (isGroup ? "Group Call" : "Veil Contact");
+        com.m3.veil.calling.ui.VeilCallConfirmationDialog.show(
+                this,
+                peerUserId,
+                name,
+                null,
+                type,
+                isGroup,
+                this::startCall
+        );
     }
 
     private void startCall(String type) {
@@ -439,7 +455,7 @@ public class UserProfileActivity extends AppCompatActivity {
                     : (profileName + (pId.equals(currentUserId) ? " (You)" : ""));
             String subLabel = preferUsername && handle != null && !handle.isEmpty()
                     ? profileName
-                    : ((handle != null && !handle.isEmpty()) ? "@" + handle.replace("@", "") : "P2P Mesh Peer");
+                    : ((handle != null && !handle.isEmpty()) ? "@" + handle.replace("@", "") : "Active Contact");
             tvName.setText(label);
             info.addView(tvName);
 
@@ -981,7 +997,7 @@ public class UserProfileActivity extends AppCompatActivity {
         container.setPadding(56, 36, 56, 20);
 
         TextView badge = new TextView(this);
-        badge.setText("🔒 E2EE WebRTC DataChannel + SQLCipher-256");
+        badge.setText("🔒 End-to-End Encrypted");
         badge.setTextSize(13f);
         badge.setTypeface(null, Typeface.BOLD);
         badge.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
@@ -997,7 +1013,7 @@ public class UserProfileActivity extends AppCompatActivity {
         container.addView(tvSas);
 
         TextView tvSasHint = new TextView(this);
-        tvSasHint.setText("Visual SAS Emoji Fingerprint (Instant Match)");
+        tvSasHint.setText("Security Emoji Fingerprint");
         tvSasHint.setTextSize(11.5f);
         tvSasHint.setTextColor(ContextCompat.getColor(this, R.color.colorTextSecondary));
         tvSasHint.setGravity(Gravity.CENTER);
@@ -1012,9 +1028,8 @@ public class UserProfileActivity extends AppCompatActivity {
         container.addView(codeView);
 
         TextView desc = new TextView(this);
-        desc.setText("Compare these 60 digits with " + (peerUserName != null ? peerUserName : "your peer")
-                + ". Keys are derived locally via HKDF-SHA256 & Labyrinth thread ratchets.\n\nVOPRF Blinded Credential:\n"
-                + voprfToken.substring(0, Math.min(28, voprfToken.length())) + "...");
+        desc.setText("To verify that messages and calls with " + (peerUserName != null ? peerUserName : "this contact")
+                + " are end-to-end encrypted, compare these 60 digits or emoji code on their device.");
         desc.setTextSize(12.5f);
         desc.setGravity(Gravity.CENTER);
         container.addView(desc);
@@ -1027,7 +1042,7 @@ public class UserProfileActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         vLp.topMargin = (int) (18 * dp);
         btnVerify.setLayoutParams(vLp);
-        btnVerify.setText("Mark Verified (Trust 100%)");
+        btnVerify.setText("Mark as Verified");
         btnVerify.setCornerRadius((int) (12 * dp));
         btnVerify.setOnClickListener(v -> {
             if (chatId != null) {
@@ -1037,7 +1052,7 @@ public class UserProfileActivity extends AppCompatActivity {
                     EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(c);
                 }
             }
-            Toast.makeText(this, "Peer identity verified (Trust Score 100%)", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Contact verified successfully", Toast.LENGTH_SHORT).show();
             sheet.dismiss();
         });
         container.addView(btnVerify);
@@ -1119,7 +1134,7 @@ public class UserProfileActivity extends AppCompatActivity {
             EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
         }
         updateBlockUI();
-        Toast.makeText(this, isUserBlocked ? "User blocked locally on P2P layer" : "User unblocked", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, isUserBlocked ? "User blocked" : "User unblocked", Toast.LENGTH_SHORT).show();
     }
 
     private void confirmClearChat() {
@@ -1328,7 +1343,7 @@ public class UserProfileActivity extends AppCompatActivity {
             showGroupInviteLinkSheet();
         }), insertIdx + 2);
 
-        parent.addView(createProfileOptionRow("📅 Group Events & Calendar", "RSVP, countdowns, and synchronized mesh events", R.drawable.ic_timer, v -> {
+        parent.addView(createProfileOptionRow("📅 Group Events & Calendar", "RSVP, countdowns, and group events", R.drawable.ic_timer, v -> {
             EventsCalendarBottomSheet sheet = EventsCalendarBottomSheet.newInstance(chatId, peerUserName != null ? peerUserName : "Group");
             sheet.show(getSupportFragmentManager(), "EventsCalendarBottomSheet");
         }), insertIdx + 3);
@@ -1337,7 +1352,7 @@ public class UserProfileActivity extends AppCompatActivity {
             showSubgroupsDialog();
         }), insertIdx + 4);
 
-        parent.addView(createProfileOptionRow("🎨 Group Themes & Wallpaper", "Customize theme and broadcast to group mesh", R.drawable.ic_appearance, v -> {
+        parent.addView(createProfileOptionRow("🎨 Group Themes & Wallpaper", "Customize theme for the group", R.drawable.ic_appearance, v -> {
             showThemesAndWallpaperDialog(true);
         }), insertIdx + 5);
 
@@ -1467,7 +1482,7 @@ public class UserProfileActivity extends AppCompatActivity {
         root.addView(title);
 
         TextView sub = new TextView(this);
-        sub.setText("Control member capabilities and rate-limiting across the group mesh");
+        sub.setText("Control member permissions across the group");
         sub.setTextSize(12.5f);
         sub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
         sub.setPadding(0, (int) (4 * dp), 0, (int) (14 * dp));
@@ -2262,7 +2277,7 @@ public class UserProfileActivity extends AppCompatActivity {
 
         String[][] badges = {
                 {"👑 Founding Architect", "Created or joined as one of the inaugural peers", "true"},
-                {"⚡ Mesh Relay Master", "Exchanged encrypted P2P frames across group", "true"},
+                {"⚡ Active Contributor", "Sent active messages across group", "true"},
                 {"🛡️ Cryptographic Guardian", "E2EE session verified with forward secrecy", "true"},
                 {"🎙️ Voice Maverick", "Participated in live voice room or call", "true"},
                 {"📅 Master Event Host", "Created or joined group events", String.valueOf(eventCount > 0)},

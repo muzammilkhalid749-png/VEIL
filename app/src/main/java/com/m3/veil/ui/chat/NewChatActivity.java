@@ -68,7 +68,10 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
         try {
             db = FirebaseFirestore.getInstance();
         } catch (Throwable ignored) {}
-        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(this).getActivePersonaPeerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        }
         if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
         }
@@ -616,7 +619,7 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
             }
             if (tvNewChatDirectoryStatus != null) {
                 int bloomCount = engine.getBloomFilter().getApproximateCount();
-                tvNewChatDirectoryStatus.setText("🔐 O(1) k=7 Bloom Directory (" + bloomCount + " handles) • Mesh Ready");
+                tvNewChatDirectoryStatus.setText("Directory (" + bloomCount + " users) • Ready");
             }
             searchUsers("");
             return;
@@ -625,9 +628,9 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
         boolean bloomHit = cleanHandle.length() >= 3 && engine.mightContainUsername(cleanHandle);
         if (tvNewChatDirectoryStatus != null) {
             if (bloomHit) {
-                tvNewChatDirectoryStatus.setText("⚡ Bloom Filter HIT (<0.02ms): @" + cleanHandle + " indexed in directory");
+                tvNewChatDirectoryStatus.setText("User @" + cleanHandle + " found in directory");
             } else {
-                tvNewChatDirectoryStatus.setText("🔍 Searching SQLCipher + Blinded Directory for @" + cleanHandle + "…");
+                tvNewChatDirectoryStatus.setText("Searching directory for @" + cleanHandle + "…");
             }
         }
 
@@ -635,8 +638,8 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
             if (cleanHandle.length() >= 3 && cleanHandle.matches("^[a-z0-9_]{3,32}$")) {
                 btnQuickConnectHandle.setVisibility(View.VISIBLE);
                 tvQuickConnectLabel.setText(bloomHit
-                        ? "⚡ Verified in Bloom Filter: Chat with @" + cleanHandle
-                        : "🔗 Direct P2P Lookup & Connect with @" + cleanHandle);
+                        ? "⚡ User found: Chat with @" + cleanHandle
+                        : "🔗 Connect with @" + cleanHandle);
                 btnQuickConnectHandle.setOnClickListener(v -> connectDirectlyByHandle(cleanHandle));
             } else {
                 btnQuickConnectHandle.setVisibility(View.GONE);

@@ -12,7 +12,7 @@
     <View
         android:layout_width="36dp"
         android:layout_height="4dp"
-        android:background="@color/colorOutline"
+        android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="14dp" />
 
@@ -233,7 +233,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="18dp"
-            android:text="Message info &amp; P2P status"
+            android:text="Message info &amp; details"
             android:textColor="@color/textPrimary"
             android:textSize="15sp" />
 
@@ -252,12 +252,11 @@
         android:clickable="true"
         android:focusable="true">
 
-        <TextView
+        <ImageView
             android:layout_width="22dp"
             android:layout_height="22dp"
-            android:gravity="center"
-            android:text="✏️"
-            android:textSize="15sp" />
+            android:src="@drawable/ic_edit"
+            app:tint="@color/textPrimary" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -282,18 +281,49 @@
         android:clickable="true"
         android:focusable="true">
 
-        <TextView
+        <ImageView
             android:layout_width="22dp"
             android:layout_height="22dp"
-            android:gravity="center"
-            android:text="📌"
-            android:textSize="15sp" />
+            android:src="@drawable/ic_chat_pin"
+            app:tint="@color/textPrimary" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="18dp"
             android:text="Pin / Unpin message"
+            android:textColor="@color/textPrimary"
+            android:textSize="15sp" />
+
+    </LinearLayout>
+
+    <!-- Action: Favorite Media (Sticker / GIF / Emoji) -->
+    <LinearLayout
+        android:id="@+id/actionFavoriteMedia"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/ivFavoriteMediaIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_star"
+            app:tint="@color/textPrimary" />
+
+        <TextView
+            android:id="@+id/tvFavoriteMediaTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="18dp"
+            android:text="Add to Favorites"
             android:textColor="@color/textPrimary"
             android:textSize="15sp" />
 
@@ -312,12 +342,11 @@
         android:clickable="true"
         android:focusable="true">
 
-        <TextView
+        <ImageView
             android:layout_width="22dp"
             android:layout_height="22dp"
-            android:gravity="center"
-            android:text="🌐"
-            android:textSize="15sp" />
+            android:src="@drawable/ic_language"
+            app:tint="@color/textPrimary" />
 
         <TextView
             android:layout_width="wrap_content"

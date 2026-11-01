@@ -64,7 +64,10 @@ public class ArchivedChatsActivity extends AppCompatActivity implements ChatsAda
         handleWindowInsets();
 
         encryptedDb = EncryptedChatDatabase.getInstance(this);
-        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(this).getActivePersonaPeerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        }
         if (currentUserId == null) currentUserId = "";
 
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
@@ -90,7 +93,7 @@ public class ArchivedChatsActivity extends AppCompatActivity implements ChatsAda
         if (isSecretMode) {
             if (tvTitle != null) tvTitle.setText("Secret Vault ⚙️");
             if (ivNoticeIcon != null) ivNoticeIcon.setImageResource(R.drawable.ic_lock);
-            if (tvNoticeText != null) tvNoticeText.setText("Conversations in your Secret Vault are end-to-end encrypted with SQLCipher and hidden from your main chats. Tap header to manage or add chats.");
+            if (tvNoticeText != null) tvNoticeText.setText("Conversations in your Secret Vault are hidden from your main chats and protected by passcode.");
             if (ivEmptyIcon != null) ivEmptyIcon.setImageResource(R.drawable.ic_lock);
             if (tvEmptyTitle != null) tvEmptyTitle.setText("Secret Vault is empty");
             if (tvEmptySubtitle != null) tvEmptySubtitle.setText("Tap the header above or long-press any chat in your main list to move it to your hidden Secret Vault.");
@@ -519,7 +522,7 @@ public class ArchivedChatsActivity extends AppCompatActivity implements ChatsAda
 
         actionPin.setVisibility(View.GONE);
         actionMute.setText(chat.isMuted() ? "Unmute notifications" : "Mute notifications");
-        actionArchive.setText(isSecretMode ? "👁️  Move out of Secret Vault" : "Unarchive chat");
+        actionArchive.setText(isSecretMode ? "Move out of Secret Vault" : "Unarchive chat");
 
         actionMute.setOnClickListener(v -> {
             bottomSheetDialog.dismiss();
@@ -559,10 +562,10 @@ public class ArchivedChatsActivity extends AppCompatActivity implements ChatsAda
 
             if (tvTitle != null) tvTitle.setText("Delete Chat?");
             if (tvMsg != null) {
-                tvMsg.setText("Are you sure you want to permanently delete this conversation from your encrypted SQLCipher vault? All messages and attachments will be wiped.");
+                tvMsg.setText("Are you sure you want to permanently delete this conversation? All messages and attachments will be deleted.");
             }
             if (btnConfirm != null) {
-                btnConfirm.setText("Delete & Shred");
+                btnConfirm.setText("Delete Conversation");
                 btnConfirm.setOnClickListener(cv -> {
                     confirmSheet.dismiss();
                     encryptedDb.deleteChat(chat.getId());

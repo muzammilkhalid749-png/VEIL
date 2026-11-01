@@ -586,7 +586,7 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
             root.addView(etNode);
 
             MaterialButton btnAdd = new MaterialButton(context);
-            btnAdd.setText("Append & Broadcast to Mesh");
+            btnAdd.setText("Add Contribution");
             btnAdd.setCornerRadius((int) (14 * dp));
             btnAdd.setOnClickListener(v -> {
                 String line = etNode.getText().toString().trim();

@@ -43,7 +43,7 @@
                     android:text="New Group"
                     android:textColor="@color/textPrimary"
                     android:textSize="18sp"
-                    android:textStyle="bold" />
+                    android:fontFamily="sans-serif-medium" />
 
                 <TextView
                     android:id="@+id/tvSubtitle"

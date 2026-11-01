@@ -3,172 +3,203 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/bg_bottom_sheet_modern"
+    android:background="@drawable/bottom_sheet_background"
     android:orientation="vertical"
-    android:paddingStart="24dp"
+    android:paddingStart="20dp"
     android:paddingTop="12dp"
-    android:paddingEnd="24dp"
+    android:paddingEnd="20dp"
     android:paddingBottom="32dp">
 
-    <!-- Drag Handle -->
+    <!-- Minimal Drag Handle -->
     <View
-        android:layout_width="40dp"
+        android:layout_width="36dp"
         android:layout_height="4dp"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="16dp"
-        android:background="@drawable/bg_attach_item"
-        android:backgroundTint="@color/colorOutline" />
+        android:background="@drawable/bg_persona_drag_handle" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="📱 Linked Devices (VEIL Web)"
-        android:textColor="@color/colorTextPrimary"
+        android:text="Linked Devices (VEIL Web)"
+        android:textColor="@color/textPrimary"
         android:textSize="20sp"
-        android:textStyle="bold" />
+        android:fontFamily="sans-serif-medium" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="Link your PC or laptop web browser directly via serverless WebRTC P2P DataChannels."
-        android:textColor="@color/colorTextSecondary"
+        android:layout_marginTop="3dp"
+        android:layout_marginBottom="18dp"
+        android:text="Link your desktop browser to use VEIL on your computer"
+        android:textColor="@color/textSecondary"
         android:textSize="13sp" />
 
     <!-- Link a Device Primary CTA Button -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnScanQr"
         android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:layout_marginTop="18dp"
+        android:layout_height="50dp"
+        android:layout_marginBottom="16dp"
         android:text="Link a Device (Scan QR Code)"
         android:textAllCaps="false"
         android:textSize="15sp"
-        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
         app:cornerRadius="16dp"
-        app:icon="@drawable/ic_veil_shield"
+        app:icon="@drawable/ic_devices"
         app:iconGravity="textStart"
         app:iconTint="@android:color/white"
         android:backgroundTint="@color/colorPrimary" />
 
-    <!-- Divider or manual input toggle -->
+    <!-- Manual Pairing Code Card -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:strokeWidth="1dp"
+        app:strokeColor="@color/colorOutline"
+        app:cardBackgroundColor="@color/colorSurfaceContainerLow">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PAIRING CODE / PEER ID"
+                android:textColor="@color/colorPrimary"
+                android:textSize="11sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.06"
+                android:layout_marginBottom="10dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/etPairingCode"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_search_input"
+                    android:hint="e.g. sess_uuid or veil_web_..."
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:textColor="@color/textPrimary"
+                    android:textColorHint="@color/textSecondary"
+                    android:textSize="13sp"
+                    android:fontFamily="monospace"
+                    android:singleLine="true" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnConnectCode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="46dp"
+                    android:layout_marginStart="8dp"
+                    android:text="Link"
+                    android:textAllCaps="false"
+                    android:fontFamily="sans-serif-medium"
+                    app:cornerRadius="12dp"
+                    android:backgroundTint="@color/colorPrimary" />
+            </LinearLayout>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Active Sessions Header -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="8dp"
-        android:text="OR ENTER PAIRING CODE / PEER ID"
-        android:textColor="@color/colorTextSecondary"
+        android:text="ACTIVE SESSIONS"
+        android:textColor="@color/colorPrimary"
         android:textSize="11sp"
-        android:textStyle="bold" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-
-        <EditText
-            android:id="@+id/etPairingCode"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_search_input"
-            android:hint="e.g. sess_uuid or veil_web_..."
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:textColor="@color/colorTextPrimary"
-            android:textColorHint="@color/colorTextSecondary"
-            android:textSize="13sp"
-            android:fontFamily="monospace"
-            android:singleLine="true" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnConnectCode"
-            android:layout_width="wrap_content"
-            android:layout_height="48dp"
-            android:layout_marginStart="8dp"
-            android:text="Link"
-            android:textAllCaps="false"
-            android:textStyle="bold"
-            app:cornerRadius="14dp"
-            android:backgroundTint="@color/colorPrimary" />
-    </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="18dp"
-        android:layout_marginBottom="14dp"
-        android:background="@color/colorOutline" />
-
-    <!-- Active Linked Devices Header -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Active Desktop Sessions"
-        android:textColor="@color/colorTextPrimary"
-        android:textSize="15sp"
-        android:textStyle="bold" />
+        android:fontFamily="sans-serif-medium"
+        android:letterSpacing="0.06"
+        android:layout_marginStart="4dp"
+        android:layout_marginBottom="8dp" />
 
     <LinearLayout
         android:id="@+id/containerLinkedDevices"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
         android:orientation="vertical">
 
-        <!-- Default or Dynamic Linked Device Card -->
-        <LinearLayout
-            android:id="@+id/cardActiveWebDevice"
+        <!-- Active Linked Device Card -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_search_input"
-            android:padding="14dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:src="@drawable/ic_info"
-                app:tint="@color/colorPrimary" />
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/colorOutline"
+            app:cardBackgroundColor="@color/colorSurfaceContainerLow">
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:id="@+id/cardActiveWebDevice"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:padding="16dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-                <TextView
-                    android:id="@+id/tvDeviceTitle"
+                <FrameLayout
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:background="@drawable/bg_persona_avatar_circle"
+                    android:backgroundTint="@color/colorSurfaceVariant">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_devices"
+                        app:tint="@color/colorPrimary" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvDeviceTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="No desktop companion linked"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="15sp"
+                        android:fontFamily="sans-serif-medium" />
+
+                    <TextView
+                        android:id="@+id/tvDeviceSubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="Scan QR on web.veil.network to link"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnUnlinkDevice"
+                    style="@style/Widget.Material3.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="No desktop companion linked"
-                    android:textColor="@color/colorTextPrimary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvDeviceSubtitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Scan QR on web.veil.network to link"
-                    android:textColor="@color/colorTextSecondary"
-                    android:textSize="12sp" />
+                    android:text="Unlink"
+                    android:textColor="@color/colorError"
+                    android:fontFamily="sans-serif-medium"
+                    android:visibility="gone" />
             </LinearLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnUnlinkDevice"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Unlink"
-                android:textColor="@android:color/holo_red_light"
-                android:visibility="gone" />
-        </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
     </LinearLayout>
 
 </LinearLayout>

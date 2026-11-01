@@ -114,7 +114,7 @@ public class PrivacySettingsBottomSheet extends BottomSheetDialogFragment {
             } else if (isChecked) {
                 Toast.makeText(requireContext(), "Tor Proxy Active • Strict TURN Relay Mode Enforced", Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(requireContext(), "Tor Proxy Disabled • Direct P2P Restored", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), "Proxy Disabled (Direct Connection)", Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -129,7 +129,7 @@ public class PrivacySettingsBottomSheet extends BottomSheetDialogFragment {
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             lp.topMargin = (int) (12 * dp);
             btnAdvancedVault.setLayoutParams(lp);
-            btnAdvancedVault.setText("🔐 Cryptographic Vault & Duress PIN");
+            btnAdvancedVault.setText("🔐 Secret Vault & Decoy PIN");
             btnAdvancedVault.setAllCaps(false);
             btnAdvancedVault.setCornerRadius((int) (14 * dp));
             btnAdvancedVault.setOnClickListener(v -> {
@@ -146,7 +146,7 @@ public class PrivacySettingsBottomSheet extends BottomSheetDialogFragment {
             tvTorProxyStatus.setText("Active • " + bridge.getProxyHost() + ":" + bridge.getProxyPort() + " (Strict Relay)");
             tvTorProxyStatus.setTextColor(0xFF10B981); // Emerald green
         } else {
-            tvTorProxyStatus.setText("Disabled • Direct P2P (No Proxy)");
+            tvTorProxyStatus.setText("Disabled (Direct Connection)");
             tvTorProxyStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.colorTextSecondary));
         }
     }

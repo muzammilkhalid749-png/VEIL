@@ -92,6 +92,7 @@ public class MediaViewerActivity extends AppCompatActivity {
     public static final String EXTRA_PEER_ID = "extra_peer_id";
     public static final String EXTRA_IS_STARRED = "extra_is_starred";
     public static final String EXTRA_START_IN_ALBUM_FEED = "extra_start_in_album_feed";
+    public static final String EXTRA_RECIPIENT_NAME = "extra_recipient_name";
 
     // Grouped Album extras
     public static final String EXTRA_ALBUM_PATHS = "extra_album_paths";
@@ -165,6 +166,7 @@ public class MediaViewerActivity extends AppCompatActivity {
     private String filePath;
     private String mediaType;
     private String senderName;
+    private String recipientName;
     private String timestamp;
     private String caption;
 
@@ -356,6 +358,18 @@ public class MediaViewerActivity extends AppCompatActivity {
         chatId = intent.getStringExtra(EXTRA_CHAT_ID);
         peerId = intent.getStringExtra(EXTRA_PEER_ID);
         isStarred = intent.getBooleanExtra(EXTRA_IS_STARRED, false);
+        recipientName = intent.getStringExtra(EXTRA_RECIPIENT_NAME);
+        if ((recipientName == null || recipientName.isEmpty()) && intent.hasExtra("recipientName")) {
+            recipientName = intent.getStringExtra("recipientName");
+        }
+        if ((recipientName == null || recipientName.trim().isEmpty() || "You".equalsIgnoreCase(recipientName.trim())) && chatId != null && !chatId.isEmpty()) {
+            try {
+                com.m3.veil.model.Chat c = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
+                if (c != null && c.getName() != null && !c.getName().trim().isEmpty()) {
+                    recipientName = c.getName();
+                }
+            } catch (Throwable ignored) {}
+        }
 
         if (messageId != null && !messageId.isEmpty()) {
             try {
@@ -1325,8 +1339,30 @@ public class MediaViewerActivity extends AppCompatActivity {
         editIntent.putStringArrayListExtra(MediaEditActivity.EXTRA_BATCH_URIS, singleBatchUri);
         editIntent.putStringArrayListExtra(MediaEditActivity.EXTRA_BATCH_TYPES, singleBatchType);
         editIntent.putExtra(MediaEditActivity.EXTRA_IS_STATUS_MODE, statusMode);
+        String targetChatName = recipientName;
+        if (targetChatName == null || targetChatName.trim().isEmpty() || "You".equalsIgnoreCase(targetChatName.trim())) {
+            if (chatId != null && !chatId.isEmpty()) {
+                try {
+                    com.m3.veil.model.Chat c = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
+                    if (c != null && c.getName() != null && !c.getName().trim().isEmpty()) {
+                        targetChatName = c.getName();
+                    }
+                } catch (Throwable ignored) {}
+            }
+        }
+        if (targetChatName == null || targetChatName.trim().isEmpty() || "You".equalsIgnoreCase(targetChatName.trim())) {
+            if (senderName != null && !senderName.trim().isEmpty() && !"You".equalsIgnoreCase(senderName.trim())) {
+                targetChatName = senderName;
+            }
+        }
+        if (targetChatName == null || targetChatName.trim().isEmpty() || "You".equalsIgnoreCase(targetChatName.trim())) {
+            targetChatName = "Current Chat";
+        }
         editIntent.putExtra(MediaEditActivity.EXTRA_RECIPIENT_NAME,
-                statusMode ? "Status (Contacts)" : (senderName != null && !senderName.isEmpty() ? senderName : "Status (Contacts)"));
+                statusMode ? "Status (Contacts)" : targetChatName);
+        if (chatId != null && !chatId.isEmpty()) {
+            editIntent.putExtra("extra_chat_id", chatId);
+        }
         startActivityForResult(editIntent, REQUEST_EDIT_FROM_VIEWER);
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
     }

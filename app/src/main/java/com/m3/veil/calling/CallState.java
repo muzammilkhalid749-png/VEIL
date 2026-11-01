@@ -47,7 +47,7 @@ public enum CallState {
     }
 
     public boolean isIncoming() {
-        return this == RECEIVED_CALL || this == PRE_ACCEPT_RECEIVED;
+        return this == RECEIVED_CALL;
     }
 
     public boolean isEstablished() {

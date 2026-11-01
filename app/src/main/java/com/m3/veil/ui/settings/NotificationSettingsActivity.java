@@ -39,6 +39,8 @@ public class NotificationSettingsActivity extends AppCompatActivity {
     private SwitchCompat switchInAppSounds;
     private SwitchCompat switchInAppVibrate;
     private SwitchCompat switchInAppPreview;
+    private com.google.android.material.card.MaterialCardView cardBatteryOptimization;
+    private android.widget.TextView tvBatteryOptStatus;
     private MaterialButton btnResetAll;
 
     private SharedPreferences prefs;
@@ -57,6 +59,24 @@ public class NotificationSettingsActivity extends AppCompatActivity {
         setupListeners();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateBatteryOptimizationState();
+    }
+
+    private void updateBatteryOptimizationState() {
+        if (tvBatteryOptStatus == null) return;
+        boolean ignoring = com.m3.veil.utils.VeilBatteryOptimizationHelper.isIgnoringBatteryOptimizations(this);
+        if (ignoring) {
+            tvBatteryOptStatus.setText("Unrestricted (Calls & messages delivered instantly)");
+            tvBatteryOptStatus.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.colorPrimary));
+        } else {
+            tvBatteryOptStatus.setText("Restricted (Battery saver may delay incoming calls)");
+            tvBatteryOptStatus.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.colorError));
+        }
+    }
+
     private void bindViews() {
         ImageView btnBack = findViewById(R.id.btnBack);
         btnBack.setOnClickListener(v -> finish());
@@ -72,6 +92,8 @@ public class NotificationSettingsActivity extends AppCompatActivity {
         switchInAppSounds = findViewById(R.id.switchInAppSounds);
         switchInAppVibrate = findViewById(R.id.switchInAppVibrate);
         switchInAppPreview = findViewById(R.id.switchInAppPreview);
+        cardBatteryOptimization = findViewById(R.id.cardBatteryOptimization);
+        tvBatteryOptStatus = findViewById(R.id.tvBatteryOptStatus);
         btnResetAll = findViewById(R.id.btnResetAllNotifications);
     }
 
@@ -101,6 +123,12 @@ public class NotificationSettingsActivity extends AppCompatActivity {
         switchInAppSounds.setOnCheckedChangeListener((b, val) -> prefs.edit().putBoolean(KEY_INAPP_SOUNDS, val).apply());
         switchInAppVibrate.setOnCheckedChangeListener((b, val) -> prefs.edit().putBoolean(KEY_INAPP_VIBRATE, val).apply());
         switchInAppPreview.setOnCheckedChangeListener((b, val) -> prefs.edit().putBoolean(KEY_INAPP_PREVIEW, val).apply());
+
+        if (cardBatteryOptimization != null) {
+            cardBatteryOptimization.setOnClickListener(v -> {
+                com.m3.veil.utils.VeilBatteryOptimizationHelper.showPromptDialog(this, true);
+            });
+        }
 
         btnResetAll.setOnClickListener(v -> {
             new MaterialAlertDialogBuilder(this)

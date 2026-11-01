@@ -95,7 +95,7 @@
             android:fontFamily="monospace"
             android:paddingHorizontal="16dp"
             android:paddingVertical="6dp"
-            android:text="🔐 SQLCipher FTS + O(1) k=7 Bloom Directory Ready"
+            android:text="Search chats and contacts"
             android:textColor="@color/veil_accent"
             android:textSize="11.5sp"
             android:textStyle="bold" />

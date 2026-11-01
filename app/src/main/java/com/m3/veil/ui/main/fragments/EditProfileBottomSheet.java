@@ -56,6 +56,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import com.yalantis.ucrop.UCrop;
 import de.hdodenhof.circleimageview.CircleImageView;
 
 /**
@@ -122,7 +123,25 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
                 if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
                     Uri imageUri = result.getData().getData();
                     if (imageUri != null) {
-                        processSelectedAvatarUri(imageUri);
+                        launchCropActivity(imageUri);
+                    }
+                }
+            });
+
+    private final ActivityResultLauncher<Intent> cropLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    Uri resultUri = UCrop.getOutput(result.getData());
+                    if (resultUri != null) {
+                        processSelectedAvatarUri(resultUri);
+                    }
+                } else if (result.getResultCode() == UCrop.RESULT_ERROR && result.getData() != null) {
+                    Throwable cropError = UCrop.getError(result.getData());
+                    if (cropError != null) {
+                        Log.e(TAG, "UCrop error", cropError);
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(), "Crop failed: " + cropError.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
                     }
                 }
             });
@@ -190,7 +209,7 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
                 int insertPos = parent.indexOfChild(editDisplayNameInput) + 1;
 
                 TextView tvUsernameLabel = new TextView(requireContext());
-                tvUsernameLabel.setText("@Username Handle (Bloom Filter O(1) Verified)");
+                tvUsernameLabel.setText("Username");
                 tvUsernameLabel.setTextColor(ContextCompat.getColor(requireContext(), R.color.colorTextSecondary));
                 tvUsernameLabel.setTextSize(12f);
                 tvUsernameLabel.setTypeface(null, Typeface.BOLD);
@@ -441,6 +460,38 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
         }
     }
 
+    private void launchCropActivity(Uri sourceUri) {
+        if (getContext() == null || sourceUri == null) return;
+        try {
+            File destinationFile = new File(requireContext().getCacheDir(), "cropped_avatar_" + System.currentTimeMillis() + ".jpg");
+            Uri destinationUri = Uri.fromFile(destinationFile);
+
+            UCrop.Options options = new UCrop.Options();
+            options.setCircleDimmedLayer(true);
+            options.setShowCropGrid(false);
+            options.setShowCropFrame(true);
+            options.setCropGridStrokeWidth(1);
+            options.setCompressionQuality(92);
+            options.setCompressionFormat(Bitmap.CompressFormat.JPEG);
+            options.setToolbarColor(ContextCompat.getColor(requireContext(), R.color.colorSurface));
+            options.setStatusBarColor(ContextCompat.getColor(requireContext(), R.color.colorSurface));
+            options.setToolbarWidgetColor(ContextCompat.getColor(requireContext(), R.color.colorOnSurface));
+            options.setCropFrameColor(ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+            options.setActiveControlsWidgetColor(ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+            options.setToolbarTitle("Crop Profile Photo");
+
+            Intent cropIntent = UCrop.of(sourceUri, destinationUri)
+                    .withAspectRatio(1, 1)
+                    .withMaxResultSize(1024, 1024)
+                    .withOptions(options)
+                    .getIntent(requireContext());
+            cropLauncher.launch(cropIntent);
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting UCrop, falling back to direct image", e);
+            processSelectedAvatarUri(sourceUri);
+        }
+    }
+
     private void processSelectedAvatarUri(Uri uri) {
         if (getContext() == null) return;
         try (InputStream is = getContext().getContentResolver().openInputStream(uri)) {
@@ -517,10 +568,10 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
         tvUsernameAvailability.setVisibility(View.VISIBLE);
         if (!bloomMightContain) {
             isUsernameValidAndAvailable = true;
-            tvUsernameAvailability.setText("⚡ Bloom O(1) (" + us + "µs): @" + clean + " is available");
+            tvUsernameAvailability.setText("✓ @" + clean + " is available");
             tvUsernameAvailability.setTextColor(ContextCompat.getColor(getContext(), R.color.colorPrimary));
         } else {
-            tvUsernameAvailability.setText("🔍 Bloom hit (" + us + "µs) — checking directory...");
+            tvUsernameAvailability.setText("Checking availability...");
             tvUsernameAvailability.setTextColor(ContextCompat.getColor(getContext(), R.color.colorTextSecondary));
         }
 
@@ -538,7 +589,7 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
                     tvUsernameAvailability.setTextColor(ContextCompat.getColor(getContext(), R.color.colorError));
                 } else {
                     isUsernameValidAndAvailable = true;
-                    tvUsernameAvailability.setText("✓ Bloom + Directory Verified: @" + clean + " is available");
+                    tvUsernameAvailability.setText("✓ @" + clean + " is available");
                     tvUsernameAvailability.setTextColor(ContextCompat.getColor(getContext(), R.color.colorPrimary));
                 }
             });
@@ -606,6 +657,7 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
             activePersona.setBio(finalBio);
             activePersona.setMood(selectedMood);
             activePersona.setAvatarUri(personaAvatarRef);
+            VeilAvatarLoader.clearCache();
             personaManager.saveOrUpdatePersona(activePersona);
             finishSaveOnUiThread();
             return;
@@ -651,8 +703,18 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
         final String finalAvatarForPrefs = (resolvedAvatarPath != null && !resolvedAvatarPath.isEmpty())
                 ? resolvedAvatarPath : finalAvatarB64;
 
-        // 2. Update UserPreferences & PreferenceManager immediately
+        // 2. Update UserPreferences & PreferenceManager immediately and flush avatar cache
+        VeilAvatarLoader.clearCache();
         preferenceManager.putString("user_mood", selectedMood);
+        if (avatarRemoved) {
+            userPreferences.clearAvatar();
+            preferenceManager.remove("avatar");
+            preferenceManager.remove("avatar_path");
+            preferenceManager.remove("photo_url");
+            if (uid != null) {
+                sovereignEngine.deleteAvatarFile(uid);
+            }
+        }
         userPreferences.saveProfileFields(uid, finalUsername, finalDisplayName, finalBio, finalAvatarForPrefs);
 
         User currentUser = userPreferences.getCurrentUser();
@@ -668,10 +730,10 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
             userPreferences.saveUser(currentUser);
         }
 
-        // 3. Register new username in Bloom Filter & sync active persona
+        // 3. Register new username in Bloom Filter & sync active persona (including avatar)
         sovereignEngine.recordClaimedUsername(finalUsername);
         com.m3.veil.manager.VeilFeatureManager.getInstance(getContext())
-                .syncPrimaryPersonaWithUser(finalUsername, finalDisplayName, finalBio, selectedMood);
+                .syncPrimaryPersonaWithUser(finalUsername, finalDisplayName, finalBio, selectedMood, finalAvatarForPrefs);
 
         // 4. Update Firestore ("users/{uid}" & "usernames/{finalUsername}")
         if (uid != null && !uid.isEmpty()) {
@@ -737,6 +799,7 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void finishSaveOnUiThread() {
+        VeilAvatarLoader.clearCache();
         if (!isAdded()) return;
         isSaving = false;
         if (listener != null) {

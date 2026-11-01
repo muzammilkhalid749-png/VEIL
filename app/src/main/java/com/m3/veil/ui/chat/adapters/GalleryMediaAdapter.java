@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.LruCache;
 import android.util.Size;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -18,8 +19,10 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.m3.veil.R;
@@ -29,6 +32,7 @@ import com.m3.veil.utils.VoicePlayerManager;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -52,12 +56,54 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
     private final List<GalleryMediaItem> selectedItems = new ArrayList<>();
     private final OnGalleryItemClickListener listener;
     private SelectionMode selectionMode = SelectionMode.SINGLE_SELECT;
+    private boolean alwaysShowSelectionRing = false;
+    private int maxSelectionCount = 30;
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private static final LruCache<String, Bitmap> THUMB_CACHE = new LruCache<>(180);
 
     public GalleryMediaAdapter(List<GalleryMediaItem> items, OnGalleryItemClickListener listener) {
         this.items = items;
         this.listener = listener;
+    }
+
+    public void setSelectionMode(SelectionMode mode) {
+        this.selectionMode = mode != null ? mode : SelectionMode.SINGLE_SELECT;
+        notifyDataSetChanged();
+    }
+
+    public SelectionMode getSelectionMode() {
+        return selectionMode;
+    }
+
+    public void setAlwaysShowSelectionRing(boolean alwaysShow) {
+        this.alwaysShowSelectionRing = alwaysShow;
+        if (alwaysShow) {
+            this.selectionMode = SelectionMode.MULTI_SELECT;
+        }
+        notifyDataSetChanged();
+    }
+
+    public boolean isAlwaysShowSelectionRing() {
+        return alwaysShowSelectionRing;
+    }
+
+    public void setMaxSelectionCount(int maxCount) {
+        this.maxSelectionCount = Math.max(1, maxCount);
+    }
+
+    public void clearSelection() {
+        for (GalleryMediaItem item : selectedItems) {
+            if (item != null) item.setSelected(false);
+        }
+        selectedItems.clear();
+        if (!alwaysShowSelectionRing) {
+            selectionMode = SelectionMode.SINGLE_SELECT;
+        }
+        notifyDataSetChanged();
+        if (listener != null) {
+            listener.onMultiSelectionChanged(new ArrayList<>());
+        }
     }
 
     @NonNull
@@ -82,13 +128,25 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             vh.cardCameraTile.setVisibility(View.GONE);
             vh.cardMediaContainer.setVisibility(View.VISIBLE);
 
-            vh.ivThumbnail.setImageBitmap(null);
-            vh.ivThumbnail.setTag(item.getUri());
-            loadThumbnailAsync(item, vh.ivThumbnail);
+            Uri uri = item.getUri();
+            String cacheKey = uri != null ? uri.toString() : "";
+            Bitmap cached = !cacheKey.isEmpty() ? THUMB_CACHE.get(cacheKey) : null;
+            if (cached != null && !cached.isRecycled()) {
+                vh.ivThumbnail.setImageBitmap(cached);
+                vh.ivThumbnail.setTag(uri);
+            } else {
+                vh.ivThumbnail.setImageBitmap(null);
+                vh.ivThumbnail.setTag(uri);
+                loadThumbnailAsync(item, vh.ivThumbnail);
+            }
 
+            boolean isGif = item.getPath() != null && item.getPath().toLowerCase(Locale.ROOT).endsWith(".gif");
             if (item.isVideo()) {
                 vh.videoDurationPill.setVisibility(View.VISIBLE);
                 vh.tvVideoDuration.setText(VoicePlayerManager.formatDuration((int) item.getDurationMs()));
+            } else if (isGif) {
+                vh.videoDurationPill.setVisibility(View.VISIBLE);
+                vh.tvVideoDuration.setText("GIF");
             } else {
                 vh.videoDurationPill.setVisibility(View.GONE);
             }
@@ -98,17 +156,24 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             vh.selectedOverlay.setVisibility(isSelected ? View.VISIBLE : View.GONE);
             vh.ivCheckmark.setVisibility(View.GONE);
 
-            if (selectionMode == SelectionMode.MULTI_SELECT) {
+            boolean showRing = alwaysShowSelectionRing || selectionMode == SelectionMode.MULTI_SELECT;
+            if (showRing) {
                 vh.selectionBadge.setVisibility(View.VISIBLE);
+                float dp = vh.itemView.getResources().getDisplayMetrics().density;
                 if (isSelected) {
-                    GradientDrawable greenCircle = new GradientDrawable();
-                    greenCircle.setShape(GradientDrawable.OVAL);
-                    greenCircle.setColor(Color.parseColor("#00A884"));
-                    vh.selectionBadge.setBackground(greenCircle);
+                    GradientDrawable accentCircle = new GradientDrawable();
+                    accentCircle.setShape(GradientDrawable.OVAL);
+                    accentCircle.setColor(ContextCompat.getColor(vh.itemView.getContext(), R.color.veil_accent));
+                    accentCircle.setStroke(Math.round(1.5f * dp), Color.WHITE);
+                    vh.selectionBadge.setBackground(accentCircle);
                     vh.tvSelectionNumber.setVisibility(View.VISIBLE);
                     vh.tvSelectionNumber.setText(String.valueOf(selIndex + 1));
                 } else {
-                    vh.selectionBadge.setBackgroundResource(R.drawable.bg_circle_translucent);
+                    GradientDrawable emptyRing = new GradientDrawable();
+                    emptyRing.setShape(GradientDrawable.OVAL);
+                    emptyRing.setColor(Color.parseColor("#33000000"));
+                    emptyRing.setStroke(Math.round(2f * dp), Color.WHITE);
+                    vh.selectionBadge.setBackground(emptyRing);
                     vh.tvSelectionNumber.setVisibility(View.GONE);
                 }
             } else {
@@ -116,35 +181,41 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
                 vh.tvSelectionNumber.setVisibility(View.GONE);
             }
 
-            // Single Tap: In SINGLE_SELECT, immediately pass URI to preview/editor; in MULTI_SELECT, toggle selection
             vh.cardMediaContainer.setOnClickListener(v -> {
-                if (selectionMode == SelectionMode.SINGLE_SELECT && selectedItems.isEmpty()) {
+                if (!alwaysShowSelectionRing && selectionMode == SelectionMode.SINGLE_SELECT && selectedItems.isEmpty()) {
                     if (listener != null) {
                         listener.onSingleMediaItemClicked(item);
                     }
                     return;
                 }
-                toggleMultiSelectItem(item);
+                toggleMultiSelectItem(v, item);
             });
 
-            // Long Press: Transition to MULTI_SELECT and select item
             vh.cardMediaContainer.setOnLongClickListener(v -> {
                 selectionMode = SelectionMode.MULTI_SELECT;
-                toggleMultiSelectItem(item);
+                toggleMultiSelectItem(v, item);
                 return true;
             });
         }
     }
 
-    private void toggleMultiSelectItem(GalleryMediaItem item) {
+    private void toggleMultiSelectItem(View anchor, GalleryMediaItem item) {
         int existingIdx = indexOfSelected(item);
         if (existingIdx >= 0) {
             item.setSelected(false);
             selectedItems.remove(existingIdx);
-            if (selectedItems.isEmpty()) {
+            if (selectedItems.isEmpty() && !alwaysShowSelectionRing) {
                 selectionMode = SelectionMode.SINGLE_SELECT;
             }
         } else {
+            if (selectedItems.size() >= maxSelectionCount) {
+                if (anchor != null && anchor.getContext() != null) {
+                    Toast.makeText(anchor.getContext(),
+                            "You can select up to " + maxSelectionCount + " items",
+                            Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
             selectionMode = SelectionMode.MULTI_SELECT;
             item.setSelected(true);
             selectedItems.add(item);
@@ -168,24 +239,34 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         return -1;
     }
 
+    public static void loadThumbnailInto(GalleryMediaItem item, ImageView imageView) {
+        if (item == null || item.getUri() == null || imageView == null) return;
+        Uri uri = item.getUri();
+        Bitmap cached = THUMB_CACHE.get(uri.toString());
+        if (cached != null && !cached.isRecycled()) {
+            imageView.setImageBitmap(cached);
+            return;
+        }
+        ContentResolver cr = imageView.getContext().getContentResolver();
+        Executors.newSingleThreadExecutor().execute(() -> {
+            Bitmap thumb = decodeMediaThumb(cr, uri);
+            if (thumb != null) {
+                THUMB_CACHE.put(uri.toString(), thumb);
+                new Handler(Looper.getMainLooper()).post(() -> imageView.setImageBitmap(thumb));
+            }
+        });
+    }
+
     private void loadThumbnailAsync(GalleryMediaItem item, ImageView imageView) {
         final Uri uri = item.getUri();
+        if (uri == null) return;
         final ContentResolver cr = imageView.getContext().getContentResolver();
 
         executor.execute(() -> {
-            Bitmap thumb = null;
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    thumb = cr.loadThumbnail(uri, new Size(200, 200), null);
-                } else {
-                    try (InputStream is = cr.openInputStream(uri)) {
-                        BitmapFactory.Options opts = new BitmapFactory.Options();
-                        opts.inSampleSize = 4;
-                        thumb = BitmapFactory.decodeStream(is, null, opts);
-                    }
-                }
-            } catch (Exception ignored) {}
-
+            Bitmap thumb = decodeMediaThumb(cr, uri);
+            if (thumb != null) {
+                THUMB_CACHE.put(uri.toString(), thumb);
+            }
             final Bitmap result = thumb;
             mainHandler.post(() -> {
                 if (uri.equals(imageView.getTag()) && result != null) {
@@ -193,6 +274,22 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
                 }
             });
         });
+    }
+
+    private static Bitmap decodeMediaThumb(ContentResolver cr, Uri uri) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                return cr.loadThumbnail(uri, new Size(240, 240), null);
+            } else {
+                try (InputStream is = cr.openInputStream(uri)) {
+                    BitmapFactory.Options opts = new BitmapFactory.Options();
+                    opts.inSampleSize = 4;
+                    return BitmapFactory.decodeStream(is, null, opts);
+                }
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     @Override
@@ -233,7 +330,7 @@ public class GalleryMediaAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             tvSelectionNumber = new TextView(itemView.getContext());
             tvSelectionNumber.setGravity(Gravity.CENTER);
             tvSelectionNumber.setTextColor(Color.WHITE);
-            tvSelectionNumber.setTextSize(11f);
+            tvSelectionNumber.setTextSize(11.5f);
             tvSelectionNumber.setTypeface(null, Typeface.BOLD);
             tvSelectionNumber.setVisibility(View.GONE);
             if (selectionBadge instanceof FrameLayout) {

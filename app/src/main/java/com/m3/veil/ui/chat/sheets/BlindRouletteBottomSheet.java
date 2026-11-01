@@ -107,7 +107,7 @@ public class BlindRouletteBottomSheet extends BottomSheetDialogFragment {
         pbRadar.setVisibility(View.VISIBLE);
         btnStartMatch.setEnabled(false);
         chipGroupMood.setEnabled(false);
-        tvStatus.setText("Scanning mesh for an anonymous partner in [" + selectedMood + "]...");
+        tvStatus.setText("Looking for someone to chat with in [" + selectedMood + "]...");
 
         long thirtySecsAgo = System.currentTimeMillis() - 45000L;
 

@@ -39,6 +39,19 @@ public class UserPreferences {
     private final SharedPreferences prefs;
     private final Context appContext;
 
+    private static volatile UserPreferences sInstance;
+
+    public static UserPreferences getInstance(Context context) {
+        if (sInstance == null) {
+            synchronized (UserPreferences.class) {
+                if (sInstance == null) {
+                    sInstance = new UserPreferences(context.getApplicationContext());
+                }
+            }
+        }
+        return sInstance;
+    }
+
     public UserPreferences(Context context) {
         this.appContext = context.getApplicationContext();
         this.prefs = getOrCreateSharedPrefs(this.appContext);
@@ -126,15 +139,22 @@ public class UserPreferences {
 
         String avatarVal = user.getAvatar();
         String photoUrlVal = user.getPhotoUrl();
+        boolean hasAvatarVal = (avatarVal != null && !avatarVal.trim().isEmpty())
+                || (photoUrlVal != null && !photoUrlVal.trim().isEmpty());
         if (photoUrlVal != null && !photoUrlVal.isEmpty()) {
             editor.putString(KEY_PHOTO_URL, photoUrlVal);
         } else if (avatarVal != null && !avatarVal.isEmpty()) {
             editor.putString(KEY_PHOTO_URL, avatarVal);
+        } else if (!hasAvatarVal) {
+            editor.remove(KEY_PHOTO_URL);
         }
         if (avatarVal != null && !avatarVal.isEmpty()) {
             editor.putString(KEY_AVATAR, avatarVal);
         } else if (photoUrlVal != null && !photoUrlVal.isEmpty()) {
             editor.putString(KEY_AVATAR, photoUrlVal);
+        } else if (!hasAvatarVal) {
+            editor.remove(KEY_AVATAR);
+            editor.remove(KEY_AVATAR_PATH);
         }
 
         if (user.getStatus() != null) {
@@ -325,16 +345,25 @@ public class UserPreferences {
         if (bio != null) {
             editor.putString(KEY_BIO, bio);
         }
+        boolean hasAvatar = (avatarPath != null && !avatarPath.trim().isEmpty())
+                || (avatarBase64 != null && !avatarBase64.trim().isEmpty());
         if (avatarPath != null && !avatarPath.isEmpty()) {
             editor.putString(KEY_AVATAR_PATH, avatarPath);
             editor.putString(KEY_PHOTO_URL, avatarPath);
+        } else if (!hasAvatar) {
+            editor.remove(KEY_AVATAR_PATH);
         }
+
         if (avatarBase64 != null && !avatarBase64.isEmpty()) {
             editor.putString(KEY_AVATAR, avatarBase64);
             if (avatarPath == null || avatarPath.isEmpty()) {
                 editor.putString(KEY_PHOTO_URL, avatarBase64);
             }
+        } else if (!hasAvatar) {
+            editor.remove(KEY_AVATAR);
+            editor.remove(KEY_PHOTO_URL);
         }
+
         editor.putLong(KEY_LAST_UPDATED, System.currentTimeMillis());
         editor.apply();
 
@@ -345,6 +374,20 @@ public class UserPreferences {
                 bio,
                 avatarPath != null && !avatarPath.isEmpty() ? avatarPath : avatarBase64
         );
+    }
+
+    public void clearAvatar() {
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.remove(KEY_AVATAR);
+        editor.remove(KEY_AVATAR_PATH);
+        editor.remove(KEY_PHOTO_URL);
+        editor.putLong(KEY_LAST_UPDATED, System.currentTimeMillis());
+        editor.apply();
+        try {
+            PreferenceManager pm = new PreferenceManager(appContext);
+            pm.remove("avatar");
+            pm.remove("avatar_path");
+        } catch (Exception ignored) {}
     }
 
     private void syncToPreferenceManager(String userId, String username, String displayName, String bio, String avatarRef) {
@@ -372,8 +415,11 @@ public class UserPreferences {
             if (bio != null) {
                 pm.putString("bio", bio);
             }
-            if (avatarRef != null && !avatarRef.isEmpty()) {
-                pm.putString("avatar_path", avatarRef);
+            if (avatarRef != null && !avatarRef.trim().isEmpty()) {
+                pm.putString("avatar_path", avatarRef.trim());
+            } else {
+                pm.remove("avatar");
+                pm.remove("avatar_path");
             }
         } catch (Exception ignored) {
         }
@@ -486,5 +532,65 @@ public class UserPreferences {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    public void setUsername(String username) {
+        updateUserField("username", username);
+    }
+
+    public static final String KEY_PENDING_CLOUD_USERNAME_SYNC = "pending_cloud_username_sync";
+
+    public void setPendingCloudUsernameSync(boolean pending) {
+        prefs.edit().putBoolean(KEY_PENDING_CLOUD_USERNAME_SYNC, pending).apply();
+    }
+
+    public boolean isPendingCloudUsernameSync() {
+        return prefs.getBoolean(KEY_PENDING_CLOUD_USERNAME_SYNC, false);
+    }
+
+    public static final String KEY_STATUS_MENTIONS_INFO_SHOWN = "status_mentions_info_shown";
+    public static final String KEY_STATUS_AUDIENCE_TYPE = "status_audience_type";
+    public static final String KEY_STATUS_AUDIENCE_EXCLUDED = "status_audience_excluded";
+    public static final String KEY_STATUS_AUDIENCE_INCLUDED = "status_audience_included";
+    public static final String KEY_STATUS_AUDIENCE_CLOSE_FRIENDS = "status_audience_close_friends";
+
+    public boolean isStatusMentionsInfoShown() {
+        return prefs.getBoolean(KEY_STATUS_MENTIONS_INFO_SHOWN, false);
+    }
+
+    public void setStatusMentionsInfoShown(boolean shown) {
+        prefs.edit().putBoolean(KEY_STATUS_MENTIONS_INFO_SHOWN, shown).apply();
+    }
+
+    public String getStatusAudienceType() {
+        return prefs.getString(KEY_STATUS_AUDIENCE_TYPE, "contacts");
+    }
+
+    public void setStatusAudienceType(String type) {
+        prefs.edit().putString(KEY_STATUS_AUDIENCE_TYPE, type).apply();
+    }
+
+    public java.util.Set<String> getStatusAudienceExcluded() {
+        return prefs.getStringSet(KEY_STATUS_AUDIENCE_EXCLUDED, new java.util.HashSet<>());
+    }
+
+    public void setStatusAudienceExcluded(java.util.Set<String> excluded) {
+        prefs.edit().putStringSet(KEY_STATUS_AUDIENCE_EXCLUDED, excluded).apply();
+    }
+
+    public java.util.Set<String> getStatusAudienceIncluded() {
+        return prefs.getStringSet(KEY_STATUS_AUDIENCE_INCLUDED, new java.util.HashSet<>());
+    }
+
+    public void setStatusAudienceIncluded(java.util.Set<String> included) {
+        prefs.edit().putStringSet(KEY_STATUS_AUDIENCE_INCLUDED, included).apply();
+    }
+
+    public java.util.Set<String> getStatusAudienceCloseFriends() {
+        return prefs.getStringSet(KEY_STATUS_AUDIENCE_CLOSE_FRIENDS, new java.util.HashSet<>());
+    }
+
+    public void setStatusAudienceCloseFriends(java.util.Set<String> closeFriends) {
+        prefs.edit().putStringSet(KEY_STATUS_AUDIENCE_CLOSE_FRIENDS, closeFriends).apply();
     }
 }

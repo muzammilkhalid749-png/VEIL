@@ -192,8 +192,8 @@ public class StorageSettingsBottomSheet extends BottomSheetDialogFragment {
         container.addView(input);
 
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-                .setTitle("ðŸ” Encrypt Vault Backup")
-                .setMessage("Your backup will be encrypted with AES-256-GCM. Save this passwordâ€”it is required to restore your chats!")
+                .setTitle("🔐 Encrypt Chat Backup")
+                .setMessage("Your backup will be securely encrypted. Save this password — it is required to restore your chats!")
                 .setView(container)
                 .setPositiveButton("Export", (dialog, which) -> {
                     String pass = input.getText().toString().trim();
@@ -275,7 +275,7 @@ public class StorageSettingsBottomSheet extends BottomSheetDialogFragment {
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
                 .setTitle("🧹 Selective Media Cleaner")
                 .setMultiChoiceItems(categories, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
-                .setPositiveButton("Purge Selected Media", (dialog, which) -> {
+                .setPositiveButton("Delete Selected Media", (dialog, which) -> {
                     clearCache();
                     Toast.makeText(requireContext(), "Selected media categories purged from local cache (encrypted text messages preserved)", Toast.LENGTH_LONG).show();
                 })

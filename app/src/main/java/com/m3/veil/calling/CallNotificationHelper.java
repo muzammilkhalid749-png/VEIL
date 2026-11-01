@@ -55,9 +55,10 @@ public final class CallNotificationHelper {
         manager.createNotificationChannel(incoming);
 
         NotificationChannel ongoing = new NotificationChannel(CHANNEL_ONGOING, "Ongoing calls",
-                NotificationManager.IMPORTANCE_LOW);
+                NotificationManager.IMPORTANCE_DEFAULT);
         ongoing.setDescription("Active Veil call status");
-        ongoing.setShowBadge(false);
+        ongoing.setShowBadge(true);
+        ongoing.setSound(null, null);
         manager.createNotificationChannel(ongoing);
     }
 
@@ -139,7 +140,8 @@ public final class CallNotificationHelper {
         intent.putExtra(CallActivity.EXTRA_CALL_TYPE,
                 info.getType() == CallType.VIDEO ? "video" : "audio");
         intent.putExtra(CallActivity.EXTRA_CALL_ID, info.getCallId());
-        intent.putExtra(CallActivity.EXTRA_IS_INCOMING, true);
+        boolean incoming = !info.isCaller();
+        intent.putExtra(CallActivity.EXTRA_IS_INCOMING, incoming);
         if (info.getGroupId() != null) {
             intent.putExtra(CallActivity.EXTRA_GROUP_ID, info.getGroupId());
         }
@@ -148,29 +150,124 @@ public final class CallNotificationHelper {
         }
     }
 
+    public static Notification buildOngoingNotification(Context context, CallInfo info) {
+        boolean isMuted = false;
+        try {
+            isMuted = CallEngine.getInstance(context).isMuted();
+        } catch (Throwable ignored) { }
+        return buildOngoingNotification(context, info, isMuted);
+    }
+
+    public static Notification buildOngoingNotification(Context context, CallInfo info, boolean isMuted) {
+        ensureChannels(context);
+        String title = "Veil Call";
+        CallState state = CallState.ACTIVE;
+        long durationMs = 0L;
+        long connectedAtMs = 0L;
+        boolean isE2ee = false;
+        boolean isVideo = false;
+
+        if (info != null) {
+            title = info.isGroup() && info.getGroupName() != null
+                    ? info.getGroupName() : (info.getPeerName() != null ? info.getPeerName() : "Veil Call");
+            state = info.getState() != null ? info.getState() : CallState.ACTIVE;
+            durationMs = info.getDurationMs();
+            connectedAtMs = info.getConnectedAtMs();
+            isE2ee = info.isE2eeEnabled();
+            isVideo = info.isVideo();
+        }
+
+        String statusText;
+        boolean useChronometer = false;
+        long whenTime = 0L;
+
+        if (state == CallState.CALLING) {
+            statusText = isVideo ? "Calling (Video)\u2026" : "Calling\u2026";
+        } else if (state == CallState.PRE_ACCEPT_RECEIVED) {
+            statusText = isVideo ? "Ringing (Video)\u2026" : "Ringing\u2026";
+        } else if (state == CallState.PRECALLING || state == CallState.ACCEPT_SENT || state == CallState.ACCEPT_RECEIVED) {
+            statusText = "Connecting\u2026";
+        } else if (state == CallState.REJOINING) {
+            statusText = "Reconnecting\u2026";
+        } else if (state.isEnded()) {
+            statusText = "Call ended";
+        } else {
+            // Established / Active VoIP media flowing
+            useChronometer = true;
+            whenTime = connectedAtMs > 0 ? connectedAtMs : (System.currentTimeMillis() - durationMs);
+            String typeLabel = isVideo ? "Video Call" : "Voice Call";
+            if (isMuted) {
+                statusText = typeLabel + " (Muted) \u2022 " + (isE2ee ? "E2EE" : "Protected");
+            } else {
+                statusText = typeLabel + " \u2022 " + (isE2ee ? "E2EE" : "Protected");
+            }
+        }
+
+        // Tap notification to return to CallActivity
+        Intent callIntent = buildCallIntent(context, info, false);
+        PendingIntent contentPending = PendingIntent.getActivity(context, 201, callIntent, pendingFlags());
+
+        // Action: Hang Up
+        Intent hangupIntent = new Intent(context, VeilCallService.class).setAction(VeilCallService.ACTION_HANGUP);
+        PendingIntent hangupPending = PendingIntent.getService(context, 202, hangupIntent, pendingFlags());
+
+        // Action: Toggle Mute
+        Intent muteIntent = new Intent(context, VeilCallService.class).setAction(VeilCallService.ACTION_TOGGLE_MUTE);
+        PendingIntent mutePending = PendingIntent.getService(context, 203, muteIntent, pendingFlags());
+
+        androidx.core.app.Person callerPerson = new androidx.core.app.Person.Builder()
+                .setName(title)
+                .setImportant(true)
+                .build();
+
+        NotificationCompat.CallStyle callStyle = NotificationCompat.CallStyle.forOngoingCall(callerPerson, hangupPending);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ONGOING)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(title)
+                .setContentText(statusText)
+                .setStyle(callStyle)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setOngoing(true)
+                .setContentIntent(contentPending);
+
+        if (state.isEstablished()) {
+            builder.addAction(0, isMuted ? "Unmute" : "Mute", mutePending);
+        }
+        builder.addAction(0, "End Call", hangupPending);
+
+        if (useChronometer && whenTime > 0) {
+            builder.setWhen(whenTime);
+            builder.setUsesChronometer(true);
+            builder.setShowWhen(true);
+        } else {
+            builder.setUsesChronometer(false);
+            builder.setShowWhen(false);
+        }
+
+        return builder.build();
+    }
+
+    private static volatile long sLastOngoingPostTimeMs = 0L;
+    private static final long MIN_ONGOING_INTERVAL_MS = 1500L;
+
     public static void showOngoingCall(Context context, CallInfo info) {
+        showOngoingCall(context, info, false);
+    }
+
+    public static void showOngoingCall(Context context, CallInfo info, boolean force) {
         ensureChannels(context);
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null || info == null) return;
+        long now = System.currentTimeMillis();
+        if (!force && (now - sLastOngoingPostTimeMs < MIN_ONGOING_INTERVAL_MS)) {
+            return; // Throttled to prevent Android system_server notification shedding
+        }
+        sLastOngoingPostTimeMs = now;
         try {
             cancelIncoming(context);
-            PendingIntent contentIntent = PendingIntent.getActivity(context, 102,
-                    buildCallIntent(context, info, false), pendingFlags());
-            String title = info.isGroup() && info.getGroupName() != null
-                    ? info.getGroupName() : info.getPeerName();
-            long seconds = info.getDurationMs() / 1000L;
-            String text = String.format(java.util.Locale.US, "%02d:%02d \u2022 %s",
-                    seconds / 60, seconds % 60, info.isE2eeEnabled() ? "E2EE" : "connected");
-            Notification notification = new NotificationCompat.Builder(context, CHANNEL_ONGOING)
-                    .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle(title)
-                    .setContentText(text)
-                    .setPriority(NotificationCompat.PRIORITY_LOW)
-                    .setCategory(NotificationCompat.CATEGORY_CALL)
-                    .setOngoing(true)
-                    .setContentIntent(contentIntent)
-                    .build();
-            manager.notify(ID_ONGOING, notification);
+            manager.notify(ID_ONGOING, buildOngoingNotification(context, info));
         } catch (Throwable t) {
             Log.w(TAG, "showOngoingCall failed: " + t.getMessage());
         }
@@ -252,7 +349,7 @@ public final class CallNotificationHelper {
         }
     }
 
-    private static int pendingFlags() {
+    public static int pendingFlags() {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
         return flags;

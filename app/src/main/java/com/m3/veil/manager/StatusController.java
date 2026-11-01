@@ -614,6 +614,7 @@ public class StatusController {
     // In-Memory Telegram Parity Caches
     private final ConcurrentHashMap<String, PeerStatusChain> allPeerChains = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, StatusSegment> statusItemCache = new ConcurrentHashMap<>();
+    private final Set<String> purgedStatusIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final ConcurrentHashMap<String, UploadingStatus> activeUploads = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> peerIdToMaxReadTimestamp = new ConcurrentHashMap<>();
     private final Set<String> closeFriendsSet = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -623,6 +624,7 @@ public class StatusController {
     // Swarm chunk tracking (statusId -> Set of peerIds seeding this status)
     private final ConcurrentHashMap<String, Set<String>> statusSwarmPeers = new ConcurrentHashMap<>();
     private final Set<String> activePreloadStatusIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private com.google.firebase.firestore.ListenerRegistration firestoreStatusListener;
 
     public static StatusController getInstance(Context context) {
         if (instance == null) {
@@ -877,62 +879,119 @@ public class StatusController {
         });
     }
 
-    private void syncRemoteStatusesFromFirestore() {
+    private synchronized void syncRemoteStatusesFromFirestore() {
         try {
+            if (firestoreStatusListener != null) {
+                firestoreStatusListener.remove();
+                firestoreStatusListener = null;
+            }
             long now = System.currentTimeMillis();
-            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            firestoreStatusListener = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                     .collection("statuses")
                     .whereGreaterThan("expiresAtMs", now)
-                    .limit(50)
-                    .get()
-                    .addOnSuccessListener(snapshot -> {
-                        if (snapshot == null || snapshot.isEmpty()) return;
-                        boolean updated = false;
-                        String myUid = getCurrentUserId();
-                        for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
-                            String sId = doc.getString("statusId");
-                            if (sId == null) sId = doc.getId();
-                            if (statusItemCache.containsKey(sId)) continue;
+                    .limit(100)
+                    .addSnapshotListener((snapshot, error) -> {
+                        if (error != null) {
+                            Log.w(TAG, "Firestore status listener error: " + error.getMessage());
+                            return;
+                        }
+                        if (snapshot == null) return;
 
-                            String authorId = doc.getString("authorId");
-                            String authorName = doc.getString("authorName");
-                            String text = doc.getString("contentText");
-                            String typeStr = doc.getString("mediaType");
-                            MediaType mediaType = ("IMAGE".equalsIgnoreCase(typeStr) || "PHOTO".equalsIgnoreCase(typeStr)) ? MediaType.IMAGE :
-                                    ("VIDEO".equalsIgnoreCase(typeStr) ? MediaType.VIDEO : MediaType.TEXT);
-                            String bgColor = doc.getString("bgColorHex");
-                            long fontIdx = VeilFirestoreUtils.getSafeLong(doc, "fontStyleIndex", 0);
-                            long ts = VeilFirestoreUtils.getSafeTimestampMillis(doc, "timestampMs", now);
-                            long exp = VeilFirestoreUtils.getSafeTimestampMillis(doc, "expiresAtMs", now + 86400000L);
+                        ioExecutor.execute(() -> {
+                            try {
+                                boolean updated = false;
+                                String myUid = getCurrentUserId();
 
-                            StatusSegment segment = new StatusSegment(
-                                    sId,
-                                    authorId != null ? authorId : "peer",
-                                    authorName != null ? authorName : "Contact",
-                                    text != null ? text : "",
-                                    mediaType,
-                                    null,
-                                    bgColor != null ? bgColor : "#008069",
-                                    (int) fontIdx,
-                                    ts,
-                                    PrivacyAcl.ALL_CONTACTS,
-                                    authorId != null && authorId.equals(myUid)
-                            );
-                            segment.expiresAtMs = exp;
+                                // 1. Realtime document changes (immediate deletion & insertion events)
+                                for (com.google.firebase.firestore.DocumentChange dc : snapshot.getDocumentChanges()) {
+                                    com.google.firebase.firestore.DocumentSnapshot doc = dc.getDocument();
+                                    String sId = doc.getString("statusId");
+                                    if (sId == null) sId = doc.getId();
+                                    String aId = doc.getString("authorId");
 
-                            statusItemCache.put(sId, segment);
-                            PeerStatusChain chain = allPeerChains.get(segment.authorId);
-                            if (chain == null) {
-                                chain = new PeerStatusChain(segment.authorId, segment.authorName, null);
-                                allPeerChains.put(segment.authorId, chain);
+                                    if (dc.getType() == com.google.firebase.firestore.DocumentChange.Type.REMOVED) {
+                                        Log.i(TAG, "Instant deletion received from Firestore for status: " + sId);
+                                        purgeRemoteStatus(sId, aId);
+                                        VeilFeatureManager.getInstance(appContext).removePeerStatus(sId);
+                                        updated = true;
+                                        continue;
+                                    }
+
+                                    Boolean isDeleted = doc.getBoolean("deleted");
+                                    if (Boolean.TRUE.equals(isDeleted) || purgedStatusIds.contains(sId)) {
+                                        purgeRemoteStatus(sId, aId);
+                                        VeilFeatureManager.getInstance(appContext).removePeerStatus(sId);
+                                        updated = true;
+                                        continue;
+                                    }
+
+                                    if (dc.getType() == com.google.firebase.firestore.DocumentChange.Type.ADDED
+                                            || dc.getType() == com.google.firebase.firestore.DocumentChange.Type.MODIFIED) {
+                                        if (statusItemCache.containsKey(sId)) continue;
+
+                                        String authorName = doc.getString("authorName");
+                                        String text = doc.getString("contentText");
+                                        String typeStr = doc.getString("mediaType");
+                                        MediaType mediaType = ("IMAGE".equalsIgnoreCase(typeStr) || "PHOTO".equalsIgnoreCase(typeStr)) ? MediaType.IMAGE :
+                                                ("VIDEO".equalsIgnoreCase(typeStr) ? MediaType.VIDEO : MediaType.TEXT);
+                                        String bgColor = doc.getString("bgColorHex");
+                                        long fontIdx = VeilFirestoreUtils.getSafeLong(doc, "fontStyleIndex", 0);
+                                        long ts = VeilFirestoreUtils.getSafeTimestampMillis(doc, "timestampMs", now);
+                                        long exp = VeilFirestoreUtils.getSafeTimestampMillis(doc, "expiresAtMs", now + 86400000L);
+
+                                        StatusSegment segment = new StatusSegment(
+                                                sId,
+                                                aId != null ? aId : "peer",
+                                                authorName != null ? authorName : "Contact",
+                                                text != null ? text : "",
+                                                mediaType,
+                                                null,
+                                                bgColor != null ? bgColor : "#008069",
+                                                (int) fontIdx,
+                                                ts,
+                                                PrivacyAcl.ALL_CONTACTS,
+                                                aId != null && aId.equals(myUid)
+                                        );
+                                        segment.expiresAtMs = exp;
+
+                                        statusItemCache.put(sId, segment);
+                                        PeerStatusChain chain = allPeerChains.get(segment.authorId);
+                                        if (chain == null) {
+                                            chain = new PeerStatusChain(segment.authorId, segment.authorName, null);
+                                            allPeerChains.put(segment.authorId, chain);
+                                        }
+                                        chain.addOrUpdateSegment(segment);
+                                        EncryptedChatDatabase.getInstance(appContext).saveStatusSegment(segment);
+                                        updated = true;
+                                    }
+                                }
+
+                                // 2. Offline catch-up reconciliation:
+                                // If local statusItemCache contains remote statuses not in active Firestore snapshot
+                                java.util.Set<String> activeSnapshotIds = new java.util.HashSet<>();
+                                for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
+                                    String id = doc.getString("statusId");
+                                    activeSnapshotIds.add(id != null ? id : doc.getId());
+                                }
+
+                                for (StatusSegment localSeg : statusItemCache.values()) {
+                                    if (localSeg != null && !localSeg.isMine && localSeg.authorId != null && !localSeg.authorId.equals(myUid)) {
+                                        if (!activeSnapshotIds.contains(localSeg.id) && (System.currentTimeMillis() - localSeg.timestampMs > 30_000L)) {
+                                            Log.i(TAG, "Reconciled status deleted while device was offline: " + localSeg.id);
+                                            purgeRemoteStatus(localSeg.id, localSeg.authorId);
+                                            VeilFeatureManager.getInstance(appContext).removePeerStatus(localSeg.id);
+                                            updated = true;
+                                        }
+                                    }
+                                }
+
+                                if (updated) {
+                                    notifyObserversUpdated();
+                                }
+                            } catch (Throwable t) {
+                                Log.w(TAG, "Error processing status snapshot: " + t.getMessage());
                             }
-                            chain.addOrUpdateSegment(segment);
-                            EncryptedChatDatabase.getInstance(appContext).saveStatusSegment(segment);
-                            updated = true;
-                        }
-                        if (updated) {
-                            notifyObserversUpdated();
-                        }
+                        });
                     });
         } catch (Throwable ignored) {}
     }
@@ -1238,10 +1297,34 @@ public class StatusController {
         if (aesKeyBase64 == null) aesKeyBase64 = "";
 
         List<String> allowedRecipients = new ArrayList<>();
-        if (acl == PrivacyAcl.SELECTED_PEERS && targetPeers != null) {
-            allowedRecipients.addAll(targetPeers);
+        if (acl == PrivacyAcl.SELECTED_PEERS) {
+            if (targetPeers != null && !targetPeers.isEmpty()) {
+                allowedRecipients.addAll(targetPeers);
+            } else {
+                com.m3.veil.utils.UserPreferences up = com.m3.veil.utils.UserPreferences.getInstance(appContext);
+                String aType = up.getStatusAudienceType();
+                if ("excluded".equals(aType)) {
+                    Set<String> excluded = up.getStatusAudienceExcluded();
+                    List<Chat> chats = EncryptedChatDatabase.getInstance(appContext).getAllChats();
+                    for (Chat c : chats) {
+                        if (c.getParticipants() != null) {
+                            for (String p : c.getParticipants()) {
+                                if (!p.equals(getCurrentUserId()) && !excluded.contains(p) && !allowedRecipients.contains(p)) {
+                                    allowedRecipients.add(p);
+                                }
+                            }
+                        } else if (c.getId() != null && !excluded.contains(c.getId()) && !allowedRecipients.contains(c.getId())) {
+                            allowedRecipients.add(c.getId());
+                        }
+                    }
+                } else {
+                    allowedRecipients.addAll(up.getStatusAudienceIncluded());
+                }
+            }
         } else if (acl == PrivacyAcl.CLOSE_FRIENDS) {
             allowedRecipients.addAll(closeFriendsSet);
+            com.m3.veil.utils.UserPreferences up = com.m3.veil.utils.UserPreferences.getInstance(appContext);
+            allowedRecipients.addAll(up.getStatusAudienceCloseFriends());
         } else {
             // ALL_CONTACTS: get all distinct contacts from local SQLCipher
             List<Chat> chats = EncryptedChatDatabase.getInstance(appContext).getAllChats();
@@ -1252,6 +1335,8 @@ public class StatusController {
                             allowedRecipients.add(p);
                         }
                     }
+                } else if (c.getId() != null && !allowedRecipients.contains(c.getId())) {
+                    allowedRecipients.add(c.getId());
                 }
             }
         }
@@ -1381,9 +1466,27 @@ public class StatusController {
         if (payload == null || payload.length == 0) return;
         ioExecutor.execute(() -> {
             try {
+                if (payload[0] == '{') {
+                    try {
+                        String str = new String(payload, StandardCharsets.UTF_8);
+                        JSONObject json = new JSONObject(str);
+                        if ("status_delete".equals(json.optString("type"))) {
+                            String statusId = json.optString("statusId");
+                            String authorId = json.optString("authorId", fromPeerId);
+                            purgeRemoteStatus(statusId, authorId);
+                            WebRtcManager.getInstance(appContext).relayStatusDelete(statusId, authorId, fromPeerId);
+                            return;
+                        }
+                    } catch (Exception ignored) {}
+                }
+
                 StatusGossipManifest manifest = StatusGossipManifest.deserialize(payload);
                 if (manifest == null) {
                     Log.w(TAG, "Received corrupt status manifest from " + fromPeerId);
+                    return;
+                }
+
+                if (purgedStatusIds.contains(manifest.statusId)) {
                     return;
                 }
 
@@ -1726,10 +1829,58 @@ public class StatusController {
     }
 
     /**
+     * Checks if a status segment was purged or is no longer in memory.
+     */
+    public boolean isStatusPurged(String statusId) {
+        if (statusId == null) return true;
+        return purgedStatusIds.contains(statusId) || !statusItemCache.containsKey(statusId);
+    }
+
+    /**
+     * Purges an individual status segment deleted remotely by its author.
+     */
+    public void purgeRemoteStatus(String statusId, @Nullable String authorId) {
+        if (statusId == null) return;
+        purgedStatusIds.add(statusId);
+        ioExecutor.execute(() -> {
+            try {
+                StatusSegment seg = statusItemCache.remove(statusId);
+                if (authorId != null && !authorId.isEmpty()) {
+                    PeerStatusChain chain = allPeerChains.get(authorId);
+                    if (chain != null) {
+                        chain.removeSegment(statusId);
+                        if (chain.segments.isEmpty()) {
+                            allPeerChains.remove(authorId);
+                        }
+                    }
+                }
+                for (Map.Entry<String, PeerStatusChain> entry : allPeerChains.entrySet()) {
+                    PeerStatusChain chain = entry.getValue();
+                    chain.removeSegment(statusId);
+                    if (chain.segments.isEmpty()) {
+                        allPeerChains.remove(entry.getKey());
+                    }
+                }
+                if (seg != null) {
+                    shredFile(seg.encryptedFilePath);
+                    shredFile(seg.mediaFilePath);
+                }
+                EncryptedChatDatabase.getInstance(appContext).deleteStatusSegment(statusId);
+                VeilFeatureManager.getInstance(appContext).removePeerStatus(statusId);
+                notifyObserversUpdated();
+                Log.i(TAG, "Purged remote status segment: " + statusId);
+            } catch (Exception e) {
+                Log.w(TAG, "Failed purging remote status: " + statusId, e);
+            }
+        });
+    }
+
+    /**
      * Delete an individual status segment authored by the user.
      */
     public void deleteStatusSegment(String statusId) {
         if (statusId == null) return;
+        purgedStatusIds.add(statusId);
         ioExecutor.execute(() -> {
             try {
                 StatusSegment seg = statusItemCache.remove(statusId);
@@ -1737,6 +1888,9 @@ public class StatusController {
                 PeerStatusChain chain = allPeerChains.get(myUid);
                 if (chain != null) {
                     chain.removeSegment(statusId);
+                    if (chain.segments.isEmpty()) {
+                        allPeerChains.remove(myUid);
+                    }
                 }
 
                 if (seg != null) {
@@ -1745,14 +1899,28 @@ public class StatusController {
                 }
 
                 EncryptedChatDatabase.getInstance(appContext).deleteStatusSegment(statusId);
+                VeilFeatureManager.getInstance(appContext).removePeerStatus(statusId);
 
-                // Broadcast deletion notification over WebRTC mesh
-                JSONObject del = new JSONObject();
-                del.put("type", "status_delete");
-                del.put("statusId", statusId);
-                del.put("authorId", myUid);
-                VeilPacket packet = new VeilPacket(VeilPacket.LANE_MESH_GOSSIP, VeilPacket.TYPE_STATUS_POST, del.toString());
-                WebRtcManager.getInstance(appContext).broadcastStatus(del.toString().getBytes(StandardCharsets.UTF_8));
+                // 1. Permanently delete from Firebase Firestore so peers never pull it back
+                // Also write a soft-delete tombstone first so any listener gets instant notification even if delete races
+                try {
+                    Map<String, Object> tombstone = new HashMap<>();
+                    tombstone.put("deleted", true);
+                    tombstone.put("deletedAtMs", System.currentTimeMillis());
+                    com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+                    db.collection("statuses").document(statusId)
+                            .set(tombstone, com.google.firebase.firestore.SetOptions.merge())
+                            .addOnCompleteListener(t -> {
+                                db.collection("statuses").document(statusId).delete()
+                                        .addOnSuccessListener(aVoid -> Log.d(TAG, "Status deleted from Firestore: " + statusId))
+                                        .addOnFailureListener(e -> Log.w(TAG, "Failed deleting status from Firestore: " + statusId, e));
+                            });
+                } catch (Throwable t) {
+                    Log.w(TAG, "Firestore delete error: " + t.getMessage());
+                }
+
+                // 2. Broadcast deletion notification over WebRTC mesh
+                WebRtcManager.getInstance(appContext).broadcastStatusDelete(statusId, myUid);
 
                 notifyObserversUpdated();
                 Log.i(TAG, "Status segment deleted and purged: " + statusId);
@@ -1898,9 +2066,14 @@ public class StatusController {
             Bitmap thumb = null;
             if (mediaType == MediaType.VIDEO) {
                 MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-                mmr.setDataSource(path);
-                thumb = mmr.getFrameAtTime(1000000);
-                mmr.release();
+                try {
+                    mmr.setDataSource(path);
+                    thumb = mmr.getFrameAtTime(1000000);
+                } finally {
+                    try {
+                        mmr.release();
+                    } catch (Throwable ignored) {}
+                }
             } else {
                 BitmapFactory.Options opts = new BitmapFactory.Options();
                 opts.inSampleSize = 4;

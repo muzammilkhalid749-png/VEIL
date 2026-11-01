@@ -285,11 +285,11 @@ public class WhatsAppDocumentPickerSheet extends BottomSheetDialogFragment {
             if (!veilDocsDir.exists()) veilDocsDir.mkdirs();
 
             ensureSampleDoc(veilDocsDir, "VeilChat_Security_Whitepaper.pdf",
-                    "%PDF-1.4\n% VeilChat End-to-End Encrypted P2P Security Whitepaper (SQLCipher 256-bit + WebRTC DTLS/SRTP)\n");
+                    "%PDF-1.4\n% VEIL Security & Privacy Whitepaper\n");
             ensureSampleDoc(veilDocsDir, "Zero_Trace_Recovery_Key_Backup.txt",
-                    "VEILCHAT ANONYMOUS RECOVERY EXPORT\nCipher: AES-256-GCM / SQLCipher\nStatus: Verified Zero-Trace Node\n");
+                    "VEIL ANONYMOUS RECOVERY EXPORT\nStatus: Verified Secure\n");
             ensureSampleDoc(veilDocsDir, "P2P_Network_Audit_Report_2026.docx",
-                    "VeilChat Mesh Network Audit Report - 100% Peer-to-Peer Direct DataChannel Verification.");
+                    "VEIL Security Audit Report - End-to-End Encrypted Verification.");
             ensureSampleDoc(veilDocsDir, "Encrypted_Key_Bundle_Archive.zip",
                     "PK\u0003\u0004 VeilChat Encrypted Identity Archive");
             String activeHandle = com.m3.veil.manager.VeilFeatureManager.getInstance(requireContext()).getActivePersona().getDisplayName();

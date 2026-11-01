@@ -1,7 +1,13 @@
 package com.m3.veil.ui.auth;
 
 import android.content.Intent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.os.Bundle;
+import android.view.HapticFeedbackConstants;
+import android.widget.TextView;
+import androidx.core.content.ContextCompat;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
@@ -39,6 +45,9 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
     private EditText phraseEditText;
     private Button restoreButton;
     private ProgressBar progressBar;
+    private View btnPastePhrase;
+    private View btnClearPhrase;
+    private TextView tvWordCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,10 +60,35 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
         phraseEditText = findViewById(R.id.phraseEditText);
         restoreButton = findViewById(R.id.restoreButton);
         progressBar = findViewById(R.id.progressBar);
+        btnPastePhrase = findViewById(R.id.btnPastePhrase);
+        btnClearPhrase = findViewById(R.id.btnClearPhrase);
+        tvWordCount = findViewById(R.id.tvWordCount);
 
         View backBtn = findViewById(R.id.backButton);
         if (backBtn != null) {
             backBtn.setOnClickListener(v -> finish());
+        }
+
+        if (btnPastePhrase != null) {
+            btnPastePhrase.setOnClickListener(v -> {
+                v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard != null && clipboard.hasPrimaryClip() && clipboard.getPrimaryClip() != null) {
+                    ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+                    if (item != null && item.getText() != null) {
+                        String pasted = item.getText().toString();
+                        phraseEditText.setText(pasted);
+                        phraseEditText.setSelection(phraseEditText.getText().length());
+                    }
+                }
+            });
+        }
+
+        if (btnClearPhrase != null) {
+            btnClearPhrase.setOnClickListener(v -> {
+                v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                phraseEditText.setText("");
+            });
         }
 
         phraseEditText.addTextChangedListener(new TextWatcher() {
@@ -63,10 +97,34 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                String normalized = SovereignIdentityAndDirectoryEngine.normalizePhrase(s.toString());
+                String raw = s != null ? s.toString() : "";
+                if (btnClearPhrase != null) {
+                    btnClearPhrase.setVisibility(raw.trim().isEmpty() ? View.GONE : View.VISIBLE);
+                }
+
+                String normalized = SovereignIdentityAndDirectoryEngine.normalizePhrase(raw);
                 String[] words = normalized.isEmpty() ? new String[0] : normalized.split("\\s+");
-                boolean valid = words.length == 12
+                int wordCount = words.length;
+
+                boolean valid = wordCount == 12
                         && SovereignIdentityAndDirectoryEngine.getInstance(RestoreAnonymousActivity.this).validatePhrase(normalized);
+
+                if (tvWordCount != null) {
+                    if (wordCount == 0) {
+                        tvWordCount.setText("0 / 12 words");
+                        tvWordCount.setTextColor(ContextCompat.getColor(RestoreAnonymousActivity.this, R.color.colorTextSecondary));
+                    } else if (valid) {
+                        tvWordCount.setText("✓ 12 words valid");
+                        tvWordCount.setTextColor(ContextCompat.getColor(RestoreAnonymousActivity.this, R.color.veil_accent));
+                    } else if (wordCount == 12) {
+                        tvWordCount.setText("12 words (invalid phrase)");
+                        tvWordCount.setTextColor(ContextCompat.getColor(RestoreAnonymousActivity.this, R.color.colorError));
+                    } else {
+                        tvWordCount.setText(wordCount + " / 12 words");
+                        tvWordCount.setTextColor(ContextCompat.getColor(RestoreAnonymousActivity.this, R.color.colorTextSecondary));
+                    }
+                }
+
                 restoreButton.setEnabled(valid);
                 restoreButton.setAlpha(valid ? 1.0f : 0.6f);
             }
@@ -145,6 +203,21 @@ public class RestoreAnonymousActivity extends AppCompatActivity {
                             avatarB64
                     );
                     prefManager.setOnboardingCompleted(true);
+
+                    com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(RestoreAnonymousActivity.this);
+                    if (manifest != null && manifest.personasJsonArray != null && !manifest.personasJsonArray.isEmpty() && !"[]".equals(manifest.personasJsonArray)) {
+                        pm.restorePersonasFromJson(manifest.personasJsonArray);
+                    }
+                    pm.ensureInitializedAndRepaired();
+                    com.m3.veil.model.Persona primary = pm.getPersona(com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID);
+                    if (primary != null) {
+                        primary.setDisplayName(cleanDisplayName);
+                        primary.setUsername(cleanUsername);
+                        primary.setBio(cleanBio);
+                        if (avatarPath != null) primary.setAvatarUrl(avatarPath);
+                        pm.updatePersona(primary);
+                    }
+                    pm.switchPersona(com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID);
 
                     try {
                         VeilMeshDaemonService.start(RestoreAnonymousActivity.this);

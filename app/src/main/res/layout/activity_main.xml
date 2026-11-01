@@ -27,6 +27,7 @@
 
                 <!-- App Logo and Name -->
                 <LinearLayout
+                    android:id="@+id/layoutBrandHeader"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:orientation="horizontal"
@@ -51,8 +52,47 @@
 
                 </LinearLayout>
 
+                <!-- App-Bar Micro-Pill (Ongoing / Ringing VoIP Call matching WhatsApp/Chatter) -->
+                <LinearLayout
+                    android:id="@+id/appBarCallMicroPill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_toEndOf="@id/layoutBrandHeader"
+                    android:layout_toStartOf="@id/layoutActionIcons"
+                    android:layout_centerVertical="true"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="6dp"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/bg_appbar_call_micropill"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="12dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:visibility="gone">
+
+                    <View
+                        android:id="@+id/pillPulseDot"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:background="@drawable/bg_green_pulse_dot"
+                        android:layout_marginEnd="6dp" />
+
+                    <TextView
+                        android:id="@+id/tvCallPillText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Ongoing (00:00)"
+                        android:textColor="@color/colorPrimary"
+                        android:textSize="12.5sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
                 <!-- Action Icons -->
                 <LinearLayout
+                    android:id="@+id/layoutActionIcons"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:orientation="horizontal"
@@ -147,6 +187,24 @@
             app:paddingRightSystemWindowInsets="false"
             app:paddingTopSystemWindowInsets="false" />
     </LinearLayout>
+
+    <!-- Secondary Pencil / Text Status FAB (Shown when Status filter chip is active) -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabStatusPencil"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="26dp"
+        android:layout_marginBottom="140dp"
+        android:src="@drawable/ic_edit"
+        android:contentDescription="Text Status"
+        android:visibility="gone"
+        app:fabCustomSize="44dp"
+        app:maxImageSize="20dp"
+        app:backgroundTint="@color/colorSurfaceVariant"
+        app:tint="@color/colorTextPrimary"
+        app:elevation="4dp"
+        app:borderWidth="0dp" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabNewMessage"

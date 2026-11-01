@@ -68,7 +68,7 @@ public class KarmaLeaderboardBottomSheet extends BottomSheetDialogFragment {
         root.addView(tvTitle);
 
         TextView tvSub = new TextView(context);
-        tvSub.setText("Decentralized reputation calculated from peer reactions, mesh forwarding, and community jury duty.");
+        tvSub.setText("Reputation calculated from peer reactions, helpful interactions, and community contributions.");
         tvSub.setTextSize(13f);
         tvSub.setTextColor(ContextCompat.getColor(context, R.color.textSecondary));
         tvSub.setPadding(0, (int) (4 * dp), 0, (int) (14 * dp));

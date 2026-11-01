@@ -84,7 +84,7 @@ public class AccountSettingsBottomSheet extends BottomSheetDialogFragment {
             com.google.android.material.button.MaterialButton btnCancel = sheetView.findViewById(R.id.btnDestructiveCancel);
 
             tvTitle.setText("🔥 Panic Wipe & Burn Identity");
-            tvMsg.setText("WARNING: This will permanently wipe all local encrypted chats, shred cryptographic keys, delete local personas, and reset the app. This cannot be undone!\n\nAre you sure you want to proceed?");
+            tvMsg.setText("WARNING: This will permanently erase all local chats, account keys, personas, and reset the app. This action cannot be undone.\n\nAre you sure you want to proceed?");
             btnConfirm.setText("Wipe & Destroy");
 
             btnConfirm.setOnClickListener(cv -> {
@@ -182,15 +182,15 @@ public class AccountSettingsBottomSheet extends BottomSheetDialogFragment {
                             java.io.FileOutputStream fos = new java.io.FileOutputStream(backupFile);
                             fos.write(android.util.Base64.encode(payload.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8), android.util.Base64.NO_WRAP));
                             fos.close();
-                            Toast.makeText(requireContext(), "✅ Encrypted backup saved to local vault (" + backupFile.getName() + ")", Toast.LENGTH_LONG).show();
+                            Toast.makeText(requireContext(), "✅ Encrypted backup saved (" + backupFile.getName() + ")", Toast.LENGTH_LONG).show();
                         } catch (Exception e) {
                             Toast.makeText(requireContext(), "Backup error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                         }
                     } else {
                         if (backupFile.exists()) {
-                            Toast.makeText(requireContext(), "✅ Verified AES-256-GCM .veilbackup (" + backupFile.length() + " bytes) — Vault state intact", Toast.LENGTH_LONG).show();
+                            Toast.makeText(requireContext(), "✅ Backup verified (" + backupFile.length() + " bytes) — File is valid and intact", Toast.LENGTH_LONG).show();
                         } else {
-                            Toast.makeText(requireContext(), "No local .veilbackup archive found yet. Export one first.", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(requireContext(), "No backup file found yet. Create a backup first.", Toast.LENGTH_SHORT).show();
                         }
                     }
                 })
