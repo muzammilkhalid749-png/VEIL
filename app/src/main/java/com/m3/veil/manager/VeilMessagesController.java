@@ -819,6 +819,18 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     /**
      * 0ms lock-free retrieval of a cached dialog (never blocks on SQLCipher).
      */
+    /**
+     * Injects a Chat directly into RAM cache immediately (0ms).
+     * Call this before launching ChatActivity so Frame 1 never touches disk or SQLCipher.
+     */
+    public void cacheDialogImmediate(Chat chat) {
+        if (chat == null || chat.getId() == null) return;
+        mDialogsDict.put(chat.getId(), chat);
+        synchronized (mDialogs_dict) {
+            mDialogs_dict.put(getDialogIdHash(chat.getId()), chat);
+        }
+    }
+
     public Chat getCachedDialogImmediate(String dialogId) {
         if (dialogId == null) return null;
         Chat c = mDialogsDict.get(dialogId);

@@ -2386,6 +2386,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         }
         final Context appCtx = requireContext().getApplicationContext();
         final String targetChatId = chat.getId();
+        com.m3.veil.manager.VeilMessagesController.getInstance(appCtx).cacheDialogImmediate(chat);
         com.m3.veil.manager.VeilMessagesController.getInstance(appCtx).prewarmDialog(targetChatId);
         homeExecutor.execute(() -> EncryptedChatDatabase.getInstance(appCtx).updateChatUnreadCount(targetChatId, 0));
 

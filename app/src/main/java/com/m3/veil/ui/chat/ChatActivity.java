@@ -201,7 +201,7 @@ public class ChatActivity extends AppCompatActivity {
     private final Runnable presenceTicker = new Runnable() {
         @Override
         public void run() {
-            boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId));
+            boolean blocked = isChatBlocked;
             if (blocked) {
                 isRecipientOnline = false;
                 isRecipientTypingState = false;
@@ -422,7 +422,7 @@ public class ChatActivity extends AppCompatActivity {
                 @Override
                 public void onMessageReceived(String dialogId, Message message) {
                     if (chatId != null && chatId.equals(dialogId)) {
-                        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId))) {
+                        if (isChatBlocked) {
                             return;
                         }
                         if (message != null && "[roulette_control:reveal_request]".equals(message.getText())) {
@@ -433,7 +433,7 @@ public class ChatActivity extends AppCompatActivity {
                         boolean canMarkRead = !isReq && isActivityResumed && isChatUnlocked() && (message == null || !message.isMediaRequiringActionToRead());
                         if (canMarkRead) {
                             sendReadReceiptsForUnreadMessages();
-                            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId);
+                            dbExecutor.execute(() -> com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId));
                         }
                         runOnUiThread(() -> {
                             updateVanishUI(false);
@@ -455,7 +455,7 @@ public class ChatActivity extends AppCompatActivity {
                 @Override
                 public void onMessageStatusChanged(String dialogId, String messageId, boolean delivered, boolean read) {
                     runOnUiThread(() -> {
-                        boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId));
+                        boolean blocked = isChatBlocked;
                         boolean accepted = isDirectChatAcceptedFastUi();
                         for (int i = 0; i < messageList.size(); i++) {
                             Message m = messageList.get(i);
@@ -519,7 +519,7 @@ public class ChatActivity extends AppCompatActivity {
 
                 @Override
                 public void onPeerTyping(String dialogId, String peerId, boolean isTyping) {
-                    if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId))) {
+                    if (isChatBlocked) {
                         return;
                     }
                     boolean matches = (chatId != null && chatId.equals(dialogId))
@@ -629,7 +629,7 @@ public class ChatActivity extends AppCompatActivity {
             boolean matchesThisChat = (message != null && chatId != null && chatId.equals(message.getChatId()))
                     || (!isGroupChatContext() && peerId != null && peerId.equals(recipientId));
             if (matchesThisChat) {
-                if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, peerId != null ? peerId : recipientId))) {
+                if (isChatBlocked) {
                     return;
                 }
                 if (message != null && "[roulette_control:reveal_request]".equals(message.getText())) {
@@ -659,7 +659,7 @@ public class ChatActivity extends AppCompatActivity {
         @Override
         public void onMessageStatusChanged(String messageId, boolean delivered, boolean read) {
             runOnUiThread(() -> {
-                boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId));
+                boolean blocked = isChatBlocked;
                 boolean accepted = isDirectChatAcceptedFastUi();
                 for (int i = 0; i < messageList.size(); i++) {
                     Message m = messageList.get(i);
@@ -691,7 +691,7 @@ public class ChatActivity extends AppCompatActivity {
         @Override
         public void onAllMessagesRead(String updatedChatId) {
             if (chatId != null && chatId.equals(updatedChatId)) {
-                if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId))) {
+                if (isChatBlocked) {
                     return;
                 }
                 if (!isGroupChatContext() && !isDirectChatAcceptedFastUi()) {
@@ -730,7 +730,7 @@ public class ChatActivity extends AppCompatActivity {
 
         @Override
         public void onPeerTyping(String peerId, boolean isTyping) {
-            if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, peerId != null ? peerId : recipientId))) {
+            if (isChatBlocked) {
                 return;
             }
             boolean inThisChat = (peerId != null && peerId.equals(recipientId))
@@ -890,9 +890,6 @@ public class ChatActivity extends AppCompatActivity {
         // 1. Instant 0ms RAM lookup for dialog metadata before building views
         if (chatId != null) {
             currentLocalChat = com.m3.veil.manager.VeilMessagesController.getInstance(this).getCachedDialogImmediate(chatId);
-            if (currentLocalChat == null) {
-                currentLocalChat = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
-            }
             if (currentLocalChat != null) {
                 if (currentLocalChat.isGroup() || "group".equalsIgnoreCase(currentLocalChat.getType()) || "channel".equalsIgnoreCase(currentLocalChat.getType())) {
                     recipientId = null;
@@ -908,9 +905,9 @@ public class ChatActivity extends AppCompatActivity {
                 if (currentLocalChat.getVanishMode() != null) {
                     currentVanishMode = currentLocalChat.getVanishMode();
                 }
-                isChatBlocked = currentLocalChat.isBlocked() || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId));
-            } else if (!intentIsGroup) {
-                isChatBlocked = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId);
+                isChatBlocked = currentLocalChat.isBlocked();
+            } else {
+                isChatBlocked = false;
             }
         }
 
@@ -940,7 +937,7 @@ public class ChatActivity extends AppCompatActivity {
                 loadGroupMentionCandidates();
             }
         } else if (isChatBlocked) {
-            updateBlockedState(true, com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChatBlockedBy(chatId));
+            updateBlockedState(true, null);
         }
         updateRequestLimitComposerState();
         applyChatWallpaper();
@@ -958,9 +955,6 @@ public class ChatActivity extends AppCompatActivity {
         vanishHandler.postDelayed(vanishRunnable, 1000);
 
         // Always reconcile with vault asynchronously (16ms VSync window) so Frame 1 draws immediately
-        if (messageList == null || messageList.isEmpty()) {
-            showMinimalLoadingDialog();
-        }
         reloadMessagesFromLocalVault();
 
         // 3. Defer heavy WebRTC, Firestore listeners, and key lookups until 64ms after Frame 1 draws
@@ -1197,7 +1191,7 @@ public class ChatActivity extends AppCompatActivity {
         if (btnAudioCall != null) {
             UiAnimator.attachSpringPress(btnAudioCall);
             btnAudioCall.setOnClickListener(v -> {
-                if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+                if (isChatBlocked) {
                     Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
                     return;
                 }
@@ -1211,7 +1205,7 @@ public class ChatActivity extends AppCompatActivity {
         if (btnVideoCall != null) {
             UiAnimator.attachSpringPress(btnVideoCall);
             btnVideoCall.setOnClickListener(v -> {
-                if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+                if (isChatBlocked) {
                     Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
                     return;
                 }
@@ -2281,13 +2275,13 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void sendMessageWithType(String type, String content) {
-        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+        if (isChatBlocked) {
             Toast.makeText(this, "Cannot send messages to a blocked user", Toast.LENGTH_SHORT).show();
             return;
         }
         if (content == null || content.isEmpty()) return;
         if (currentLocalChat != null && currentLocalChat.isRequest()) {
-            boolean hasInboundFromPeer = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getInboundUserMessageCount(chatId, currentUserId) > 0;
+            boolean hasInboundFromPeer = hasInboundPeerMessageFastUi();
             if (hasInboundFromPeer) {
                 acceptMessageRequest();
             }
@@ -2658,13 +2652,13 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void uploadAndSendMediaWithMetadata(File rawFile, String mediaType, String caption, @Nullable String customMetadataJson) {
-        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+        if (isChatBlocked) {
             Toast.makeText(this, "Cannot send media to a blocked user", Toast.LENGTH_SHORT).show();
             return;
         }
         if (rawFile == null || !rawFile.exists()) return;
         if (currentLocalChat != null && currentLocalChat.isRequest()) {
-            boolean hasInboundFromPeer = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getInboundUserMessageCount(chatId, currentUserId) > 0;
+            boolean hasInboundFromPeer = hasInboundPeerMessageFastUi();
             if (hasInboundFromPeer) {
                 acceptMessageRequest();
             }
@@ -3016,11 +3010,14 @@ public class ChatActivity extends AppCompatActivity {
             }
         }
         if (chatMetaUpdated && currentLocalChat != null) {
-            if (isGroupChatContext() || com.m3.veil.database.EncryptedChatDatabase.getInstance(this).hasAnyMessagesInChat(chatId)) {
-                com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(currentLocalChat);
-            }
+            final Chat chatToSave = currentLocalChat;
+            dbExecutor.execute(() -> {
+                if (isGroupChatContext() || com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).hasAnyMessagesInChat(chatId)) {
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveOrUpdateChat(chatToSave);
+                }
+            });
         }
-        boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId));
+        boolean blocked = isChatBlocked;
         if (blocked) {
             isRecipientOnline = false;
             recipientLastSeenFormatted = "";
@@ -3529,6 +3526,24 @@ public class ChatActivity extends AppCompatActivity {
         return sentCount >= com.m3.veil.database.EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES;
     }
 
+    private boolean hasInboundPeerMessageFastUi() {
+        List<Message> msgs = messageList;
+        if (msgs != null && !msgs.isEmpty()) {
+            for (int i = 0; i < msgs.size(); i++) {
+                Message m = msgs.get(i);
+                if (m == null) continue;
+                String t = m.getType();
+                if ("system".equals(t) || "date_header".equals(t) || "unread_divider".equals(t) || "call".equals(t)) {
+                    continue;
+                }
+                if (!isSenderMe(m.getSenderId(), m)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private volatile boolean fastDirectAcceptedCached = false;
 
     private boolean isDirectChatAcceptedFastUi() {
@@ -3588,7 +3603,7 @@ public class ChatActivity extends AppCompatActivity {
             return;
         }
         if (isFinishing() || isDestroyed() || messageEditText == null || sendButton == null) return;
-        boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId));
+        boolean blocked = isChatBlocked;
         if (blocked) {
             updateBlockedState(true, currentLocalChat != null ? currentLocalChat.getBlockedBy() : null);
             return;
@@ -4078,7 +4093,7 @@ public class ChatActivity extends AppCompatActivity {
     private void showCallConfirmationDialog(String type) {
         boolean isGrp = isGroupChatContext();
         if (!isGrp) {
-            if (isChatBlocked || com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId)) {
+            if (isChatBlocked) {
                 Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -4115,7 +4130,7 @@ public class ChatActivity extends AppCompatActivity {
         }
         boolean isGrp = isGroupChatContext();
         if (!isGrp) {
-            if (isChatBlocked || com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId)) {
+            if (isChatBlocked) {
                 Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -4333,7 +4348,7 @@ public class ChatActivity extends AppCompatActivity {
             return;
         }
         if (isFinishing() || isDestroyed()) return;
-        boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId));
+        boolean blocked = isChatBlocked;
         if (blocked) {
             isRecipientTypingState = false;
             isRecipientOnline = false;
@@ -7224,7 +7239,7 @@ public class ChatActivity extends AppCompatActivity {
 
     private void setupClickListeners() {
         sendButton.setOnTouchListener((v, event) -> {
-            if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId))) return true;
+            if (isChatBlocked) return true;
             if (isOutboundRequestLimitReached()) {
                 if (event.getAction() == MotionEvent.ACTION_UP) {
                     Toast.makeText(ChatActivity.this, "You can only send up to 3 messages until the chat request is accepted", Toast.LENGTH_SHORT).show();
@@ -7423,7 +7438,7 @@ public class ChatActivity extends AppCompatActivity {
     private long lastGroupSlowModeSentMs = 0L;
 
     private void sendMessage() {
-        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+        if (isChatBlocked) {
             Toast.makeText(this, "Cannot send messages to a blocked user", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -8146,7 +8161,7 @@ public class ChatActivity extends AppCompatActivity {
 
     private void sendReadReceiptsForUnreadMessages() {
         if (!isActivityResumed || chatId == null || !isChatUnlocked()) return;
-        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) return;
+        if (isChatBlocked) return;
         if (currentLocalChat != null && currentLocalChat.isRequest()) return;
         long now = System.currentTimeMillis();
         if (now - lastReadReceiptSweepMs < 1200L) return;
@@ -8278,12 +8293,24 @@ public class ChatActivity extends AppCompatActivity {
             dbExecutor.execute(() -> com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this).fetchAndProcessOfflineInboxOnce(currentUserId));
         }
         if (chatId != null) {
-            Chat latestChat = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
-            if (latestChat != null) {
-                currentLocalChat = latestChat;
-                isChatBlocked = latestChat.isBlocked();
-                updateBlockedState(isChatBlocked, latestChat.getBlockedBy());
+            Chat cachedChat = com.m3.veil.manager.VeilMessagesController.getInstance(this).getCachedDialogImmediate(chatId);
+            if (cachedChat != null) {
+                currentLocalChat = cachedChat;
+                isChatBlocked = cachedChat.isBlocked();
+                updateBlockedState(isChatBlocked, cachedChat.getBlockedBy());
             }
+            dbExecutor.execute(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                Chat latestChat = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).getChat(chatId);
+                if (latestChat != null) {
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        currentLocalChat = latestChat;
+                        isChatBlocked = latestChat.isBlocked();
+                        updateBlockedState(isChatBlocked, latestChat.getBlockedBy());
+                    });
+                }
+            });
             com.m3.veil.manager.VeilMessagesController.getInstance(this).setActiveChatIdInForeground(chatId);
             if (isChatUnlocked() && !isChatBlocked) {
                 sendReadReceiptsForUnreadMessages();
@@ -8341,64 +8368,7 @@ public class ChatActivity extends AppCompatActivity {
     private android.app.Dialog mMinimalLoadingDialog;
 
     private void showMinimalLoadingDialog() {
-        if (isFinishing() || isDestroyed() || mMinimalLoadingDialog != null) return;
-        try {
-            android.app.Dialog d = new android.app.Dialog(this);
-            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-            if (d.getWindow() != null) {
-                d.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
-                d.getWindow().setDimAmount(0.35f);
-            }
-            float dp = getResources().getDisplayMetrics().density;
-            LinearLayout root = new LinearLayout(this);
-            root.setOrientation(LinearLayout.VERTICAL);
-            root.setGravity(Gravity.CENTER);
-            int pad = Math.round(24f * dp);
-            root.setPadding(pad, pad, pad, pad);
-            GradientDrawable bg = new GradientDrawable();
-            bg.setColor(ContextCompat.getColor(this, R.color.colorSurfaceContainerHigh));
-            bg.setCornerRadius(20f * dp);
-            bg.setStroke(Math.max(1, Math.round(1f * dp)), ContextCompat.getColor(this, R.color.colorOutline));
-            root.setBackground(bg);
-
-            android.widget.ProgressBar pb = new android.widget.ProgressBar(this);
-            int pbSize = Math.round(38f * dp);
-            LinearLayout.LayoutParams pbLp = new LinearLayout.LayoutParams(pbSize, pbSize);
-            pbLp.bottomMargin = Math.round(14f * dp);
-            pb.setLayoutParams(pbLp);
-            pb.setIndeterminate(true);
-            if (pb.getIndeterminateDrawable() != null) {
-                pb.getIndeterminateDrawable().setColorFilter(
-                        ContextCompat.getColor(this, R.color.colorPrimary),
-                        android.graphics.PorterDuff.Mode.SRC_IN
-                );
-            }
-            root.addView(pb);
-
-            TextView tv = new TextView(this);
-            tv.setText("Decrypting Vault");
-            tv.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
-            tv.setTextSize(15f);
-            tv.setTypeface(null, Typeface.BOLD);
-            tv.setGravity(Gravity.CENTER);
-            root.addView(tv);
-
-            TextView tvSub = new TextView(this);
-            tvSub.setText("Loading end-to-end encrypted messages...");
-            tvSub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
-            tvSub.setTextSize(12f);
-            tvSub.setGravity(Gravity.CENTER);
-            tvSub.setPadding(0, Math.round(4f * dp), 0, 0);
-            root.addView(tvSub);
-
-            d.setContentView(root);
-            d.setCancelable(true);
-            d.setCanceledOnTouchOutside(false);
-            d.show();
-            mMinimalLoadingDialog = d;
-
-            chatDebounceHandler.postDelayed(this::hideMinimalLoadingDialog, 1800L);
-        } catch (Exception ignored) {}
+        // No-op: Modal dialogs on Frame 1 freeze Choreographer and drop input frames
     }
 
     private void hideMinimalLoadingDialog() {
@@ -8715,7 +8685,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showVanishTimerDialog() {
-        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+        if (isChatBlocked) {
             Toast.makeText(this, "Cannot change disappearing messages while user is blocked", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -8799,7 +8769,7 @@ public class ChatActivity extends AppCompatActivity {
             card.addView(row);
             card.setOnClickListener(v -> {
                 sheet.dismiss();
-                if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+                if (isChatBlocked) {
                     return;
                 }
                 currentVanishTimer = selectedTimer;
@@ -8829,7 +8799,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showVanishModePickerSubDialog(long selectedTimer) {
-        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+        if (isChatBlocked) {
             return;
         }
         BottomSheetDialog sheet = new BottomSheetDialog(this);
@@ -8868,7 +8838,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void commitVanishSettings(String modeLabel) {
-        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+        if (isChatBlocked) {
             return;
         }
         if (currentLocalChat != null) {
@@ -9310,7 +9280,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showCreateInlinePollDialog() {
-        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) return;
+        if (isChatBlocked) return;
         if (isOutboundRequestLimitReached()) {
             Toast.makeText(this, "You can only send up to 3 messages until the chat request is accepted", Toast.LENGTH_SHORT).show();
             updateRequestLimitComposerState();
@@ -9672,7 +9642,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showDoodlePadDialog() {
-        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) return;
+        if (isChatBlocked) return;
         if (isOutboundRequestLimitReached()) {
             Toast.makeText(this, "You can only send up to 3 messages until the chat request is accepted", Toast.LENGTH_SHORT).show();
             updateRequestLimitComposerState();
@@ -11462,9 +11432,13 @@ public class ChatActivity extends AppCompatActivity {
         hideMinimalLoadingDialog();
         super.onDestroy();
         if (chatId != null && !isGroupChatContext()) {
-            try {
-                com.m3.veil.database.EncryptedChatDatabase.getInstance(this).deleteEmptyDirectChatIfNoMessages(chatId);
-            } catch (Exception ignored) {}
+            final String targetChatId = chatId;
+            final Context appCtx = getApplicationContext();
+            dbExecutor.execute(() -> {
+                try {
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(appCtx).deleteEmptyDirectChatIfNoMessages(targetChatId);
+                } catch (Exception ignored) {}
+            });
         }
         try {
             CallEngine.getInstance(this).removeListener(chatCallEngineListener);
