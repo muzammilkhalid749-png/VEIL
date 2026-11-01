@@ -3326,7 +3326,7 @@ public class ChatActivity extends AppCompatActivity {
             messageEditText.setEnabled(false);
             messageEditText.setFocusable(false);
             messageEditText.setClickable(blockedByMe);
-            messageEditText.setHint(blockedByMe ? "You blocked this person. Tap to unblock." : "You cannot reply to this conversation");
+            messageEditText.setHint(blockedByMe ? "You blocked this user" : "You cannot reply to this conversation");
             if (blockedByMe) {
                 messageEditText.setOnClickListener(v -> confirmBlockUser());
             } else {
