@@ -839,22 +839,8 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
         Collections.sort(ids);
         String chatId = ids.get(0) + "_" + ids.get(1);
 
-        Chat existing = EncryptedChatDatabase.getInstance(this).getChat(chatId);
-        if (existing == null) {
-            String recipientTitle = otherUser.getDisplayName() != null ? otherUser.getDisplayName() : otherUser.getUsername();
-            Chat newChat = new Chat(
-                    chatId,
-                    recipientTitle,
-                    "",
-                    Timestamp.now(),
-                    otherUser.getPhotoUrl(),
-                    0,
-                    false,
-                    false,
-                    "direct",
-                    Arrays.asList(currentUserId, otherUser.getUserId())
-            );
-            EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(newChat);
+        if (otherUser.getPhotoUrl() != null && !otherUser.getPhotoUrl().trim().isEmpty()) {
+            com.m3.veil.utils.VeilAvatarLoader.cachePeerAvatarSource(this, otherUser.getUserId(), otherUser.getPhotoUrl().trim());
         }
         navigateToChat(chatId, otherUser);
     }
@@ -865,6 +851,9 @@ public class NewChatActivity extends AppCompatActivity implements UsersAdapter.O
         intent.putExtra("recipientId", otherUser.getUserId());
         intent.putExtra("recipientName", otherUser.getDisplayName() != null
                 ? otherUser.getDisplayName() : otherUser.getUsername());
+        if (otherUser.getPhotoUrl() != null && !otherUser.getPhotoUrl().trim().isEmpty()) {
+            intent.putExtra("recipientAvatar", otherUser.getPhotoUrl().trim());
+        }
         startActivity(intent);
         finish();
     }

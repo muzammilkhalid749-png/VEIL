@@ -129,7 +129,7 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Quick Action Buttons (Audio Call / Video Call) -->
+            <!-- Quick Action Buttons (Audio Call / Video Call / Add Contact) -->
             <LinearLayout
                 android:id="@+id/callActionsContainer"
                 android:layout_width="match_parent"
@@ -142,11 +142,11 @@
                 <!-- Audio Call Action -->
                 <LinearLayout
                     android:id="@+id/btnProfileAudioCall"
-                    android:layout_width="72dp"
+                    android:layout_width="76dp"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:gravity="center"
-                    android:layout_marginEnd="16dp"
+                    android:layout_marginEnd="12dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
                     android:focusable="true">
@@ -178,11 +178,12 @@
                 <!-- Video Call Action -->
                 <LinearLayout
                     android:id="@+id/btnProfileVideoCall"
-                    android:layout_width="72dp"
+                    android:layout_width="76dp"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:gravity="center"
-                    android:layout_marginStart="16dp"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
                     android:focusable="true">
@@ -209,6 +210,45 @@
                         android:textSize="12sp"
                         android:fontFamily="sans-serif-medium"
                         android:layout_marginTop="6dp" />
+                </LinearLayout>
+
+                <!-- Add / Remove Contact Action -->
+                <LinearLayout
+                    android:id="@+id/btnProfileAddContact"
+                    android:layout_width="84dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:layout_marginStart="12dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <FrameLayout
+                        android:layout_width="52dp"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_profile_action_pill">
+
+                        <ImageView
+                            android:id="@+id/ivProfileContactIcon"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_contacts"
+                            app:tint="@color/colorPrimary"
+                            android:contentDescription="Add Contact" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:id="@+id/tvProfileContactLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Add Contact"
+                        android:textColor="@color/textSecondary"
+                        android:textSize="12sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:layout_marginTop="6dp"
+                        android:singleLine="true" />
                 </LinearLayout>
             </LinearLayout>
 

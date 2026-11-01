@@ -103,9 +103,15 @@ public class VeilMeshDaemonService extends Service {
     private Handler mainHandler;
     private ConnectivityManager.NetworkCallback networkCallback;
     private ListenerRegistration meshSignalRegistration;
+    private ListenerRegistration backgroundChatsRegistration;
+    private ListenerRegistration backgroundGroupsRegistration;
+    private PowerManager.WakeLock persistentWakeLock;
+    private android.net.wifi.WifiManager.WifiLock persistentWifiLock;
+    private android.content.BroadcastReceiver screenStateReceiver;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
     private final Set<String> seenPacketIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<String, Long> lastWakeKnockSentMs = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastSyncedChatTimestampMs = new ConcurrentHashMap<>();
 
     public static void start(Context context) {
         if (context == null) return;
@@ -303,19 +309,275 @@ public class VeilMeshDaemonService extends Service {
         }
 
         ensureInProcessEnginesInitialized(getCtx());
+        acquirePersistentLocks();
+        registerScreenStateReceiver();
 
         meshExecutor = Executors.newScheduledThreadPool(2, r -> {
             Thread t = new Thread(r, "VeilMeshWorker");
             t.setDaemon(true);
+            t.setPriority(Thread.NORM_PRIORITY + 1);
             return t;
         });
 
-        meshExecutor.scheduleWithFixedDelay(this::drainOutbox, 1, 4, TimeUnit.SECONDS);
+        meshExecutor.scheduleWithFixedDelay(this::drainOutbox, 1, 3, TimeUnit.SECONDS);
         meshExecutor.scheduleWithFixedDelay(this::exchangeBloomFiltersWithPeers, 8, 25, TimeUnit.SECONDS);
         meshExecutor.scheduleWithFixedDelay(this::pruneExpiredPackets, 60, 120, TimeUnit.SECONDS);
 
         registerNetworkChangeCallback();
         attachMeshWakeListener();
+        attachBackgroundMessageSyncListeners();
+    }
+
+    private void acquirePersistentLocks() {
+        try {
+            Context ctx = getCtx();
+            if (ctx == null) return;
+            PowerManager pm = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                if (persistentWakeLock == null) {
+                    persistentWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "veil:daemon_keepalive_wl");
+                    persistentWakeLock.setReferenceCounted(false);
+                }
+                if (!persistentWakeLock.isHeld()) {
+                    persistentWakeLock.acquire();
+                }
+            }
+            android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) ctx.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wm != null) {
+                if (persistentWifiLock == null) {
+                    int lockMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                            ? android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+                            : android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF;
+                    persistentWifiLock = wm.createWifiLock(lockMode, "veil:daemon_wifi_lock");
+                    persistentWifiLock.setReferenceCounted(false);
+                }
+                if (!persistentWifiLock.isHeld()) {
+                    persistentWifiLock.acquire();
+                }
+            }
+        } catch (Throwable e) {
+            Log.w(TAG, "acquirePersistentLocks notice: " + e.getMessage());
+        }
+    }
+
+    private void releasePersistentLocks() {
+        try {
+            if (persistentWakeLock != null && persistentWakeLock.isHeld()) {
+                persistentWakeLock.release();
+            }
+        } catch (Throwable ignored) {}
+        try {
+            if (persistentWifiLock != null && persistentWifiLock.isHeld()) {
+                persistentWifiLock.release();
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void registerScreenStateReceiver() {
+        try {
+            Context ctx = getCtx();
+            if (ctx == null || screenStateReceiver != null) return;
+            screenStateReceiver = new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    acquirePersistentLocks();
+                    ensureInProcessEnginesInitialized(getCtx());
+                    attachMeshWakeListener();
+                    attachBackgroundMessageSyncListeners();
+                    triggerImmediateOutboxDrain();
+                }
+            };
+            android.content.IntentFilter filter = new android.content.IntentFilter();
+            filter.addAction(Intent.ACTION_SCREEN_OFF);
+            filter.addAction(Intent.ACTION_SCREEN_ON);
+            filter.addAction(Intent.ACTION_USER_PRESENT);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ctx.registerReceiver(screenStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                ctx.registerReceiver(screenStateReceiver, filter);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    public void attachBackgroundMessageSyncListeners() {
+        try {
+            final Context ctx = getCtx();
+            if (ctx == null) return;
+            final String myUid = AuthManager.getInstance().getCurrentUserId(ctx);
+            if (myUid == null || myUid.isEmpty()) return;
+
+            if (backgroundChatsRegistration == null) {
+                backgroundChatsRegistration = FirebaseFirestore.getInstance()
+                        .collection("chats")
+                        .whereArrayContains("participants", myUid)
+                        .addSnapshotListener((snapshots, error) -> {
+                            if (error != null || snapshots == null) return;
+                            for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                                if (dc.getType() == DocumentChange.Type.ADDED || dc.getType() == DocumentChange.Type.MODIFIED) {
+                                    syncInboundMessagesForChatDoc(ctx, myUid, dc.getDocument(), false);
+                                }
+                            }
+                        });
+            }
+
+            if (backgroundGroupsRegistration == null) {
+                backgroundGroupsRegistration = FirebaseFirestore.getInstance()
+                        .collection("groups")
+                        .whereArrayContains("participants", myUid)
+                        .addSnapshotListener((snapshots, error) -> {
+                            if (error != null || snapshots == null) return;
+                            for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                                if (dc.getType() == DocumentChange.Type.ADDED || dc.getType() == DocumentChange.Type.MODIFIED) {
+                                    syncInboundMessagesForChatDoc(ctx, myUid, dc.getDocument(), true);
+                                }
+                            }
+                        });
+            }
+        } catch (Throwable e) {
+            Log.w(TAG, "attachBackgroundMessageSyncListeners notice: " + e.getMessage());
+        }
+    }
+
+    private void syncInboundMessagesForChatDoc(
+            @NonNull Context ctx,
+            @NonNull String myUid,
+            @NonNull DocumentSnapshot chatDoc,
+            boolean isGroup) {
+        try {
+            final String chatId = chatDoc.getId();
+            if (chatId == null || chatId.isEmpty()) return;
+
+            String lastSenderId = chatDoc.getString("lastSenderId");
+            if (lastSenderId != null && AuthManager.getInstance().isMyUserId(ctx, lastSenderId)) {
+                return;
+            }
+
+            com.google.firebase.Timestamp lastTime = chatDoc.getTimestamp("lastMessageTime");
+            long lastMs = lastTime != null ? lastTime.toDate().getTime() : System.currentTimeMillis();
+            Long prevSyncedMs = lastSyncedChatTimestampMs.get(chatId);
+            if (prevSyncedMs != null && lastMs <= prevSyncedMs && dcHasNoUnreadIncrease(ctx, chatId, chatDoc)) {
+                return;
+            }
+            lastSyncedChatTimestampMs.put(chatId, lastMs);
+
+            String collectionName = isGroup ? "groups" : "chats";
+            FirebaseFirestore.getInstance()
+                    .collection(collectionName)
+                    .document(chatId)
+                    .collection("messages")
+                    .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .limit(5)
+                    .get()
+                    .addOnSuccessListener(querySnapshot -> {
+                        if (querySnapshot == null || querySnapshot.isEmpty()) return;
+                        if (meshExecutor != null && !meshExecutor.isShutdown()) {
+                            meshExecutor.execute(() -> processBackgroundFetchedMessages(ctx, myUid, chatId, chatDoc, querySnapshot.getDocuments(), isGroup));
+                        }
+                    });
+        } catch (Throwable ignored) {}
+    }
+
+    private boolean dcHasNoUnreadIncrease(@NonNull Context ctx, @NonNull String chatId, @NonNull DocumentSnapshot chatDoc) {
+        try {
+            Chat local = EncryptedChatDatabase.getInstance(ctx).getChat(chatId);
+            if (local == null) return false;
+            Long remoteUnread = chatDoc.getLong("unreadCount");
+            return remoteUnread == null || remoteUnread <= local.getUnreadCount();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private void processBackgroundFetchedMessages(
+            @NonNull Context ctx,
+            @NonNull String myUid,
+            @NonNull String chatId,
+            @NonNull DocumentSnapshot chatDoc,
+            @NonNull List<DocumentSnapshot> docs,
+            boolean isGroup) {
+        try {
+            EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(ctx);
+            String peerId = null;
+            if (!isGroup && chatId.contains("_")) {
+                String[] parts = chatId.split("_");
+                if (parts.length == 2) {
+                    peerId = parts[0].equals(myUid) ? parts[1] : parts[0];
+                }
+            }
+            if (peerId != null && db.isPeerBlockedInAnyChat(peerId, myUid)) {
+                return;
+            }
+
+            List<DocumentSnapshot> ordered = new java.util.ArrayList<>(docs);
+            Collections.reverse(ordered);
+
+            for (DocumentSnapshot mDoc : ordered) {
+                if (mDoc == null || !mDoc.exists()) continue;
+                Message msg = mDoc.toObject(Message.class);
+                if (msg == null) continue;
+                if (msg.getId() == null || msg.getId().isEmpty()) {
+                    msg.setId(mDoc.getId());
+                }
+                msg.setChatId(chatId);
+                if (AuthManager.getInstance().isMyUserId(ctx, msg.getSenderId())) {
+                    continue;
+                }
+                if (db.getMessageById(msg.getId()) != null) {
+                    continue;
+                }
+                if (msg.getText() != null && msg.getText().startsWith("ENC:v")) {
+                    msg.setText(com.m3.veil.utils.EncryptionManager.decryptGroupPayload(chatId, msg.getText()));
+                }
+                msg.setDelivered(true);
+                db.saveMessage(chatId, msg);
+
+                // Ensure chat row exists and has decrypted preview
+                Chat localChat = db.getChat(chatId);
+                String preview = VeilHybridNotificationManager.buildCleanPreviewText(msg);
+                if (localChat == null) {
+                    String title = chatDoc.getString("name");
+                    if (title == null || title.trim().isEmpty()) {
+                        title = msg.getSenderName() != null ? msg.getSenderName() : "Chat";
+                    }
+                    @SuppressWarnings("unchecked")
+                    List<String> participants = (List<String>) chatDoc.get("participants");
+                    localChat = new Chat(chatId, title, preview,
+                            msg.getTimestamp() != null ? msg.getTimestamp() : com.google.firebase.Timestamp.now(),
+                            chatDoc.getString("avatarUrl"), 1, isGroup, false,
+                            isGroup ? "group" : "direct",
+                            participants != null ? participants : new java.util.ArrayList<>());
+                    if (!isGroup && peerId != null && !db.isContact(peerId) && !db.isChatAccepted(chatId)) {
+                        localChat.setRequest(true);
+                    }
+                    db.saveOrUpdateChat(localChat);
+                } else {
+                    localChat.setLastMessage(preview);
+                    if (msg.getTimestamp() != null) {
+                        localChat.setLastMessageTime(msg.getTimestamp());
+                    }
+                    String activeFg = com.m3.veil.manager.VeilMessagesController.getInstance(ctx).getActiveChatIdInForeground();
+                    if (!chatId.equals(activeFg)) {
+                        localChat.setUnreadCount(localChat.getUnreadCount() + 1);
+                    }
+                    db.saveOrUpdateChat(localChat);
+                }
+
+                // Acknowledge delivery back to Firestore so sender sees double-tick immediately even while our screen is locked
+                if (!localChat.isRequest() || db.isChatAccepted(chatId)) {
+                    mDoc.getReference().update("delivered", true);
+                }
+
+                // Trigger notification & receive sound immediately
+                VeilHybridNotificationManager.getInstance(ctx).onInboundMessageForNotification(
+                        chatId,
+                        peerId != null ? peerId : msg.getSenderId(),
+                        msg,
+                        false
+                );
+            }
+        } catch (Throwable e) {
+            Log.w(TAG, "processBackgroundFetchedMessages error: " + e.getMessage());
+        }
     }
 
     private void registerNetworkChangeCallback() {
@@ -888,11 +1150,31 @@ public class VeilMeshDaemonService extends Service {
     @Override
     public void onDestroy() {
         isRunning.set(false);
+        releasePersistentLocks();
+        if (screenStateReceiver != null) {
+            try {
+                Context ctx = getCtx();
+                if (ctx != null) ctx.unregisterReceiver(screenStateReceiver);
+            } catch (Throwable ignored) {}
+            screenStateReceiver = null;
+        }
         if (meshSignalRegistration != null) {
             try {
                 meshSignalRegistration.remove();
             } catch (Exception ignored) {}
             meshSignalRegistration = null;
+        }
+        if (backgroundChatsRegistration != null) {
+            try {
+                backgroundChatsRegistration.remove();
+            } catch (Exception ignored) {}
+            backgroundChatsRegistration = null;
+        }
+        if (backgroundGroupsRegistration != null) {
+            try {
+                backgroundGroupsRegistration.remove();
+            } catch (Exception ignored) {}
+            backgroundGroupsRegistration = null;
         }
         if (networkCallback != null) {
             try {

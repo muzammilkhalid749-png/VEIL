@@ -528,11 +528,26 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
         String type = call.isVideo() ? "video" : "audio";
         boolean isGrp = call.isGroup();
 
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(requireContext());
+        String directChatId = (!isGrp && targetId != null && myUid != null)
+                ? EncryptedChatDatabase.generateDirectChatId(myUid, targetId)
+                : targetId;
+        if (!isGrp && db.isPeerOrChatBlocked(directChatId, targetId)) {
+            Toast.makeText(requireContext(), "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!isGrp && directChatId != null && !db.isDirectChatAcceptedByPeer(directChatId, myUid, targetId)) {
+            Toast.makeText(requireContext(), "Calls are disabled until the chat request is accepted", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String resolvedAvatar = com.m3.veil.utils.VeilAvatarLoader.resolvePeerAvatarSource(requireContext(), myUid, targetId);
+
         com.m3.veil.calling.ui.VeilCallConfirmationDialog.show(
                 requireContext(),
                 targetId,
                 displayName,
-                null,
+                resolvedAvatar,
                 type,
                 isGrp,
                 confirmedType -> {

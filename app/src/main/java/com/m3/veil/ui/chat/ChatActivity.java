@@ -201,6 +201,14 @@ public class ChatActivity extends AppCompatActivity {
     private final Runnable presenceTicker = new Runnable() {
         @Override
         public void run() {
+            boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId));
+            if (blocked) {
+                isRecipientOnline = false;
+                isRecipientTypingState = false;
+                recipientLastSeenFormatted = "";
+                updatePresenceAndToolbarStatus();
+                return;
+            }
             if (recipientId != null && !recipientId.isEmpty() && !isGroupChatContext() && db != null) {
                 db.collection("users").document(recipientId).get().addOnSuccessListener(doc -> {
                     if (doc != null && doc.exists()) {
@@ -414,11 +422,15 @@ public class ChatActivity extends AppCompatActivity {
                 @Override
                 public void onMessageReceived(String dialogId, Message message) {
                     if (chatId != null && chatId.equals(dialogId)) {
+                        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId))) {
+                            return;
+                        }
                         if (message != null && "[roulette_control:reveal_request]".equals(message.getText())) {
                             handleInboundRouletteReveal();
                             return;
                         }
-                        boolean canMarkRead = isActivityResumed && isChatUnlocked() && (message == null || !message.isMediaRequiringActionToRead());
+                        boolean isReq = currentLocalChat != null && currentLocalChat.isRequest();
+                        boolean canMarkRead = !isReq && isActivityResumed && isChatUnlocked() && (message == null || !message.isMediaRequiringActionToRead());
                         if (canMarkRead) {
                             sendReadReceiptsForUnreadMessages();
                             com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId);
@@ -433,23 +445,34 @@ public class ChatActivity extends AppCompatActivity {
                 @Override
                 public void onMessageSent(String dialogId, Message message) {
                     if (chatId != null && chatId.equals(dialogId)) {
-                        runOnUiThread(() -> reloadMessagesFromLocalVault());
+                        runOnUiThread(() -> {
+                            updateRequestLimitComposerState();
+                            reloadMessagesFromLocalVault();
+                        });
                     }
                 }
 
                 @Override
                 public void onMessageStatusChanged(String dialogId, String messageId, boolean delivered, boolean read) {
                     runOnUiThread(() -> {
+                        boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId));
+                        boolean accepted = isGroupChatContext() || com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId);
                         for (int i = 0; i < messageList.size(); i++) {
                             Message m = messageList.get(i);
                             if (m.getId() != null && m.getId().equals(messageId)) {
-                                boolean newRead = m.isRead() || read;
-                                m.setDelivered(m.isDelivered() || delivered || newRead);
-                                m.setRead(newRead);
-                                if (delivered || read) {
+                                if (blocked || !accepted) {
+                                    m.setDelivered(false);
+                                    m.setRead(false);
                                     m.setPending(false);
-                                    if (messagesAdapter != null) {
-                                        messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADED, 100);
+                                } else {
+                                    boolean newRead = m.isRead() || read;
+                                    m.setDelivered(m.isDelivered() || delivered || newRead);
+                                    m.setRead(newRead);
+                                    if (delivered || read) {
+                                        m.setPending(false);
+                                        if (messagesAdapter != null) {
+                                            messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADED, 100);
+                                        }
                                     }
                                 }
                                 messagesAdapter.notifyItemChanged(i + 1);
@@ -485,6 +508,9 @@ public class ChatActivity extends AppCompatActivity {
 
                 @Override
                 public void onPeerTyping(String dialogId, String peerId, boolean isTyping) {
+                    if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId))) {
+                        return;
+                    }
                     boolean matches = (chatId != null && chatId.equals(dialogId))
                             || (peerId != null && peerId.equals(recipientId))
                             || (!isGroupChatContext() && peerId != null && chatId != null && chatId.contains(peerId));
@@ -592,6 +618,9 @@ public class ChatActivity extends AppCompatActivity {
             boolean matchesThisChat = (message != null && chatId != null && chatId.equals(message.getChatId()))
                     || (!isGroupChatContext() && peerId != null && peerId.equals(recipientId));
             if (matchesThisChat) {
+                if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, peerId != null ? peerId : recipientId))) {
+                    return;
+                }
                 if (message != null && "[roulette_control:reveal_request]".equals(message.getText())) {
                     handleInboundRouletteReveal();
                     return;
@@ -599,7 +628,7 @@ public class ChatActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     updateVanishUI(false);
                     boolean isRequest = currentLocalChat != null && currentLocalChat.isRequest();
-                    boolean canMarkRead = isActivityResumed && hasWindowFocus() && (message == null || !message.isMediaRequiringActionToRead());
+                    boolean canMarkRead = !isRequest && isActivityResumed && hasWindowFocus() && (message == null || !message.isMediaRequiringActionToRead());
                     android.content.SharedPreferences privacyPrefs = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE);
                     boolean sendReadReceipt = privacyPrefs.getBoolean("read_receipts_enabled", true);
                     String targetReceiptPeer = (peerId != null && !peerId.isEmpty()) ? peerId : recipientId;
@@ -619,18 +648,26 @@ public class ChatActivity extends AppCompatActivity {
         @Override
         public void onMessageStatusChanged(String messageId, boolean delivered, boolean read) {
             runOnUiThread(() -> {
+                boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId));
+                boolean accepted = isGroupChatContext() || com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId);
                 for (int i = 0; i < messageList.size(); i++) {
                     Message m = messageList.get(i);
                     if (m.getId() != null && m.getId().equals(messageId)) {
-                        boolean newRead = m.isRead() || read;
-                        m.setDelivered(m.isDelivered() || delivered || newRead);
-                        m.setRead(newRead);
-                        boolean transferIncomplete = com.m3.veil.manager.VeilMessagesController
-                                .getInstance(ChatActivity.this).isOutboundMediaTransferIncomplete(messageId);
-                        if ((delivered || read) && !transferIncomplete) {
+                        if (blocked || !accepted) {
+                            m.setDelivered(false);
+                            m.setRead(false);
                             m.setPending(false);
-                            if (messagesAdapter != null) {
-                                messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADED, 100);
+                        } else {
+                            boolean newRead = m.isRead() || read;
+                            m.setDelivered(m.isDelivered() || delivered || newRead);
+                            m.setRead(newRead);
+                            boolean transferIncomplete = com.m3.veil.manager.VeilMessagesController
+                                    .getInstance(ChatActivity.this).isOutboundMediaTransferIncomplete(messageId);
+                            if ((delivered || read) && !transferIncomplete) {
+                                m.setPending(false);
+                                if (messagesAdapter != null) {
+                                    messagesAdapter.setMediaDownloadState(messageId, MessagesAdapter.STATE_DOWNLOADED, 100);
+                                }
                             }
                         }
                         messagesAdapter.notifyItemChanged(i + 1);
@@ -643,6 +680,12 @@ public class ChatActivity extends AppCompatActivity {
         @Override
         public void onAllMessagesRead(String updatedChatId) {
             if (chatId != null && chatId.equals(updatedChatId)) {
+                if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId))) {
+                    return;
+                }
+                if (!isGroupChatContext() && !com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+                    return;
+                }
                 runOnUiThread(() -> {
                     boolean updated = false;
                     com.m3.veil.manager.VeilMessagesController ctrl =
@@ -676,6 +719,9 @@ public class ChatActivity extends AppCompatActivity {
 
         @Override
         public void onPeerTyping(String peerId, boolean isTyping) {
+            if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, peerId != null ? peerId : recipientId))) {
+                return;
+            }
             boolean inThisChat = (peerId != null && peerId.equals(recipientId))
                     || (!isGroupChatContext() && peerId != null && chatId != null && chatId.contains(peerId))
                     || (isGroupChatContext() && currentLocalChat != null
@@ -710,6 +756,7 @@ public class ChatActivity extends AppCompatActivity {
             boolean matches = (targetChatId != null && targetChatId.equals(chatId))
                     || (peerId != null && peerId.equals(recipientId));
             if (matches) {
+                com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markDirectChatAccepted(chatId, recipientId);
                 runOnUiThread(() -> {
                     if (currentLocalChat != null) {
                         currentLocalChat.setRequest(false);
@@ -717,6 +764,7 @@ public class ChatActivity extends AppCompatActivity {
                     if (layoutMessageRequestBanner != null) {
                         layoutMessageRequestBanner.setVisibility(View.GONE);
                     }
+                    updateRequestLimitComposerState();
                     updatePresenceAndToolbarStatus();
                     reloadMessagesFromLocalVault();
                 });
@@ -849,7 +897,9 @@ public class ChatActivity extends AppCompatActivity {
                 if (currentLocalChat.getVanishMode() != null) {
                     currentVanishMode = currentLocalChat.getVanishMode();
                 }
-                isChatBlocked = currentLocalChat.isBlocked();
+                isChatBlocked = currentLocalChat.isBlocked() || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId));
+            } else if (!intentIsGroup) {
+                isChatBlocked = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId);
             }
         }
 
@@ -878,7 +928,10 @@ public class ChatActivity extends AppCompatActivity {
             if (isGroupChatContext()) {
                 loadGroupMentionCandidates();
             }
+        } else if (isChatBlocked) {
+            updateBlockedState(true, com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChatBlockedBy(chatId));
         }
+        updateRequestLimitComposerState();
         applyChatWallpaper();
         updateChannelRoleComposerState();
         runOnUiThread(this::updateRecipientHeader);
@@ -921,14 +974,19 @@ public class ChatActivity extends AppCompatActivity {
                                     recipientName = dName;
                                     if (currentLocalChat != null && !currentLocalChat.isGroup()) {
                                         currentLocalChat.setName(dName);
-                                        com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveOrUpdateChat(currentLocalChat);
+                                        if (com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).hasAnyMessagesInChat(chatId)) {
+                                            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveOrUpdateChat(currentLocalChat);
+                                        }
                                     }
                                 }
                                 String remoteAvatar = doc.getString("avatar");
                                 if (remoteAvatar != null && !remoteAvatar.isEmpty()) {
+                                    com.m3.veil.utils.VeilAvatarLoader.cachePeerAvatarSource(ChatActivity.this, recipientId, remoteAvatar);
                                     if (currentLocalChat != null) {
                                         currentLocalChat.setAvatar(remoteAvatar);
-                                        com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveOrUpdateChat(currentLocalChat);
+                                        if (com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).hasAnyMessagesInChat(chatId)) {
+                                            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveOrUpdateChat(currentLocalChat);
+                                        }
                                     }
                                 }
                                 runOnUiThread(this::updateRecipientHeader);
@@ -1023,7 +1081,11 @@ public class ChatActivity extends AppCompatActivity {
             }
             boolean isGrp = (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_")))
                     || (currentLocalChat != null && currentLocalChat.isGroup());
-            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(recipientAvatar, avSource, recipientName, isGrp);
+            if (isGrp) {
+                com.m3.veil.utils.VeilAvatarLoader.loadAvatar(recipientAvatar, avSource, recipientName, true);
+            } else {
+                com.m3.veil.utils.VeilAvatarLoader.loadPeerAvatar(recipientAvatar, recipientId, avSource, recipientName);
+            }
         }
     }
 
@@ -1097,13 +1159,29 @@ public class ChatActivity extends AppCompatActivity {
         if (btnAudioCall != null) {
             UiAnimator.attachSpringPress(btnAudioCall);
             btnAudioCall.setOnClickListener(v -> {
-                if (!isChatBlocked) showCallConfirmationDialog("audio");
+                if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+                    Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!isGroupChatContext() && !com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+                    Toast.makeText(this, "Calls are disabled until the chat request is accepted", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showCallConfirmationDialog("audio");
             });
         }
         if (btnVideoCall != null) {
             UiAnimator.attachSpringPress(btnVideoCall);
             btnVideoCall.setOnClickListener(v -> {
-                if (!isChatBlocked) showCallConfirmationDialog("video");
+                if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+                    Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!isGroupChatContext() && !com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+                    Toast.makeText(this, "Calls are disabled until the chat request is accepted", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showCallConfirmationDialog("video");
             });
         }
 
@@ -1405,6 +1483,7 @@ public class ChatActivity extends AppCompatActivity {
             android.view.MenuItem vanishItem = menu.findItem(R.id.action_vanish_timer);
             if (vanishItem != null) {
                 vanishItem.setTitle("⏱️ Disappearing Messages (Vanish)");
+                vanishItem.setVisible(!isChatBlocked);
             }
 
             // Group/Channel-only options vs. 1:1 Direct Chat options
@@ -1414,9 +1493,17 @@ public class ChatActivity extends AppCompatActivity {
             setMenuItemVisible(menu, R.id.action_group_achievements, isGrp && !isChan);
             setMenuItemVisible(menu, R.id.action_chat_wallpaper, !isGrp);
 
+            // Explicit Contact toggle for 1:1 chats
+            final int MENU_ID_TOGGLE_CONTACT = 9901;
+            if (!isGrp && recipientId != null && !recipientId.isEmpty()) {
+                boolean isInContacts = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isExplicitContact(recipientId);
+                menu.add(0, MENU_ID_TOGGLE_CONTACT, 1, isInContacts ? "👤 Remove from Contacts" : "➕ Add to Contacts");
+            }
+
             android.view.MenuItem schedItem = menu.findItem(R.id.action_schedule_message);
             if (schedItem != null) {
                 schedItem.setTitle(isChan ? "⏰ Schedule Channel Post" : "⏰ Schedule Message");
+                schedItem.setVisible(!isChatBlocked);
             }
 
             android.view.MenuItem blockOrLeaveItem = menu.findItem(R.id.action_block_user);
@@ -1431,7 +1518,18 @@ public class ChatActivity extends AppCompatActivity {
 
             popup.setOnMenuItemClickListener(item -> {
                 int id = item.getItemId();
-                if (id == R.id.action_view_profile) {
+                if (id == MENU_ID_TOGGLE_CONTACT) {
+                    com.m3.veil.database.EncryptedChatDatabase dbLocal = com.m3.veil.database.EncryptedChatDatabase.getInstance(this);
+                    if (dbLocal.isExplicitContact(recipientId)) {
+                        dbLocal.removeExplicitContact(recipientId);
+                        Toast.makeText(this, "Removed from contacts", Toast.LENGTH_SHORT).show();
+                    } else {
+                        String av = cachedRecipientUser != null ? cachedRecipientUser.getAvatar() : (currentLocalChat != null ? currentLocalChat.getAvatar() : null);
+                        dbLocal.addExplicitContact(recipientId, recipientName, av);
+                        Toast.makeText(this, (recipientName != null ? recipientName : "User") + " added to contacts", Toast.LENGTH_SHORT).show();
+                    }
+                    return true;
+                } else if (id == R.id.action_view_profile) {
                     findViewById(R.id.profileArea).performClick();
                     return true;
                 } else if (id == R.id.action_blink_mode) {
@@ -2142,9 +2240,21 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void sendMessageWithType(String type, String content) {
+        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+            Toast.makeText(this, "Cannot send messages to a blocked user", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (content == null || content.isEmpty()) return;
         if (currentLocalChat != null && currentLocalChat.isRequest()) {
-            acceptMessageRequest();
+            boolean hasInboundFromPeer = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getInboundUserMessageCount(chatId, currentUserId) > 0;
+            if (hasInboundFromPeer) {
+                acceptMessageRequest();
+            }
+        }
+        if (isOutboundRequestLimitReached()) {
+            Toast.makeText(this, "You can only send up to 3 messages until the chat request is accepted", Toast.LENGTH_SHORT).show();
+            updateRequestLimitComposerState();
+            return;
         }
 
         String messageId = UUID.randomUUID().toString();
@@ -2206,6 +2316,7 @@ public class ChatActivity extends AppCompatActivity {
 
         // Transmit via application-wide VeilMessagesController (warm cache, outbox retry, and direct P2P delivery)
         com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, isGroupChatContext() ? null : recipientId, message);
+        updateRequestLimitComposerState();
         reloadMessagesFromLocalVault();
     }
 
@@ -2506,8 +2617,22 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void uploadAndSendMediaWithMetadata(File rawFile, String mediaType, String caption, @Nullable String customMetadataJson) {
-        if (isChatBlocked) return;
+        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+            Toast.makeText(this, "Cannot send media to a blocked user", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (rawFile == null || !rawFile.exists()) return;
+        if (currentLocalChat != null && currentLocalChat.isRequest()) {
+            boolean hasInboundFromPeer = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getInboundUserMessageCount(chatId, currentUserId) > 0;
+            if (hasInboundFromPeer) {
+                acceptMessageRequest();
+            }
+        }
+        if (isOutboundRequestLimitReached()) {
+            Toast.makeText(this, "You can only send up to 3 messages until the chat request is accepted", Toast.LENGTH_SHORT).show();
+            updateRequestLimitComposerState();
+            return;
+        }
 
         if (isGroupChatContext() && chatId != null) {
             boolean isAdmin = currentLocalChat == null || currentUserId == null || currentLocalChat.isAdmin(currentUserId);
@@ -2843,16 +2968,25 @@ public class ChatActivity extends AppCompatActivity {
             }
         }
         if (user.getAvatar() != null && !user.getAvatar().isEmpty()) {
+            com.m3.veil.utils.VeilAvatarLoader.cachePeerAvatarSource(this, recipientId, user.getAvatar());
             if (currentLocalChat != null && !user.getAvatar().equals(currentLocalChat.getAvatar())) {
                 currentLocalChat.setAvatar(user.getAvatar());
                 chatMetaUpdated = true;
             }
         }
         if (chatMetaUpdated && currentLocalChat != null) {
-            com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(currentLocalChat);
+            if (isGroupChatContext() || com.m3.veil.database.EncryptedChatDatabase.getInstance(this).hasAnyMessagesInChat(chatId)) {
+                com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(currentLocalChat);
+            }
         }
-        isRecipientOnline = user.isUserOnline();
-        recipientLastSeenFormatted = user.getFormattedLastSeen();
+        boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId));
+        if (blocked) {
+            isRecipientOnline = false;
+            recipientLastSeenFormatted = "";
+        } else {
+            isRecipientOnline = user.isUserOnline();
+            recipientLastSeenFormatted = user.getFormattedLastSeen();
+        }
         updatePresenceAndToolbarStatus();
         runOnUiThread(this::updateRecipientHeader);
     }
@@ -2903,17 +3037,24 @@ public class ChatActivity extends AppCompatActivity {
                 if (!isGroupOrChan && !isKnown) {
                     localChat.setRequest(true);
                 }
-                com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(localChat);
+                // Only persist to SQLite immediately for group/channel chats or if messages already exist;
+                // for a brand-new 1:1 direct chat, keep in memory until a message is actually sent or received!
+                if (isGroupOrChan || com.m3.veil.database.EncryptedChatDatabase.getInstance(this).hasAnyMessagesInChat(chatId)) {
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(localChat);
+                }
             } else if (!localChat.isGroup() && recipientName != null && !recipientName.isEmpty()
                     && !recipientName.equals(myOwnName) && !recipientName.equals(localChat.getName())
                     && !"Direct Chat".equals(recipientName) && !"Veil Contact".equals(recipientName)) {
                 localChat.setName(recipientName);
-                com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(localChat);
+                if (com.m3.veil.database.EncryptedChatDatabase.getInstance(this).hasAnyMessagesInChat(chatId)) {
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(localChat);
+                }
             }
             currentLocalChat = localChat;
             runOnUiThread(() -> {
                 if (!isFinishing() && !isDestroyed()) {
                     runOnUiThread(this::updateRecipientHeader);
+                    updateRequestLimitComposerState();
                     updatePresenceAndToolbarStatus();
                 }
             });
@@ -2927,7 +3068,9 @@ public class ChatActivity extends AppCompatActivity {
                 com.m3.veil.model.Chat chat = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
                 if (isFinishing() || isDestroyed()) return;
             if (chat == null) {
-                if (currentLocalChat != null) {
+                // If currentLocalChat is an unsaved empty 1-on-1 chat (0 messages yet), do not finish the activity!
+                boolean hasMessages = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).hasAnyMessagesInChat(chatId);
+                if (currentLocalChat != null && (isGroupChatContext() || hasMessages)) {
                     currentLocalChat = null;
                     runOnUiThread(() -> {
                         if (isFinishing() || isDestroyed()) return;
@@ -2943,7 +3086,7 @@ public class ChatActivity extends AppCompatActivity {
             currentLocalChat = chat;
             long vanishTimer = chat.getVanishTimer();
             String vanishMode = chat.getVanishMode() != null ? chat.getVanishMode() : "after_send";
-            boolean blocked = chat.isBlocked();
+            boolean blocked = chat.isBlocked() || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId));
             String blockedBy = chat.getBlockedBy();
             String myOwnName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
             String localChatName = chat.getName();
@@ -3336,9 +3479,111 @@ public class ChatActivity extends AppCompatActivity {
         sheet.show();
     }
 
+    private boolean isOutboundRequestLimitReached() {
+        if (isGroupChatContext() || chatId == null || currentUserId == null) return false;
+        com.m3.veil.database.EncryptedChatDatabase dbLocal = com.m3.veil.database.EncryptedChatDatabase.getInstance(this);
+        if (dbLocal.isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+            return false;
+        }
+        int sentCount = dbLocal.getOutboundUserMessageCount(chatId, currentUserId);
+        return sentCount >= com.m3.veil.database.EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES;
+    }
+
+    private void updateRequestLimitComposerState() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            runOnUiThread(this::updateRequestLimitComposerState);
+            return;
+        }
+        if (isFinishing() || isDestroyed() || messageEditText == null || sendButton == null) return;
+        boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId));
+        if (blocked) {
+            updateBlockedState(true, currentLocalChat != null ? currentLocalChat.getBlockedBy() : null);
+            return;
+        }
+        boolean isGrp = isGroupChatContext();
+        com.m3.veil.database.EncryptedChatDatabase dbLocal = com.m3.veil.database.EncryptedChatDatabase.getInstance(this);
+        boolean isAccepted = isGrp || dbLocal.isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId);
+        int sentCount = (!isGrp && chatId != null && currentUserId != null)
+                ? dbLocal.getOutboundUserMessageCount(chatId, currentUserId) : 0;
+        boolean limitReached = !isAccepted && sentCount >= com.m3.veil.database.EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES;
+
+        if (btnAudioCall != null) {
+            btnAudioCall.setAlpha(isAccepted ? 1.0f : 0.38f);
+        }
+        if (btnVideoCall != null) {
+            btnVideoCall.setAlpha(isAccepted ? 1.0f : 0.38f);
+        }
+
+        if (limitReached) {
+            if (isRecording) {
+                cancelRecordingUI();
+            }
+            messageEditText.setText("");
+            messageEditText.setEnabled(false);
+            messageEditText.setFocusable(false);
+            messageEditText.setClickable(false);
+            messageEditText.setHint("Request pending (3/3 messages sent). Wait for peer to accept.");
+            sendButton.setEnabled(false);
+            sendButton.setClickable(false);
+            sendButton.setAlpha(0.38f);
+            int[] inputButtons = {
+                    R.id.emojiButton,
+                    R.id.attachmentButton,
+                    R.id.cameraButton,
+                    R.id.chipQuickBlink,
+                    R.id.chipQuickPoll,
+                    R.id.chipQuickDoodle,
+                    R.id.chipQuickVoiceMask,
+                    R.id.chipQuickSmartReply
+            };
+            for (int viewId : inputButtons) {
+                View v = findViewById(viewId);
+                if (v != null) {
+                    v.setEnabled(false);
+                    v.setClickable(false);
+                    v.setAlpha(0.38f);
+                }
+            }
+        } else {
+            messageEditText.setEnabled(true);
+            messageEditText.setFocusable(true);
+            messageEditText.setFocusableInTouchMode(true);
+            messageEditText.setClickable(true);
+            if (!isAccepted && sentCount > 0) {
+                messageEditText.setHint("Message request (" + sentCount + "/" + com.m3.veil.database.EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES + " sent)...");
+            } else if (!isBlinkModeActive) {
+                messageEditText.setHint(R.string.type_message);
+            }
+            sendButton.setEnabled(true);
+            sendButton.setClickable(true);
+            sendButton.setAlpha(1.0f);
+            int[] inputButtons = {
+                    R.id.emojiButton,
+                    R.id.attachmentButton,
+                    R.id.cameraButton,
+                    R.id.chipQuickBlink,
+                    R.id.chipQuickPoll,
+                    R.id.chipQuickDoodle,
+                    R.id.chipQuickVoiceMask,
+                    R.id.chipQuickSmartReply
+            };
+            for (int viewId : inputButtons) {
+                View v = findViewById(viewId);
+                if (v != null) {
+                    v.setEnabled(true);
+                    v.setClickable(true);
+                    v.setAlpha(1.0f);
+                }
+            }
+        }
+    }
+
     private void updateBlockedState(boolean blocked, String blockedBy) {
         if (messageEditText == null || sendButton == null) return;
         if (blocked) {
+            isRecipientOnline = false;
+            isRecipientTypingState = false;
+            recipientLastSeenFormatted = "";
             if (isRecording) {
                 cancelRecordingUI();
             }
@@ -3391,6 +3636,10 @@ public class ChatActivity extends AppCompatActivity {
         if (blocked && layoutSmartReplies != null) {
             layoutSmartReplies.setVisibility(View.GONE);
         }
+        if (!blocked) {
+            updateRequestLimitComposerState();
+        }
+        updatePresenceAndToolbarStatus();
     }
 
     private void insertLocalSystemMessage(String text, String type) {
@@ -3462,8 +3711,19 @@ public class ChatActivity extends AppCompatActivity {
     private void acceptMessageRequest() {
         if (chatId == null) return;
         if (currentLocalChat != null) currentLocalChat.setRequest(false);
+        com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markDirectChatAccepted(chatId, recipientId);
         new Thread(() -> {
             com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).updateChatRequestStatus(chatId, false);
+            // Update Firestore chat/group doc so sender immediately learns request was accepted
+            try {
+                java.util.Map<String, Object> acceptData = new java.util.HashMap<>();
+                acceptData.put("requestAccepted", true);
+                acceptData.put("requestAcceptedAt", System.currentTimeMillis());
+                if (db != null) {
+                    db.collection("groups").document(chatId).set(acceptData, com.google.firebase.firestore.SetOptions.merge());
+                    db.collection("chats").document(chatId).set(acceptData, com.google.firebase.firestore.SetOptions.merge());
+                }
+            } catch (Exception ignored) {}
             // Flush delivery and read receipts to sender for all pending messages now that request is accepted!
             List<Message> allMsgs = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).getMessagesForChat(chatId);
             if (allMsgs != null && recipientId != null && !recipientId.isEmpty()) {
@@ -3474,6 +3734,18 @@ public class ChatActivity extends AppCompatActivity {
                                 .sendReceipt(recipientId, m.getId(), true, canMarkRead);
                         com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this)
                                 .updateMessageStatus(m.getId(), true, canMarkRead, System.currentTimeMillis());
+                        if (db != null && m.getId() != null) {
+                            java.util.Map<String, Object> ack = new java.util.HashMap<>();
+                            ack.put("delivered", true);
+                            if (canMarkRead) {
+                                ack.put("read", true);
+                                ack.put("readAt", System.currentTimeMillis());
+                            }
+                            db.collection("groups").document(chatId).collection("messages").document(m.getId())
+                                    .set(ack, com.google.firebase.firestore.SetOptions.merge());
+                            db.collection("chats").document(chatId).collection("messages").document(m.getId())
+                                    .set(ack, com.google.firebase.firestore.SetOptions.merge());
+                        }
                     }
                 }
             }
@@ -3483,6 +3755,7 @@ public class ChatActivity extends AppCompatActivity {
         }
         if (layoutMessageRequestBanner != null) layoutMessageRequestBanner.setVisibility(View.GONE);
         insertLocalSystemMessage("Message request accepted. You can now chat freely.", "system");
+        updateRequestLimitComposerState();
         updatePresenceAndToolbarStatus();
         Toast.makeText(this, "Message request accepted", Toast.LENGTH_SHORT).show();
     }
@@ -3697,6 +3970,17 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showCallConfirmationDialog(String type) {
+        boolean isGrp = isGroupChatContext();
+        if (!isGrp) {
+            if (isChatBlocked || com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId)) {
+                Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (!com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+                Toast.makeText(this, "Calls are disabled until the chat request is accepted", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
         String peerId = recipientId;
         String name = recipientName;
         String avatar = null;
@@ -3705,7 +3989,9 @@ public class ChatActivity extends AppCompatActivity {
         } else if (currentLocalChat != null && currentLocalChat.getAvatar() != null) {
             avatar = currentLocalChat.getAvatar();
         }
-        boolean isGrp = isGroupChatContext();
+        if (!isGrp) {
+            avatar = com.m3.veil.utils.VeilAvatarLoader.resolvePeerAvatarSource(this, peerId, avatar);
+        }
         com.m3.veil.calling.ui.VeilCallConfirmationDialog.show(
                 this,
                 peerId,
@@ -3719,6 +4005,16 @@ public class ChatActivity extends AppCompatActivity {
 
     private void startCall(String type) {
         boolean isGrp = isGroupChatContext();
+        if (!isGrp) {
+            if (isChatBlocked || com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId)) {
+                Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (!com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+                Toast.makeText(this, "Calls are disabled until the chat request is accepted", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
         String newCallId = UUID.randomUUID().toString();
         Intent intent = new Intent(this, CallActivity.class);
         intent.putExtra(CallActivity.EXTRA_CALL_TYPE, type);
@@ -3928,9 +4224,15 @@ public class ChatActivity extends AppCompatActivity {
             return;
         }
         if (isFinishing() || isDestroyed()) return;
+        boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId));
+        if (blocked) {
+            isRecipientTypingState = false;
+            isRecipientOnline = false;
+            recipientLastSeenFormatted = "";
+        }
         if (messagesAdapter != null) {
-            messagesAdapter.setTyping(isRecipientTypingState);
-            if (isRecipientTypingState && messagesRecyclerView != null) {
+            messagesAdapter.setTyping(!blocked && isRecipientTypingState);
+            if (!blocked && isRecipientTypingState && messagesRecyclerView != null) {
                 messagesRecyclerView.scrollToPosition(messagesAdapter.getItemCount() - 1);
             }
         }
@@ -3946,7 +4248,19 @@ public class ChatActivity extends AppCompatActivity {
         int trust = currentLocalChat != null ? currentLocalChat.getTrustScore() : 10;
         String subPrefix = (currentSubgroupTitle != null ? "#" + currentSubgroupTitle + " • " : "");
 
-        if (isRecipientTypingState) {
+        if (blocked) {
+            onlineStatus.setText("Blocked");
+            onlineStatus.setTextColor(getResources().getColor(R.color.text_secondary));
+            if (ivStatusDot != null) ivStatusDot.setVisibility(View.GONE);
+            if (ivLockIcon != null) ivLockIcon.setVisibility(View.VISIBLE);
+            return;
+        }
+
+        boolean isUnacceptedDirect = !isGroupChatContext()
+                && ((currentLocalChat != null && currentLocalChat.isRequest())
+                || !com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId));
+
+        if (!isUnacceptedDirect && isRecipientTypingState) {
             onlineStatus.setText(subPrefix + "typing...");
             onlineStatus.setTextColor(getResources().getColor(R.color.veil_accent));
             if (ivStatusDot != null) ivStatusDot.setVisibility(View.GONE);
@@ -3990,8 +4304,8 @@ public class ChatActivity extends AppCompatActivity {
             onlineStatus.setTextColor(getResources().getColor(connectedPeers > 0 ? R.color.statusSuccess : R.color.text_secondary));
             if (ivStatusDot != null) ivStatusDot.setVisibility(connectedPeers > 0 ? View.VISIBLE : View.GONE);
             if (ivLockIcon != null) ivLockIcon.setVisibility(connectedPeers > 0 ? View.GONE : View.VISIBLE);
-        } else if (currentLocalChat != null && currentLocalChat.isRequest()) {
-            // For unaccepted message requests: sender must NOT see online status, direct status, or green dot
+        } else if (isUnacceptedDirect) {
+            // For unaccepted message requests: neither sender nor receiver sees online status, direct status, or green dot
             onlineStatus.setText(subPrefix + "Message request pending • Trust " + trust + "%");
             onlineStatus.setTextColor(getResources().getColor(R.color.text_secondary));
             if (ivStatusDot != null) ivStatusDot.setVisibility(View.GONE);
@@ -6362,7 +6676,14 @@ public class ChatActivity extends AppCompatActivity {
 
     private void setupClickListeners() {
         sendButton.setOnTouchListener((v, event) -> {
-            if (isChatBlocked) return true;
+            if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId))) return true;
+            if (isOutboundRequestLimitReached()) {
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    Toast.makeText(ChatActivity.this, "You can only send up to 3 messages until the chat request is accepted", Toast.LENGTH_SHORT).show();
+                    updateRequestLimitComposerState();
+                }
+                return true;
+            }
             String text = messageEditText.getText().toString().trim();
             if (!text.isEmpty()) {
                 if (event.getAction() == MotionEvent.ACTION_DOWN) {
@@ -6554,11 +6875,22 @@ public class ChatActivity extends AppCompatActivity {
     private long lastGroupSlowModeSentMs = 0L;
 
     private void sendMessage() {
-        if (isChatBlocked) return;
+        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+            Toast.makeText(this, "Cannot send messages to a blocked user", Toast.LENGTH_SHORT).show();
+            return;
+        }
         String text = messageEditText.getText().toString().trim();
         if (text.isEmpty()) return;
         if (currentLocalChat != null && currentLocalChat.isRequest()) {
-            acceptMessageRequest();
+            boolean hasInboundFromPeer = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getInboundUserMessageCount(chatId, currentUserId) > 0;
+            if (hasInboundFromPeer) {
+                acceptMessageRequest();
+            }
+        }
+        if (isOutboundRequestLimitReached()) {
+            Toast.makeText(this, "You can only send up to 3 messages until the chat request is accepted", Toast.LENGTH_SHORT).show();
+            updateRequestLimitComposerState();
+            return;
         }
 
         if (isGroupChatContext() && chatId != null) {
@@ -6644,6 +6976,7 @@ public class ChatActivity extends AppCompatActivity {
 
         // Route through application-wide VeilMessagesController (optimistic UI + ratcheted encryption + outbox)
         com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, isGroupChatContext() ? null : recipientId, message);
+        updateRequestLimitComposerState();
     }
 
     private void listenForMessages() {
@@ -6998,8 +7331,10 @@ public class ChatActivity extends AppCompatActivity {
         if (docs == null || docs.isEmpty()) return;
         final boolean hasFocusNow = hasWindowFocus();
         dbExecutor.execute(() -> {
-            if (chatId == null || isChatBlocked) return;
+            if (chatId == null || isChatBlocked || com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId)) return;
             boolean changed = false;
+            boolean isDirectAccepted = isGroupChatContext()
+                    || com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId);
             android.content.SharedPreferences privacyPrefs = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE);
             boolean sendReadReceipt = privacyPrefs.getBoolean("read_receipts_enabled", true);
             boolean isChatActiveInFg = isActivityResumed && isChatUnlocked() && sendReadReceipt && chatId.equals(
@@ -7028,8 +7363,8 @@ public class ChatActivity extends AppCompatActivity {
                     String thumbnail = mDoc.getString("thumbnail");
                     boolean isEdited = VeilFirestoreUtils.getSafeBoolean(mDoc, "edited", false);
                     Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", Timestamp.now());
-                    boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
-                    boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
+                    boolean docDelivered = isDirectAccepted && VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
+                    boolean docRead = isDirectAccepted && VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
 
                     Message existing = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).getMessageById(mId);
                     boolean isFromMe = isSenderMe(sId, existing);
@@ -7058,12 +7393,17 @@ public class ChatActivity extends AppCompatActivity {
                                 existing.setPending(false);
                                 statusChanged = true;
                             }
-                            if (!existing.isDelivered() && (docDelivered || docRead)) {
+                            if (!isDirectAccepted && (existing.isDelivered() || existing.isRead())) {
+                                existing.setDelivered(false);
+                                existing.setRead(false);
+                                statusChanged = true;
+                            }
+                            if (isDirectAccepted && !existing.isDelivered() && (docDelivered || docRead)) {
                                 existing.setDelivered(true);
                                 existing.setPending(false);
                                 statusChanged = true;
                             }
-                            if (docRead && !existing.isRead()) {
+                            if (isDirectAccepted && docRead && !existing.isRead()) {
                                 existing.setRead(true);
                                 existing.setDelivered(true);
                                 existing.setPending(false);
@@ -7118,8 +7458,18 @@ public class ChatActivity extends AppCompatActivity {
                             changed = true;
                         }
                     } else {
+                        // Incoming message from peer: mark direct chat accepted if we had previously sent a request
+                        com.m3.veil.database.EncryptedChatDatabase dbInst = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this);
+                        if (dbInst.getOutboundUserMessageCount(chatId, currentUserId) > 0) {
+                            dbInst.markDirectChatAccepted(chatId, sId != null ? sId : recipientId);
+                            isDirectAccepted = true;
+                        }
+                        boolean isReq = currentLocalChat != null && currentLocalChat.isRequest();
+                        if (isReq && existing == null && dbInst.getInboundUserMessageCount(chatId, currentUserId) >= com.m3.veil.database.EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES) {
+                            continue;
+                        }
                         boolean isMediaAction = Message.isMediaRequiringActionToRead(mType);
-                        boolean shouldMarkReadNow = isChatActiveInFg && hasFocusNow && !isMediaAction;
+                        boolean shouldMarkReadNow = !isReq && isChatActiveInFg && hasFocusNow && !isMediaAction;
                         if (existing == null) {
                             boolean fromMe = isSenderMe(sId, null);
                             Message m = new Message(
@@ -7143,12 +7493,14 @@ public class ChatActivity extends AppCompatActivity {
                                         ChatActivity.this, chatId, m, this::reloadMessagesFromLocalVault);
                             }
                             if (isEdited) m.setEdited(true);
-                            boolean isReq = currentLocalChat != null && currentLocalChat.isRequest();
                             m.setDelivered(!isReq);
                             m.setPending(false);
                             m.setRead(!isReq && shouldMarkReadNow);
 
-                            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveMessage(chatId, m);
+                            if (currentLocalChat != null) {
+                                dbInst.saveOrUpdateChat(currentLocalChat);
+                            }
+                            dbInst.saveMessage(chatId, m);
 
                             if (!isReq) {
                                 Map<String, Object> ack = new HashMap<>();
@@ -7185,8 +7537,8 @@ public class ChatActivity extends AppCompatActivity {
                                         .updateMessageText(chatId, mId, mText);
                                 changed = true;
                             }
-                            boolean isReq = currentLocalChat != null && currentLocalChat.isRequest();
-                            if (!isReq && shouldMarkReadNow && !existing.isRead()) {
+                            boolean isReqExisting = currentLocalChat != null && currentLocalChat.isRequest();
+                            if (!isReqExisting && shouldMarkReadNow && !existing.isRead()) {
                                 existing.setRead(true);
                                 existing.setDelivered(true);
                                 com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this)
@@ -7234,6 +7586,7 @@ public class ChatActivity extends AppCompatActivity {
 
     private void sendReadReceiptsForUnreadMessages() {
         if (!isActivityResumed || chatId == null || !isChatUnlocked()) return;
+        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) return;
         if (currentLocalChat != null && currentLocalChat.isRequest()) return;
         long now = System.currentTimeMillis();
         if (now - lastReadReceiptSweepMs < 1200L) return;
@@ -7583,6 +7936,7 @@ public class ChatActivity extends AppCompatActivity {
                 }
                  updateSmartReplySuggestions(lastIncoming);
                  initMessageRequestBanner();
+                 updateRequestLimitComposerState();
             });
         });
     }
@@ -7690,6 +8044,10 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showVanishTimerDialog() {
+        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+            Toast.makeText(this, "Cannot change disappearing messages while user is blocked", Toast.LENGTH_SHORT).show();
+            return;
+        }
         String[] options = {"Off", "10 seconds", "1 minute", "1 hour", "24 hours", "7 days", "30 days"};
         long[] times = {0, 10000, 60000, 3600000, 86400000L, 604800000L, 2592000000L};
 
@@ -7770,6 +8128,9 @@ public class ChatActivity extends AppCompatActivity {
             card.addView(row);
             card.setOnClickListener(v -> {
                 sheet.dismiss();
+                if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+                    return;
+                }
                 currentVanishTimer = selectedTimer;
                 if (selectedTimer == 0) {
                     currentVanishMode = "off";
@@ -7797,6 +8158,9 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showVanishModePickerSubDialog(long selectedTimer) {
+        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+            return;
+        }
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         sheet.setContentView(R.layout.dialog_vanish_mode_sheet);
 
@@ -7833,6 +8197,9 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void commitVanishSettings(String modeLabel) {
+        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) {
+            return;
+        }
         if (currentLocalChat != null) {
             currentLocalChat.setVanishTimer(currentVanishTimer);
             currentLocalChat.setVanishMode(currentVanishMode);
@@ -8272,7 +8639,12 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showCreateInlinePollDialog() {
-        if (isChatBlocked) return;
+        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) return;
+        if (isOutboundRequestLimitReached()) {
+            Toast.makeText(this, "You can only send up to 3 messages until the chat request is accepted", Toast.LENGTH_SHORT).show();
+            updateRequestLimitComposerState();
+            return;
+        }
         if (isGroupChatContext() && chatId != null) {
             boolean isAdmin = currentLocalChat == null || currentUserId == null || currentLocalChat.isAdmin(currentUserId);
             if (!isAdmin) {
@@ -8434,6 +8806,7 @@ public class ChatActivity extends AppCompatActivity {
                     pollMsg.setExpiresAt(new Timestamp(new Date(expiresMillis)));
                 }
                 com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(currentLocalChat, isGroupChatContext() ? null : recipientId, pollMsg);
+                updateRequestLimitComposerState();
                 reloadMessagesFromLocalVault();
                 sheet.dismiss();
             } catch (Exception ignored) {}
@@ -8628,7 +9001,12 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showDoodlePadDialog() {
-        if (isChatBlocked) return;
+        if (isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId))) return;
+        if (isOutboundRequestLimitReached()) {
+            Toast.makeText(this, "You can only send up to 3 messages until the chat request is accepted", Toast.LENGTH_SHORT).show();
+            updateRequestLimitComposerState();
+            return;
+        }
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         float dp = getResources().getDisplayMetrics().density;
 
@@ -10352,6 +10730,11 @@ public class ChatActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (chatId != null && !isGroupChatContext()) {
+            try {
+                com.m3.veil.database.EncryptedChatDatabase.getInstance(this).deleteEmptyDirectChatIfNoMessages(chatId);
+            } catch (Exception ignored) {}
+        }
         try {
             CallEngine.getInstance(this).removeListener(chatCallEngineListener);
         } catch (Throwable ignored) {}

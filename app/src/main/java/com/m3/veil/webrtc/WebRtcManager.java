@@ -1083,17 +1083,28 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                return;
             }
 
+            String directChatIdForPeer = getChatId(this.currentUserId, peerId);
+            EncryptedChatDatabase fastDb = EncryptedChatDatabase.getInstance(this.context);
+            boolean isBlockedPeer = peerId != null && fastDb.isPeerOrChatBlocked(directChatIdForPeer, peerId);
+
             if (packetType == 2) {
                return;
             }
 
             if (packetType == 3) {
+               if (isBlockedPeer) {
+                  return;
+               }
+               Chat dc = fastDb.getChat(directChatIdForPeer);
+               if (dc != null && dc.isRequest()) {
+                  return;
+               }
                byte[] p = packet.getPayload();
                boolean isTyping = p != null && p.length > 0 && p[0] == 1;
                this.peerTypingStates.put(peerId, isTyping);
                if (this.currentUserId != null && peerId != null) {
                   com.m3.veil.manager.VeilMessagesController.getInstance(this.context)
-                          .onPeerTypingInDialog(getChatId(this.currentUserId, peerId), peerId, isTyping);
+                          .onPeerTypingInDialog(directChatIdForPeer, peerId, isTyping);
                }
                this.mainHandler.post(() -> {
                   for(P2PEventListener l : WebRtcManager.this.listeners) {
@@ -1105,6 +1116,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             }
 
             if (packetType == 4) {
+               if (isBlockedPeer || !fastDb.isDirectChatAcceptedByPeer(directChatIdForPeer, this.currentUserId, peerId)) {
+                  return;
+               }
                String payloadStr = packet.getPayloadAsString();
                String messageId = payloadStr;
 
@@ -1117,7 +1131,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                }
 
                final String finalDeliveredId = messageId;
-               EncryptedChatDatabase.getInstance(this.context).updateMessageStatus(finalDeliveredId, true, false);
+               fastDb.updateMessageStatus(finalDeliveredId, true, false);
                VeilMeshDaemonService.getInstance(this.context).onDeliveredAckReceived(finalDeliveredId);
                this.mainHandler.post(() -> {
                   for(P2PEventListener l : WebRtcManager.this.listeners) {
@@ -1136,7 +1150,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   if (payloadStr.startsWith("{")) {
                      JSONObject j = new JSONObject(payloadStr);
                      if ("status_viewed".equals(j.optString("type"))) {
-                        StatusController.getInstance(this.context).onInboundViewReceipt(peerId, j);
+                        if (!isBlockedPeer) {
+                           StatusController.getInstance(this.context).onInboundViewReceipt(peerId, j);
+                        }
                         return;
                      }
 
@@ -1145,8 +1161,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                } catch (Exception var9) {
                }
 
+               if (isBlockedPeer || !fastDb.isDirectChatAcceptedByPeer(directChatIdForPeer, this.currentUserId, peerId)) {
+                  return;
+               }
+
                final String finalReadId = messageId;
-               EncryptedChatDatabase.getInstance(this.context).updateMessageStatus(finalReadId, true, true);
+               fastDb.updateMessageStatus(finalReadId, true, true);
                this.mainHandler.post(() -> {
                   for(P2PEventListener l : WebRtcManager.this.listeners) {
                      l.onMessageStatusChanged(finalReadId, true, true);
@@ -1157,9 +1177,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             }
 
             if (packetType == 6) {
+               if (isBlockedPeer || !fastDb.isDirectChatAcceptedByPeer(directChatIdForPeer, this.currentUserId, peerId)) {
+                  return;
+               }
                String messageId = packet.getPayloadAsString();
-               String chatId = getChatId(this.currentUserId, peerId);
-               EncryptedChatDatabase.getInstance(this.context).markBlinkMessageViewed(chatId, messageId);
+               String chatId = directChatIdForPeer;
+               fastDb.markBlinkMessageViewed(chatId, messageId);
                this.mainHandler.post(() -> {
                   for(P2PEventListener l : WebRtcManager.this.listeners) {
                      l.onMessageStatusChanged(messageId, true, true);
@@ -1174,6 +1197,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             if (lane != 3 && packetType != 769 && packetType != 770 && packetType != 775) {
                this.processInboundPayload(peerId, packet.getPayloadAsString());
             } else if (packetType == 775) {
+               if (peerId != null && EncryptedChatDatabase.getInstance(this.context).isPeerOrChatBlocked(null, peerId)) {
+                  return;
+               }
                try {
                   StatusController.getInstance(this.context).onInboundStatusGossipPacket(peerId, packet.getPayload());
                } catch (Throwable var10) {
@@ -1184,11 +1210,25 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                VeilMeshDaemonService.getInstance(this.context).handleMeshPacket(peerId, packet);
             }
          } else {
+            String directChatIdForPeer = getChatId(this.currentUserId, peerId);
+            EncryptedChatDatabase fDb = EncryptedChatDatabase.getInstance(this.context);
+            if (fDb.isPeerOrChatBlocked(directChatIdForPeer, peerId)) {
+               return;
+            }
             P2PFileTransferHelper.handleIncomingPacket(this.context, peerId, packet, (transferId, fileName, mediaType, caption, file) -> {
                Message existing = EncryptedChatDatabase.getInstance(this.context).getMessageById(transferId);
                String chatId = (existing != null && existing.getChatId() != null && !existing.getChatId().isEmpty())
                        ? existing.getChatId()
                        : getChatId(this.currentUserId, peerId);
+               EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(this.context, chatId, peerId);
+               if (targetDb.isPeerOrChatBlocked(chatId, peerId)) {
+                  return;
+               }
+               Chat curChat = targetDb.getChat(chatId);
+               boolean isPendingReq = curChat != null && !curChat.isGroupChat() && curChat.isRequest();
+               if (existing == null && isPendingReq && targetDb.getInboundUserMessageCount(chatId, peerId) >= EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES) {
+                  return;
+               }
                String messageContent = caption != null && !caption.trim().isEmpty() ? caption.trim() : fileName;
                Message fileMsg = existing != null ? existing : new Message(transferId, peerId, this.currentUserId, messageContent, Timestamp.now(), mediaType);
                fileMsg.setChatId(chatId);
@@ -1262,14 +1302,16 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   } catch (Exception ignored) {}
                }
 
-               EncryptedChatDatabase.getDatabaseForTarget(this.context, chatId, peerId).saveMessage(chatId, fileMsg);
+               targetDb.saveMessage(chatId, fileMsg);
                if (allowAutoSave) {
                   try {
                      com.m3.veil.manager.VeilMessagesController.getInstance(this.context)
                              .notifyGlobalMediaTransferProgress(chatId, transferId, 100);
                   } catch (Throwable ignored) {}
                }
-               this.sendReceipt(peerId, transferId, true, false);
+               if (!isPendingReq) {
+                  this.sendReceipt(peerId, transferId, true, false);
+               }
                this.mainHandler.post(() -> {
                   for(P2PEventListener l : WebRtcManager.this.listeners) {
                      l.onMessageReceived(peerId, fileMsg);
@@ -1380,17 +1422,36 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             long expiresAt = p.optLong("expiresAt", 0L);
 
             EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(this.context, chatId, peerId);
-            if (targetDb.isChatBlocked(chatId) || (peerId != null && targetDb.isChatBlocked(peerId))) {
+            if (targetDb.isPeerOrChatBlocked(chatId, peerId)) {
                return;
             }
             Message existingMsg = targetDb.getMessageById(msgId);
             if (existingMsg != null) {
-               this.sendReceipt(peerId, msgId, true, existingMsg.isRead());
+               Chat existingChatForAck = targetDb.getChat(chatId);
+               if (existingChatForAck == null || !existingChatForAck.isRequest()) {
+                  this.sendReceipt(peerId, msgId, true, existingMsg.isRead());
+               }
                return;
             }
 
             boolean isGroup = p.optBoolean("isGroup", false)
                     || (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_")));
+            Chat existingChat = targetDb.getChat(chatId);
+            if (!isGroup && !"system".equalsIgnoreCase(msgType)) {
+               boolean willBeRequest = false;
+               if (existingChat == null) {
+                  boolean isKnown = isKnownPeerOrContact(peerId, senderName);
+                  String whoCanMessage = this.context.getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
+                          .getString("privacy_who_can_message", "everyone");
+                  willBeRequest = "nobody".equalsIgnoreCase(whoCanMessage) || !isKnown;
+               } else {
+                  willBeRequest = existingChat.isRequest() || !hasAcceptedOrRepliedInChat(targetDb, chatId);
+               }
+               if (willBeRequest && targetDb.getInboundUserMessageCount(chatId, peerId) >= EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES) {
+                  return;
+               }
+            }
+
             List<String> incomingParts = new ArrayList<>();
             JSONArray partsArr = p.optJSONArray("participants");
             if (partsArr != null) {
@@ -1417,7 +1478,6 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                incomingParts.add(peerId);
             }
 
-            Chat existingChat = targetDb.getChat(chatId);
             String myOwnPersonaName = VeilFeatureManager.getInstance(this.context).getActivePersona().getDisplayName();
             if (existingChat == null) {
                String defaultName = isGroup ? "Encrypted Group" : (senderName != null && !senderName.isEmpty() ? senderName : "Peer " + peerId.substring(0, Math.min(5, peerId.length())));
@@ -1487,7 +1547,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             if (p.has("senderUsername")) {
                message.setSenderUsername(p.optString("senderUsername", null));
             }
-            message.setDelivered(true);
+            Chat activeChatState = targetDb.getChat(chatId);
+            boolean isPendingRequest = activeChatState != null && !activeChatState.isGroupChat() && activeChatState.isRequest();
+            message.setDelivered(!isPendingRequest);
             message.setRead(false);
             message.setReplyToMessageId(replyId);
             message.setReplySenderName(replyName);
@@ -1527,11 +1589,6 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             targetDb.saveMessage(chatId, message);
 
             // Suppress double-tick delivery receipt for incoming message requests until accepted
-            boolean isPendingRequest = false;
-            Chat activeChatState = targetDb.getChat(chatId);
-            if (activeChatState != null && activeChatState.isRequest()) {
-               isPendingRequest = true;
-            }
             if (!isPendingRequest) {
                this.sendReceipt(peerId, msgId, true, false);
             }
@@ -1544,16 +1601,21 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             });
          } else if ("receipt".equals(type)) {
             String messageId = json.getString("messageId");
+            String receiptChatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
+            EncryptedChatDatabase rDb = EncryptedChatDatabase.getDatabaseForTarget(this.context, receiptChatId, peerId);
+            boolean isGroupReceipt = receiptChatId != null && (receiptChatId.startsWith("group_") || receiptChatId.startsWith("channel_") || receiptChatId.startsWith("lounge_"));
+            if (rDb.isPeerOrChatBlocked(receiptChatId, peerId)
+                    || (!isGroupReceipt && !rDb.isDirectChatAcceptedByPeer(receiptChatId, this.currentUserId, peerId))) {
+               return;
+            }
             boolean delivered = json.optBoolean("delivered", false);
             boolean read = json.optBoolean("read", false);
             long readAt = json.optLong("readAt", System.currentTimeMillis());
             boolean blinkOpened = json.optBoolean("blinkOpened", false);
             if (blinkOpened) {
-               String chatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
-               EncryptedChatDatabase.getDatabaseForTarget(this.context, chatId, peerId).markBlinkMessageViewed(chatId, messageId);
+               rDb.markBlinkMessageViewed(receiptChatId, messageId);
             } else {
-               String receiptChatId = json.optString("chatId", null);
-               EncryptedChatDatabase.getDatabaseForTarget(this.context, receiptChatId, peerId).updateMessageStatus(messageId, delivered, read, readAt);
+               rDb.updateMessageStatus(messageId, delivered, read, readAt);
                if (delivered) {
                   VeilMeshDaemonService.getInstance(this.context).onDeliveredAckReceived(messageId);
                }
@@ -1568,6 +1630,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          } else if ("chat_read".equals(type)) {
             long readAt = json.optLong("readAt", System.currentTimeMillis());
             String targetChatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
+            EncryptedChatDatabase rDb = EncryptedChatDatabase.getDatabaseForTarget(this.context, targetChatId, peerId);
+            boolean isGroupRead = targetChatId != null && (targetChatId.startsWith("group_") || targetChatId.startsWith("channel_") || targetChatId.startsWith("lounge_"));
+            if (rDb.isPeerOrChatBlocked(targetChatId, peerId)
+                    || (!isGroupRead && !rDb.isDirectChatAcceptedByPeer(targetChatId, this.currentUserId, peerId))) {
+               return;
+            }
             // Watermark: newest of MY messages (timestamped by my own clock) that the peer actually has.
             // Legacy builds don't send it -> only already-delivered, non-pending messages up to readAt qualify.
             long readUpTo = json.optLong("readUpTo", readAt);
@@ -1579,7 +1647,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   if (rid != null && !rid.isEmpty()) explicitIds.add(rid);
                }
             }
-            final List<String> updatedReadIds = EncryptedChatDatabase.getDatabaseForTarget(this.context, targetChatId, peerId)
+            final List<String> updatedReadIds = rDb
                     .markOutboundMessagesReadUpTo(targetChatId, readUpTo, explicitIds, readAt);
             if (!updatedReadIds.isEmpty()) {
                this.mainHandler.post(() -> {
@@ -1591,21 +1659,55 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                });
             }
          } else if ("status_viewed".equals(type)) {
+            if (EncryptedChatDatabase.getInstance(this.context).isPeerOrChatBlocked(null, peerId)) {
+               return;
+            }
             String statusId = json.optString("statusId");
             String viewerId = json.optString("viewerId", peerId);
             String viewerName = json.optString("viewerName", "Anonymous Peer");
             String avatarUrl = json.optString("avatarUrl", "");
             VeilFeatureManager.getInstance(this.context).recordStatusView(statusId, viewerId, viewerName, avatarUrl);
+            try {
+               com.m3.veil.manager.StatusController.getInstance(this.context).onInboundViewReceipt(peerId, json);
+            } catch (Throwable ignored) {}
          } else if ("status_post".equals(type)) {
             String id = json.optString("id");
             String authorId = json.optString("authorId", peerId);
+            if (EncryptedChatDatabase.getInstance(this.context).isPeerOrChatBlocked(null, authorId)) {
+               return;
+            }
             String authorName = json.optString("authorName", "Anonymous Peer");
             String contentText = json.optString("contentText", "");
             String mediaUri = json.optString("mediaUri", "");
             String bgColorHex = json.optString("bgColorHex", "#008069");
             int fontStyle = json.optInt("fontStyleIndex", 0);
             long timestamp = json.optLong("timestamp", System.currentTimeMillis());
-            VeilFeatureManager.getInstance(this.context).addPeerStatus(id, authorId, authorName, contentText, mediaUri, bgColorHex, fontStyle, timestamp);
+            String audienceType = json.optString("audienceType", "");
+            String privacyAcl = json.optString("privacyAcl", "");
+            List<String> allowedList = new ArrayList<>();
+            JSONArray allowArr = json.optJSONArray("allowedPeerIds");
+            if (allowArr != null) {
+               for (int i = 0; i < allowArr.length(); i++) {
+                  String s = allowArr.optString(i);
+                  if (s != null && !s.isEmpty()) allowedList.add(s);
+               }
+            }
+            List<String> excludedList = new ArrayList<>();
+            JSONArray exclArr = json.optJSONArray("excludedPeerIds");
+            if (exclArr != null) {
+               for (int i = 0; i < exclArr.length(); i++) {
+                  String s = exclArr.optString(i);
+                  if (s != null && !s.isEmpty()) excludedList.add(s);
+               }
+            }
+            boolean allowedForMe = true;
+            try {
+               allowedForMe = com.m3.veil.manager.StatusController.getInstance(this.context)
+                       .isPeerStatusAllowedForMe(authorId, audienceType, privacyAcl, allowedList, excludedList);
+            } catch (Throwable ignored) {}
+            if (allowedForMe) {
+               VeilFeatureManager.getInstance(this.context).addPeerStatus(id, authorId, authorName, contentText, mediaUri, bgColorHex, fontStyle, timestamp);
+            }
          } else if ("status_delete".equals(type)) {
             String statusId = json.optString("statusId");
             String authorId = json.optString("authorId", peerId);
@@ -1620,6 +1722,16 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                String typingChatId = json.optString("chatId", null);
                String senderPeer = json.optString("senderId", peerId);
                final String effectivePeer = (senderPeer != null && !senderPeer.isEmpty()) ? senderPeer : peerId;
+               EncryptedChatDatabase tDb = EncryptedChatDatabase.getInstance(this.context);
+               String checkTypingChatId = (typingChatId != null && !typingChatId.isEmpty())
+                       ? typingChatId : getChatId(this.currentUserId, effectivePeer);
+               if (tDb.isPeerOrChatBlocked(checkTypingChatId, effectivePeer)) {
+                  return;
+               }
+               Chat tChat = checkTypingChatId != null ? tDb.getChat(checkTypingChatId) : null;
+               if (tChat != null && !tChat.isGroupChat() && tChat.isRequest()) {
+                  return;
+               }
                if (effectivePeer != null) {
                   this.peerTypingStates.put(effectivePeer, isTyping);
                }
@@ -1636,17 +1748,20 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                });
             } else if ("reaction".equals(type)) {
                String chatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
+               if (EncryptedChatDatabase.getInstance(this.context).isPeerOrChatBlocked(chatId, peerId)) return;
                String messageId = json.getString("messageId");
                String reactorId = json.optString("userId", peerId);
                String emoji = json.optString("emoji", "");
                EncryptedChatDatabase.getInstance(this.context).updateMessageReaction(chatId, messageId, reactorId, emoji);
             } else if ("edit_msg".equals(type)) {
                String chatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
+               if (EncryptedChatDatabase.getInstance(this.context).isPeerOrChatBlocked(chatId, peerId)) return;
                String messageId = json.getString("messageId");
                String newText = json.optString("newText", "");
                EncryptedChatDatabase.getInstance(this.context).updateMessageText(chatId, messageId, newText);
             } else if ("delete_msg".equals(type)) {
                String chatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
+               if (EncryptedChatDatabase.getInstance(this.context).isPeerOrChatBlocked(chatId, peerId)) return;
                String messageId = json.getString("messageId");
                EncryptedChatDatabase.getInstance(this.context).markMessageDeletedForEveryone(chatId, messageId);
             } else if ("delete_conversation".equals(type)) {
@@ -1672,13 +1787,18 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                }
             } else if ("poll_vote".equals(type)) {
                String chatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
+               if (EncryptedChatDatabase.getInstance(this.context).isPeerOrChatBlocked(chatId, peerId)) return;
                String messageId = json.getString("messageId");
                String pollJson = json.optString("pollJson", "");
                EncryptedChatDatabase.getInstance(this.context).updateMessagePollJson(chatId, messageId, pollJson);
             } else if ("chat_setting".equals(type)) {
                String chatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
+               EncryptedChatDatabase csDb = EncryptedChatDatabase.getInstance(this.context);
+               if (csDb.isPeerOrChatBlocked(chatId, peerId)) {
+                  return;
+               }
                String setting = json.optString("setting");
-               Chat chat = EncryptedChatDatabase.getInstance(this.context).getChat(chatId);
+               Chat chat = csDb.getChat(chatId);
                if ("group_invite".equals(setting) || "group_update".equals(setting)) {
                   String gName = json.optString("groupName", chat != null ? chat.getName() : "Encrypted Group");
                   String gType = json.optString("groupType", chat != null ? chat.getType() : "group");
@@ -1720,14 +1840,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   if (json.has("isPublic")) gChat.setPublic(json.optBoolean("isPublic", false));
                   String handle = json.optString("handle", null);
                   if (handle != null && !handle.isEmpty()) gChat.setHandle(handle);
-                  EncryptedChatDatabase.getInstance(this.context).saveOrUpdateChat(gChat);
-               } else if (chat != null) {
+                  csDb.saveOrUpdateChat(gChat);
+               } else if (chat != null && !chat.isBlocked()) {
                   if ("vanish".equals(setting)) {
                      String vMode = json.optString("vanishMode", "off");
                      long vTimer = json.optLong("vanishTimer", 0L);
                      chat.setVanishMode(vMode);
                      chat.setVanishTimer(vTimer);
-                     EncryptedChatDatabase.getInstance(this.context).saveOrUpdateChat(chat);
+                     csDb.saveOrUpdateChat(chat);
 
                      String senderPeerName = chat.getName();
                      if (senderPeerName == null || senderPeerName.trim().isEmpty() || "Direct Chat".equals(senderPeerName)) {
@@ -1747,7 +1867,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      sysMsg.setText(sysText);
                      sysMsg.setType("action_vanish");
                      sysMsg.setTimestamp(Timestamp.now());
-                     EncryptedChatDatabase.getInstance(this.context).saveMessage(chatId, sysMsg);
+                     csDb.saveMessage(chatId, sysMsg);
 
                      this.mainHandler.post(() -> {
                         for (P2PEventListener l : WebRtcManager.this.listeners) {
@@ -1757,21 +1877,21 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   } else if ("pin_msg".equals(setting)) {
                      String unpinnedId = json.optString("unpinnedMsgId", (String) null);
                      if (unpinnedId != null && !unpinnedId.isEmpty()) {
-                        EncryptedChatDatabase.getInstance(this.context).updateMessagePinStatus(chatId, unpinnedId, false);
+                        csDb.updateMessagePinStatus(chatId, unpinnedId, false);
                      }
                      String incomingPinId = json.optString("msgId", (String) null);
                      String incomingPinText = json.optString("msgText", (String) null);
                      if (incomingPinId != null && !incomingPinId.isEmpty()) {
-                        EncryptedChatDatabase.getInstance(this.context).updateMessagePinStatus(chatId, incomingPinId, true);
-                        EncryptedChatDatabase.getInstance(this.context).updateChatPinnedMessage(chatId, incomingPinId, incomingPinText);
+                        csDb.updateMessagePinStatus(chatId, incomingPinId, true);
+                        csDb.updateChatPinnedMessage(chatId, incomingPinId, incomingPinText);
                      } else {
-                        EncryptedChatDatabase.getInstance(this.context).unpinAllMessagesInChat(chatId);
+                        csDb.unpinAllMessagesInChat(chatId);
                      }
                   } else if ("theme_wallpaper".equals(setting)) {
                      String hex = json.optString("themeColorHex", "");
                      if (!hex.isEmpty()) {
                         chat.setThemeColorHex(hex);
-                        EncryptedChatDatabase.getInstance(this.context).saveOrUpdateChat(chat);
+                        csDb.saveOrUpdateChat(chat);
                         this.context.getSharedPreferences("VeilChatSpecificPrefs", Context.MODE_PRIVATE)
                                 .edit()
                                 .putString("wallpaper_" + chatId, hex)
@@ -1841,11 +1961,21 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             } else if ("request_accepted".equals(type) || ("control".equals(type) && "request_accepted".equals(json.optString("action")))) {
                String targetChatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
                EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(this.context, targetChatId, peerId);
+               targetDb.markDirectChatAccepted(targetChatId, peerId);
                targetDb.updateChatRequestStatus(targetChatId, false);
                Chat c = targetDb.getChat(targetChatId);
                if (c != null) {
                    c.setRequest(false);
                    targetDb.saveOrUpdateChat(c);
+               }
+               List<Message> existingMsgs = targetDb.getMessagesForChat(targetChatId);
+               if (existingMsgs != null) {
+                   for (Message em : existingMsgs) {
+                       if (em != null && em.getId() != null && this.currentUserId != null
+                               && this.currentUserId.equals(em.getSenderId()) && !em.isDelivered()) {
+                           targetDb.updateMessageStatus(em.getId(), true, em.isRead());
+                       }
+                   }
                }
                Message sysMsg = new Message(
                        "sys_req_acc_" + System.currentTimeMillis(),
@@ -1878,7 +2008,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   boolean isVideo = json.optBoolean("isVideo", false);
                   String callTypeStr = isVideo ? "video" : "audio";
                   if ("invite".equals(action)) {
-                     if (EncryptedChatDatabase.getInstance(this.context).isChatBlocked(peerId)) {
+                     String directCId = getChatId(this.currentUserId, peerId);
+                     EncryptedChatDatabase cDb = EncryptedChatDatabase.getInstance(this.context);
+                     Chat cObj = directCId != null ? cDb.getChat(directCId) : null;
+                     if (cDb.isPeerOrChatBlocked(directCId, peerId)
+                             || (cObj != null && cObj.isRequest())
+                             || !cDb.isDirectChatAcceptedByPeer(directCId, this.currentUserId, peerId)) {
                         return;
                      }
                      this.onCallInviteReceived(peerId, callId, callerName, callTypeStr);
@@ -1892,18 +2027,31 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      this.onCallEndReceived(peerId, callId);
                   }
                } else {
+                  String directCId = getChatId(this.currentUserId, peerId);
+                  if (EncryptedChatDatabase.getInstance(this.context).isPeerOrChatBlocked(directCId, peerId)) {
+                     return;
+                  }
                   P2PFileTransferHelper.handleIncomingPayload(this.context, payload, (transferId, fileName, mediaType, caption, file) -> {
                      Message existing = EncryptedChatDatabase.getInstance(this.context).getMessageById(transferId);
                      String chatId = (existing != null && existing.getChatId() != null && !existing.getChatId().isEmpty())
                              ? existing.getChatId()
                              : getChatId(this.currentUserId, peerId);
+                     EncryptedChatDatabase fDb = EncryptedChatDatabase.getDatabaseForTarget(this.context, chatId, peerId);
+                     if (fDb.isPeerOrChatBlocked(chatId, peerId)) {
+                        return;
+                     }
+                     Chat fChat = fDb.getChat(chatId);
+                     boolean isPendingReq = fChat != null && !fChat.isGroupChat() && fChat.isRequest();
+                     if (existing == null && isPendingReq && fDb.getInboundUserMessageCount(chatId, peerId) >= EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES) {
+                        return;
+                     }
                      String messageContent = caption != null && !caption.trim().isEmpty() ? caption.trim() : fileName;
                      Message fileMsg = existing != null ? existing : new Message(transferId, peerId, this.currentUserId, messageContent, Timestamp.now(), mediaType);
                      fileMsg.setChatId(chatId);
                      if (file != null && file.exists()) {
                         fileMsg.setMediaSize(file.length());
                      }
-                     fileMsg.setDelivered(true);
+                     fileMsg.setDelivered(!isPendingReq);
                      fileMsg.setRead(false);
 
                      boolean isStagedOnly = file != null && file.getName().startsWith("staged_");
@@ -1968,8 +2116,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                         } catch (Exception ignored) {}
                      }
 
-                     EncryptedChatDatabase.getDatabaseForTarget(this.context, chatId, peerId).saveMessage(chatId, fileMsg);
-                     this.sendReceipt(peerId, transferId, true, false);
+                     fDb.saveMessage(chatId, fileMsg);
+                     if (!isPendingReq) {
+                        this.sendReceipt(peerId, transferId, true, false);
+                     }
                      this.mainHandler.post(() -> {
                         for(P2PEventListener l : WebRtcManager.this.listeners) {
                            l.onMessageReceived(peerId, fileMsg);
@@ -2960,6 +3110,15 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
    public void sendReceipt(String peerId, String messageId, boolean delivered, boolean read) {
       if (peerId != null && messageId != null) {
+         EncryptedChatDatabase rDb = EncryptedChatDatabase.getInstance(this.context);
+         String checkChatId = getChatId(this.currentUserId, peerId);
+         if (rDb.isPeerOrChatBlocked(checkChatId, peerId)) {
+            return;
+         }
+         Chat localChat = checkChatId != null ? rDb.getChat(checkChatId) : null;
+         if (localChat != null && !localChat.isGroupChat() && localChat.isRequest()) {
+            return;
+         }
          JSONObject json = new JSONObject();
 
          try {
@@ -3038,6 +3197,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             myUid = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context).getCurrentUserId();
          }
          String resolvedChatId = (chatId != null && !chatId.isEmpty()) ? chatId : getChatId(myUid, peerId);
+         EncryptedChatDatabase rDb = EncryptedChatDatabase.getInstance(this.context);
+         if (rDb.isPeerOrChatBlocked(resolvedChatId, peerId)) {
+            return;
+         }
+         Chat localChat = resolvedChatId != null ? rDb.getChat(resolvedChatId) : null;
+         if (localChat != null && !localChat.isGroupChat() && localChat.isRequest()) {
+            return;
+         }
          long now = System.currentTimeMillis();
          long prevWatermark = this.lastReadWatermarkSent.getOrDefault(resolvedChatId, 0L);
          long lastSentMs = this.lastReadReceiptTimeMs.getOrDefault(resolvedChatId, 0L);
@@ -3128,57 +3295,114 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
    }
 
    public void sendStatusViewReceipt(String peerId, String statusId, String myName) {
-      if (peerId != null && statusId != null) {
+      if (peerId != null && !peerId.isEmpty() && statusId != null && !statusId.isEmpty()) {
+         final String avatarUrl;
+         String resolvedAvatar = "";
+         try {
+            resolvedAvatar = com.m3.veil.utils.UserPreferences.getInstance(this.context).getAvatarPath();
+         } catch (Throwable ignored) {}
+         avatarUrl = resolvedAvatar != null ? resolvedAvatar : "";
+         final long now = System.currentTimeMillis();
          this.sendJsonToPeer(peerId, () -> {
             JSONObject json = new JSONObject();
             json.put("type", "status_viewed");
             json.put("statusId", statusId);
             json.put("viewerId", this.currentUserId);
-            json.put("viewerName", myName);
-            json.put("viewedAt", System.currentTimeMillis());
+            json.put("viewerName", myName != null && !myName.isEmpty() ? myName : "Anonymous Contact");
+            json.put("avatarUrl", avatarUrl);
+            json.put("viewedAt", now);
             return json;
          });
+         try {
+            JSONObject receipt = new JSONObject();
+            receipt.put("type", "status_viewed");
+            receipt.put("statusId", statusId);
+            receipt.put("viewerId", this.currentUserId);
+            receipt.put("viewerName", myName != null && !myName.isEmpty() ? myName : "Anonymous Contact");
+            receipt.put("avatarUrl", avatarUrl);
+            receipt.put("viewedAt", now);
+            byte[] payload = receipt.toString().getBytes(StandardCharsets.UTF_8);
+            VeilPacket ctrlPacket = new VeilPacket((byte)0, (short)104, payload);
+            this.sendPacket(peerId, ctrlPacket);
+         } catch (Exception ignored) {}
       }
    }
 
    public void broadcastStatus(String statusId, String contentText, String mediaUri, String bgColor, int fontStyle) {
-      if (statusId != null) {
+      if (statusId != null && !statusId.isEmpty()) {
          try {
+            com.m3.veil.manager.StatusController sc = com.m3.veil.manager.StatusController.getInstance(this.context);
+            com.m3.veil.manager.StatusController.PrivacyAcl acl =
+                    com.m3.veil.ui.main.status.WhatsAppStatusUi.resolveConfiguredPrivacyAcl(this.context);
+            List<String> configuredTargets =
+                    com.m3.veil.ui.main.status.WhatsAppStatusUi.resolveConfiguredTargetPeers(this.context, null);
+            List<String> allowedPeers = sc.resolveAllowedPeerIds(acl, configuredTargets);
+            List<String> excludedPeers = sc.resolveExcludedPeerIds();
+            String audType = com.m3.veil.utils.UserPreferences.getInstance(this.context).getStatusAudienceType();
+
             JSONObject json = new JSONObject();
             json.put("type", "status_post");
             json.put("id", statusId);
             json.put("authorId", this.currentUserId);
             json.put("authorName", VeilFeatureManager.getInstance(this.context).getActivePersona().getDisplayName());
-            json.put("contentText", contentText != null ? contentText : "");
+            json.put("contentText", com.m3.veil.manager.StatusController.sanitizeStatusText(contentText));
             json.put("mediaUri", mediaUri != null ? mediaUri : "");
             json.put("bgColorHex", bgColor != null ? bgColor : "#008069");
             json.put("fontStyleIndex", fontStyle);
             json.put("timestamp", System.currentTimeMillis());
+            json.put("audienceType", audType != null ? audType : "contacts");
+            json.put("privacyAcl", acl != null ? acl.name() : "ALL_CONTACTS");
+            json.put("allowedPeerIds", new JSONArray(allowedPeers));
+            json.put("excludedPeerIds", new JSONArray(excludedPeers));
             byte[] payload = json.toString().getBytes(StandardCharsets.UTF_8);
             VeilPacket packet = new VeilPacket((byte)3, (short)775, payload);
 
-            for(String peerId : this.peerHubs.keySet()) {
+            Set<String> dispatched = new java.util.HashSet<>();
+            for (String peerId : this.peerHubs.keySet()) {
+               if (peerId == null || peerId.isEmpty()) continue;
+               if (excludedPeers.contains(peerId)) continue;
+               if (!allowedPeers.isEmpty() && !allowedPeers.contains(peerId)) continue;
+               if (EncryptedChatDatabase.getInstance(this.context).isChatBlocked(peerId)) continue;
                this.sendPacket(peerId, packet);
+               dispatched.add(peerId);
+            }
+            for (String targetPeer : allowedPeers) {
+               if (targetPeer == null || targetPeer.isEmpty() || dispatched.contains(targetPeer)) continue;
+               if (excludedPeers.contains(targetPeer)) continue;
+               if (EncryptedChatDatabase.getInstance(this.context).isChatBlocked(targetPeer)) continue;
+               if (this.peerHubs.containsKey(targetPeer)) {
+                  this.sendPacket(targetPeer, packet);
+               }
             }
          } catch (Exception e) {
             Log.w("WebRtcManager", "broadcastStatus failed: " + e.getMessage());
          }
-
       }
    }
 
    public void broadcastStatus(byte[] manifestBytes) {
       if (manifestBytes != null && manifestBytes.length != 0) {
          try {
+            com.m3.veil.manager.StatusController sc = com.m3.veil.manager.StatusController.getInstance(this.context);
+            com.m3.veil.manager.StatusController.PrivacyAcl acl =
+                    com.m3.veil.ui.main.status.WhatsAppStatusUi.resolveConfiguredPrivacyAcl(this.context);
+            List<String> configuredTargets =
+                    com.m3.veil.ui.main.status.WhatsAppStatusUi.resolveConfiguredTargetPeers(this.context, null);
+            List<String> allowedPeers = sc.resolveAllowedPeerIds(acl, configuredTargets);
+            List<String> excludedPeers = sc.resolveExcludedPeerIds();
+
             VeilPacket packet = new VeilPacket((byte)3, (short)775, manifestBytes);
 
-            for(String peerId : this.peerHubs.keySet()) {
+            for (String peerId : this.peerHubs.keySet()) {
+               if (peerId == null || peerId.isEmpty()) continue;
+               if (excludedPeers.contains(peerId)) continue;
+               if (!allowedPeers.isEmpty() && !allowedPeers.contains(peerId)) continue;
+               if (EncryptedChatDatabase.getInstance(this.context).isChatBlocked(peerId)) continue;
                this.sendPacket(peerId, packet);
             }
          } catch (Exception e) {
             Log.w("WebRtcManager", "broadcastStatus bytes failed: " + e.getMessage());
          }
-
       }
    }
 
@@ -3188,7 +3412,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          JSONObject json = new JSONObject();
          json.put("type", "status_delete");
          json.put("statusId", statusId);
-         json.put("authorId", authorId != null ? authorId : this.currentUserId);
+         json.put("authorId", authorId != null && !authorId.isEmpty() ? authorId : this.currentUserId);
          json.put("timestamp", System.currentTimeMillis());
          byte[] payload = json.toString().getBytes(StandardCharsets.UTF_8);
 
@@ -3244,9 +3468,17 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       if (peerId == null || peerId.isEmpty()) {
          return;
       }
+      String effectiveChatId = (chatId != null && !chatId.isEmpty())
+              ? chatId : getChatId(this.currentUserId, peerId);
+      EncryptedChatDatabase tDb = EncryptedChatDatabase.getInstance(this.context);
+      if (tDb.isPeerOrChatBlocked(effectiveChatId, peerId)) {
+         return;
+      }
+      Chat localChat = effectiveChatId != null ? tDb.getChat(effectiveChatId) : null;
+      if (localChat != null && !localChat.isGroupChat() && localChat.isRequest()) {
+         return;
+      }
       if (!VeilFeatureManager.getInstance(this.context).isStealthTypingEnabled()) {
-         String effectiveChatId = (chatId != null && !chatId.isEmpty())
-                 ? chatId : getChatId(this.currentUserId, peerId);
          VeilPacket packet = new VeilPacket((byte)0, (short)3, new byte[]{(byte)(isTyping ? 1 : 0)});
          boolean sentBinary = this.sendPacket(peerId, packet);
          try {
@@ -4174,11 +4406,15 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
     public boolean isKnownPeerOrContact(String peerId, String senderName) {
         if (peerId == null) return false;
         try {
-            List<Chat> chats = EncryptedChatDatabase.getInstance(this.context).getAllChats();
+            EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(this.context);
+            if (db.isExplicitContact(peerId)) {
+                return true;
+            }
+            List<Chat> chats = db.getAllChats();
             if (chats != null) {
                 for (Chat c : chats) {
                     if (c != null && !c.isGroup() && !c.isRequest() && c.getParticipants() != null && c.getParticipants().contains(peerId)) {
-                        if (hasAcceptedOrRepliedInChat(EncryptedChatDatabase.getInstance(this.context), c.getId())) {
+                        if (hasAcceptedOrRepliedInChat(db, c.getId())) {
                             return true;
                         }
                     }

@@ -49,6 +49,9 @@
         android:id="@+id/action_schedule_message"
         android:title="⏰ Schedule Message / Channel Post" />
     <item
+        android:id="@+id/action_bookmarked_messages"
+        android:title="🔖 Bookmarked Messages" />
+    <item
         android:id="@+id/action_read_later_reminders"
         android:title="📌 Read-Later Reminders" />
     <item

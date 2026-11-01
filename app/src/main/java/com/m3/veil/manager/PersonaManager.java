@@ -377,6 +377,20 @@ public class PersonaManager {
         if (persona == null || TextUtils.isEmpty(persona.getId())) return false;
         EncryptedChatDatabase masterDb = EncryptedChatDatabase.getMasterDatabase(appContext);
 
+        boolean isExisting = false;
+        List<Persona> currentList = masterDb.getAllPersonasFromDb();
+        for (Persona existingP : currentList) {
+            if (existingP != null && persona.getId().equals(existingP.getId())) {
+                isExisting = true;
+                break;
+            }
+        }
+        if (!isExisting && !PRIMARY_PERSONA_ID.equals(persona.getId())) {
+            if (!BillingManager.getInstance(appContext).canCreateNewPersona(currentList.size())) {
+                return false;
+            }
+        }
+
         String normalizedUsername = Persona.normalizeUsername(
                 !TextUtils.isEmpty(persona.getUsername()) ? persona.getUsername() : persona.getDisplayName()
         );
@@ -396,6 +410,9 @@ public class PersonaManager {
         }
 
         boolean ok = masterDb.upsertPersonaInDb(persona);
+        if (!PRIMARY_PERSONA_ID.equals(persona.getId()) && ok) {
+            BillingManager.getInstance(appContext).markSecondPersonaSlotUsed();
+        }
         if (PRIMARY_PERSONA_ID.equals(persona.getId())) {
             // Also keep primary UserPreferences aligned when editing Persona 1
             UserPreferences userPrefs = new UserPreferences(appContext);
@@ -422,12 +439,13 @@ public class PersonaManager {
     /**
      * Permanently deletes a non-primary persona from SQLite and preferences.
      * Prevents deletion of PRIMARY_PERSONA_ID.
-     * If the deleted persona is active, reverts active identity to PRIMARY_PERSONA_ID.
+     * Marks the second persona slot as permanently used/deleted so it cannot be recreated.
      */
     public synchronized boolean deletePersona(String personaId) {
         if (personaId == null || PRIMARY_PERSONA_ID.equals(personaId) || "default".equals(personaId)) {
             return false;
         }
+        BillingManager.getInstance(appContext).markSecondPersonaDeleted();
         EncryptedChatDatabase masterDb = EncryptedChatDatabase.getMasterDatabase(appContext);
         masterDb.deletePersonaFromDb(personaId);
 

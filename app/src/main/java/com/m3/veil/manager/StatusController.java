@@ -93,7 +93,7 @@ public class StatusController {
     public static final int CHUNK_SIZE = 16384; // 16 KB per WebRTC media chunk (Telegram parity)
     public static final int HEAD_PRELOAD_CHUNK_COUNT = 4; // 4 chunks * 16KB = 64KB look-ahead
     public static final int PRELOAD_PEER_WINDOW = 3; // Preload next 3 contacts
-    public static final int THUMB_SIZE_PX = 32; // 32x32 micro thumbnail for 0ms BlurHash previews
+    public static final int THUMB_SIZE_PX = 480; // Crisp preview resolution for status viewer
 
     // State Constants (Telegram Parity)
     public static final int STATE_READ = 0;
@@ -649,10 +649,358 @@ public class StatusController {
                     .getBoolean("stealth_status_view", false);
             stealthViewMode.set(stealth);
         } catch (Throwable ignored) {}
+        loadPurgedStatusIdsFromPrefs();
         loadCachedDataFromDb();
         schedulePeriodicShredder();
         scheduleOutboxGossipFlush();
         registerWebRtcListeners();
+    }
+
+    private void loadPurgedStatusIdsFromPrefs() {
+        try {
+            Set<String> saved = appContext.getSharedPreferences("veil_status_purged_prefs", Context.MODE_PRIVATE)
+                    .getStringSet("purged_ids", null);
+            if (saved != null) {
+                purgedStatusIds.addAll(saved);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    public void persistPurgedStatusId(String statusId) {
+        if (statusId == null || statusId.isEmpty()) return;
+        purgedStatusIds.add(statusId);
+        try {
+            android.content.SharedPreferences sp = appContext.getSharedPreferences("veil_status_purged_prefs", Context.MODE_PRIVATE);
+            Set<String> copy = new HashSet<>(purgedStatusIds);
+            sp.edit().putStringSet("purged_ids", copy).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    public static String sanitizeStatusText(String raw) {
+        if (raw == null) return "";
+        String s = raw
+                .replace("ðŸŽ¤", "\uD83C\uDFA4")
+                .replace("ðŸŽµ", "\uD83C\uDFB5")
+                .replace("ðŸŽ§", "\uD83C\uDFA7")
+                .replace("ðŸŒ§ï¸ ", "\uD83C\uDF27\uFE0F")
+                .replace("ðŸŒ§", "\uD83C\uDF27\uFE0F")
+                .replace("âš¡", "\u26A1")
+                .replace("â˜€ï¸ ", "\u2600\uFE0F")
+                .replace("â˜€", "\u2600\uFE0F")
+                .replace("ðŸŽ¹", "\uD83C\uDFB9")
+                .replace("ðŸŽ¬", "\uD83C\uDFAC")
+                .replace("ðŸ“·", "\uD83D\uDCF7")
+                .replace("ðŸ”’", "\uD83D\uDD12")
+                .replace("â€¢", "\u2022")
+                .replace("Â·", "\u00B7")
+                .replace("â–¶", "\u25B6")
+                .replace("â ¸", "\u23F8")
+                .replace("âœ“", "\u2713")
+                .replace("â†ª", "\u21AA")
+                .replace("ðŸ”¥", "\uD83D\uDD25")
+                .replace("â ¤ï¸ ", "\u2764\uFE0F")
+                .replace("ðŸ˜‚", "\uD83D\uDE02")
+                .replace("ðŸ˜®", "\uD83D\uDE2E")
+                .replace("ðŸ˜¢", "\uD83D\uDE22")
+                .replace("ðŸ‘ ", "\uD83D\uDC4D");
+        if (s.startsWith("data:image") || s.startsWith("data:audio") || s.startsWith("data:video")) {
+            return "";
+        }
+        int garbledCount = 0;
+        int len = s.length();
+        for (int i = 0; i < len; i++) {
+            char c = s.charAt(i);
+            if (c == '\uFFFD' || (c < 32 && c != '\n' && c != '\r' && c != '\t')) {
+                garbledCount++;
+            }
+        }
+        if (len > 0 && garbledCount * 3 > len) {
+            return "";
+        }
+        return s.trim();
+    }
+
+    public Set<String> getMyAllIdentityIds() {
+        Set<String> ids = new HashSet<>();
+        ids.add("me");
+        try {
+            String cur = getCurrentUserId();
+            if (cur != null && !cur.isEmpty()) ids.add(cur);
+        } catch (Throwable ignored) {}
+        try {
+            String authUid = AuthManager.getInstance().getCurrentUserId(appContext);
+            if (authUid != null && !authUid.isEmpty()) ids.add(authUid);
+        } catch (Throwable ignored) {}
+        try {
+            FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
+            if (u != null && u.getUid() != null && !u.getUid().isEmpty()) ids.add(u.getUid());
+        } catch (Throwable ignored) {}
+        try {
+            PersonaManager pm = PersonaManager.getInstance(appContext);
+            List<com.m3.veil.model.Persona> personas = pm.getPersonas();
+            if (personas != null) {
+                for (com.m3.veil.model.Persona p : personas) {
+                    if (p == null) continue;
+                    if (p.getPersonaId() != null && !p.getPersonaId().isEmpty()) {
+                        ids.add(p.getPersonaId());
+                        ids.add("persona_" + p.getPersonaId());
+                    }
+                    if (p.getKeyPairId() != null && !p.getKeyPairId().isEmpty()) {
+                        ids.add(p.getKeyPairId());
+                    }
+                }
+            }
+            String activePeerId = pm.getActivePersonaPeerId();
+            if (activePeerId != null && !activePeerId.isEmpty()) ids.add(activePeerId);
+        } catch (Throwable ignored) {}
+        return ids;
+    }
+
+    public Set<String> expandChatOrPeerIds(java.util.Collection<String> rawIds) {
+        Set<String> expanded = new HashSet<>();
+        if (rawIds == null || rawIds.isEmpty()) return expanded;
+        Set<String> myIds = getMyAllIdentityIds();
+        for (String id : rawIds) {
+            if (id != null && !id.trim().isEmpty()) {
+                expanded.add(id.trim());
+            }
+        }
+        try {
+            List<Chat> chats = EncryptedChatDatabase.getInstance(appContext).getAllChats();
+            if (chats != null) {
+                for (Chat c : chats) {
+                    if (c == null) continue;
+                    String cid = c.getId();
+                    boolean matched = cid != null && expanded.contains(cid);
+                    if (!matched && c.getParticipants() != null) {
+                        for (String p : c.getParticipants()) {
+                            if (p != null && expanded.contains(p)) {
+                                matched = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (matched) {
+                        if (cid != null && !cid.isEmpty()) expanded.add(cid);
+                        if (c.getParticipants() != null) {
+                            for (String p : c.getParticipants()) {
+                                if (p != null && !p.isEmpty() && !myIds.contains(p)) {
+                                    expanded.add(p);
+                                }
+                            }
+                        }
+                        if (cid != null && cid.contains("_")) {
+                            for (String part : cid.split("_")) {
+                                if (!part.isEmpty() && !myIds.contains(part)) {
+                                    expanded.add(part);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return expanded;
+    }
+
+    public List<String> resolveAllowedPeerIds(PrivacyAcl acl, List<String> explicitTargets) {
+        Set<String> allowed = new HashSet<>();
+        Set<String> myIds = getMyAllIdentityIds();
+        com.m3.veil.utils.UserPreferences up = com.m3.veil.utils.UserPreferences.getInstance(appContext);
+        String aType = up.getStatusAudienceType();
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(appContext);
+
+        if (explicitTargets != null && !explicitTargets.isEmpty()) {
+            allowed.addAll(expandChatOrPeerIds(explicitTargets));
+        }
+
+        if ("included".equalsIgnoreCase(aType) || (acl == PrivacyAcl.SELECTED_PEERS && !"excluded".equalsIgnoreCase(aType))) {
+            allowed.addAll(expandChatOrPeerIds(up.getStatusAudienceIncluded()));
+        } else if ("close_friends".equalsIgnoreCase(aType) || acl == PrivacyAcl.CLOSE_FRIENDS) {
+            allowed.addAll(expandChatOrPeerIds(closeFriendsSet));
+            allowed.addAll(expandChatOrPeerIds(up.getStatusAudienceCloseFriends()));
+        } else {
+            Set<String> excluded = "excluded".equalsIgnoreCase(aType)
+                    ? expandChatOrPeerIds(up.getStatusAudienceExcluded())
+                    : Collections.emptySet();
+            List<Chat> chats = db.getAllChats();
+            if (chats != null) {
+                for (Chat c : chats) {
+                    if (c == null || c.isGroup() || c.isBlocked() || c.isRequest()) continue;
+                    String cid = c.getId();
+                    if (cid != null && (excluded.contains(cid) || db.isChatBlocked(cid))) continue;
+                    boolean peerExcluded = false;
+                    if (c.getParticipants() != null) {
+                        for (String p : c.getParticipants()) {
+                            if (p != null && (excluded.contains(p) || db.isChatBlocked(p))) {
+                                peerExcluded = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (peerExcluded) continue;
+                    if (cid != null && !myIds.contains(cid)) allowed.add(cid);
+                    if (c.getParticipants() != null) {
+                        for (String p : c.getParticipants()) {
+                            if (p != null && !p.isEmpty() && !myIds.contains(p)) {
+                                allowed.add(p);
+                            }
+                        }
+                    }
+                    if (cid != null && cid.contains("_")) {
+                        for (String part : cid.split("_")) {
+                            if (!part.isEmpty() && !myIds.contains(part) && !excluded.contains(part)) {
+                                allowed.add(part);
+                            }
+                        }
+                    }
+                }
+            }
+            for (String explicitContactId : db.getExplicitContactIds()) {
+                if (explicitContactId != null && !explicitContactId.isEmpty()
+                        && !myIds.contains(explicitContactId)
+                        && !excluded.contains(explicitContactId)
+                        && !db.isChatBlocked(explicitContactId)) {
+                    allowed.add(explicitContactId);
+                }
+            }
+        }
+
+        Iterator<String> it = allowed.iterator();
+        while (it.hasNext()) {
+            String p = it.next();
+            if (p == null || p.isEmpty() || myIds.contains(p) || db.isChatBlocked(p)) {
+                it.remove();
+            }
+        }
+        return new ArrayList<>(allowed);
+    }
+
+    public List<String> resolveExcludedPeerIds() {
+        Set<String> excluded = new HashSet<>();
+        try {
+            com.m3.veil.utils.UserPreferences up = com.m3.veil.utils.UserPreferences.getInstance(appContext);
+            if ("excluded".equalsIgnoreCase(up.getStatusAudienceType())) {
+                excluded.addAll(expandChatOrPeerIds(up.getStatusAudienceExcluded()));
+            }
+            EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(appContext);
+            List<Chat> chats = db.getAllChats();
+            if (chats != null) {
+                for (Chat c : chats) {
+                    if (c != null && (c.isBlocked() || (c.getId() != null && db.isChatBlocked(c.getId())))) {
+                        if (c.getId() != null) excluded.add(c.getId());
+                        if (c.getParticipants() != null) excluded.addAll(c.getParticipants());
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        excluded.removeAll(getMyAllIdentityIds());
+        return new ArrayList<>(excluded);
+    }
+
+    public boolean isAcceptedContact(String authorId) {
+        if (authorId == null || authorId.isEmpty()) return false;
+        try {
+            EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(appContext);
+            if (db.isChatBlocked(authorId)) return false;
+            if (db.isExplicitContact(authorId)) return true;
+            List<Chat> chats = db.getAllChats();
+            if (chats != null) {
+                for (Chat c : chats) {
+                    if (c == null || c.isGroup()) continue;
+                    boolean matches = authorId.equals(c.getId())
+                            || (c.getId() != null && (c.getId().startsWith(authorId + "_") || c.getId().endsWith("_" + authorId)))
+                            || (c.getParticipants() != null && c.getParticipants().contains(authorId));
+                    if (matches) {
+                        if (c.isBlocked() || (c.getId() != null && db.isChatBlocked(c.getId()))) {
+                            return false;
+                        }
+                        if (!c.isRequest()) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    private boolean matchesMyIdentityOrChat(String authorId, java.util.Collection<String> targetSet) {
+        if (targetSet == null || targetSet.isEmpty()) return false;
+        Set<String> myIds = getMyAllIdentityIds();
+        for (String myId : myIds) {
+            if (targetSet.contains(myId)) return true;
+            if (authorId != null && !authorId.isEmpty()) {
+                String c1 = myId.compareTo(authorId) < 0 ? myId + "_" + authorId : authorId + "_" + myId;
+                String c2 = authorId + "_" + myId;
+                String c3 = myId + "_" + authorId;
+                if (targetSet.contains(c1) || targetSet.contains(c2) || targetSet.contains(c3)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public boolean isPeerStatusAllowedForMe(String authorId, String audienceType, String privacyAclName,
+                                            java.util.Collection<String> allowedPeers,
+                                            java.util.Collection<String> excludedPeers) {
+        int code = PrivacyAcl.ALL_CONTACTS.code;
+        if (privacyAclName != null) {
+            String n = privacyAclName.trim().toUpperCase(Locale.ROOT);
+            if ("CLOSE_FRIENDS".equals(n) || "2".equals(n)) code = PrivacyAcl.CLOSE_FRIENDS.code;
+            else if ("SELECTED_PEERS".equals(n) || "1".equals(n)) code = PrivacyAcl.SELECTED_PEERS.code;
+        }
+        return isPeerStatusAllowedForMe(authorId, audienceType, code, allowedPeers, excludedPeers);
+    }
+
+    public boolean isPeerStatusAllowedForMe(String authorId, String audienceType, int privacyAclCode,
+                                            java.util.Collection<String> allowedPeers,
+                                            java.util.Collection<String> excludedPeers) {
+        if (authorId == null || authorId.isEmpty()) return false;
+        if (getMyAllIdentityIds().contains(authorId)) return true;
+        try {
+            EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(appContext);
+            if (db.isChatBlocked(authorId)) return false;
+            List<Chat> chats = db.getAllChats();
+            if (chats != null) {
+                for (Chat c : chats) {
+                    if (c == null) continue;
+                    boolean m = authorId.equals(c.getId())
+                            || (c.getParticipants() != null && c.getParticipants().contains(authorId));
+                    if (m && (c.isBlocked() || (c.getId() != null && db.isChatBlocked(c.getId())))) {
+                        return false;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        if (excludedPeers != null && !excludedPeers.isEmpty() && matchesMyIdentityOrChat(authorId, excludedPeers)) {
+            return false;
+        }
+
+        String normType = audienceType != null ? audienceType.trim().toLowerCase(Locale.ROOT) : "";
+        boolean isStrictAllowList = "included".equals(normType)
+                || "close_friends".equals(normType)
+                || privacyAclCode == PrivacyAcl.CLOSE_FRIENDS.code
+                || (privacyAclCode == PrivacyAcl.SELECTED_PEERS.code && !"excluded".equals(normType));
+
+        if (isStrictAllowList) {
+            return allowedPeers != null && !allowedPeers.isEmpty() && matchesMyIdentityOrChat(authorId, allowedPeers);
+        }
+
+        if ("excluded".equals(normType)) {
+            if (allowedPeers != null && !allowedPeers.isEmpty()) {
+                return matchesMyIdentityOrChat(authorId, allowedPeers);
+            }
+            return isAcceptedContact(authorId);
+        }
+
+        // Default "contacts" / ALL_CONTACTS: must be an accepted contact or explicitly in allowedPeers
+        if (allowedPeers != null && !allowedPeers.isEmpty() && matchesMyIdentityOrChat(authorId, allowedPeers)) {
+            return true;
+        }
+        return isAcceptedContact(authorId);
     }
 
     // =========================================================================
@@ -858,19 +1206,42 @@ public class StatusController {
         workerExecutor.execute(() -> {
             try {
                 List<StatusSegment> cachedSegments = EncryptedChatDatabase.getInstance(appContext).getAllActiveStatusSegments();
-                String myUid = getCurrentUserId();
+                Set<String> myIds = getMyAllIdentityIds();
 
                 for (StatusSegment seg : cachedSegments) {
+                    if (seg == null || seg.id == null || purgedStatusIds.contains(seg.id)) {
+                        if (seg != null && seg.id != null) {
+                            EncryptedChatDatabase.getInstance(appContext).deleteStatusSegment(seg.id);
+                        }
+                        continue;
+                    }
+                    seg.contentText = sanitizeStatusText(seg.contentText);
+                    seg.isMine = seg.isMine || (seg.authorId != null && myIds.contains(seg.authorId));
+                    if (!seg.isMine && !isPeerStatusAllowedForMe(seg.authorId, null,
+                            seg.privacyAcl != null ? seg.privacyAcl.code : 0, null, null)) {
+                        continue;
+                    }
+                    if (seg.viewers != null) {
+                        Iterator<StatusViewer> vit = seg.viewers.iterator();
+                        while (vit.hasNext()) {
+                            StatusViewer v = vit.next();
+                            if (v == null || (v.userId != null && myIds.contains(v.userId))) {
+                                vit.remove();
+                            }
+                        }
+                        seg.viewCount = Math.max(seg.viewCount, seg.viewers.size());
+                    }
                     statusItemCache.put(seg.id, seg);
-                    PeerStatusChain chain = allPeerChains.get(seg.authorId);
+                    String chainKey = seg.isMine ? getCurrentUserId() : seg.authorId;
+                    PeerStatusChain chain = allPeerChains.get(chainKey);
                     if (chain == null) {
-                        chain = new PeerStatusChain(seg.authorId, seg.authorName, seg.authorAvatarUrl);
-                        allPeerChains.put(seg.authorId, chain);
+                        chain = new PeerStatusChain(chainKey, seg.authorName, seg.authorAvatarUrl);
+                        allPeerChains.put(chainKey, chain);
                     }
                     chain.addOrUpdateSegment(seg);
                 }
 
-                Log.d(TAG, "Loaded " + cachedSegments.size() + " active status segments from encrypted database");
+                Log.d(TAG, "Loaded " + statusItemCache.size() + " active status segments from encrypted database");
                 notifyObserversUpdated();
                 syncRemoteStatusesFromFirestore();
             } catch (Throwable t) {
@@ -879,7 +1250,52 @@ public class StatusController {
         });
     }
 
-    private synchronized void syncRemoteStatusesFromFirestore() {
+    @SuppressWarnings("unchecked")
+    private List<StatusViewer> extractFirestoreViewers(com.google.firebase.firestore.DocumentSnapshot doc, Set<String> myIds) {
+        List<StatusViewer> list = new ArrayList<>();
+        if (doc == null) return list;
+        try {
+            Object rawViewers = doc.get("viewers");
+            if (rawViewers instanceof Map) {
+                Map<String, Object> vMap = (Map<String, Object>) rawViewers;
+                for (Map.Entry<String, Object> entry : vMap.entrySet()) {
+                    String vKey = entry.getKey();
+                    Object val = entry.getValue();
+                    if (val instanceof Map) {
+                        Map<String, Object> vm = (Map<String, Object>) val;
+                        String uid = vm.get("viewerId") != null ? String.valueOf(vm.get("viewerId")) : vKey;
+                        if (uid == null || uid.isEmpty() || (myIds != null && myIds.contains(uid))) continue;
+                        String name = vm.get("viewerName") != null ? String.valueOf(vm.get("viewerName")) : "Contact";
+                        String av = vm.get("avatarUrl") != null ? String.valueOf(vm.get("avatarUrl")) : null;
+                        long viewedAt = System.currentTimeMillis();
+                        Object tsObj = vm.get("viewedAtMs");
+                        if (tsObj instanceof Number) {
+                            viewedAt = ((Number) tsObj).longValue();
+                        }
+                        list.add(new StatusViewer(uid, name, av, viewedAt));
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return list;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> extractStringList(com.google.firebase.firestore.DocumentSnapshot doc, String field) {
+        List<String> out = new ArrayList<>();
+        if (doc == null || field == null) return out;
+        try {
+            Object raw = doc.get(field);
+            if (raw instanceof List) {
+                for (Object item : (List<Object>) raw) {
+                    if (item != null) out.add(String.valueOf(item));
+                }
+            }
+        } catch (Throwable ignored) {}
+        return out;
+    }
+
+    public synchronized void syncRemoteStatusesFromFirestore() {
         try {
             if (firestoreStatusListener != null) {
                 firestoreStatusListener.remove();
@@ -901,8 +1317,9 @@ public class StatusController {
                             try {
                                 boolean updated = false;
                                 String myUid = getCurrentUserId();
+                                Set<String> myIds = getMyAllIdentityIds();
 
-                                // 1. Realtime document changes (immediate deletion & insertion events)
+                                // 1. Realtime document changes (immediate deletion, view counts & insertion events)
                                 for (com.google.firebase.firestore.DocumentChange dc : snapshot.getDocumentChanges()) {
                                     com.google.firebase.firestore.DocumentSnapshot doc = dc.getDocument();
                                     String sId = doc.getString("statusId");
@@ -925,16 +1342,65 @@ public class StatusController {
                                         continue;
                                     }
 
+                                    boolean isMineDoc = aId != null && myIds.contains(aId);
+                                    String audienceType = doc.getString("audienceType");
+                                    long aclCode = VeilFirestoreUtils.getSafeLong(doc, "privacyAcl", PrivacyAcl.ALL_CONTACTS.code);
+                                    List<String> allowedPeers = extractStringList(doc, "allowedPeerIds");
+                                    List<String> excludedPeers = extractStringList(doc, "excludedPeerIds");
+
+                                    if (!isMineDoc && !isPeerStatusAllowedForMe(aId, audienceType, (int) aclCode, allowedPeers, excludedPeers)) {
+                                        if (statusItemCache.containsKey(sId)) {
+                                            purgeRemoteStatus(sId, aId);
+                                            VeilFeatureManager.getInstance(appContext).removePeerStatus(sId);
+                                            updated = true;
+                                        }
+                                        continue;
+                                    }
+
                                     if (dc.getType() == com.google.firebase.firestore.DocumentChange.Type.ADDED
                                             || dc.getType() == com.google.firebase.firestore.DocumentChange.Type.MODIFIED) {
-                                        if (statusItemCache.containsKey(sId)) continue;
+                                        List<StatusViewer> remoteViewers = extractFirestoreViewers(doc, isMineDoc ? myIds : null);
+                                        StatusSegment existingSeg = statusItemCache.get(sId);
+                                        if (existingSeg != null) {
+                                            if (isMineDoc && !remoteViewers.isEmpty()) {
+                                                boolean viewersChanged = false;
+                                                for (StatusViewer rv : remoteViewers) {
+                                                    boolean found = false;
+                                                    for (StatusViewer lv : existingSeg.viewers) {
+                                                        if (lv.userId != null && lv.userId.equals(rv.userId)) {
+                                                            found = true;
+                                                            break;
+                                                        }
+                                                    }
+                                                    if (!found) {
+                                                        existingSeg.viewers.add(rv);
+                                                        EncryptedChatDatabase.getInstance(appContext).saveStatusView(sId, rv);
+                                                        viewersChanged = true;
+                                                    }
+                                                }
+                                                if (viewersChanged) {
+                                                    existingSeg.viewCount = existingSeg.viewers.size();
+                                                    EncryptedChatDatabase.getInstance(appContext).saveStatusSegment(existingSeg);
+                                                    List<VeilFeatureManager.StatusViewer> vfmViewers = new ArrayList<>();
+                                                    for (StatusViewer sv : existingSeg.viewers) {
+                                                        vfmViewers.add(new VeilFeatureManager.StatusViewer(
+                                                                sv.userId, sv.displayName, sv.avatarUrl, sv.viewedAtMs));
+                                                    }
+                                                    VeilFeatureManager.getInstance(appContext).updateLocalStatusViewers(sId, vfmViewers);
+                                                    updated = true;
+                                                }
+                                            }
+                                            continue;
+                                        }
 
                                         String authorName = doc.getString("authorName");
-                                        String text = doc.getString("contentText");
+                                        String text = sanitizeStatusText(doc.getString("contentText"));
                                         String typeStr = doc.getString("mediaType");
                                         MediaType mediaType = ("IMAGE".equalsIgnoreCase(typeStr) || "PHOTO".equalsIgnoreCase(typeStr)) ? MediaType.IMAGE :
                                                 ("VIDEO".equalsIgnoreCase(typeStr) ? MediaType.VIDEO : MediaType.TEXT);
                                         String bgColor = doc.getString("bgColorHex");
+                                        String mediaDataUri = doc.getString("mediaDataUri");
+                                        String thumbBase64 = doc.getString("thumbBase64");
                                         long fontIdx = VeilFirestoreUtils.getSafeLong(doc, "fontStyleIndex", 0);
                                         long ts = VeilFirestoreUtils.getSafeTimestampMillis(doc, "timestampMs", now);
                                         long exp = VeilFirestoreUtils.getSafeTimestampMillis(doc, "expiresAtMs", now + 86400000L);
@@ -943,22 +1409,32 @@ public class StatusController {
                                                 sId,
                                                 aId != null ? aId : "peer",
                                                 authorName != null ? authorName : "Contact",
-                                                text != null ? text : "",
+                                                text,
                                                 mediaType,
-                                                null,
+                                                (mediaDataUri != null && !mediaDataUri.isEmpty()) ? mediaDataUri : null,
                                                 bgColor != null ? bgColor : "#008069",
                                                 (int) fontIdx,
                                                 ts,
-                                                PrivacyAcl.ALL_CONTACTS,
-                                                aId != null && aId.equals(myUid)
+                                                PrivacyAcl.fromCode((int) aclCode),
+                                                isMineDoc
                                         );
                                         segment.expiresAtMs = exp;
+                                        if (thumbBase64 != null && !thumbBase64.isEmpty()) {
+                                            try {
+                                                segment.thumbBlob = Base64.decode(thumbBase64, Base64.NO_WRAP);
+                                            } catch (Throwable ignored) {}
+                                        }
+                                        if (isMineDoc && !remoteViewers.isEmpty()) {
+                                            segment.viewers.addAll(remoteViewers);
+                                            segment.viewCount = segment.viewers.size();
+                                        }
 
                                         statusItemCache.put(sId, segment);
-                                        PeerStatusChain chain = allPeerChains.get(segment.authorId);
+                                        String chainKey = isMineDoc ? myUid : segment.authorId;
+                                        PeerStatusChain chain = allPeerChains.get(chainKey);
                                         if (chain == null) {
-                                            chain = new PeerStatusChain(segment.authorId, segment.authorName, null);
-                                            allPeerChains.put(segment.authorId, chain);
+                                            chain = new PeerStatusChain(chainKey, segment.authorName, null);
+                                            allPeerChains.put(chainKey, chain);
                                         }
                                         chain.addOrUpdateSegment(segment);
                                         EncryptedChatDatabase.getInstance(appContext).saveStatusSegment(segment);
@@ -967,7 +1443,6 @@ public class StatusController {
                                 }
 
                                 // 2. Offline catch-up reconciliation:
-                                // If local statusItemCache contains remote statuses not in active Firestore snapshot
                                 java.util.Set<String> activeSnapshotIds = new java.util.HashSet<>();
                                 for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
                                     String id = doc.getString("statusId");
@@ -975,7 +1450,7 @@ public class StatusController {
                                 }
 
                                 for (StatusSegment localSeg : statusItemCache.values()) {
-                                    if (localSeg != null && !localSeg.isMine && localSeg.authorId != null && !localSeg.authorId.equals(myUid)) {
+                                    if (localSeg != null && !localSeg.isMine && localSeg.authorId != null && !myIds.contains(localSeg.authorId)) {
                                         if (!activeSnapshotIds.contains(localSeg.id) && (System.currentTimeMillis() - localSeg.timestampMs > 30_000L)) {
                                             Log.i(TAG, "Reconciled status deleted while device was offline: " + localSeg.id);
                                             purgeRemoteStatus(localSeg.id, localSeg.authorId);
@@ -987,6 +1462,7 @@ public class StatusController {
 
                                 if (updated) {
                                     notifyObserversUpdated();
+                                    VeilFeatureManager.getInstance(appContext).notifyStatusListeners();
                                 }
                             } catch (Throwable t) {
                                 Log.w(TAG, "Error processing status snapshot: " + t.getMessage());
@@ -1030,114 +1506,156 @@ public class StatusController {
      * Post a pure text status with customizable background color and typography (uses configured default privacy ACL).
      */
     public void postTextStatus(String contentText, String bgColorHex, int fontIndex) {
-        postTextStatus(contentText, bgColorHex, fontIndex, getDefaultPrivacyAcl(), null);
+        postTextStatus(null, contentText, bgColorHex, fontIndex, getDefaultPrivacyAcl(), null);
     }
 
-    /**
-     * Post a pure text status with customizable background color and typography.
-     */
     public void postTextStatus(String contentText, String bgColorHex, int fontIndex,
                                PrivacyAcl privacyAcl, List<String> targetPeers) {
-        if (contentText == null || contentText.trim().isEmpty()) return;
+        postTextStatus(null, contentText, bgColorHex, fontIndex, privacyAcl, targetPeers);
+    }
+
+    public String postTextStatus(String preferredStatusId, String contentText, String bgColorHex, int fontIndex,
+                                 PrivacyAcl privacyAcl, List<String> targetPeers) {
+        if (contentText == null || contentText.trim().isEmpty()) return null;
+        final String cleanText = sanitizeStatusText(contentText);
+        if (cleanText.isEmpty()) return null;
+
+        long nowCheck = System.currentTimeMillis();
+        for (StatusSegment existing : statusItemCache.values()) {
+            if (existing != null && existing.isMine && existing.mediaType == MediaType.TEXT
+                    && Math.abs(nowCheck - existing.timestampMs) < 5_000L
+                    && cleanText.equals(existing.contentText)) {
+                return existing.id;
+            }
+        }
+
+        final String statusId = (preferredStatusId != null && !preferredStatusId.isEmpty())
+                ? preferredStatusId
+                : ("st_" + UUID.randomUUID().toString());
+        final long now = System.currentTimeMillis();
+        final String myUid = getCurrentUserId();
+        final String myName = getCurrentUserName();
+        final String safeBg = bgColorHex != null ? bgColorHex : "#008069";
+        final PrivacyAcl safeAcl = privacyAcl != null ? privacyAcl : getDefaultPrivacyAcl();
+
+        StatusSegment segment = new StatusSegment(
+                statusId, myUid, myName, cleanText,
+                MediaType.TEXT, null, safeBg, fontIndex,
+                now, safeAcl, true
+        );
+        statusItemCache.put(statusId, segment);
+        PeerStatusChain myChain = allPeerChains.get(myUid);
+        if (myChain == null) {
+            myChain = new PeerStatusChain(myUid, myName, null);
+            allPeerChains.put(myUid, myChain);
+        }
+        myChain.addOrUpdateSegment(segment);
 
         ioExecutor.execute(() -> {
             try {
-                String myUid = getCurrentUserId();
-                String myName = getCurrentUserName();
-                String statusId = UUID.randomUUID().toString();
-                long now = System.currentTimeMillis();
-
-                // Render 32x32 color thumbnail
-                byte[] thumbBytes = createColorThumbnail(bgColorHex != null ? bgColorHex : "#008069");
-
-                StatusSegment segment = new StatusSegment(
-                        statusId, myUid, myName, contentText.trim(),
-                        MediaType.TEXT, null, bgColorHex, fontIndex,
-                        now, privacyAcl, true
-                );
+                byte[] thumbBytes = createColorThumbnail(safeBg);
                 segment.thumbBlob = thumbBytes;
-                segment.totalBytes = contentText.getBytes(StandardCharsets.UTF_8).length;
+                segment.totalBytes = cleanText.getBytes(StandardCharsets.UTF_8).length;
                 segment.totalChunks = 1;
 
-                // Wrap AES key for allowed contacts
-                Map<String, String> wrappedKeys = wrapKeysForAllowedPeers(privacyAcl, targetPeers, null);
-                segment.aesKeyWrapped = ""; // Text uses manifest payload directly
+                Map<String, String> wrappedKeys = wrapKeysForAllowedPeers(safeAcl, targetPeers, null);
+                segment.aesKeyWrapped = "";
 
-                // Persist locally
-                statusItemCache.put(statusId, segment);
-                PeerStatusChain myChain = allPeerChains.get(myUid);
-                if (myChain == null) {
-                    myChain = new PeerStatusChain(myUid, myName, null);
-                    allPeerChains.put(myUid, myChain);
-                }
-                myChain.addOrUpdateSegment(segment);
                 EncryptedChatDatabase.getInstance(appContext).saveStatusSegment(segment);
 
-                // Build Manifest & Gossip
                 StatusGossipManifest manifest = new StatusGossipManifest();
                 manifest.statusId = statusId;
                 manifest.authorId = myUid;
                 manifest.authorName = myName;
-                manifest.contentText = contentText.trim();
+                manifest.contentText = cleanText;
                 manifest.mediaType = MediaType.TEXT;
-                manifest.bgColorHex = bgColorHex;
+                manifest.bgColorHex = safeBg;
                 manifest.fontStyleIndex = fontIndex;
                 manifest.timestampMs = now;
                 manifest.expiresAtMs = segment.expiresAtMs;
                 manifest.totalBytes = segment.totalBytes;
                 manifest.totalChunks = 1;
-                manifest.privacyAcl = privacyAcl;
+                manifest.privacyAcl = safeAcl;
                 manifest.microThumbBytes = thumbBytes;
                 manifest.recipientKeyEnvelopes = wrappedKeys;
 
-                broadcastStatusManifest(manifest);
+                broadcastStatusManifest(manifest, null);
                 notifyObserversUpdated();
                 Log.i(TAG, "Text status posted and gossiped: " + statusId);
             } catch (Exception e) {
                 Log.e(TAG, "Failed posting text status", e);
             }
         });
+        return statusId;
     }
 
-    /**
-     * Post a photo status with caption (uses configured default privacy ACL).
-     */
     public void postPhotoStatus(String localImagePath, String caption) {
-        postPhotoStatus(localImagePath, caption, getDefaultPrivacyAcl(), null);
+        postPhotoStatus(null, localImagePath, caption, null, getDefaultPrivacyAcl(), null);
     }
 
-    /**
-     * Post a photo status with caption, 0ms BlurHash micro-thumbnail, AES-256-GCM encryption,
-     * and 16KB WebRTC chunk swarm readiness.
-     */
     public void postPhotoStatus(String localImagePath, String caption, PrivacyAcl privacyAcl,
                                 List<String> targetPeers) {
-        if (localImagePath == null) return;
-        executeMediaUploadPipeline(localImagePath, MediaType.IMAGE, caption, null, 0, privacyAcl, targetPeers);
+        postPhotoStatus(null, localImagePath, caption, null, privacyAcl, targetPeers);
     }
 
-    /**
-     * Post a video status with caption (uses configured default privacy ACL).
-     */
+    public String postPhotoStatus(String preferredStatusId, String localImagePath, String caption,
+                                  String bgColorHex, PrivacyAcl privacyAcl, List<String> targetPeers) {
+        if (localImagePath == null) return null;
+        return executeMediaUploadPipeline(preferredStatusId, localImagePath, MediaType.IMAGE, caption, bgColorHex, 0, privacyAcl, targetPeers);
+    }
+
     public void postVideoStatus(String localVideoPath, String caption) {
-        postVideoStatus(localVideoPath, caption, getDefaultPrivacyAcl(), null);
+        postVideoStatus(null, localVideoPath, caption, getDefaultPrivacyAcl(), null);
     }
 
-    /**
-     * Post a video status with 16KB WebRTC chunk swarm readiness.
-     */
     public void postVideoStatus(String localVideoPath, String caption, PrivacyAcl privacyAcl,
                                 List<String> targetPeers) {
-        if (localVideoPath == null) return;
-        executeMediaUploadPipeline(localVideoPath, MediaType.VIDEO, caption, null, 0, privacyAcl, targetPeers);
+        postVideoStatus(null, localVideoPath, caption, privacyAcl, targetPeers);
     }
 
-    private void executeMediaUploadPipeline(String localPath, MediaType mediaType, String caption,
-                                           String bgColorHex, int fontIndex, PrivacyAcl privacyAcl,
-                                           List<String> targetPeers) {
-        String statusId = UUID.randomUUID().toString();
-        UploadingStatus upload = new UploadingStatus(statusId, mediaType, localPath, caption,
-                bgColorHex, fontIndex, privacyAcl, targetPeers);
+    public String postVideoStatus(String preferredStatusId, String localVideoPath, String caption,
+                                  PrivacyAcl privacyAcl, List<String> targetPeers) {
+        if (localVideoPath == null) return null;
+        return executeMediaUploadPipeline(preferredStatusId, localVideoPath, MediaType.VIDEO, caption, "#000000", 0, privacyAcl, targetPeers);
+    }
+
+    private String executeMediaUploadPipeline(String preferredStatusId, String localPath, MediaType mediaType, String caption,
+                                              String bgColorHex, int fontIndex, PrivacyAcl privacyAcl,
+                                              List<String> targetPeers) {
+        final String cleanCaption = sanitizeStatusText(caption);
+        long nowCheck = System.currentTimeMillis();
+        for (StatusSegment existing : statusItemCache.values()) {
+            if (existing != null && existing.isMine
+                    && Math.abs(nowCheck - existing.timestampMs) < 5_000L
+                    && localPath.equals(existing.mediaFilePath)) {
+                return existing.id;
+            }
+        }
+
+        final String statusId = (preferredStatusId != null && !preferredStatusId.isEmpty())
+                ? preferredStatusId
+                : ("st_" + UUID.randomUUID().toString());
+        final PrivacyAcl safeAcl = privacyAcl != null ? privacyAcl : getDefaultPrivacyAcl();
+        final String safeBg = bgColorHex != null ? bgColorHex : "#1E293B";
+        final String myUid = getCurrentUserId();
+        final String myName = getCurrentUserName();
+        final long now = System.currentTimeMillis();
+
+        StatusSegment initialSegment = new StatusSegment(
+                statusId, myUid, myName, cleanCaption,
+                mediaType, localPath, safeBg,
+                fontIndex, now, safeAcl, true
+        );
+        statusItemCache.put(statusId, initialSegment);
+        PeerStatusChain myChain = allPeerChains.get(myUid);
+        if (myChain == null) {
+            myChain = new PeerStatusChain(myUid, myName, null);
+            allPeerChains.put(myUid, myChain);
+        }
+        myChain.addOrUpdateSegment(initialSegment);
+
+        UploadingStatus upload = new UploadingStatus(statusId, mediaType, localPath, cleanCaption,
+                safeBg, fontIndex, safeAcl, targetPeers);
         activeUploads.put(statusId, upload);
 
         ioExecutor.execute(() -> {
@@ -1145,21 +1663,27 @@ public class StatusController {
                 upload.state = UploadState.PREPARING;
                 notifyUploadProgress(upload, 0.05f);
 
-                File originalFile = new File(localPath);
+                String resolvedPath = localPath;
+                if (localPath.startsWith("file://")) {
+                    Uri u = Uri.parse(localPath);
+                    if (u.getPath() != null) resolvedPath = u.getPath();
+                }
+                File originalFile = new File(resolvedPath);
                 if (!originalFile.exists() || originalFile.length() == 0) {
                     throw new IllegalArgumentException("Source media file does not exist: " + localPath);
                 }
                 upload.totalBytes = originalFile.length();
+                boolean isAudioFile = com.m3.veil.ui.main.status.WhatsAppStatusUi.isAudioStatusUri(resolvedPath);
 
-                // 1. Generate 32x32 micro-thumbnail (BlurHash / preview)
+                // 1. Generate preview thumbnail (only for image/video, never for audio)
                 upload.state = UploadState.COMPRESSING;
                 notifyUploadProgress(upload, 0.15f);
-                byte[] thumbBytes = generateMicroThumbnail(localPath, mediaType);
+                byte[] thumbBytes = isAudioFile ? new byte[0] : generateMicroThumbnail(resolvedPath, mediaType);
                 upload.microThumbBytes = thumbBytes;
 
                 if (upload.isCancelled.get()) return;
 
-                // 2. Encrypt Media via AES-256-GCM (Zero cloud storage)
+                // 2. Encrypt Media via AES-256-GCM
                 upload.state = UploadState.ENCRYPTING;
                 notifyUploadProgress(upload, 0.35f);
                 File encDir = new File(appContext.getFilesDir(), "p2p_statuses");
@@ -1176,7 +1700,7 @@ public class StatusController {
                 // 3. Multi-Recipient Key Wrapping
                 upload.state = UploadState.WRAPPING_KEYS;
                 notifyUploadProgress(upload, 0.60f);
-                Map<String, String> wrappedKeys = wrapKeysForAllowedPeers(privacyAcl, targetPeers, upload.aesKeyBase64);
+                Map<String, String> wrappedKeys = wrapKeysForAllowedPeers(safeAcl, targetPeers, upload.aesKeyBase64);
                 upload.wrappedKeysForPeers = wrappedKeys;
 
                 // 4. Compute SHA-256 Hash of encrypted file
@@ -1185,35 +1709,20 @@ public class StatusController {
                 // 5. Save to local SQLite status vault
                 upload.state = UploadState.SAVING_LOCAL;
                 notifyUploadProgress(upload, 0.80f);
-                String myUid = getCurrentUserId();
-                String myName = getCurrentUserName();
-                long now = System.currentTimeMillis();
 
                 int totalChunks = (int) Math.ceil((double) encFile.length() / CHUNK_SIZE);
                 if (totalChunks <= 0) totalChunks = 1;
 
-                StatusSegment segment = new StatusSegment(
-                        statusId, myUid, myName, caption != null ? caption.trim() : "",
-                        mediaType, localPath, bgColorHex != null ? bgColorHex : "#000000",
-                        fontIndex, now, privacyAcl, true
-                );
-                segment.encryptedFilePath = encFile.getAbsolutePath();
-                segment.thumbBlob = thumbBytes;
-                segment.totalBytes = encFile.length();
-                segment.totalChunks = totalChunks;
-                segment.aesKeyWrapped = upload.aesKeyBase64; // Author holds raw AES key
-                segment.ivBase64 = upload.ivBase64;
+                initialSegment.mediaFilePath = resolvedPath;
+                initialSegment.encryptedFilePath = encFile.getAbsolutePath();
+                initialSegment.thumbBlob = (thumbBytes != null && thumbBytes.length > 0) ? thumbBytes : null;
+                initialSegment.totalBytes = encFile.length();
+                initialSegment.totalChunks = totalChunks;
+                initialSegment.aesKeyWrapped = upload.aesKeyBase64;
+                initialSegment.ivBase64 = upload.ivBase64;
 
-                statusItemCache.put(statusId, segment);
-                PeerStatusChain myChain = allPeerChains.get(myUid);
-                if (myChain == null) {
-                    myChain = new PeerStatusChain(myUid, myName, null);
-                    allPeerChains.put(myUid, myChain);
-                }
-                myChain.addOrUpdateSegment(segment);
-                EncryptedChatDatabase.getInstance(appContext).saveStatusSegment(segment);
+                EncryptedChatDatabase.getInstance(appContext).saveStatusSegment(initialSegment);
 
-                // Mark all chunks complete for author in chunk bitmap
                 BitSet authorBits = new BitSet(totalChunks);
                 authorBits.set(0, totalChunks);
                 EncryptedChatDatabase.getInstance(appContext).saveStatusChunkBitmap(statusId, authorBits, totalChunks, totalChunks);
@@ -1226,21 +1735,25 @@ public class StatusController {
                 manifest.statusId = statusId;
                 manifest.authorId = myUid;
                 manifest.authorName = myName;
-                manifest.contentText = caption != null ? caption.trim() : "";
+                manifest.contentText = cleanCaption;
                 manifest.mediaType = mediaType;
-                manifest.bgColorHex = bgColorHex;
+                manifest.bgColorHex = safeBg;
                 manifest.fontStyleIndex = fontIndex;
                 manifest.timestampMs = now;
-                manifest.expiresAtMs = segment.expiresAtMs;
-                manifest.totalBytes = segment.totalBytes;
+                manifest.expiresAtMs = initialSegment.expiresAtMs;
+                manifest.totalBytes = initialSegment.totalBytes;
                 manifest.totalChunks = totalChunks;
                 manifest.chunkHashSha256 = fileHash;
-                manifest.privacyAcl = privacyAcl;
+                manifest.privacyAcl = safeAcl;
                 manifest.microThumbBytes = thumbBytes;
                 manifest.ivBase64 = upload.ivBase64;
                 manifest.recipientKeyEnvelopes = wrappedKeys;
 
-                broadcastStatusManifest(manifest);
+                String previewDataUri = null;
+                if (!isAudioFile && thumbBytes != null && thumbBytes.length > 0) {
+                    previewDataUri = "data:image/jpeg;base64," + Base64.encodeToString(thumbBytes, Base64.NO_WRAP);
+                }
+                broadcastStatusManifest(manifest, previewDataUri);
 
                 upload.state = UploadState.COMPLETED;
                 notifyUploadCompleted(upload);
@@ -1255,6 +1768,7 @@ public class StatusController {
                 activeUploads.remove(statusId);
             }
         });
+        return statusId;
     }
 
     private void notifyUploadProgress(UploadingStatus upload, float progress) {
@@ -1296,55 +1810,10 @@ public class StatusController {
         Map<String, String> map = new HashMap<>();
         if (aesKeyBase64 == null) aesKeyBase64 = "";
 
-        List<String> allowedRecipients = new ArrayList<>();
-        if (acl == PrivacyAcl.SELECTED_PEERS) {
-            if (targetPeers != null && !targetPeers.isEmpty()) {
-                allowedRecipients.addAll(targetPeers);
-            } else {
-                com.m3.veil.utils.UserPreferences up = com.m3.veil.utils.UserPreferences.getInstance(appContext);
-                String aType = up.getStatusAudienceType();
-                if ("excluded".equals(aType)) {
-                    Set<String> excluded = up.getStatusAudienceExcluded();
-                    List<Chat> chats = EncryptedChatDatabase.getInstance(appContext).getAllChats();
-                    for (Chat c : chats) {
-                        if (c.getParticipants() != null) {
-                            for (String p : c.getParticipants()) {
-                                if (!p.equals(getCurrentUserId()) && !excluded.contains(p) && !allowedRecipients.contains(p)) {
-                                    allowedRecipients.add(p);
-                                }
-                            }
-                        } else if (c.getId() != null && !excluded.contains(c.getId()) && !allowedRecipients.contains(c.getId())) {
-                            allowedRecipients.add(c.getId());
-                        }
-                    }
-                } else {
-                    allowedRecipients.addAll(up.getStatusAudienceIncluded());
-                }
-            }
-        } else if (acl == PrivacyAcl.CLOSE_FRIENDS) {
-            allowedRecipients.addAll(closeFriendsSet);
-            com.m3.veil.utils.UserPreferences up = com.m3.veil.utils.UserPreferences.getInstance(appContext);
-            allowedRecipients.addAll(up.getStatusAudienceCloseFriends());
-        } else {
-            // ALL_CONTACTS: get all distinct contacts from local SQLCipher
-            List<Chat> chats = EncryptedChatDatabase.getInstance(appContext).getAllChats();
-            for (Chat c : chats) {
-                if (c.getParticipants() != null) {
-                    for (String p : c.getParticipants()) {
-                        if (!p.equals(getCurrentUserId()) && !allowedRecipients.contains(p)) {
-                            allowedRecipients.add(p);
-                        }
-                    }
-                } else if (c.getId() != null && !allowedRecipients.contains(c.getId())) {
-                    allowedRecipients.add(c.getId());
-                }
-            }
-        }
+        List<String> allowedRecipients = resolveAllowedPeerIds(acl, targetPeers);
 
         for (String peerId : allowedRecipients) {
             try {
-                // In production, encrypt AES key with peer's RSA public key.
-                // For direct mesh relay, we wrap key using RSA or secure HKDF secret
                 String wrapped = wrapKeyForPeer(peerId, aesKeyBase64);
                 if (wrapped != null) {
                     map.put(peerId, wrapped);
@@ -1423,36 +1892,60 @@ public class StatusController {
     // =========================================================================
 
     public void broadcastStatusManifest(StatusGossipManifest manifest) {
+        broadcastStatusManifest(manifest, null);
+    }
+
+    public void broadcastStatusManifest(StatusGossipManifest manifest, @Nullable String mediaDataUri) {
         if (manifest == null) return;
         ioExecutor.execute(() -> {
             try {
                 byte[] manifestBytes = manifest.serialize();
                 VeilPacket packet = new VeilPacket(VeilPacket.LANE_MESH_GOSSIP, VeilPacket.TYPE_STATUS_POST, manifestBytes);
 
-                // 1. Broadcast over active DataChannels directly
-                WebRtcManager.getInstance(appContext).broadcastStatus(manifestBytes);
+                com.m3.veil.utils.UserPreferences up = com.m3.veil.utils.UserPreferences.getInstance(appContext);
+                String audienceType = up.getStatusAudienceType();
+                List<String> allowedPeers = manifest.recipientKeyEnvelopes != null && !manifest.recipientKeyEnvelopes.isEmpty()
+                        ? new ArrayList<>(manifest.recipientKeyEnvelopes.keySet())
+                        : resolveAllowedPeerIds(manifest.privacyAcl, null);
+                List<String> excludedPeers = resolveExcludedPeerIds();
 
-                // 2. Enqueue in local SQLCipher status gossip queue for offline contacts
-                EncryptedChatDatabase.getInstance(appContext).enqueueStatusGossip(manifest.statusId, null, packet.serialize());
+                // 1. Send over active DataChannels only to allowed peers
+                for (String peerId : allowedPeers) {
+                    if (peerId == null || peerId.isEmpty() || excludedPeers.contains(peerId)) continue;
+                    boolean sent = WebRtcManager.getInstance(appContext).sendPacket(peerId, packet);
+                    if (!sent) {
+                        EncryptedChatDatabase.getInstance(appContext).enqueueStatusGossip(manifest.statusId, peerId, manifestBytes);
+                    }
+                }
 
-                // 3. Mirror status metadata to Firestore for offline peers
+                // 2. Mirror status metadata + privacy ACL to Firestore for offline allowed contacts
                 try {
                     java.util.Map<String, Object> statusMap = new java.util.HashMap<>();
                     statusMap.put("statusId", manifest.statusId);
                     statusMap.put("authorId", manifest.authorId);
                     statusMap.put("authorName", manifest.authorName);
-                    statusMap.put("contentText", manifest.contentText);
+                    statusMap.put("contentText", sanitizeStatusText(manifest.contentText));
                     statusMap.put("mediaType", manifest.mediaType != null ? manifest.mediaType.name() : "TEXT");
-                    statusMap.put("bgColorHex", manifest.bgColorHex);
+                    statusMap.put("bgColorHex", manifest.bgColorHex != null ? manifest.bgColorHex : "#008069");
                     statusMap.put("fontStyleIndex", manifest.fontStyleIndex);
                     statusMap.put("timestampMs", manifest.timestampMs);
                     statusMap.put("expiresAtMs", manifest.expiresAtMs);
+                    statusMap.put("privacyAcl", manifest.privacyAcl != null ? manifest.privacyAcl.code : PrivacyAcl.ALL_CONTACTS.code);
+                    statusMap.put("audienceType", audienceType != null ? audienceType : "contacts");
+                    statusMap.put("allowedPeerIds", allowedPeers);
+                    statusMap.put("excludedPeerIds", excludedPeers);
+                    if (mediaDataUri != null && !mediaDataUri.isEmpty() && mediaDataUri.length() < 650_000) {
+                        statusMap.put("mediaDataUri", mediaDataUri);
+                    }
+                    if (manifest.microThumbBytes != null && manifest.microThumbBytes.length > 0 && manifest.microThumbBytes.length < 250_000) {
+                        statusMap.put("thumbBase64", Base64.encodeToString(manifest.microThumbBytes, Base64.NO_WRAP));
+                    }
                     com.google.firebase.firestore.FirebaseFirestore.getInstance()
                             .collection("statuses").document(manifest.statusId)
-                            .set(statusMap);
+                            .set(statusMap, com.google.firebase.firestore.SetOptions.merge());
                 } catch (Throwable ignored) {}
 
-                Log.d(TAG, "Status manifest broadcasted: " + manifest.statusId + " size=" + manifestBytes.length);
+                Log.d(TAG, "Status manifest broadcasted: " + manifest.statusId + " allowedPeers=" + allowedPeers.size());
             } catch (Exception e) {
                 Log.e(TAG, "Failed broadcasting status manifest", e);
             }
@@ -1478,6 +1971,7 @@ public class StatusController {
                             return;
                         }
                     } catch (Exception ignored) {}
+                    return;
                 }
 
                 StatusGossipManifest manifest = StatusGossipManifest.deserialize(payload);
@@ -1490,57 +1984,61 @@ public class StatusController {
                     return;
                 }
 
-                // Drop if expired
                 if (System.currentTimeMillis() >= manifest.expiresAtMs) {
                     Log.d(TAG, "Dropping expired status manifest: " + manifest.statusId);
                     return;
                 }
 
-                String myUid = getCurrentUserId();
-                if (myUid.equals(manifest.authorId)) {
-                    // Own status echoed back
+                Set<String> myIds = getMyAllIdentityIds();
+                if (manifest.authorId != null && myIds.contains(manifest.authorId)) {
                     return;
                 }
 
-                // Track peer as a swarm seeder for this status
+                Set<String> envelopePeers = manifest.recipientKeyEnvelopes != null
+                        ? manifest.recipientKeyEnvelopes.keySet()
+                        : Collections.emptySet();
+                int aclCode = manifest.privacyAcl != null ? manifest.privacyAcl.code : PrivacyAcl.ALL_CONTACTS.code;
+                if (!isPeerStatusAllowedForMe(manifest.authorId, null, aclCode, envelopePeers, null)) {
+                    Log.d(TAG, "Dropping status manifest due to privacy ACL restriction: " + manifest.statusId);
+                    return;
+                }
+
                 recordSwarmPeer(manifest.statusId, fromPeerId);
 
-                // Determine if local user is authorized to decrypt
                 String myWrappedKey = null;
-                boolean isAllowed = false;
-                if (manifest.recipientKeyEnvelopes != null && manifest.recipientKeyEnvelopes.containsKey(myUid)) {
-                    myWrappedKey = manifest.recipientKeyEnvelopes.get(myUid);
-                    isAllowed = true;
-                } else if (manifest.privacyAcl == PrivacyAcl.ALL_CONTACTS) {
-                    isAllowed = true;
+                if (manifest.recipientKeyEnvelopes != null) {
+                    for (String myId : myIds) {
+                        if (manifest.recipientKeyEnvelopes.containsKey(myId)) {
+                            myWrappedKey = manifest.recipientKeyEnvelopes.get(myId);
+                            break;
+                        }
+                    }
                 }
 
                 String unwrappedAesKey = null;
-                if (isAllowed && myWrappedKey != null) {
+                if (myWrappedKey != null) {
                     unwrappedAesKey = unwrapKeyForMe(myWrappedKey, manifest.authorId);
                 }
 
-                // Check if segment already exists locally
                 StatusSegment existing = statusItemCache.get(manifest.statusId);
                 if (existing != null) {
                     return;
                 }
 
-                // Construct new peer status segment
                 StatusSegment segment = new StatusSegment();
                 segment.id = manifest.statusId;
                 segment.authorId = manifest.authorId;
                 segment.authorName = manifest.authorName;
-                segment.contentText = manifest.contentText;
+                segment.contentText = sanitizeStatusText(manifest.contentText);
                 segment.mediaType = manifest.mediaType;
-                segment.bgColorHex = manifest.bgColorHex;
+                segment.bgColorHex = manifest.bgColorHex != null ? manifest.bgColorHex : "#008069";
                 segment.fontStyleIndex = manifest.fontStyleIndex;
                 segment.timestampMs = manifest.timestampMs;
                 segment.expiresAtMs = manifest.expiresAtMs;
                 segment.totalBytes = manifest.totalBytes;
                 segment.totalChunks = manifest.totalChunks;
                 segment.privacyAcl = manifest.privacyAcl;
-                segment.thumbBlob = manifest.microThumbBytes;
+                segment.thumbBlob = (manifest.microThumbBytes != null && manifest.microThumbBytes.length > 0) ? manifest.microThumbBytes : null;
                 segment.ivBase64 = manifest.ivBase64;
                 segment.aesKeyWrapped = unwrappedAesKey != null ? unwrappedAesKey : myWrappedKey;
                 segment.isMine = false;
@@ -1557,8 +2055,8 @@ public class StatusController {
 
                 Log.i(TAG, "Ingested new P2P status segment from @" + manifest.authorName + " (" + manifest.statusId + ")");
                 notifyObserversUpdated();
+                VeilFeatureManager.getInstance(appContext).notifyStatusListeners();
 
-                // Trigger look-ahead head preloading for immediate playback
                 triggerLookAheadPreload();
             } catch (Exception e) {
                 Log.e(TAG, "Error handling inbound status gossip packet", e);
@@ -1682,33 +2180,60 @@ public class StatusController {
      * Updates unread ring tracking and sends signed view receipt back to author over `veil-ctrl`.
      */
     public void markStatusViewed(String statusId) {
+        markStatusViewed(statusId, null);
+    }
+
+    public void markStatusViewed(String statusId, @Nullable String fallbackAuthorId) {
         if (statusId == null) return;
         ioExecutor.execute(() -> {
             try {
                 StatusSegment seg = statusItemCache.get(statusId);
                 if (seg == null) {
                     seg = EncryptedChatDatabase.getInstance(appContext).getStatusSegmentById(statusId);
-                }
-                if (seg == null || seg.isViewed) return;
-
-                seg.isViewed = true;
-                EncryptedChatDatabase.getInstance(appContext).saveStatusSegment(seg);
-
-                // Update author's chain watermark
-                PeerStatusChain chain = allPeerChains.get(seg.authorId);
-                if (chain != null) {
-                    if (seg.timestampMs > chain.maxReadStatusTimestampMs) {
-                        chain.maxReadStatusTimestampMs = seg.timestampMs;
+                    if (seg != null) {
+                        statusItemCache.put(statusId, seg);
                     }
                 }
-                peerIdToMaxReadTimestamp.put(seg.authorId, seg.timestampMs);
 
-                // If not own status, dispatch signed view receipt to author over WebRTC veil-ctrl
-                // strictly respecting StealthView mode (suppressing receipts to protect viewer privacy)
-                if (!isStealthViewMode() && !seg.isMine && !seg.authorId.equals(getCurrentUserId())) {
-                    sendSignedViewReceipt(seg);
+                String authorId = (seg != null && seg.authorId != null && !seg.authorId.isEmpty())
+                        ? seg.authorId : fallbackAuthorId;
+                boolean isMine = seg != null && seg.isMine;
+
+                if (authorId == null || authorId.isEmpty()) {
+                    try {
+                        List<StatusUpdate> all = VeilFeatureManager.getInstance(appContext).getStatusUpdates(null);
+                        if (all != null) {
+                            for (StatusUpdate su : all) {
+                                if (su != null && statusId.equals(su.id)) {
+                                    authorId = su.authorId;
+                                    isMine = su.isMine;
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+                }
+
+                if (seg != null) {
+                    seg.isViewed = true;
+                    EncryptedChatDatabase.getInstance(appContext).saveStatusSegment(seg);
+
+                    PeerStatusChain chain = allPeerChains.get(seg.authorId);
+                    if (chain != null) {
+                        if (seg.timestampMs > chain.maxReadStatusTimestampMs) {
+                            chain.maxReadStatusTimestampMs = seg.timestampMs;
+                        }
+                    }
+                    if (seg.authorId != null) {
+                        peerIdToMaxReadTimestamp.put(seg.authorId, seg.timestampMs);
+                    }
+                }
+
+                Set<String> myIds = getMyAllIdentityIds();
+                if (!isStealthViewMode() && !isMine && authorId != null && !myIds.contains(authorId)) {
+                    sendSignedViewReceipt(statusId, authorId);
                 } else if (isStealthViewMode()) {
-                    Log.d(TAG, "StealthView mode active: Suppressed view receipt for status " + seg.id);
+                    Log.d(TAG, "StealthView mode active: Suppressed view receipt for status " + statusId);
                 }
 
                 notifyObserversUpdated();
@@ -1719,33 +2244,40 @@ public class StatusController {
         });
     }
 
-    private void sendSignedViewReceipt(StatusSegment seg) {
+    private void sendSignedViewReceipt(String statusId, String authorId) {
         try {
             String myUid = getCurrentUserId();
             String myName = getCurrentUserName();
+            String myAvatar = com.m3.veil.ui.main.status.WhatsAppStatusUi.resolveMyAvatarSource(appContext);
             long now = System.currentTimeMillis();
 
             JSONObject receipt = new JSONObject();
             receipt.put("type", "status_viewed");
-            receipt.put("statusId", seg.id);
+            receipt.put("statusId", statusId);
             receipt.put("viewerId", myUid);
             receipt.put("viewerName", myName);
+            receipt.put("avatarUrl", (myAvatar != null && !myAvatar.startsWith("/")) ? myAvatar : "");
             receipt.put("viewedAtMs", now);
 
             VeilPacket packet = new VeilPacket(VeilPacket.LANE_CTRL, VeilPacket.TYPE_READ_RECEIPT, receipt.toString());
-            WebRtcManager.getInstance(appContext).sendPacket(seg.authorId, packet);
-            com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(seg.authorId, "p2p_action", receipt);
+            WebRtcManager.getInstance(appContext).sendPacket(authorId, packet);
+            WebRtcManager.getInstance(appContext).sendStatusViewReceipt(authorId, statusId, myName);
+            com.m3.veil.webrtc.SignalingClient.getInstance().sendP2PSignal(authorId, "p2p_action", receipt);
 
-            // Also record view in Firestore statuses/{id} so author sees view count even if offline when viewed
+            // Record view in Firestore statuses/{id} using merge so it always succeeds
             java.util.Map<String, Object> viewerEntry = new java.util.HashMap<>();
             viewerEntry.put("viewerId", myUid);
             viewerEntry.put("viewerName", myName);
             viewerEntry.put("viewedAtMs", now);
+            java.util.Map<String, Object> viewersMap = new java.util.HashMap<>();
+            viewersMap.put(myUid, viewerEntry);
+            java.util.Map<String, Object> rootUpdate = new java.util.HashMap<>();
+            rootUpdate.put("viewers", viewersMap);
             com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                    .collection("statuses").document(seg.id)
-                    .update("viewers." + myUid, viewerEntry);
+                    .collection("statuses").document(statusId)
+                    .set(rootUpdate, com.google.firebase.firestore.SetOptions.merge());
 
-            Log.d(TAG, "Dispatched signed view receipt for status " + seg.id + " to author " + seg.authorId);
+            Log.d(TAG, "Dispatched signed view receipt for status " + statusId + " to author " + authorId);
         } catch (Exception e) {
             Log.w(TAG, "Failed sending view receipt: " + e.getMessage());
         }
@@ -1761,9 +2293,26 @@ public class StatusController {
                 String statusId = receiptJson.optString("statusId");
                 String viewerId = receiptJson.optString("viewerId", fromPeerId);
                 String viewerName = receiptJson.optString("viewerName", "Contact");
+                String avatarUrl = receiptJson.optString("avatarUrl", null);
                 long viewedAtMs = receiptJson.optLong("viewedAtMs", System.currentTimeMillis());
 
+                if (viewerId == null || viewerId.isEmpty() || getMyAllIdentityIds().contains(viewerId)) {
+                    return;
+                }
+
+                // Always forward to VeilFeatureManager as well so both caches stay in sync
+                VeilFeatureManager.getInstance(appContext).recordStatusView(statusId, viewerId, viewerName, avatarUrl);
+
                 StatusSegment seg = statusItemCache.get(statusId);
+                if (seg == null) {
+                    // Fallback: if statusId was from VeilFeatureManager or matched recent own status
+                    for (StatusSegment candidate : statusItemCache.values()) {
+                        if (candidate != null && candidate.isMine) {
+                            seg = candidate;
+                            break;
+                        }
+                    }
+                }
                 if (seg != null && seg.isMine) {
                     boolean alreadyViewed = false;
                     for (StatusViewer v : seg.viewers) {
@@ -1773,21 +2322,23 @@ public class StatusController {
                         }
                     }
                     if (!alreadyViewed) {
-                        StatusViewer viewer = new StatusViewer(viewerId, viewerName, null, viewedAtMs);
+                        StatusViewer viewer = new StatusViewer(viewerId, viewerName, avatarUrl, viewedAtMs);
                         seg.viewers.add(viewer);
                         seg.viewCount = seg.viewers.size();
 
-                        EncryptedChatDatabase.getInstance(appContext).saveStatusView(statusId, viewer);
+                        EncryptedChatDatabase.getInstance(appContext).saveStatusView(seg.id, viewer);
+                        EncryptedChatDatabase.getInstance(appContext).saveStatusSegment(seg);
                         notifyObserversUpdated();
 
+                        final String finalStatusId = seg.id;
                         mainHandler.post(() -> {
                             for (StatusObserver obs : observers) {
                                 try {
-                                    obs.onStatusViewed(statusId, viewerId);
+                                    obs.onStatusViewed(finalStatusId, viewerId);
                                 } catch (Throwable ignored) {}
                             }
                         });
-                        Log.i(TAG, "Recorded P2P view receipt from " + viewerName + " for status " + statusId);
+                        Log.i(TAG, "Recorded P2P view receipt from " + viewerName + " for status " + seg.id);
                     }
                 }
             } catch (Exception e) {
@@ -1829,11 +2380,11 @@ public class StatusController {
     }
 
     /**
-     * Checks if a status segment was purged or is no longer in memory.
+     * Checks if a status segment was explicitly purged/deleted.
      */
     public boolean isStatusPurged(String statusId) {
         if (statusId == null) return true;
-        return purgedStatusIds.contains(statusId) || !statusItemCache.containsKey(statusId);
+        return purgedStatusIds.contains(statusId);
     }
 
     /**
@@ -1841,29 +2392,20 @@ public class StatusController {
      */
     public void purgeRemoteStatus(String statusId, @Nullable String authorId) {
         if (statusId == null) return;
-        purgedStatusIds.add(statusId);
+        persistPurgedStatusId(statusId);
+        StatusSegment removedNow = statusItemCache.remove(statusId);
+        for (Map.Entry<String, PeerStatusChain> entry : allPeerChains.entrySet()) {
+            PeerStatusChain chain = entry.getValue();
+            chain.removeSegment(statusId);
+            if (chain.segments.isEmpty()) {
+                allPeerChains.remove(entry.getKey());
+            }
+        }
         ioExecutor.execute(() -> {
             try {
-                StatusSegment seg = statusItemCache.remove(statusId);
-                if (authorId != null && !authorId.isEmpty()) {
-                    PeerStatusChain chain = allPeerChains.get(authorId);
-                    if (chain != null) {
-                        chain.removeSegment(statusId);
-                        if (chain.segments.isEmpty()) {
-                            allPeerChains.remove(authorId);
-                        }
-                    }
-                }
-                for (Map.Entry<String, PeerStatusChain> entry : allPeerChains.entrySet()) {
-                    PeerStatusChain chain = entry.getValue();
-                    chain.removeSegment(statusId);
-                    if (chain.segments.isEmpty()) {
-                        allPeerChains.remove(entry.getKey());
-                    }
-                }
-                if (seg != null) {
-                    shredFile(seg.encryptedFilePath);
-                    shredFile(seg.mediaFilePath);
+                if (removedNow != null) {
+                    shredFile(removedNow.encryptedFilePath);
+                    shredFile(removedNow.mediaFilePath);
                 }
                 EncryptedChatDatabase.getInstance(appContext).deleteStatusSegment(statusId);
                 VeilFeatureManager.getInstance(appContext).removePeerStatus(statusId);
@@ -1880,50 +2422,73 @@ public class StatusController {
      */
     public void deleteStatusSegment(String statusId) {
         if (statusId == null) return;
-        purgedStatusIds.add(statusId);
-        ioExecutor.execute(() -> {
-            try {
-                StatusSegment seg = statusItemCache.remove(statusId);
-                String myUid = getCurrentUserId();
-                PeerStatusChain chain = allPeerChains.get(myUid);
-                if (chain != null) {
-                    chain.removeSegment(statusId);
-                    if (chain.segments.isEmpty()) {
-                        allPeerChains.remove(myUid);
+        persistPurgedStatusId(statusId);
+
+        Set<String> allIdsToDelete = new HashSet<>();
+        allIdsToDelete.add(statusId);
+
+        StatusSegment targetSeg = statusItemCache.remove(statusId);
+        if (targetSeg != null) {
+            for (StatusSegment candidate : new ArrayList<>(statusItemCache.values())) {
+                if (candidate != null && candidate.isMine && Math.abs(candidate.timestampMs - targetSeg.timestampMs) < 60_000L) {
+                    boolean sameMedia = targetSeg.mediaFilePath != null && !targetSeg.mediaFilePath.isEmpty()
+                            && targetSeg.mediaFilePath.equals(candidate.mediaFilePath);
+                    boolean sameText = (targetSeg.mediaFilePath == null || targetSeg.mediaFilePath.isEmpty())
+                            && (candidate.mediaFilePath == null || candidate.mediaFilePath.isEmpty())
+                            && java.util.Objects.equals(targetSeg.contentText, candidate.contentText);
+                    if (sameMedia || sameText) {
+                        allIdsToDelete.add(candidate.id);
                     }
                 }
+            }
+        }
 
-                if (seg != null) {
-                    shredFile(seg.encryptedFilePath);
-                    shredFile(seg.mediaFilePath);
+        for (String id : allIdsToDelete) {
+            persistPurgedStatusId(id);
+            statusItemCache.remove(id);
+            for (Map.Entry<String, PeerStatusChain> entry : allPeerChains.entrySet()) {
+                PeerStatusChain chain = entry.getValue();
+                chain.removeSegment(id);
+                if (chain.segments.isEmpty()) {
+                    allPeerChains.remove(entry.getKey());
+                }
+            }
+        }
+        notifyObserversUpdated();
+
+        ioExecutor.execute(() -> {
+            try {
+                String myUid = getCurrentUserId();
+                if (targetSeg != null) {
+                    shredFile(targetSeg.encryptedFilePath);
+                    shredFile(targetSeg.mediaFilePath);
                 }
 
-                EncryptedChatDatabase.getInstance(appContext).deleteStatusSegment(statusId);
-                VeilFeatureManager.getInstance(appContext).removePeerStatus(statusId);
+                for (String id : allIdsToDelete) {
+                    EncryptedChatDatabase.getInstance(appContext).deleteStatusSegment(id);
+                    VeilFeatureManager.getInstance(appContext).removePeerStatus(id);
 
-                // 1. Permanently delete from Firebase Firestore so peers never pull it back
-                // Also write a soft-delete tombstone first so any listener gets instant notification even if delete races
-                try {
-                    Map<String, Object> tombstone = new HashMap<>();
-                    tombstone.put("deleted", true);
-                    tombstone.put("deletedAtMs", System.currentTimeMillis());
-                    com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
-                    db.collection("statuses").document(statusId)
-                            .set(tombstone, com.google.firebase.firestore.SetOptions.merge())
-                            .addOnCompleteListener(t -> {
-                                db.collection("statuses").document(statusId).delete()
-                                        .addOnSuccessListener(aVoid -> Log.d(TAG, "Status deleted from Firestore: " + statusId))
-                                        .addOnFailureListener(e -> Log.w(TAG, "Failed deleting status from Firestore: " + statusId, e));
-                            });
-                } catch (Throwable t) {
-                    Log.w(TAG, "Firestore delete error: " + t.getMessage());
+                    try {
+                        Map<String, Object> tombstone = new HashMap<>();
+                        tombstone.put("deleted", true);
+                        tombstone.put("deletedAtMs", System.currentTimeMillis());
+                        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+                        db.collection("statuses").document(id)
+                                .set(tombstone, com.google.firebase.firestore.SetOptions.merge())
+                                .addOnCompleteListener(t -> {
+                                    db.collection("statuses").document(id).delete()
+                                            .addOnSuccessListener(aVoid -> Log.d(TAG, "Status deleted from Firestore: " + id))
+                                            .addOnFailureListener(e -> Log.w(TAG, "Failed deleting status from Firestore: " + id, e));
+                                });
+                    } catch (Throwable t) {
+                        Log.w(TAG, "Firestore delete error: " + t.getMessage());
+                    }
+
+                    WebRtcManager.getInstance(appContext).broadcastStatusDelete(id, myUid);
                 }
-
-                // 2. Broadcast deletion notification over WebRTC mesh
-                WebRtcManager.getInstance(appContext).broadcastStatusDelete(statusId, myUid);
 
                 notifyObserversUpdated();
-                Log.i(TAG, "Status segment deleted and purged: " + statusId);
+                Log.i(TAG, "Status segment(s) deleted and purged: " + allIdsToDelete);
             } catch (Exception e) {
                 Log.e(TAG, "Failed deleting status segment: " + statusId, e);
             }
@@ -2020,7 +2585,7 @@ public class StatusController {
 
         for (PeerStatusChain chain : chains) {
             for (StatusSegment seg : chain.segments) {
-                if (!seg.isExpired()) {
+                if (seg != null && !seg.isExpired() && !purgedStatusIds.contains(seg.id)) {
                     list.add(convertToStatusUpdate(seg, myUid));
                 }
             }
@@ -2029,30 +2594,47 @@ public class StatusController {
     }
 
     public StatusUpdate convertToStatusUpdate(StatusSegment seg, String myUid) {
+        Set<String> myIds = getMyAllIdentityIds();
         List<VeilFeatureManager.StatusViewer> viewersList = new ArrayList<>();
         if (seg.viewers != null) {
             for (StatusViewer v : seg.viewers) {
-                viewersList.add(new VeilFeatureManager.StatusViewer(v.userId, v.displayName, v.avatarUrl, v.viewedAtMs));
+                if (v != null && v.userId != null && !myIds.contains(v.userId)) {
+                    viewersList.add(new VeilFeatureManager.StatusViewer(v.userId, v.displayName, v.avatarUrl, v.viewedAtMs));
+                }
             }
         }
 
-        String displayMedia = seg.mediaFilePath != null ? seg.mediaFilePath : seg.encryptedFilePath;
-        if (displayMedia == null && seg.thumbBlob != null) {
+        String displayMedia = null;
+        if (seg.mediaFilePath != null && !seg.mediaFilePath.isEmpty() && !seg.mediaFilePath.endsWith(".enc")) {
+            if (seg.mediaFilePath.startsWith("data:") || seg.mediaFilePath.startsWith("content:") || seg.mediaFilePath.startsWith("http")) {
+                displayMedia = seg.mediaFilePath;
+            } else {
+                String checkPath = seg.mediaFilePath.startsWith("file://")
+                        ? Uri.parse(seg.mediaFilePath).getPath() : seg.mediaFilePath;
+                if (checkPath != null && new File(checkPath).exists()) {
+                    displayMedia = seg.mediaFilePath;
+                }
+            }
+        }
+        if (displayMedia == null && seg.thumbBlob != null && seg.thumbBlob.length > 0) {
             displayMedia = "data:image/jpeg;base64," + Base64.encodeToString(seg.thumbBlob, Base64.NO_WRAP);
         }
+
+        int totalViews = Math.max(viewersList.size(), seg.viewCount);
+        boolean mine = seg.isMine || (seg.authorId != null && myIds.contains(seg.authorId));
 
         return new StatusUpdate(
                 seg.id,
                 seg.authorId,
                 seg.authorName,
-                seg.contentText,
+                sanitizeStatusText(seg.contentText),
                 displayMedia,
                 seg.bgColorHex != null ? seg.bgColorHex : "#008069",
                 seg.fontStyleIndex,
                 seg.timestampMs,
                 seg.isViewed,
-                seg.viewCount,
-                seg.isMine || seg.authorId.equals(myUid),
+                totalViews,
+                mine,
                 viewersList
         );
     }

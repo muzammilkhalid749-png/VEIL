@@ -120,14 +120,23 @@ public class UserProfileActivity extends AppCompatActivity {
         de.hdodenhof.circleimageview.CircleImageView profileAvatarImage = findViewById(R.id.profileAvatarImage);
         final String[] activeAvatarSource = {
                 (chat != null && chat.getAvatar() != null && !chat.getAvatar().isEmpty())
-                        ? chat.getAvatar() : null
+                        ? chat.getAvatar()
+                        : (!isGroup ? com.m3.veil.utils.VeilAvatarLoader.resolvePeerAvatarSource(this, peerUserId, null) : null)
         };
         if (profileAvatarImage != null) {
-            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, activeAvatarSource[0], peerUserName, isGroup);
+            if (isGroup) {
+                com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, activeAvatarSource[0], peerUserName, true);
+            } else {
+                com.m3.veil.utils.VeilAvatarLoader.loadPeerAvatar(profileAvatarImage, peerUserId, activeAvatarSource[0], peerUserName);
+            }
             profileAvatarImage.setOnClickListener(v -> {
-                if (activeAvatarSource[0] != null && !activeAvatarSource[0].isEmpty()) {
+                String resolved = activeAvatarSource[0];
+                if ((resolved == null || resolved.isEmpty()) && !isGroup) {
+                    resolved = com.m3.veil.utils.VeilAvatarLoader.resolvePeerAvatarSource(this, peerUserId, null);
+                }
+                if (resolved != null && !resolved.isEmpty()) {
                     Intent viewerIntent = new Intent(this, MediaViewerActivity.class);
-                    viewerIntent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, activeAvatarSource[0]);
+                    viewerIntent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, resolved);
                     viewerIntent.putExtra(MediaViewerActivity.EXTRA_MEDIA_TYPE, "image");
                     viewerIntent.putExtra(MediaViewerActivity.EXTRA_SENDER_NAME, peerUserName != null ? peerUserName : "Profile");
                     startActivity(viewerIntent);
@@ -172,6 +181,7 @@ public class UserProfileActivity extends AppCompatActivity {
 
         android.view.View btnAudio = findViewById(R.id.btnProfileAudioCall);
         android.view.View btnVideo = findViewById(R.id.btnProfileVideoCall);
+        android.view.View btnAddContact = findViewById(R.id.btnProfileAddContact);
         if (btnAudio != null) {
             UiAnimator.attachSpringPress(btnAudio);
             btnAudio.setOnClickListener(v -> showCallConfirmationDialog("audio"));
@@ -179,6 +189,16 @@ public class UserProfileActivity extends AppCompatActivity {
         if (btnVideo != null) {
             UiAnimator.attachSpringPress(btnVideo);
             btnVideo.setOnClickListener(v -> showCallConfirmationDialog("video"));
+        }
+        if (btnAddContact != null) {
+            if (isGroup || peerUserId == null || peerUserId.trim().isEmpty()) {
+                btnAddContact.setVisibility(View.GONE);
+            } else {
+                btnAddContact.setVisibility(View.VISIBLE);
+                UiAnimator.attachSpringPress(btnAddContact);
+                updateContactButtonUI(activeAvatarSource[0]);
+                btnAddContact.setOnClickListener(v -> toggleExplicitContact(activeAvatarSource[0]));
+            }
         }
 
         if (isGroup) {
@@ -232,20 +252,25 @@ public class UserProfileActivity extends AppCompatActivity {
             }
         }
         if (profileSubtitle != null) {
-            StringBuilder sub = new StringBuilder();
-            if (m.username != null && !m.username.trim().isEmpty()) {
-                sub.append("@").append(m.username.trim());
-            }
-            if (m.bio != null && !m.bio.trim().isEmpty()) {
-                if (sub.length() > 0) sub.append("  •  ");
-                sub.append(m.bio.trim());
-            }
-            if (sub.length() > 0) {
-                profileSubtitle.setText(sub.toString());
+            if (!isGroup && EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, peerUserId)) {
+                profileSubtitle.setText("Blocked");
+            } else {
+                StringBuilder sub = new StringBuilder();
+                if (m.username != null && !m.username.trim().isEmpty()) {
+                    sub.append("@").append(m.username.trim());
+                }
+                if (m.bio != null && !m.bio.trim().isEmpty()) {
+                    if (sub.length() > 0) sub.append("  •  ");
+                    sub.append(m.bio.trim());
+                }
+                if (sub.length() > 0) {
+                    profileSubtitle.setText(sub.toString());
+                }
             }
         }
         if (m.avatarBase64 != null && !m.avatarBase64.trim().isEmpty()) {
             activeAvatarSource[0] = m.avatarBase64.trim();
+            com.m3.veil.utils.VeilAvatarLoader.cachePeerAvatarSource(this, peerUserId, activeAvatarSource[0]);
             if (profileAvatarImage != null) {
                 com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, activeAvatarSource[0], peerUserName, false);
             }
@@ -256,13 +281,55 @@ public class UserProfileActivity extends AppCompatActivity {
         }
     }
 
+    private void updateContactButtonUI(String currentAvatar) {
+        if (isGroup || peerUserId == null) return;
+        boolean isContact = EncryptedChatDatabase.getInstance(this).isExplicitContact(peerUserId);
+        TextView tvLabel = findViewById(R.id.tvProfileContactLabel);
+        ImageView ivIcon = findViewById(R.id.ivProfileContactIcon);
+        if (tvLabel != null) {
+            tvLabel.setText(isContact ? "In Contacts" : "Add Contact");
+        }
+        if (ivIcon != null) {
+            ivIcon.setImageResource(isContact ? R.drawable.ic_person_check : R.drawable.ic_contacts);
+        }
+    }
+
+    private void toggleExplicitContact(String currentAvatar) {
+        if (isGroup || peerUserId == null || peerUserId.trim().isEmpty()) return;
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(this);
+        boolean isCurrentlyContact = db.isExplicitContact(peerUserId);
+        if (isCurrentlyContact) {
+            db.removeExplicitContact(peerUserId);
+            Toast.makeText(this, (peerUserName != null ? peerUserName : "User") + " removed from contacts", Toast.LENGTH_SHORT).show();
+        } else {
+            String avatar = currentAvatar != null && !currentAvatar.isEmpty()
+                    ? currentAvatar
+                    : com.m3.veil.utils.VeilAvatarLoader.resolvePeerAvatarSource(this, peerUserId, null);
+            db.addExplicitContact(peerUserId, peerUserName != null ? peerUserName : "Veil Contact", avatar);
+            Toast.makeText(this, (peerUserName != null ? peerUserName : "User") + " added to contacts", Toast.LENGTH_SHORT).show();
+        }
+        updateContactButtonUI(currentAvatar);
+    }
+
     private void showCallConfirmationDialog(String type) {
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(this);
+        if (!isGroup && db.isPeerOrChatBlocked(chatId, peerUserId)) {
+            Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!isGroup && !db.isDirectChatAcceptedByPeer(chatId, currentUserId, peerUserId)) {
+            Toast.makeText(this, "Calls are disabled until the chat request is accepted", Toast.LENGTH_SHORT).show();
+            return;
+        }
         String name = peerUserName != null ? peerUserName : (isGroup ? "Group Call" : "Veil Contact");
+        String resolvedAvatar = !isGroup
+                ? com.m3.veil.utils.VeilAvatarLoader.resolvePeerAvatarSource(this, peerUserId, null)
+                : null;
         com.m3.veil.calling.ui.VeilCallConfirmationDialog.show(
                 this,
                 peerUserId,
                 name,
-                null,
+                resolvedAvatar,
                 type,
                 isGroup,
                 this::startCall
@@ -270,12 +337,21 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private void startCall(String type) {
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(this);
+        if (!isGroup && db.isPeerOrChatBlocked(chatId, peerUserId)) {
+            Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!isGroup && !db.isDirectChatAcceptedByPeer(chatId, currentUserId, peerUserId)) {
+            Toast.makeText(this, "Calls are disabled until the chat request is accepted", Toast.LENGTH_SHORT).show();
+            return;
+        }
         Intent intent = new Intent(this, CallActivity.class);
         intent.putExtra(CallActivity.EXTRA_CALL_TYPE, type);
         intent.putExtra(CallActivity.EXTRA_CALL_ID, UUID.randomUUID().toString());
         intent.putExtra(CallActivity.EXTRA_IS_INCOMING, false);
         if (isGroup && chatId != null) {
-            Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
+            Chat chat = db.getChat(chatId);
             List<String> parts = chat != null && chat.getParticipants() != null
                     ? new ArrayList<>(chat.getParticipants()) : new ArrayList<>();
             parts.remove(currentUserId);
@@ -936,19 +1012,23 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private void loadLocalChatMetadata() {
-        if (chatId == null) return;
-        Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(this);
+        Chat chat = chatId != null ? db.getChat(chatId) : null;
         if (chat != null) {
             currentVanishTimer = chat.getVanishTimer();
             currentVanishMode = chat.getVanishMode() != null ? chat.getVanishMode() : "after_send";
             isUserBlocked = chat.isBlocked();
         }
+        if (!isGroup && db.isPeerOrChatBlocked(chatId, peerUserId)) {
+            isUserBlocked = true;
+        }
         updateVanishTimerUI();
         updateVanishModeUI();
         updateBlockUI();
 
+        if (chatId == null) return;
         // Count shared media/files/polls in local SQLCipher vault
-        List<Message> msgs = EncryptedChatDatabase.getInstance(this).getMessagesForChat(chatId);
+        List<Message> msgs = db.getMessagesForChat(chatId);
         int mediaCount = 0;
         for (Message m : msgs) {
             if (!"text".equals(m.getType()) || m.isStarred()) {
@@ -1111,41 +1191,68 @@ public class UserProfileActivity extends AppCompatActivity {
             ivBlockUser.setColorFilter(ContextCompat.getColor(this, R.color.colorError));
             return;
         }
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(this);
+        String blockedBy = db.getChatBlockedBy(chatId, peerUserId);
+        boolean blockedByPeer = isUserBlocked && blockedBy != null && !blockedBy.isEmpty() && !blockedBy.equals(currentUserId);
         if (isUserBlocked) {
-            tvBlockUser.setText("Unblock User");
-            tvBlockUser.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
-            ivBlockUser.setImageResource(R.drawable.ic_check);
-            ivBlockUser.setColorFilter(ContextCompat.getColor(this, R.color.colorPrimary));
+            tvBlockUser.setText(blockedByPeer ? "Blocked by Peer" : "Unblock User");
+            tvBlockUser.setTextColor(ContextCompat.getColor(this, blockedByPeer ? R.color.textSecondary : R.color.colorPrimary));
+            ivBlockUser.setImageResource(blockedByPeer ? R.drawable.ic_block : R.drawable.ic_check);
+            ivBlockUser.setColorFilter(ContextCompat.getColor(this, blockedByPeer ? R.color.textSecondary : R.color.colorPrimary));
+            TextView profileSubtitle = findViewById(R.id.profileSubtitleText);
+            if (profileSubtitle != null) {
+                profileSubtitle.setText("Blocked");
+            }
         } else {
             tvBlockUser.setText("Block User");
             tvBlockUser.setTextColor(ContextCompat.getColor(this, R.color.colorError));
             ivBlockUser.setImageResource(R.drawable.ic_block);
             ivBlockUser.setColorFilter(ContextCompat.getColor(this, R.color.colorError));
         }
+        boolean canCall = !isUserBlocked && db.isDirectChatAcceptedByPeer(chatId, currentUserId, peerUserId);
+        View btnAudio = findViewById(R.id.btnProfileAudioCall);
+        View btnVideo = findViewById(R.id.btnProfileVideoCall);
+        View btnVanishTimer = findViewById(R.id.btnVanishTimer);
+        View btnVanishMode = findViewById(R.id.btnVanishMode);
+        if (btnAudio != null) btnAudio.setAlpha(canCall ? 1.0f : 0.38f);
+        if (btnVideo != null) btnVideo.setAlpha(canCall ? 1.0f : 0.38f);
+        if (btnVanishTimer != null) btnVanishTimer.setAlpha(isUserBlocked ? 0.38f : 1.0f);
+        if (btnVanishMode != null) btnVanishMode.setAlpha(isUserBlocked ? 0.38f : 1.0f);
     }
 
     private void toggleBlockUser() {
+        if (chatId == null && peerUserId != null && currentUserId != null) {
+            chatId = com.m3.veil.webrtc.WebRtcManager.getChatId(currentUserId, peerUserId);
+        }
         if (chatId == null) return;
-        Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(this);
+        String blockedBy = db.getChatBlockedBy(chatId, peerUserId);
+        if (isUserBlocked && blockedBy != null && !blockedBy.isEmpty() && !blockedBy.equals(currentUserId)) {
+            Toast.makeText(this, "You cannot unblock a chat that was blocked by the other user", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Chat chat = db.getChat(chatId);
         isUserBlocked = !isUserBlocked;
-        EncryptedChatDatabase.getInstance(this).setChatBlocked(chatId, isUserBlocked, isUserBlocked ? currentUserId : null);
+        db.setChatBlocked(chatId, isUserBlocked, isUserBlocked ? currentUserId : null);
         if (chat != null) {
             chat.setBlocked(isUserBlocked);
             chat.setBlockedBy(isUserBlocked ? currentUserId : null);
-            EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
+            db.saveOrUpdateChat(chat);
         }
         if (peerUserId != null && !peerUserId.isEmpty()) {
             com.m3.veil.webrtc.WebRtcManager.getInstance(this).sendBlockStatus(peerUserId, chatId, isUserBlocked);
         }
-        com.m3.veil.model.Message sysMsg = new com.m3.veil.model.Message();
-        sysMsg.setId("sys_" + System.currentTimeMillis());
-        sysMsg.setChatId(chatId);
-        sysMsg.setSenderId(currentUserId != null ? currentUserId : "system");
-        sysMsg.setReceiverId(peerUserId != null ? peerUserId : "");
-        sysMsg.setText(isUserBlocked ? "You blocked this person. Tap to unblock." : "You unblocked this person.");
-        sysMsg.setType(isUserBlocked ? "system_block" : "system");
-        sysMsg.setTimestamp(com.google.firebase.Timestamp.now());
-        EncryptedChatDatabase.getInstance(this).saveMessage(chatId, sysMsg);
+        if (db.hasAnyMessagesInChat(chatId)) {
+            com.m3.veil.model.Message sysMsg = new com.m3.veil.model.Message();
+            sysMsg.setId("sys_" + System.currentTimeMillis());
+            sysMsg.setChatId(chatId);
+            sysMsg.setSenderId(currentUserId != null ? currentUserId : "system");
+            sysMsg.setReceiverId(peerUserId != null ? peerUserId : "");
+            sysMsg.setText(isUserBlocked ? "You blocked this person. Tap to unblock." : "You unblocked this person.");
+            sysMsg.setType(isUserBlocked ? "system_block" : "system");
+            sysMsg.setTimestamp(com.google.firebase.Timestamp.now());
+            db.saveMessage(chatId, sysMsg);
+        }
         updateBlockUI();
         Toast.makeText(this, isUserBlocked ? "User blocked" : "User unblocked", Toast.LENGTH_SHORT).show();
     }
@@ -1197,6 +1304,10 @@ public class UserProfileActivity extends AppCompatActivity {
 
     private void showVanishModeDialog() {
         if (chatId == null) return;
+        if (!isGroup && (isUserBlocked || EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, peerUserId))) {
+            Toast.makeText(this, "Cannot change disappearing messages for a blocked user", Toast.LENGTH_SHORT).show();
+            return;
+        }
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         sheet.setContentView(R.layout.dialog_vanish_mode_sheet);
 
@@ -1227,6 +1338,9 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private void applyVanishModeChange(String label) {
+        if (!isGroup && (isUserBlocked || EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, peerUserId))) {
+            return;
+        }
         Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
         if (chat != null) {
             chat.setVanishMode(currentVanishMode);
@@ -1242,6 +1356,10 @@ public class UserProfileActivity extends AppCompatActivity {
 
     private void showVanishTimerDialog() {
         if (chatId == null) return;
+        if (!isGroup && (isUserBlocked || EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, peerUserId))) {
+            Toast.makeText(this, "Cannot change disappearing messages for a blocked user", Toast.LENGTH_SHORT).show();
+            return;
+        }
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         sheet.setContentView(R.layout.dialog_vanish_timer_sheet);
 

@@ -671,7 +671,8 @@
                     android:text="✨ Smart Reply"
                     android:textColor="@color/textSecondary"
                     android:textSize="11sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:visibility="gone" />
 
 
             </LinearLayout>

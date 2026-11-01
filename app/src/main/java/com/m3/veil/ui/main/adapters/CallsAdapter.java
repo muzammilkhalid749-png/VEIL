@@ -124,37 +124,42 @@ public class CallsAdapter extends RecyclerView.Adapter<CallsAdapter.CallViewHold
                     resolvedPeerId = isOutgoing ? record.getCallerId() : record.getReceiverId();
                 }
             }
-            if (displayName == null || displayName.isEmpty() || isSelfName(displayName)) {
+            if (displayName == null || displayName.isEmpty() || isSelfName(displayName) || "Veil Contact".equals(displayName)) {
                 if (resolvedPeerId != null && !resolvedPeerId.isEmpty() && !resolvedPeerId.equals(myId) && !"local_user".equals(resolvedPeerId)) {
-                    com.m3.veil.model.Chat c = com.m3.veil.database.EncryptedChatDatabase.getInstance(ctx).getChat(resolvedPeerId);
+                    com.m3.veil.database.EncryptedChatDatabase db = com.m3.veil.database.EncryptedChatDatabase.getInstance(ctx);
+                    String directChatId = (myId != null && !myId.isEmpty() && !record.isGroup())
+                            ? com.m3.veil.database.EncryptedChatDatabase.generateDirectChatId(myId, resolvedPeerId)
+                            : resolvedPeerId;
+                    com.m3.veil.model.Chat c = db.getChat(directChatId);
+                    if (c == null) c = db.getChat(resolvedPeerId);
                     if (c != null && c.getName() != null && !c.getName().trim().isEmpty() && !isSelfName(c.getName())) {
                         displayName = c.getName().trim();
+                    } else {
+                        String contactNameStr = db.getExplicitContactName(resolvedPeerId);
+                        if (contactNameStr != null && !contactNameStr.trim().isEmpty() && !isSelfName(contactNameStr)) {
+                            displayName = contactNameStr.trim();
+                        } else {
+                            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest = db.getSovereignProfileManifest(resolvedPeerId);
+                            if (manifest != null && manifest.displayName != null && !manifest.displayName.trim().isEmpty() && !isSelfName(manifest.displayName)) {
+                                displayName = manifest.displayName.trim();
+                            }
+                        }
                     }
                 }
             }
             if (displayName == null || displayName.trim().isEmpty() || isSelfName(displayName)) {
-                displayName = "Veil Contact";
+                displayName = record.isGroup() ? "Group Call" : "Veil Contact";
             }
             contactName.setText(displayName);
 
-            // Avatar rendering
-            boolean avatarLoaded = false;
-            if (resolvedPeerId != null && !resolvedPeerId.isEmpty() && !resolvedPeerId.equals(myId)) {
-                com.m3.veil.model.Chat chat = com.m3.veil.database.EncryptedChatDatabase.getInstance(ctx).getChat(resolvedPeerId);
-                if (chat != null && chat.getAvatar() != null && !chat.getAvatar().isEmpty() && !chat.getAvatar().startsWith("http")) {
-                    try {
-                        byte[] decoded = android.util.Base64.decode(chat.getAvatar(), android.util.Base64.DEFAULT);
-                        android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(decoded, 0, decoded.length);
-                        if (bmp != null) {
-                            avatar.setImageBitmap(bmp);
-                            avatarLoaded = true;
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            }
-            if (!avatarLoaded) {
-                avatar.setImageResource(R.drawable.ic_profile_placeholder);
-            }
+            // Unified DP rendering (resolves direct chat, explicit contact, manifest, or Firestore user avatar)
+            com.m3.veil.utils.VeilAvatarLoader.loadPeerAvatar(
+                    avatar,
+                    myId,
+                    resolvedPeerId,
+                    displayName,
+                    record.isGroup()
+            );
 
             // Time & direction text
             boolean isVideo = "video".equalsIgnoreCase(record.getCallType());

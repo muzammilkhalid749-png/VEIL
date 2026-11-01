@@ -77,18 +77,65 @@ public class BillingManager {
         return prefs.getString(KEY_PREMIUM_PLAN, "");
     }
 
+    public static final int MAX_PERSONAS = 2;
+
+    public boolean hasUsedSecondPersonaSlot() {
+        SharedPreferences featurePrefs = appContext.getSharedPreferences("VeilFeaturePrefs", Context.MODE_PRIVATE);
+        boolean used = prefs.getBoolean("second_persona_created_ever", false)
+                || prefs.getBoolean("second_persona_deleted_ever", false)
+                || featurePrefs.getBoolean("second_persona_created_ever", false)
+                || featurePrefs.getBoolean("second_persona_deleted_ever", false)
+                || featurePrefs.getBoolean("second_persona_deleted", false);
+        if (used) return true;
+        try {
+            int count = PersonaManager.getInstance(appContext).getPersonas().size();
+            if (count >= MAX_PERSONAS) {
+                markSecondPersonaSlotUsed();
+                return true;
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    public boolean hasDeletedSecondPersona() {
+        SharedPreferences featurePrefs = appContext.getSharedPreferences("VeilFeaturePrefs", Context.MODE_PRIVATE);
+        return prefs.getBoolean("second_persona_deleted_ever", false)
+                || featurePrefs.getBoolean("second_persona_deleted_ever", false)
+                || featurePrefs.getBoolean("second_persona_deleted", false);
+    }
+
+    public void markSecondPersonaSlotUsed() {
+        prefs.edit().putBoolean("second_persona_created_ever", true).apply();
+        appContext.getSharedPreferences("VeilFeaturePrefs", Context.MODE_PRIVATE)
+                .edit().putBoolean("second_persona_created_ever", true).apply();
+    }
+
+    public void markSecondPersonaDeleted() {
+        prefs.edit()
+                .putBoolean("second_persona_created_ever", true)
+                .putBoolean("second_persona_deleted_ever", true)
+                .apply();
+        appContext.getSharedPreferences("VeilFeaturePrefs", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("second_persona_created_ever", true)
+                .putBoolean("second_persona_deleted_ever", true)
+                .putBoolean("second_persona_deleted", true)
+                .apply();
+    }
+
     public boolean canAccessPersonaSlot(int zeroBasedIndex) {
-        if (zeroBasedIndex < MAX_FREE_PERSONAS) {
-            return true;
-        }
-        return isPremiumActive();
+        return zeroBasedIndex < MAX_PERSONAS;
     }
 
     public boolean canCreateNewPersona(int currentPersonaCount) {
-        if (currentPersonaCount < MAX_FREE_PERSONAS) {
-            return true;
+        if (currentPersonaCount >= MAX_PERSONAS) {
+            markSecondPersonaSlotUsed();
+            return false;
         }
-        return isPremiumActive();
+        if (hasUsedSecondPersonaSlot()) {
+            return false;
+        }
+        return currentPersonaCount < MAX_PERSONAS;
     }
 
     public void activatePremium(String planId, long durationMs) {

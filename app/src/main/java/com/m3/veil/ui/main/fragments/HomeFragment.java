@@ -191,16 +191,19 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             };
 
     private void updateChatTypingIndicator(String dialogId, String peerId, boolean isTyping) {
+        if (getContext() != null && EncryptedChatDatabase.getInstance(getContext()).isPeerOrChatBlocked(dialogId, peerId)) {
+            isTyping = false;
+        }
         boolean changed = false;
         for (Chat c : allLocalChats) {
             if (matchesTypingChat(c, dialogId, peerId)) {
-                c.setTyping(isTyping);
+                c.setTyping(isTyping && !c.isBlocked() && !c.isRequest());
                 changed = true;
             }
         }
         for (Chat c : displayedChats) {
             if (matchesTypingChat(c, dialogId, peerId)) {
-                c.setTyping(isTyping);
+                c.setTyping(isTyping && !c.isBlocked() && !c.isRequest());
                 changed = true;
             }
         }
@@ -784,14 +787,14 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                     btnDelete.setVisibility(View.VISIBLE);
                     btnDelete.setOnClickListener(vDel -> {
                         new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-                                .setTitle("Delete Persona")
-                                .setMessage("Are you sure you want to delete @" + p.getUsername() + "? All local chats and data in this persona vault will be permanently erased.")
+                                .setTitle("Delete Second Persona Permanently?")
+                                .setMessage("Are you sure you want to delete @" + p.getUsername() + "?\n\nWarning: You can only create one second persona per account. Once deleted, you cannot create a new second persona, and all local chats in this persona vault will be permanently erased.")
                                 .setNegativeButton("Cancel", null)
-                                .setPositiveButton("Delete", (d, w) -> {
+                                .setPositiveButton("Delete Permanently", (d, w) -> {
                                     fm.shredAndRemovePersona(p.getPersonaId());
                                     updatePersonaAndMeshHeader();
                                     loadLocalEncryptedChats();
-                                    Toast.makeText(requireContext(), "Persona deleted", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(requireContext(), "Second persona permanently deleted", Toast.LENGTH_SHORT).show();
                                     dialog.dismiss();
                                     showPersonaSwitcherDialog();
                                 })
@@ -823,16 +826,25 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
             container.addView(cardView);
         }
 
+        if (!billingManager.canCreateNewPersona(personas.size())) {
+            btnAddNew.setAlpha(0.5f);
+            if (btnAddNew instanceof TextView) {
+                if (billingManager.hasDeletedSecondPersona()) {
+                    ((TextView) btnAddNew).setText("Second Persona Slot Used (Deleted)");
+                } else {
+                    ((TextView) btnAddNew).setText("Max 2 Personas Reached (Main + Second)");
+                }
+            }
+        }
         btnAddNew.setOnClickListener(v -> {
-            dialog.dismiss();
             if (!billingManager.canCreateNewPersona(personas.size())) {
-                PremiumUpgradeBottomSheetDialog.showPaywall(
-                        getParentFragmentManager(),
-                        "Create Unlimited Anonymous Personas",
-                        this::showCreatePersonaDialog
-                );
+                String msg = billingManager.hasDeletedSecondPersona()
+                        ? "You already created and deleted your second persona. Creating another persona is permanently disabled."
+                        : "Maximum limit of 2 personas (Main and Second) reached.";
+                Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
                 return;
             }
+            dialog.dismiss();
             showCreatePersonaDialog();
         });
 
@@ -1541,6 +1553,12 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     }
 
                                     EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(appCtx, gId, uid);
+                                    if (isDirectChat && targetDb.isPeerOrChatBlocked(gId, peerId)) {
+                                        continue;
+                                    }
+                                    if (isDirectChat && Boolean.TRUE.equals(doc.getBoolean("requestAccepted"))) {
+                                        targetDb.markDirectChatAccepted(gId, peerId);
+                                    }
                                     Chat existing = targetDb.getChat(gId);
                                     String myPersonaName = VeilFeatureManager.getInstance(appCtx).getActivePersona().getDisplayName();
                                     String chatTitle = gName;
@@ -1579,6 +1597,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
                                     boolean shouldSyncMessages = false;
                                     if (existing == null) {
+                                        if (isDirectChat && (lastMsg == null || lastMsg.trim().isEmpty() || "Direct chat created".equals(lastMsg))) {
+                                            continue;
+                                        }
                                         String initialTitle = chatTitle != null ? chatTitle : (isDirectChat ? "Veil Contact" : "Group Chat");
                                         Chat newGroup = new Chat(
                                                 gId,
@@ -1599,7 +1620,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                         if (handle != null) newGroup.setHandle(handle);
                                         if (isDirectChat) {
                                             boolean initiatedByMe = lastSenderId != null && isSelfId(appCtx, lastSenderId);
-                                            if (!initiatedByMe && peerId != null && !com.m3.veil.webrtc.WebRtcManager.getInstance(appCtx).isKnownPeerOrContact(peerId, null)) {
+                                            boolean acceptedInDoc = Boolean.TRUE.equals(doc.getBoolean("requestAccepted"));
+                                            if (!initiatedByMe && !acceptedInDoc && peerId != null && !com.m3.veil.webrtc.WebRtcManager.getInstance(appCtx).isKnownPeerOrContact(peerId, null)) {
                                                 newGroup.setRequest(true);
                                             }
                                         }
@@ -1647,6 +1669,9 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                         String dName = userDoc.getString("displayName");
                                                         if (dName == null || dName.isEmpty()) dName = userDoc.getString("username");
                                                         String uAvatar = userDoc.getString("avatar");
+                                                        if (uAvatar != null && !uAvatar.isEmpty()) {
+                                                            com.m3.veil.utils.VeilAvatarLoader.cachePeerAvatarSource(appCtx, fPeerId, uAvatar);
+                                                        }
                                                         if (dName != null && !dName.isEmpty()) {
                                                             Chat c = targetDb.getChat(fGId);
                                                             if (c != null) {
@@ -1675,7 +1700,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
                                     if (parts != null) {
                                         for (String pId : parts) {
-                                            if (pId != null && !pId.equals(uid)) {
+                                            if (pId != null && !pId.equals(uid) && !targetDb.isPeerOrChatBlocked(gId, pId)) {
                                                 WebRtcManager.getInstance(appCtx).initiateConnection(pId);
                                             }
                                         }
@@ -1686,6 +1711,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     }
 
                                     final String finalGroupId = gId;
+                                    final boolean finalIsDirect = isDirectChat;
+                                    final String finalGroupPeerId = peerId;
                                     com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                             .collection("groups")
                                             .document(finalGroupId)
@@ -1697,11 +1724,19 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 if (msgSnaps == null) return;
                                                 final java.util.List<com.google.firebase.firestore.DocumentSnapshot> mDocs = msgSnaps.getDocuments();
                                                 homeExecutor.execute(() -> {
+                                                    if (finalIsDirect && targetDb.isPeerOrChatBlocked(finalGroupId, finalGroupPeerId)) {
+                                                        return;
+                                                    }
                                                     boolean anyNewMsg = false;
-                                                    for (com.google.firebase.firestore.DocumentSnapshot mDoc : mDocs) {
+                                                    for (int docIdx = mDocs.size() - 1; docIdx >= 0; docIdx--) {
+                                                        com.google.firebase.firestore.DocumentSnapshot mDoc = mDocs.get(docIdx);
                                                         try {
                                                             String mId = mDoc.getString("id");
                                                             if (mId == null) mId = mDoc.getId();
+                                                            String sId = mDoc.getString("senderId");
+                                                            if (finalIsDirect && targetDb.isPeerOrChatBlocked(finalGroupId, sId != null ? sId : finalGroupPeerId)) {
+                                                                continue;
+                                                            }
                                                             com.m3.veil.model.Message existingMsg = targetDb.getMessageById(mId);
                                                             String mType = mDoc.getString("type");
                                                             String mText = mDoc.getString("text");
@@ -1716,11 +1751,23 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                             String mediaUrl = mDoc.getString("mediaUrl");
                                                             String thumbnail = mDoc.getString("thumbnail");
                                                             String voiceFilter = mDoc.getString("voiceFilter");
-                                                            String sId = mDoc.getString("senderId");
                                                             boolean isFromMe = uid.equals(sId);
+                                                            Chat curChat = targetDb.getChat(finalGroupId);
+                                                            boolean isPendingReq = finalIsDirect && curChat != null && curChat.isRequest();
+                                                            boolean isAcceptedByPeer = !finalIsDirect || targetDb.isDirectChatAcceptedByPeer(finalGroupId, uid, finalGroupPeerId);
                                                             boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
                                                             boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
+                                                            if (finalIsDirect && !isAcceptedByPeer) {
+                                                                docDelivered = false;
+                                                                docRead = false;
+                                                            }
                                                             if (existingMsg == null) {
+                                                                if (!isFromMe && isPendingReq && !"system".equalsIgnoreCase(mType)) {
+                                                                    int inboundCount = targetDb.getInboundUserMessageCount(finalGroupId, sId != null ? sId : "");
+                                                                    if (inboundCount >= EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES) {
+                                                                        continue;
+                                                                    }
+                                                                }
                                                                 String sName = mDoc.getString("senderName");
                                                                 com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
                                                                 com.m3.veil.model.Message m = new com.m3.veil.model.Message(
@@ -1753,13 +1800,13 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                     m.setRead(docRead);
                                                                 } else {
                                                                     m.setPending(false);
-                                                                    m.setDelivered(true);
+                                                                    m.setDelivered(!isPendingReq);
                                                                     m.setRead(false);
                                                                 }
                                                                 targetDb.saveMessage(finalGroupId, m);
                                                                 anyNewMsg = true;
 
-                                                                if (!isFromMe) {
+                                                                if (!isFromMe && !isPendingReq && !targetDb.isPeerOrChatBlocked(finalGroupId, sId)) {
                                                                     java.util.Map<String, Object> ack = new java.util.HashMap<>();
                                                                     ack.put("delivered", true);
                                                                     mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
@@ -1786,14 +1833,14 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                     }
                                                                 }
                                                                 if (isFromMe) {
-                                                                    if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
+                                                                    if (isAcceptedByPeer && ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead))) {
                                                                         targetDb
                                                                                 .updateMessageStatus(mId, docDelivered || docRead, docRead);
                                                                         com.m3.veil.manager.VeilMessagesController.getInstance(appCtx)
                                                                                 .onMessageStatusChanged(mId, docDelivered || docRead, docRead);
                                                                         anyNewMsg = true;
                                                                     }
-                                                                } else if (!existingMsg.isDelivered() || !docDelivered) {
+                                                                } else if (!isPendingReq && !targetDb.isPeerOrChatBlocked(finalGroupId, sId) && (!existingMsg.isDelivered() || !docDelivered)) {
                                                                     existingMsg.setDelivered(true);
                                                                     targetDb
                                                                             .updateMessageStatus(mId, true, existingMsg.isRead());
@@ -1869,19 +1916,29 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     }
                                     if (peerId == null) continue;
 
+                                    EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(appCtx, cId, peerId);
+                                    if (targetDb.isPeerOrChatBlocked(cId, peerId)) {
+                                        continue;
+                                    }
+                                    if (Boolean.TRUE.equals(doc.getBoolean("requestAccepted"))) {
+                                        targetDb.markDirectChatAccepted(cId, peerId);
+                                    }
+
                                     String lastMsg = doc.getString("lastMessage");
                                     String lastSenderId = doc.getString("lastMessageSenderId");
                                     com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
                                     if (ts == null) ts = com.google.firebase.Timestamp.now();
 
-                                    EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(appCtx, cId, peerId);
                                     Chat existing = targetDb.getChat(cId);
                                     boolean shouldSyncDirectMsgs = false;
                                     if (existing == null) {
+                                        if (lastMsg == null || lastMsg.trim().isEmpty() || "Direct chat created".equals(lastMsg)) {
+                                            continue;
+                                        }
                                         Chat newChat = new Chat(
                                                 cId,
                                                 "Veil Contact",
-                                                lastMsg != null ? lastMsg : "Direct chat created",
+                                                lastMsg,
                                                 ts,
                                                 null,
                                                 0,
@@ -1891,7 +1948,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 parts != null ? parts : new java.util.ArrayList<>()
                                         );
                                         boolean initiatedByMe = lastSenderId != null && isSelfId(appCtx, lastSenderId);
-                                        if (!initiatedByMe && !com.m3.veil.webrtc.WebRtcManager.getInstance(appCtx).isKnownPeerOrContact(peerId, null)) {
+                                        boolean acceptedInDoc = Boolean.TRUE.equals(doc.getBoolean("requestAccepted"));
+                                        if (!initiatedByMe && !acceptedInDoc && !com.m3.veil.webrtc.WebRtcManager.getInstance(appCtx).isKnownPeerOrContact(peerId, null)) {
                                             newChat.setRequest(true);
                                         }
                                         targetDb.saveOrUpdateChat(newChat);
@@ -1918,11 +1976,19 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 if (msgSnaps == null) return;
                                                 final java.util.List<com.google.firebase.firestore.DocumentSnapshot> mDocs = msgSnaps.getDocuments();
                                                 homeExecutor.execute(() -> {
+                                                    if (targetDb.isPeerOrChatBlocked(finalChatId, finalPeerId)) {
+                                                        return;
+                                                    }
                                                     boolean anyNew = false;
-                                                    for (com.google.firebase.firestore.DocumentSnapshot mDoc : mDocs) {
+                                                    for (int docIdx = mDocs.size() - 1; docIdx >= 0; docIdx--) {
+                                                        com.google.firebase.firestore.DocumentSnapshot mDoc = mDocs.get(docIdx);
                                                         try {
                                                             String mId = mDoc.getString("id");
                                                             if (mId == null) mId = mDoc.getId();
+                                                            String sId = mDoc.getString("senderId");
+                                                            if (targetDb.isPeerOrChatBlocked(finalChatId, sId != null ? sId : finalPeerId)) {
+                                                                continue;
+                                                            }
                                                             com.m3.veil.model.Message existingMsg = targetDb.getMessageById(mId);
                                                             String mType = mDoc.getString("type");
                                                             String mText = mDoc.getString("text");
@@ -1932,14 +1998,26 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                             String mediaUrl = mDoc.getString("mediaUrl");
                                                             String thumbnail = mDoc.getString("thumbnail");
                                                             String voiceFilter = mDoc.getString("voiceFilter");
-                                                            String sId = mDoc.getString("senderId");
                                                             String sName = mDoc.getString("senderName");
                                                             com.google.firebase.Timestamp mTs = VeilFirestoreUtils.getSafeTimestamp(mDoc, "timestamp", com.google.firebase.Timestamp.now());
                                                             boolean isFromMe = sId != null && sId.equals(uid);
+                                                            Chat curChat = targetDb.getChat(finalChatId);
+                                                            boolean isPendingReq = curChat != null && curChat.isRequest();
+                                                            boolean isAcceptedByPeer = targetDb.isDirectChatAcceptedByPeer(finalChatId, uid, finalPeerId);
                                                             boolean docDelivered = VeilFirestoreUtils.getSafeBoolean(mDoc, "delivered", false);
                                                             boolean docRead = VeilFirestoreUtils.getSafeBoolean(mDoc, "read", false);
+                                                            if (!isAcceptedByPeer) {
+                                                                docDelivered = false;
+                                                                docRead = false;
+                                                            }
 
                                                             if (existingMsg == null) {
+                                                                if (!isFromMe && isPendingReq && !"system".equalsIgnoreCase(mType)) {
+                                                                    int inboundCount = targetDb.getInboundUserMessageCount(finalChatId, sId != null ? sId : finalPeerId);
+                                                                    if (inboundCount >= EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES) {
+                                                                        continue;
+                                                                    }
+                                                                }
                                                                 com.m3.veil.model.Message m = new com.m3.veil.model.Message(
                                                                         mId,
                                                                         sId != null ? sId : "",
@@ -1968,12 +2046,12 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                     m.setRead(docRead);
                                                                 } else {
                                                                     m.setPending(false);
-                                                                    m.setDelivered(true);
+                                                                    m.setDelivered(!isPendingReq);
                                                                     m.setRead(false);
                                                                 }
                                                                 targetDb.saveMessage(finalChatId, m);
 
-                                                                if (!isFromMe && sId != null) {
+                                                                if (!isFromMe && sId != null && !isPendingReq && !targetDb.isPeerOrChatBlocked(finalChatId, finalPeerId)) {
                                                                     java.util.Map<String, Object> ack = new java.util.HashMap<>();
                                                                     ack.put("delivered", true);
                                                                     mDoc.getReference().set(ack, com.google.firebase.firestore.SetOptions.merge());
@@ -2005,14 +2083,14 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                                     anyNew = true;
                                                                 }
                                                                 if (isFromMe) {
-                                                                    if ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead)) {
+                                                                    if (isAcceptedByPeer && ((!existingMsg.isDelivered() && (docDelivered || docRead)) || (!existingMsg.isRead() && docRead))) {
                                                                         targetDb
                                                                                 .updateMessageStatus(mId, docDelivered || docRead, docRead);
                                                                         com.m3.veil.manager.VeilMessagesController.getInstance(appCtx)
                                                                                 .onMessageStatusChanged(mId, docDelivered || docRead, docRead);
                                                                         anyNew = true;
                                                                     }
-                                                                } else if (!existingMsg.isDelivered() || !docDelivered) {
+                                                                } else if (!isPendingReq && !targetDb.isPeerOrChatBlocked(finalChatId, finalPeerId) && (!existingMsg.isDelivered() || !docDelivered)) {
                                                                     existingMsg.setDelivered(true);
                                                                     targetDb
                                                                             .updateMessageStatus(mId, true, existingMsg.isRead());
@@ -2754,6 +2832,10 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
     private void showVanishTimerDialog(Chat chat) {
         if (getContext() == null || chat == null) return;
+        if (chat.isBlocked() || EncryptedChatDatabase.getInstance(requireContext()).isPeerOrChatBlocked(chat.getId(), null)) {
+            Toast.makeText(getContext(), "Cannot change disappearing messages for a blocked user", Toast.LENGTH_SHORT).show();
+            return;
+        }
         String[] labels = {
                 "Off (Messages stay until deleted)",
                 "⚡ 30 Seconds after seen",

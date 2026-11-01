@@ -3434,6 +3434,17 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         ? message.getReceiverId()
                         : WebRtcManager.getChatId(getCurrentUserId(), peerId));
             message.setChatId(dialogId);
+            if (mDatabase.isPeerOrChatBlocked(dialogId, peerId)) {
+                return;
+            }
+            Chat existingDialog = mDatabase.getChat(dialogId);
+            boolean isPendingRequest = existingDialog != null && !existingDialog.isGroupChat() && existingDialog.isRequest();
+            if (isPendingRequest && !"system".equalsIgnoreCase(message.getType())) {
+                Message existingInDb = mDatabase.getMessageById(message.getId());
+                if (existingInDb == null && mDatabase.getInboundUserMessageCount(dialogId, peerId) >= EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES) {
+                    return;
+                }
+            }
             onPeerTypingInDialog(dialogId, peerId, false);
 
             // Observe logical clock
@@ -3450,8 +3461,8 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
             boolean sendReadReceipt = mContext.getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE)
                     .getBoolean("read_receipts_enabled", true);
-            boolean isChatOpenInForeground = dialogId != null && dialogId.equals(mActiveChatIdInForeground) && sendReadReceipt && !Message.isMediaRequiringActionToRead(message.getType());
-            message.setDelivered(true);
+            boolean isChatOpenInForeground = !isPendingRequest && dialogId != null && dialogId.equals(mActiveChatIdInForeground) && sendReadReceipt && !Message.isMediaRequiringActionToRead(message.getType());
+            message.setDelivered(!isPendingRequest);
             if (isChatOpenInForeground) {
                 message.setRead(true);
             }
@@ -3487,9 +3498,11 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             });
 
             // Send DELIVERED_ACK (or READ_ACK if chat is currently open) back to sender over WebRTC + Firestore
-            mCryptoQueue.execute(() -> {
-                WebRtcManager.getInstance(mContext).sendReceipt(peerId, message.getId(), true, isChatOpenInForeground);
-            });
+            if (!isPendingRequest) {
+                mCryptoQueue.execute(() -> {
+                    WebRtcManager.getInstance(mContext).sendReceipt(peerId, message.getId(), true, isChatOpenInForeground);
+                });
+            }
 
             // Trigger Hybrid Notification Engine (deduplicated across P2P & Firebase)
             final boolean viaDirectP2P = WebRtcManager.getInstance(mContext).isPeerConnected(peerId);
@@ -3513,16 +3526,28 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             Message msg = getMessage(messageId);
             if (msg == null) return;
 
+            String dialogId = (msg.getChatId() != null && !msg.getChatId().isEmpty())
+                    ? msg.getChatId()
+                    : (msg.getReceiverId() != null
+                        ? WebRtcManager.getChatId(getCurrentUserId(), msg.getReceiverId()) : null);
+
+            boolean isGroup = dialogId != null && (dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_"));
+            if (!isGroup && dialogId != null) {
+                String peerId = msg.getReceiverId();
+                if (mDatabase.isPeerOrChatBlocked(dialogId, peerId)
+                        || !mDatabase.isDirectChatAcceptedByPeer(dialogId, getCurrentUserId(), peerId)) {
+                    msg.setPending(false);
+                    msg.setDelivered(false);
+                    msg.setRead(false);
+                    return;
+                }
+            }
+
             msg.setPending(false);
             // Monotonic status: never downgrade read -> delivered when a late/duplicate ack arrives.
             final boolean wasRead = msg.isRead();
             msg.setDelivered(msg.isDelivered() || delivered || read);
             msg.setRead(wasRead || read);
-
-            String dialogId = (msg.getChatId() != null && !msg.getChatId().isEmpty())
-                    ? msg.getChatId()
-                    : (msg.getReceiverId() != null
-                        ? WebRtcManager.getChatId(getCurrentUserId(), msg.getReceiverId()) : null);
 
             mStorageQueue.execute(() -> {
                 mDatabase.updateMessageStatus(messageId, delivered || read, read);
@@ -3548,6 +3573,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     public void onAllMessagesRead(String chatId) {
         if (chatId == null) return;
         mStageQueue.post(() -> {
+            if (mDatabase.isPeerOrChatBlocked(chatId, null)) return;
             String myId = getCurrentUserId();
             CopyOnWriteArrayList<Message> list = mDialogMessages.get(chatId);
             List<String> updatedIds = new ArrayList<>();
@@ -3589,6 +3615,14 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         String resolvedDialogId = (dialogId != null && !dialogId.isEmpty())
                 ? dialogId
                 : WebRtcManager.getChatId(getCurrentUserId(), peerId);
+        if (mDatabase.isPeerOrChatBlocked(resolvedDialogId, peerId)) {
+            isTyping = false;
+        } else {
+            Chat existing = mDatabase.getChat(resolvedDialogId);
+            if (existing != null && existing.isRequest()) {
+                isTyping = false;
+            }
+        }
         String key = resolvedDialogId + ":" + peerId;
 
         if (isTyping) {
@@ -3603,14 +3637,18 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         }
 
         final String finalDialogId = resolvedDialogId;
+        final boolean finalIsTyping = isTyping;
         runOnUI(() -> {
             for (MessagesObserver obs : mObservers) {
-                obs.onPeerTyping(finalDialogId, peerId, isTyping);
+                obs.onPeerTyping(finalDialogId, peerId, finalIsTyping);
             }
         });
     }
 
     public boolean isDialogTyping(String dialogId, String peerId) {
+        if (mDatabase.isPeerOrChatBlocked(dialogId, peerId)) {
+            return false;
+        }
         long now = System.currentTimeMillis();
         if (dialogId != null && !dialogId.isEmpty() && peerId != null && !peerId.isEmpty()) {
             Long ts = mTypingWaves.get(dialogId + ":" + peerId);
@@ -3636,6 +3674,47 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             }
         }
         return false;
+    }
+
+    @Override
+    public void onRequestAccepted(String peerId, String chatId) {
+        String resolvedChatId = (chatId != null && !chatId.isEmpty())
+                ? chatId
+                : WebRtcManager.getChatId(getCurrentUserId(), peerId);
+        if (resolvedChatId == null) return;
+        mStageQueue.post(() -> {
+            mDatabase.markDirectChatAccepted(resolvedChatId, peerId);
+            String myId = getCurrentUserId();
+            List<Message> msgs = mDatabase.getMessagesForChat(resolvedChatId);
+            List<String> upgradedIds = new ArrayList<>();
+            if (msgs != null) {
+                for (Message m : msgs) {
+                    if (m != null && m.getId() != null && m.getSenderId() != null && m.getSenderId().equals(myId) && !m.isDelivered()) {
+                        m.setPending(false);
+                        m.setDelivered(true);
+                        mDatabase.updateMessageStatus(m.getId(), true, m.isRead());
+                        upgradedIds.add(m.getId());
+                    }
+                }
+            }
+            CopyOnWriteArrayList<Message> cached = mDialogMessages.get(resolvedChatId);
+            if (cached != null) {
+                for (Message m : cached) {
+                    if (m != null && m.getId() != null && upgradedIds.contains(m.getId())) {
+                        m.setPending(false);
+                        m.setDelivered(true);
+                    }
+                }
+            }
+            refreshDialogInCache(resolvedChatId);
+            runOnUI(() -> {
+                for (MessagesObserver obs : mObservers) {
+                    for (String mid : upgradedIds) {
+                        obs.onMessageStatusChanged(resolvedChatId, mid, true, false);
+                    }
+                }
+            });
+        });
     }
 
     @Override

@@ -320,16 +320,15 @@ public class VeilHybridNotificationManager {
                     : WebRtcManager.getChatId(myId, peerId));
         if (resolvedChatId == null || resolvedChatId.isEmpty()) return;
 
-        // 1. Check if this exact conversation is open in the foreground
-        String activeForegroundChat = VeilMessagesController.getInstance(mContext).getActiveChatIdInForeground();
-        if (resolvedChatId.equals(activeForegroundChat)) {
-            markMessageNotified(message.getId());
-            triggerInAppFeedbackIfEnabled();
+        // 1. Strict Cross-Transport Deduplication (prevents duplicate alerts from P2P + Firebase)
+        if (!markMessageNotified(message.getId())) {
             return;
         }
 
-        // 2. Strict Cross-Transport Deduplication (prevents duplicate alerts from P2P + Firebase)
-        if (!markMessageNotified(message.getId())) {
+        // 2. Check if this exact conversation is open in the foreground
+        String activeForegroundChat = VeilMessagesController.getInstance(mContext).getActiveChatIdInForeground();
+        if (resolvedChatId.equals(activeForegroundChat)) {
+            triggerInAppFeedbackIfEnabled();
             return;
         }
 
@@ -370,6 +369,9 @@ public class VeilHybridNotificationManager {
         String senderName = resolveSenderDisplayName(chat, message, peerId);
         String previewText = buildCleanPreviewText(message);
         long ts = message.getTimestamp() != null ? message.getTimestamp().toDate().getTime() : System.currentTimeMillis();
+
+        // Also play in-app receive sound so messages arriving while on HomeFragment or another chat always chime reliably
+        triggerInAppFeedbackIfEnabled();
 
         postRichConversationNotification(
                 resolvedChatId,
@@ -851,45 +853,89 @@ public class VeilHybridNotificationManager {
         }
     }
 
+    private final java.util.concurrent.ExecutorService mSoundExecutor =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "VeilAudioEngine");
+                t.setDaemon(true);
+                t.setPriority(Thread.MAX_PRIORITY);
+                return t;
+            });
+    private volatile long mLastReceiveSoundQueuedMs = 0L;
+    private volatile long mLastSendSoundQueuedMs = 0L;
+    private final java.util.concurrent.atomic.AtomicInteger mPendingReceiveBurst = new java.util.concurrent.atomic.AtomicInteger(0);
+
     public void previewSoundSet(int setIndex, boolean isSend) {
         final int clamped = Math.max(1, Math.min(5, setIndex));
-        new Thread(() -> {
+        mSoundExecutor.execute(() -> {
             try {
                 short[] pcm = isSend ? synthesizeSentPcm(clamped, 44100) : synthesizeReceivedPcm(clamped, 44100);
                 playSynthesizedPcm(pcm, 44100);
             } catch (Throwable ignored) {}
-        }, "VeilSoundPreview").start();
+        });
     }
 
     public void playMessageSentSound() {
+        playMessageSentSound(1);
+    }
+
+    public void playMessageSentSound(int count) {
         try {
             SharedPreferences prefs = mContext.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
             if (!prefs.getBoolean(NotificationSettingsActivity.KEY_INAPP_SOUNDS, true)) {
                 return;
             }
+            long now = android.os.SystemClock.elapsedRealtime();
+            boolean isRapidMultiSend = (count > 1) || (now - mLastSendSoundQueuedMs < 320L);
+            mLastSendSoundQueuedMs = now;
             final int soundSet = getSelectedSendSoundSet(mContext);
-            new Thread(() -> {
+            final int effectiveCount = isRapidMultiSend ? Math.max(2, Math.min(4, count > 1 ? count : 2)) : 1;
+            mSoundExecutor.execute(() -> {
                 try {
-                    short[] pcm = synthesizeSentPcm(soundSet, 44100);
+                    short[] pcm = effectiveCount > 1
+                            ? synthesizeMultiSentPcm(soundSet, effectiveCount, 44100)
+                            : synthesizeSentPcm(soundSet, 44100);
                     playSynthesizedPcm(pcm, 44100);
                 } catch (Throwable ignored) {}
-            }, "VeilSentSound").start();
+            });
         } catch (Throwable ignored) {}
     }
 
     public void playMessageReceivedInChatSound() {
+        playMultipleMessagesReceivedSound(1);
+    }
+
+    public void playMultipleMessagesReceivedSound(int count) {
         try {
+            if (count <= 0) return;
             SharedPreferences prefs = mContext.getSharedPreferences(NotificationSettingsActivity.PREFS_NAME, Context.MODE_PRIVATE);
             if (!prefs.getBoolean(NotificationSettingsActivity.KEY_INAPP_SOUNDS, true)) {
                 return;
             }
+            long now = android.os.SystemClock.elapsedRealtime();
+            long delta = now - mLastReceiveSoundQueuedMs;
+            mLastReceiveSoundQueuedMs = now;
+
+            if (delta < 380L) {
+                int burst = mPendingReceiveBurst.addAndGet(count);
+                if (burst > 3) {
+                    // Already queued a multi-chime for this burst window
+                    return;
+                }
+            } else {
+                mPendingReceiveBurst.set(count);
+            }
+
             final int soundSet = getSelectedReceiveSoundSet(mContext);
-            new Thread(() -> {
+            final int burstCount = Math.max(count, mPendingReceiveBurst.get());
+            mSoundExecutor.execute(() -> {
                 try {
-                    short[] pcm = synthesizeReceivedPcm(soundSet, 44100);
+                    int currentBurst = Math.max(burstCount, mPendingReceiveBurst.getAndSet(0));
+                    short[] pcm = currentBurst > 1
+                            ? synthesizeMultiReceivedPcm(soundSet, Math.min(4, currentBurst), 44100)
+                            : synthesizeReceivedPcm(soundSet, 44100);
                     playSynthesizedPcm(pcm, 44100);
                 } catch (Throwable ignored) {}
-            }, "VeilRecvSound").start();
+            });
         } catch (Throwable ignored) {}
     }
 
@@ -1124,12 +1170,63 @@ public class VeilHybridNotificationManager {
         }
     }
 
+    private short[] synthesizeMultiSentPcm(int setIndex, int count, int sampleRate) {
+        short[] single = synthesizeSentPcm(setIndex, sampleRate);
+        int notes = Math.max(2, Math.min(3, count));
+        int offsetSamples = (sampleRate * 55) / 1000;
+        int totalSamples = single.length + offsetSamples * (notes - 1);
+        short[] out = new short[totalSamples];
+        for (int n = 0; n < notes; n++) {
+            int start = n * offsetSamples;
+            double gain = (n == notes - 1) ? 1.0 : 0.72;
+            for (int i = 0; i < single.length && (start + i) < totalSamples; i++) {
+                int mixed = out[start + i] + (int) Math.round(single[i] * gain);
+                out[start + i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, mixed));
+            }
+        }
+        return out;
+    }
+
+    private short[] synthesizeMultiReceivedPcm(int setIndex, int count, int sampleRate) {
+        short[] base = synthesizeReceivedPcm(setIndex, sampleRate);
+        int notes = Math.max(2, Math.min(4, count));
+        int stepSamples = (sampleRate * 68) / 1000;
+        int totalSamples = base.length + stepSamples * (notes - 1);
+        short[] out = new short[totalSamples];
+        double[] pitchFactors = {1.0, 1.12246, 1.25992, 1.49831}; // Root, Major 2nd, Major 3rd, Perfect 5th
+        for (int n = 0; n < notes; n++) {
+            int start = n * stepSamples;
+            double pitch = pitchFactors[Math.min(n, pitchFactors.length - 1)];
+            double gain = (n == notes - 1) ? 0.96 : 0.76;
+            int resampledLen = (int) (base.length / pitch);
+            for (int i = 0; i < resampledLen && (start + i) < totalSamples; i++) {
+                double srcIdx = i * pitch;
+                int idx0 = (int) srcIdx;
+                int idx1 = Math.min(base.length - 1, idx0 + 1);
+                double frac = srcIdx - idx0;
+                double interp = base[idx0] * (1.0 - frac) + base[idx1] * frac;
+                int mixed = out[start + i] + (int) Math.round(interp * gain);
+                out[start + i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, mixed));
+            }
+        }
+        return out;
+    }
+
     private void playSynthesizedPcm(@NonNull short[] pcm, int sampleRate) {
         AudioTrack track = null;
         try {
-            int byteCount = pcm.length * 2;
+            int minBytes = AudioTrack.getMinBufferSize(
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT);
+            int minSamples = (minBytes > 0) ? ((minBytes / 2) + 512) : (sampleRate / 8);
+            int tailSilenceSamples = (sampleRate * 45) / 1000; // 45ms tail silence prevents HAL cutoff
+            int targetSamples = Math.max(pcm.length + tailSilenceSamples, minSamples);
+            short[] paddedPcm = new short[targetSamples];
+            System.arraycopy(pcm, 0, paddedPcm, 0, pcm.length);
+            int byteCount = paddedPcm.length * 2;
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                // Route through USAGE_MEDIA at full clean headroom so OEM system-sound attenuators do not muffle it
                 AudioAttributes attrs = new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -1140,6 +1237,10 @@ public class VeilHybridNotificationManager {
                         .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                         .build();
                 track = new AudioTrack(attrs, format, byteCount, AudioTrack.MODE_STATIC, AudioManager.AUDIO_SESSION_ID_GENERATE);
+                if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+                    track.release();
+                    track = new AudioTrack(attrs, format, byteCount, AudioTrack.MODE_STREAM, AudioManager.AUDIO_SESSION_ID_GENERATE);
+                }
                 track.setVolume(AudioTrack.getMaxVolume());
             } else {
                 track = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
@@ -1147,15 +1248,24 @@ public class VeilHybridNotificationManager {
                         byteCount, AudioTrack.MODE_STATIC);
                 track.setStereoVolume(AudioTrack.getMaxVolume(), AudioTrack.getMaxVolume());
             }
-            track.write(pcm, 0, pcm.length);
-            track.play();
-            long sleepMs = Math.max(140L, (pcm.length * 1000L) / sampleRate + 35L);
-            Thread.sleep(sleepMs);
+            if (track.getPlayState() != AudioTrack.PLAYSTATE_PLAYING && track.getState() == AudioTrack.STATE_INITIALIZED) {
+                if (track.getPlaybackRate() <= 0) {
+                    track.setPlaybackRate(sampleRate);
+                }
+                int written = track.write(paddedPcm, 0, paddedPcm.length);
+                if (written > 0) {
+                    track.play();
+                    long sleepMs = Math.max(150L, (paddedPcm.length * 1000L) / sampleRate + 45L);
+                    Thread.sleep(sleepMs);
+                }
+            }
         } catch (Throwable ignored) {
         } finally {
             if (track != null) {
                 try {
-                    track.stop();
+                    if (track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) {
+                        track.stop();
+                    }
                 } catch (Throwable ignored) {}
                 try {
                     track.release();

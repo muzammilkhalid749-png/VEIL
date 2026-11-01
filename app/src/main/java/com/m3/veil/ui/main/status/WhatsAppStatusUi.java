@@ -100,29 +100,39 @@ public final class WhatsAppStatusUi {
 
         List<StatusUpdate> mine = new ArrayList<>();
         Map<String, List<StatusUpdate>> byAuthor = new LinkedHashMap<>();
-        for (StatusUpdate s : all) {
-            if (s.isMine) {
-                mine.add(s);
-            } else {
-                List<StatusUpdate> l = byAuthor.get(s.authorId);
-                if (l == null) {
-                    l = new ArrayList<>();
-                    byAuthor.put(s.authorId, l);
+        VeilFeatureManager vfm = VeilFeatureManager.getInstance(ctx);
+        if (all != null) {
+            for (StatusUpdate s : all) {
+                if (s == null || vfm.isDeletedStatusId(s.id)) continue;
+                s.contentText = StatusController.sanitizeStatusText(s.contentText);
+                if (s.isMine) {
+                    mine.add(s);
+                } else {
+                    List<StatusUpdate> l = byAuthor.get(s.authorId);
+                    if (l == null) {
+                        l = new ArrayList<>();
+                        byAuthor.put(s.authorId, l);
+                    }
+                    l.add(s);
                 }
-                l.add(s);
             }
+        }
+        java.util.Collections.sort(mine, (a, b) -> Long.compare(a.timestampMs, b.timestampMs));
+        for (List<StatusUpdate> group : byAuthor.values()) {
+            java.util.Collections.sort(group, (a, b) -> Long.compare(a.timestampMs, b.timestampMs));
         }
 
         // 1. My Status tile (Add status when empty, My status when active)
         String myTileTitle = mine.isEmpty() ? "Add status" : "My status";
+        StatusUpdate myPreview = mine.isEmpty() ? null : mine.get(mine.size() - 1);
         View myTile = buildTile(ctx, dp, myTileTitle,
-                mine.isEmpty() ? null : mine.get(0), true, !mine.isEmpty(), false,
+                myPreview, true, !mine.isEmpty(), false,
                 () -> showStatusCreationChooser(ctx, listener, photoListener));
         myTile.setOnClickListener(v -> {
             if (mine.isEmpty()) {
                 showStatusCreationChooser(ctx, listener, photoListener);
             } else {
-                showViewer(ctx, mine, listener);
+                showViewer(ctx, mine, 0, listener);
             }
         });
         myTile.setOnLongClickListener(v -> {
@@ -135,7 +145,7 @@ public final class WhatsAppStatusUi {
         });
         container.addView(myTile);
 
-        // 2. Peer tiles â€” unread first (like WhatsApp "Recent updates")
+        // 2. Peer tiles — unread first (like WhatsApp "Recent updates")
         List<List<StatusUpdate>> unread = new ArrayList<>();
         List<List<StatusUpdate>> seen = new ArrayList<>();
         for (List<StatusUpdate> group : byAuthor.values()) {
@@ -148,10 +158,15 @@ public final class WhatsAppStatusUi {
 
         for (List<StatusUpdate> group : ordered) {
             boolean anyUnread = false;
-            for (StatusUpdate s : group) if (!s.viewed) anyUnread = true;
-            StatusUpdate first = group.get(0);
-            View tile = buildTile(ctx, dp, first.authorName, first, false, true, anyUnread);
-            tile.setOnClickListener(v -> showViewer(ctx, group, listener));
+            StatusUpdate previewItem = group.get(group.size() - 1);
+            for (StatusUpdate s : group) {
+                if (!s.viewed) {
+                    if (!anyUnread) previewItem = s;
+                    anyUnread = true;
+                }
+            }
+            View tile = buildTile(ctx, dp, previewItem.authorName, previewItem, false, true, anyUnread);
+            tile.setOnClickListener(v -> showViewer(ctx, group, -1, listener));
             container.addView(tile);
         }
     }
@@ -170,15 +185,18 @@ public final class WhatsAppStatusUi {
     public static boolean isAudioStatusUri(String uri) {
         if (uri == null || uri.isEmpty()) return false;
         String lower = uri.toLowerCase(Locale.ROOT);
-        return lower.endsWith(".mp3") || lower.endsWith(".m4a") || lower.endsWith(".wav")
+        return lower.startsWith("data:audio/")
+                || lower.endsWith(".mp3") || lower.endsWith(".m4a") || lower.endsWith(".wav")
                 || lower.endsWith(".ogg") || lower.endsWith(".aac")
-                || lower.endsWith(".flac") || lower.contains("status_voice_") || lower.contains("status_music_");
+                || lower.endsWith(".flac") || lower.contains("status_voice_")
+                || lower.contains("status_music_") || lower.contains("peer_status_audio_");
     }
 
     public static boolean isVideoStatusUri(String uri) {
         if (uri == null || uri.isEmpty()) return false;
         String lower = uri.toLowerCase(Locale.ROOT);
-        return lower.endsWith(".mp4") || lower.endsWith(".mkv") || lower.endsWith(".webm")
+        return lower.startsWith("data:video/")
+                || lower.endsWith(".mp4") || lower.endsWith(".mkv") || lower.endsWith(".webm")
                 || lower.endsWith(".mov") || lower.endsWith(".3gp") || lower.endsWith(".avi")
                 || lower.endsWith(".m4v") || lower.contains("processed_vid_") || lower.contains("video/media");
     }
@@ -355,20 +373,29 @@ public final class WhatsAppStatusUi {
 
         List<StatusUpdate> mine = new ArrayList<>();
         Map<String, List<StatusUpdate>> byAuthor = new LinkedHashMap<>();
-        for (StatusUpdate s : all) {
-            if (s.isMine) {
-                mine.add(s);
-            } else {
-                List<StatusUpdate> l = byAuthor.get(s.authorId);
-                if (l == null) {
-                    l = new ArrayList<>();
-                    byAuthor.put(s.authorId, l);
+        VeilFeatureManager vfm = VeilFeatureManager.getInstance(ctx);
+        if (all != null) {
+            for (StatusUpdate s : all) {
+                if (s == null || vfm.isDeletedStatusId(s.id)) continue;
+                s.contentText = StatusController.sanitizeStatusText(s.contentText);
+                if (s.isMine) {
+                    mine.add(s);
+                } else {
+                    List<StatusUpdate> l = byAuthor.get(s.authorId);
+                    if (l == null) {
+                        l = new ArrayList<>();
+                        byAuthor.put(s.authorId, l);
+                    }
+                    l.add(s);
                 }
-                l.add(s);
             }
         }
+        java.util.Collections.sort(mine, (a, b) -> Long.compare(a.timestampMs, b.timestampMs));
+        for (List<StatusUpdate> group : byAuthor.values()) {
+            java.util.Collections.sort(group, (a, b) -> Long.compare(a.timestampMs, b.timestampMs));
+        }
 
-        // 1. "My status" Section Header + Status Rows (Matching WhatsApp 10.jpg & 11.jpg below statusTraySection)
+        // 1. "My status" Section Header + Status Rows
         TextView mySecHeader = new TextView(ctx);
         mySecHeader.setText("My status");
         mySecHeader.setTextSize(14f);
@@ -382,6 +409,7 @@ public final class WhatsAppStatusUi {
 
         if (hasMine) {
             for (int i = 0; i < mine.size(); i++) {
+                final int rowIdx = i;
                 final StatusUpdate su = mine.get(i);
 
                 LinearLayout row = new LinearLayout(ctx);
@@ -425,12 +453,13 @@ public final class WhatsAppStatusUi {
                     tvInit.setTextSize(11f);
                     tvInit.setMaxLines(2);
                     tvInit.setPadding((int) (4 * dp), 0, (int) (4 * dp), 0);
-                    tvInit.setText(su.contentText != null && !su.contentText.isEmpty() ? su.contentText : "Status");
+                    String cleanPreview = StatusController.sanitizeStatusText(su.contentText);
+                    tvInit.setText(!cleanPreview.isEmpty() ? cleanPreview : "Status");
                     thumbFrame.addView(tvInit);
                 }
                 row.addView(thumbFrame);
 
-                // Middle Info Column: "X views" + "Just now â€¢ My contacts..." (10.jpg)
+                // Middle Info Column: "X views" + "Just now • My contacts..."
                 LinearLayout infoCol = new LinearLayout(ctx);
                 infoCol.setOrientation(LinearLayout.VERTICAL);
                 LinearLayout.LayoutParams icLp = new LinearLayout.LayoutParams(
@@ -438,7 +467,7 @@ public final class WhatsAppStatusUi {
                 icLp.leftMargin = (int) (16 * dp);
                 infoCol.setLayoutParams(icLp);
 
-                int vCount = (su.viewers != null && !su.viewers.isEmpty()) ? su.viewers.size() : su.viewCount;
+                int vCount = (su.viewers != null && !su.viewers.isEmpty()) ? Math.max(su.viewCount, su.viewers.size()) : su.viewCount;
                 TextView tvViews = new TextView(ctx);
                 tvViews.setText(vCount + (vCount == 1 ? " view" : " views"));
                 tvViews.setTextSize(16f);
@@ -449,13 +478,13 @@ public final class WhatsAppStatusUi {
                 CharSequence relTime = DateUtils.getRelativeTimeSpanString(
                         su.timestampMs, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
                 TextView tvSub = new TextView(ctx);
-                tvSub.setText(relTime + " â€¢ " + audienceSummary);
+                tvSub.setText(relTime + " \u2022 " + audienceSummary);
                 tvSub.setTextSize(13.5f);
                 tvSub.setTextColor(ContextCompat.getColor(ctx, R.color.colorTextSecondary));
                 infoCol.addView(tvSub);
                 row.addView(infoCol);
 
-                // Right Actions: Eye Button (opens Status Viewers Bottom Sheet) + 3-Dots Menu (NO pencil icon!)
+                // Right Actions: Eye Button (opens Status Viewers Bottom Sheet) + 3-Dots Menu
                 ImageView btnEye = new ImageView(ctx);
                 btnEye.setLayoutParams(new LinearLayout.LayoutParams((int) (38 * dp), (int) (38 * dp)));
                 btnEye.setPadding((int) (8 * dp), (int) (8 * dp), (int) (8 * dp), (int) (8 * dp));
@@ -464,7 +493,6 @@ public final class WhatsAppStatusUi {
                 if (borderlessBgRes != 0) btnEye.setBackgroundResource(borderlessBgRes);
                 btnEye.setContentDescription("Viewed by");
                 btnEye.setOnClickListener(v -> showStatusViewersBottomSheet(ctx, su, listener, null, null, () -> {
-                    StatusController.getInstance(ctx).deleteStatus(su.id);
                     VeilFeatureManager.getInstance(ctx).deleteMyStatus(su.id);
                     if (listener != null) listener.onStatusesChanged();
                 }));
@@ -478,16 +506,13 @@ public final class WhatsAppStatusUi {
                 if (borderlessBgRes != 0) btnMore.setBackgroundResource(borderlessBgRes);
                 btnMore.setContentDescription("More options");
                 btnMore.setOnClickListener(v -> showStatusItemPopupMenu(ctx, v, su, () -> {
-                    StatusController.getInstance(ctx).deleteStatus(su.id);
                     VeilFeatureManager.getInstance(ctx).deleteMyStatus(su.id);
                     if (listener != null) listener.onStatusesChanged();
                 }));
                 row.addView(btnMore);
 
                 row.setOnClickListener(v -> {
-                    List<StatusUpdate> singleOrAll = new ArrayList<>();
-                    singleOrAll.add(su);
-                    showViewer(ctx, singleOrAll, listener);
+                    showViewer(ctx, new ArrayList<>(mine), rowIdx, listener);
                 });
                 container.addView(row);
 
@@ -500,16 +525,16 @@ public final class WhatsAppStatusUi {
                 container.addView(itemDiv);
             }
 
-            // E2EE Disappearing Footer Note (10.jpg)
+            // E2EE Disappearing Footer Note
             TextView tvEncNote = new TextView(ctx);
             tvEncNote.setGravity(Gravity.CENTER);
             tvEncNote.setPadding((int) (24 * dp), (int) (14 * dp), (int) (24 * dp), (int) (14 * dp));
-            tvEncNote.setText("ðŸ”’ Your statuses are end-to-end encrypted. They will disappear after 24 hours.");
+            tvEncNote.setText("\uD83D\uDD12 Your statuses are end-to-end encrypted. They will disappear after 24 hours.");
             tvEncNote.setTextSize(12.5f);
             tvEncNote.setTextColor(ContextCompat.getColor(ctx, R.color.colorTextSecondary));
             container.addView(tvEncNote);
         } else {
-            // Empty "My status" row (NO pencil icon on the row â€” floating Pencil & Camera FABs are at bottom-right)
+            // Empty "My status" row
             LinearLayout myRow = new LinearLayout(ctx);
             myRow.setOrientation(LinearLayout.HORIZONTAL);
             myRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -595,8 +620,14 @@ public final class WhatsAppStatusUi {
             container.addView(secHeader);
 
             for (List<StatusUpdate> group : unreadGroups) {
-                StatusUpdate first = group.get(0);
-                container.addView(buildPeerStatusRow(ctx, dp, selectableBgRes, first, group, true, listener));
+                StatusUpdate firstUnseen = group.get(0);
+                for (StatusUpdate s : group) {
+                    if (!s.viewed) {
+                        firstUnseen = s;
+                        break;
+                    }
+                }
+                container.addView(buildPeerStatusRow(ctx, dp, selectableBgRes, firstUnseen, group, true, listener));
             }
         }
 
@@ -611,8 +642,8 @@ public final class WhatsAppStatusUi {
             container.addView(secHeader);
 
             for (List<StatusUpdate> group : seenGroups) {
-                StatusUpdate first = group.get(0);
-                container.addView(buildPeerStatusRow(ctx, dp, selectableBgRes, first, group, false, listener));
+                StatusUpdate latest = group.get(group.size() - 1);
+                container.addView(buildPeerStatusRow(ctx, dp, selectableBgRes, latest, group, false, listener));
             }
         }
 
@@ -740,7 +771,7 @@ public final class WhatsAppStatusUi {
             ivMic.setImageResource(R.drawable.ic_mic);
             ivMic.setColorFilter(Color.WHITE);
             avFrame.addView(ivMic);
-        } else if (first.contentText != null && !first.contentText.isEmpty()) {
+        } else if (first.contentText != null && !StatusController.sanitizeStatusText(first.contentText).isEmpty()) {
             TextView tvPreview = new TextView(ctx);
             FrameLayout.LayoutParams pLp = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
@@ -748,7 +779,7 @@ public final class WhatsAppStatusUi {
             tvPreview.setLayoutParams(pLp);
             tvPreview.setGravity(Gravity.CENTER);
             tvPreview.setPadding((int) (4 * dp), 0, (int) (4 * dp), 0);
-            tvPreview.setText(first.contentText);
+            tvPreview.setText(StatusController.sanitizeStatusText(first.contentText));
             tvPreview.setTextColor(Color.WHITE);
             tvPreview.setTextSize(10.5f);
             tvPreview.setMaxLines(2);
@@ -760,7 +791,7 @@ public final class WhatsAppStatusUi {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
             cLp.setMargins(innerPad, innerPad, innerPad, innerPad);
             civ.setLayoutParams(cLp);
-            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(civ, null, first.authorName, false);
+            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(civ, resolvePeerAvatarSource(ctx, first.authorId, first.authorName), first.authorName, false);
             avFrame.addView(civ);
         }
         row.addView(avFrame);
@@ -783,13 +814,13 @@ public final class WhatsAppStatusUi {
                 System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
         String typeTag = "";
         if (isAudioStatusUri(first.mediaUri)) {
-            typeTag = "ðŸŽ¤ Voice â€¢ ";
+            typeTag = "\uD83C\uDFA4 Voice \u2022 ";
         } else if (isVideoStatusUri(first.mediaUri)) {
-            typeTag = "ðŸŽ¬ Video â€¢ ";
+            typeTag = "\uD83C\uDFAC Video \u2022 ";
         } else if (first.mediaUri != null && !first.mediaUri.isEmpty()) {
-            typeTag = "ðŸ“· Photo â€¢ ";
+            typeTag = "\uD83D\uDCF7 Photo \u2022 ";
         }
-        String countPrefix = (group != null && group.size() > 1) ? (group.size() + " updates â€¢ ") : "";
+        String countPrefix = (group != null && group.size() > 1) ? (group.size() + " updates \u2022 ") : "";
 
         TextView tvTime = new TextView(ctx);
         tvTime.setText(countPrefix + typeTag + relTime);
@@ -798,7 +829,7 @@ public final class WhatsAppStatusUi {
         col.addView(tvTime);
 
         row.addView(col);
-        row.setOnClickListener(v -> showViewer(ctx, group, listener));
+        row.setOnClickListener(v -> showViewer(ctx, group, -1, listener));
         wrapper.addView(row);
 
         View itemDiv = new View(ctx);
@@ -940,7 +971,7 @@ public final class WhatsAppStatusUi {
                 pLp.setMargins((int) (8 * dp), 0, (int) (8 * dp), 0);
                 tvPreview.setLayoutParams(pLp);
                 tvPreview.setGravity(Gravity.CENTER);
-                tvPreview.setText(preview.contentText);
+                tvPreview.setText(StatusController.sanitizeStatusText(preview.contentText));
                 tvPreview.setTextColor(Color.WHITE);
                 tvPreview.setTextSize(10f);
                 tvPreview.setMaxLines(4);
@@ -1735,14 +1766,7 @@ public final class WhatsAppStatusUi {
 
         for (int i = 0; i < pathsToPost.size(); i++) {
             String path = pathsToPost.get(i);
-            String type = i < typesToPost.size() ? typesToPost.get(i) : "image";
-            if (isVideoStatusUri(path)) type = "video";
             String slideCaption = (i == 0) ? safeCaption : "";
-            if ("video".equalsIgnoreCase(type)) {
-                StatusController.getInstance(ctx).postVideoStatus(path, slideCaption, acl, targetPeers);
-            } else {
-                StatusController.getInstance(ctx).postPhotoStatus(path, slideCaption, acl, targetPeers);
-            }
             VeilFeatureManager.getInstance(ctx).addMyMediaStatus(path, slideCaption, "#1E293B", mentionNames);
         }
         Toast.makeText(ctx, "Status shared", Toast.LENGTH_SHORT).show();
@@ -2252,11 +2276,11 @@ public final class WhatsAppStatusUi {
 
         // Track item structure: [0]=title, [1]=artist/subtitle, [2]=icon, [3]=audioUriOrSynthFreq
         final List<String[]> trackItems = new ArrayList<>();
-        trackItems.add(new String[]{"Midnight Synthwave", "VEIL Original â€¢ 128 BPM", "ðŸŽµ", "SYNTH:440"});
-        trackItems.add(new String[]{"Lo-Fi Rain & Chill", "Ambient Beats â€¢ 82 BPM", "ðŸŒ§ï¸", "SYNTH:330"});
-        trackItems.add(new String[]{"Cyberpunk Horizon", "Neon Pulse â€¢ 140 BPM", "âš¡", "SYNTH:523"});
-        trackItems.add(new String[]{"Acoustic Sunrise", "Warm Guitar â€¢ 96 BPM", "â˜€ï¸", "SYNTH:392"});
-        trackItems.add(new String[]{"Deep Focus Flow", "Minimal Piano â€¢ 74 BPM", "ðŸŽ¹", "SYNTH:293"});
+        trackItems.add(new String[]{"Midnight Synthwave", "VEIL Original \u2022 128 BPM", "\uD83C\uDFB5", "SYNTH:440"});
+        trackItems.add(new String[]{"Lo-Fi Rain & Chill", "Ambient Beats \u2022 82 BPM", "\uD83C\uDF27\uFE0F", "SYNTH:330"});
+        trackItems.add(new String[]{"Cyberpunk Horizon", "Neon Pulse \u2022 140 BPM", "\u26A1", "SYNTH:523"});
+        trackItems.add(new String[]{"Acoustic Sunrise", "Warm Guitar \u2022 96 BPM", "\u2600\uFE0F", "SYNTH:392"});
+        trackItems.add(new String[]{"Deep Focus Flow", "Minimal Piano \u2022 74 BPM", "\uD83C\uDFB9", "SYNTH:293"});
 
         final int[] selectedTrack = {0};
         final android.media.MediaPlayer[] previewPlayer = {null};
@@ -2364,7 +2388,7 @@ public final class WhatsAppStatusUi {
         final TextView btnPlayToggle = new TextView(ctx);
         btnPlayToggle.setLayoutParams(new LinearLayout.LayoutParams(Math.round(44 * dp), Math.round(44 * dp)));
         btnPlayToggle.setGravity(Gravity.CENTER);
-        btnPlayToggle.setText("â–¶");
+        btnPlayToggle.setText("\u25B6");
         btnPlayToggle.setTextColor(Color.WHITE);
         btnPlayToggle.setTextSize(16f);
         GradientDrawable playBg = new GradientDrawable();
@@ -2451,10 +2475,10 @@ public final class WhatsAppStatusUi {
                     mp.start();
                     previewPlayer[0] = mp;
                     isPlayingPreview[0] = true;
-                    btnPlayToggle.setText("â¸");
+                    btnPlayToggle.setText("\u23F8");
                 }
             } catch (Throwable e) {
-                btnPlayToggle.setText("â–¶");
+                btnPlayToggle.setText("\u25B6");
             }
         };
 
@@ -2476,7 +2500,7 @@ public final class WhatsAppStatusUi {
                 String[] tr = trackItems.get(i);
                 boolean isSel = (idx == selectedTrack[0]);
                 TextView row = new TextView(ctx);
-                row.setText(tr[2] + "  " + tr[0] + " Â· " + tr[1] + (isSel ? "   âœ“" : ""));
+                row.setText(tr[2] + "  " + tr[0] + " \u00B7 " + tr[1] + (isSel ? "   \u2713" : ""));
                 row.setTextColor(Color.WHITE);
                 row.setTextSize(13.5f);
                 row.setTypeface(null, isSel ? Typeface.BOLD : Typeface.NORMAL);
@@ -2503,7 +2527,7 @@ public final class WhatsAppStatusUi {
         btnPlayToggle.setOnClickListener(v -> {
             if (isPlayingPreview[0]) {
                 stopPreviewPlayer.run();
-                btnPlayToggle.setText("â–¶");
+                btnPlayToggle.setText("\u25B6");
             } else {
                 playSelectedTrackPreview.run();
             }
@@ -2511,7 +2535,7 @@ public final class WhatsAppStatusUi {
 
         btnBrowseMusicFiles.setOnClickListener(v -> {
             stopPreviewPlayer.run();
-            btnPlayToggle.setText("â–¶");
+            btnPlayToggle.setText("\u25B6");
             com.m3.veil.ui.chat.sheets.MediaGalleryBottomSheet.launchExternalSourcePicker(
                     ctx, "Music", false, (uris, types) -> {
                         if (uris == null || uris.isEmpty()) return;
@@ -2520,7 +2544,7 @@ public final class WhatsAppStatusUi {
                         trackItems.add(0, new String[]{
                                 displayName,
                                 "Selected from Device Files",
-                                "ðŸŽ§",
+                                "\uD83C\uDFA7",
                                 pickedUri.toString()
                         });
                         selectedTrack[0] = 0;
@@ -2585,15 +2609,10 @@ public final class WhatsAppStatusUi {
                 }
             } catch (Throwable ignored) {}
 
-            StatusController.PrivacyAcl acl = resolveConfiguredPrivacyAcl(ctx);
-            List<String> targetPeers = resolveConfiguredTargetPeers(ctx, null);
             if (savedAudio != null && savedAudio.exists()) {
-                StatusController.getInstance(ctx).postPhotoStatus(
-                        savedAudio.getAbsolutePath(), text, acl, targetPeers);
                 VeilFeatureManager.getInstance(ctx).addMyMediaStatus(
                         savedAudio.getAbsolutePath(), text, BG_COLORS[colorIdx[0]], null);
             } else {
-                StatusController.getInstance(ctx).postTextStatus(text, BG_COLORS[colorIdx[0]], 0, acl, targetPeers);
                 VeilFeatureManager.getInstance(ctx).addMyStatus(text, BG_COLORS[colorIdx[0]], 0);
             }
             Toast.makeText(ctx, "Music status shared", Toast.LENGTH_SHORT).show();
@@ -2635,7 +2654,7 @@ public final class WhatsAppStatusUi {
                     if (artist == null || artist.contains("<unknown>")) artist = "Device Audio";
                     Uri uri = android.content.ContentUris.withAppendedId(
                             android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
-                    list.add(new String[]{title != null ? title : "Track", artist, "ðŸŽµ", uri.toString()});
+                    list.add(new String[]{title != null ? title : "Track", artist, "\uD83C\uDFB5", uri.toString()});
                     count++;
                 }
             }
@@ -3249,15 +3268,11 @@ public final class WhatsAppStatusUi {
             } else {
                 cleanupAudioResources.run();
                 int finalSec = Math.max(1, recordedDurationSec[0]);
-                String label = "ðŸŽ¤ Voice Status (" + String.format(Locale.ROOT, "0:%02d", finalSec) + ")";
-                StatusController.PrivacyAcl acl = resolveConfiguredPrivacyAcl(ctx);
-                List<String> targetPeers = resolveConfiguredTargetPeers(ctx, null);
+                String label = "\uD83C\uDFA4 Voice Status (" + String.format(Locale.ROOT, "0:%02d", finalSec) + ")";
                 File voiceAudio = (recordedFile[0] != null && recordedFile[0].exists() && recordedFile[0].length() > 100)
                         ? recordedFile[0]
                         : ensureVoiceFallbackWavFile(ctx, finalSec);
                 if (voiceAudio != null && voiceAudio.exists()) {
-                    StatusController.getInstance(ctx).postPhotoStatus(
-                            voiceAudio.getAbsolutePath(), label, acl, targetPeers);
                     VeilFeatureManager.getInstance(ctx).addMyMediaStatus(
                             voiceAudio.getAbsolutePath(), label, BG_COLORS[colorIdx[0]], null);
                 }
@@ -3457,9 +3472,6 @@ public final class WhatsAppStatusUi {
                 Toast.makeText(ctx, "Type something to post a status", Toast.LENGTH_SHORT).show();
                 return;
             }
-            StatusController.PrivacyAcl acl = resolveConfiguredPrivacyAcl(ctx);
-            List<String> targetPeers = resolveConfiguredTargetPeers(ctx, null);
-            StatusController.getInstance(ctx).postTextStatus(text, BG_COLORS[colorIdx[0]], fontIdx[0], acl, targetPeers);
             VeilFeatureManager.getInstance(ctx).addMyStatus(text, BG_COLORS[colorIdx[0]], fontIdx[0]);
             Toast.makeText(ctx, "Status shared", Toast.LENGTH_SHORT).show();
             dialog.dismiss();
@@ -3594,6 +3606,7 @@ public final class WhatsAppStatusUi {
 
             String audienceSummary = getFormattedStatusAudience(ctx);
             for (int i = 0; i < workingMine.size(); i++) {
+                final int rowIdx = i;
                 final StatusUpdate su = workingMine.get(i);
                 LinearLayout row = new LinearLayout(ctx);
                 row.setOrientation(LinearLayout.HORIZONTAL);
@@ -3632,19 +3645,20 @@ public final class WhatsAppStatusUi {
                     tvInit.setTextColor(Color.WHITE);
                     tvInit.setTextSize(12f);
                     tvInit.setMaxLines(2);
-                    tvInit.setText(su.contentText != null ? su.contentText : "Status");
+                    String cleanText = StatusController.sanitizeStatusText(su.contentText);
+                    tvInit.setText(!cleanText.isEmpty() ? cleanText : "Status");
                     thumbFrame.addView(tvInit);
                 }
                 row.addView(thumbFrame);
 
-                // Views count + Timestamp & Audience Subtitle (Screenshot 10.jpg)
+                // Views count + Timestamp & Audience Subtitle
                 LinearLayout infoCol = new LinearLayout(ctx);
                 infoCol.setOrientation(LinearLayout.VERTICAL);
                 LinearLayout.LayoutParams iclp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
                 iclp.leftMargin = Math.round(16 * dp);
                 infoCol.setLayoutParams(iclp);
 
-                int vCount = (su.viewers != null && !su.viewers.isEmpty()) ? su.viewers.size() : su.viewCount;
+                int vCount = (su.viewers != null && !su.viewers.isEmpty()) ? Math.max(su.viewCount, su.viewers.size()) : su.viewCount;
                 TextView tvViews = new TextView(ctx);
                 tvViews.setText(vCount + (vCount == 1 ? " view" : " views"));
                 tvViews.setTextSize(16.5f);
@@ -3655,13 +3669,13 @@ public final class WhatsAppStatusUi {
                 CharSequence relTime = DateUtils.getRelativeTimeSpanString(
                         su.timestampMs, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
                 TextView tvSub = new TextView(ctx);
-                tvSub.setText(relTime + " â€¢ " + audienceSummary);
+                tvSub.setText(relTime + " \u2022 " + audienceSummary);
                 tvSub.setTextSize(13.5f);
                 tvSub.setTextColor(ContextCompat.getColor(ctx, R.color.colorTextSecondary));
                 infoCol.addView(tvSub);
                 row.addView(infoCol);
 
-                // Eye Button (Viewers Sheet) + 3-Dots Overflow Button (Screenshot 10.jpg & 11.jpg)
+                // Eye Button (Viewers Sheet) + 3-Dots Overflow Button
                 ImageView btnEyeMgr = new ImageView(ctx);
                 btnEyeMgr.setLayoutParams(new LinearLayout.LayoutParams(Math.round(40 * dp), Math.round(40 * dp)));
                 btnEyeMgr.setPadding(Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp), Math.round(8 * dp));
@@ -3669,7 +3683,6 @@ public final class WhatsAppStatusUi {
                 btnEyeMgr.setColorFilter(ContextCompat.getColor(ctx, R.color.colorTextSecondary));
                 if (rippleRes != 0) btnEyeMgr.setBackgroundResource(rippleRes);
                 btnEyeMgr.setOnClickListener(v -> showStatusViewersBottomSheet(ctx, su, listener, null, dialog, () -> {
-                    StatusController.getInstance(ctx).deleteStatus(su.id);
                     VeilFeatureManager.getInstance(ctx).deleteMyStatus(su.id);
                     workingMine.remove(su);
                     renderRowsHolder[0].run();
@@ -3684,7 +3697,6 @@ public final class WhatsAppStatusUi {
                 btnMore.setColorFilter(ContextCompat.getColor(ctx, R.color.colorTextSecondary));
                 if (rippleRes != 0) btnMore.setBackgroundResource(rippleRes);
                 btnMore.setOnClickListener(v -> showStatusItemPopupMenu(ctx, v, su, () -> {
-                    StatusController.getInstance(ctx).deleteStatus(su.id);
                     VeilFeatureManager.getInstance(ctx).deleteMyStatus(su.id);
                     workingMine.remove(su);
                     renderRowsHolder[0].run();
@@ -3693,9 +3705,7 @@ public final class WhatsAppStatusUi {
                 row.addView(btnMore);
 
                 row.setOnClickListener(v -> {
-                    List<StatusUpdate> single = new ArrayList<>();
-                    single.add(su);
-                    showViewer(ctx, single, listener);
+                    showViewer(ctx, new ArrayList<>(workingMine), rowIdx, listener);
                 });
                 listContainer.addView(row);
 
@@ -3706,11 +3716,11 @@ public final class WhatsAppStatusUi {
                 listContainer.addView(itemDiv);
             }
 
-            // E2EE Disappearing Footer Note (Screenshot 10.jpg)
+            // E2EE Disappearing Footer Note
             TextView tvEncNote = new TextView(ctx);
             tvEncNote.setGravity(Gravity.CENTER);
             tvEncNote.setPadding(Math.round(24 * dp), Math.round(22 * dp), Math.round(24 * dp), Math.round(22 * dp));
-            tvEncNote.setText("ðŸ”’ Your statuses are end-to-end encrypted. They will disappear after 24 hours.");
+            tvEncNote.setText("\uD83D\uDD12 Your statuses are end-to-end encrypted. They will disappear after 24 hours.");
             tvEncNote.setTextSize(12.5f);
             tvEncNote.setTextColor(ContextCompat.getColor(ctx, R.color.colorTextSecondary));
             listContainer.addView(tvEncNote);
@@ -3925,9 +3935,10 @@ public final class WhatsAppStatusUi {
         btnSendForward.setLayoutParams(bLp);
         btnSendForward.setOnClickListener(v -> {
             if (selectedChatIds.isEmpty()) return;
-            String msgBody = (su.contentText != null && !su.contentText.isEmpty())
-                    ? "â†ª Status: " + su.contentText
-                    : "â†ª Forwarded status update";
+            String cleanBody = StatusController.sanitizeStatusText(su.contentText);
+            String msgBody = !cleanBody.isEmpty()
+                    ? "\u21AA Status: " + cleanBody
+                    : "\u21AA Forwarded status update";
             String myUid = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(ctx).getCurrentUserId();
             if (myUid == null || myUid.isEmpty()) myUid = "me";
             for (String cid : selectedChatIds) {
@@ -4106,15 +4117,31 @@ public final class WhatsAppStatusUi {
     // =====================================================================
 
     public static void showViewer(Context ctx, List<StatusUpdate> statuses, StatusActionListener listener) {
+        showViewer(ctx, statuses, -1, listener);
+    }
+
+    public static void showViewer(Context ctx, List<StatusUpdate> statuses, int initialIndex, StatusActionListener listener) {
         if (statuses == null || statuses.isEmpty()) return;
         final Dialog dialog = new Dialog(ctx, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         float dp = ctx.getResources().getDisplayMetrics().density;
         final Handler handler = new Handler(Looper.getMainLooper());
-        final int[] index = {0};
+        final boolean isMineGroup = statuses.get(0).isMine;
+
+        int startIdx = 0;
+        if (initialIndex >= 0 && initialIndex < statuses.size()) {
+            startIdx = initialIndex;
+        } else if (!isMineGroup) {
+            for (int i = 0; i < statuses.size(); i++) {
+                if (!statuses.get(i).viewed) {
+                    startIdx = i;
+                    break;
+                }
+            }
+        }
+        final int[] index = {startIdx};
         final long[] segmentStart = {0};
         final long[] pausedElapsed = {0};
         final boolean[] paused = {false};
-        final boolean isMineGroup = statuses.get(0).isMine;
 
         FrameLayout root = new FrameLayout(ctx);
 
@@ -4137,6 +4164,21 @@ public final class WhatsAppStatusUi {
         photoView.setVisibility(View.GONE);
         root.addView(photoView);
 
+        // Top and Bottom dark gradient scrims so header, text, and footer controls are always readable
+        View topScrim = new View(ctx);
+        topScrim.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.round(128 * dp), Gravity.TOP));
+        topScrim.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.parseColor("#B3000000"), Color.TRANSPARENT}));
+        root.addView(topScrim);
+
+        View bottomScrim = new View(ctx);
+        bottomScrim.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.round(168 * dp), Gravity.BOTTOM));
+        bottomScrim.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,
+                new int[]{Color.parseColor("#B3000000"), Color.TRANSPARENT}));
+        root.addView(bottomScrim);
+
         // Text content
         TextView content = new TextView(ctx);
         FrameLayout.LayoutParams cLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
@@ -4146,6 +4188,7 @@ public final class WhatsAppStatusUi {
         content.setGravity(Gravity.CENTER);
         content.setTextColor(Color.WHITE);
         content.setTextSize(28f);
+        content.setShadowLayer(6f, 0f, 2f, Color.parseColor("#B3000000"));
         root.addView(content);
 
         // Interactive Voice & Audio Status Player Card (shown for Voice & Music statuses)
@@ -4292,10 +4335,12 @@ public final class WhatsAppStatusUi {
         tvAuthor.setTextColor(Color.WHITE);
         tvAuthor.setTextSize(16f);
         tvAuthor.setTypeface(null, Typeface.BOLD);
+        tvAuthor.setShadowLayer(4f, 0f, 1.5f, Color.parseColor("#99000000"));
         nameCol.addView(tvAuthor);
         TextView tvTime = new TextView(ctx);
-        tvTime.setTextColor(Color.parseColor("#DDFFFFFF"));
+        tvTime.setTextColor(Color.parseColor("#EEFFFFFF"));
         tvTime.setTextSize(12.5f);
+        tvTime.setShadowLayer(3f, 0f, 1f, Color.parseColor("#99000000"));
         nameCol.addView(tvTime);
         header.addView(nameCol);
 
@@ -4366,7 +4411,7 @@ public final class WhatsAppStatusUi {
             eyeRow.setPadding((int) (16 * dp), (int) (6 * dp), (int) (16 * dp), (int) (6 * dp));
             GradientDrawable eyePillBg = new GradientDrawable();
             eyePillBg.setCornerRadius(20 * dp);
-            eyePillBg.setColor(Color.parseColor("#4D000000"));
+            eyePillBg.setColor(Color.parseColor("#66000000"));
             eyeRow.setBackground(eyePillBg);
 
             ImageView ivEye = new ImageView(ctx);
@@ -4417,7 +4462,7 @@ public final class WhatsAppStatusUi {
             reactionsBar.setBackground(rbBg);
             reactionsBar.setPadding((int) (8 * dp), (int) (4 * dp), (int) (8 * dp), (int) (4 * dp));
 
-            String[] quickEmojis = {"ðŸ”¥", "â¤ï¸", "ðŸ˜‚", "ðŸ˜®", "ðŸ˜¢", "ðŸ‘"};
+            String[] quickEmojis = {"\uD83D\uDD25", "\u2764\uFE0F", "\uD83D\uDE02", "\uD83D\uDE2E", "\uD83D\uDE22", "\uD83D\uDC4F"};
             for (String emoji : quickEmojis) {
                 TextView emojiBtn = new TextView(ctx);
                 LinearLayout.LayoutParams ebLp = new LinearLayout.LayoutParams((int) (40 * dp), (int) (36 * dp));
@@ -4616,8 +4661,11 @@ public final class WhatsAppStatusUi {
             stopViewerAudio.run();
             currentSegmentDurationMs[0] = SEGMENT_DURATION_MS;
             StatusUpdate s = statuses.get(index[0]);
+            String cleanText = StatusController.sanitizeStatusText(s.contentText);
 
-            boolean hasMedia = s.mediaUri != null && !s.mediaUri.isEmpty();
+            boolean hasMedia = s.mediaUri != null && !s.mediaUri.trim().isEmpty()
+                    && !s.mediaUri.endsWith(".enc")
+                    && !"data:image/jpeg;base64,".equals(s.mediaUri.trim());
             boolean isAudio = hasMedia && isAudioStatusUri(s.mediaUri);
             boolean isVideo = hasMedia && !isAudio && isVideoStatusUri(s.mediaUri);
 
@@ -4666,7 +4714,6 @@ public final class WhatsAppStatusUi {
                             }
                         });
                         videoView.setOnErrorListener((mp, what, extra) -> {
-                            // Keep poster frame visible if hardware video decoder fails
                             photoView.setVisibility(View.VISIBLE);
                             return true;
                         });
@@ -4677,10 +4724,11 @@ public final class WhatsAppStatusUi {
                     videoContainer.setVisibility(View.GONE);
                 }
 
-                if (s.contentText != null && !s.contentText.isEmpty()) {
+                if (!cleanText.isEmpty()) {
                     content.setVisibility(View.VISIBLE);
-                    content.setText(com.m3.veil.utils.UiAnimator.formatTextWithLargeEmojis(s.contentText, 1.38f));
+                    content.setText(com.m3.veil.utils.UiAnimator.formatTextWithLargeEmojis(cleanText, 1.38f));
                     content.setTextSize(17.5f);
+                    content.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
                     content.setGravity(Gravity.CENTER);
                     FrameLayout.LayoutParams textLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
@@ -4705,8 +4753,7 @@ public final class WhatsAppStatusUi {
                         : resolvePeerAvatarSource(ctx, s.authorId, s.authorName);
                 com.m3.veil.utils.VeilAvatarLoader.loadAvatar(audioCiv, authorAv, authorDisplay, false);
 
-                String captionLabel = (s.contentText != null && !s.contentText.isEmpty())
-                        ? s.contentText : "ðŸŽ¤ Voice Status";
+                String captionLabel = !cleanText.isEmpty() ? cleanText : "\uD83C\uDFA4 Voice Status";
                 tvAudioCaption.setText(captionLabel);
                 viewerWaveform.resetSamples();
                 for (int w = 0; w < 28; w++) {
@@ -4718,13 +4765,26 @@ public final class WhatsAppStatusUi {
 
                 try {
                     android.media.MediaPlayer mp = new android.media.MediaPlayer();
-                    Uri u = Uri.parse(s.mediaUri);
-                    String path = "file".equalsIgnoreCase(u.getScheme()) ? u.getPath() : s.mediaUri;
-                    File af = new File(path != null ? path : s.mediaUri);
-                    if (af.exists()) {
-                        mp.setDataSource(af.getAbsolutePath());
+                    String mediaStr = s.mediaUri;
+                    if (mediaStr.startsWith("data:audio/")) {
+                        int commaIdx = mediaStr.indexOf(',');
+                        if (commaIdx > 0) {
+                            byte[] audioBytes = android.util.Base64.decode(mediaStr.substring(commaIdx + 1), android.util.Base64.DEFAULT);
+                            File tmpFile = new File(ctx.getCacheDir(), "viewer_audio_" + Math.abs(s.id.hashCode()) + ".m4a");
+                            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tmpFile)) {
+                                fos.write(audioBytes);
+                            }
+                            mp.setDataSource(tmpFile.getAbsolutePath());
+                        }
                     } else {
-                        mp.setDataSource(ctx, u);
+                        Uri u = Uri.parse(mediaStr);
+                        String path = "file".equalsIgnoreCase(u.getScheme()) ? u.getPath() : mediaStr;
+                        File af = new File(path != null ? path : mediaStr);
+                        if (af.exists()) {
+                            mp.setDataSource(af.getAbsolutePath());
+                        } else {
+                            mp.setDataSource(ctx, u);
+                        }
                     }
                     mp.prepare();
                     int audioDur = mp.getDuration();
@@ -4741,7 +4801,7 @@ public final class WhatsAppStatusUi {
                     mp.start();
                     viewerAudioPlayer[0] = mp;
                 } catch (Throwable t) {
-                    tvAudioTimer.setText(extractAudioDurationLabel(s.contentText));
+                    tvAudioTimer.setText(extractAudioDurationLabel(cleanText));
                 }
             } else {
                 audioPlayerCard.setVisibility(View.GONE);
@@ -4749,9 +4809,8 @@ public final class WhatsAppStatusUi {
                 photoView.setVisibility(View.GONE);
                 root.setBackgroundColor(parseColor(s.bgColorHex));
                 content.setVisibility(View.VISIBLE);
-                content.setText(s.contentText != null && !s.contentText.isEmpty()
-                        ? com.m3.veil.utils.UiAnimator.formatTextWithLargeEmojis(s.contentText, 1.38f)
-                        : "");
+                String displayTxt = !cleanText.isEmpty() ? cleanText : "Status update";
+                content.setText(com.m3.veil.utils.UiAnimator.formatTextWithLargeEmojis(displayTxt, 1.38f));
                 content.setTextSize(26f);
                 content.setPadding(0, 0, 0, 0);
                 content.setBackground(null);
@@ -4768,12 +4827,12 @@ public final class WhatsAppStatusUi {
                 bars.get(i).setProgress(i < index[0] ? 1000 : 0);
             }
             if (isMineGroup) {
-                int totalV = (s.viewers != null && !s.viewers.isEmpty()) ? s.viewers.size() : s.viewCount;
+                int totalV = (s.viewers != null && !s.viewers.isEmpty()) ? Math.max(s.viewCount, s.viewers.size()) : s.viewCount;
                 tvViews.setText(totalV + (totalV == 1 ? " view" : " views"));
             }
             if (!s.isMine) {
                 s.viewed = true;
-                StatusController.getInstance(ctx).markStatusViewed(s.id);
+                StatusController.getInstance(ctx).markStatusViewed(s.id, s.authorId);
                 VeilFeatureManager.getInstance(ctx).markStatusViewed(s.id);
             }
             segmentStart[0] = System.currentTimeMillis();
@@ -4784,7 +4843,6 @@ public final class WhatsAppStatusUi {
             int removedIdx = index[0];
             if (removedIdx < statuses.size()) {
                 String delId = statuses.get(removedIdx).id;
-                StatusController.getInstance(ctx).deleteStatus(delId);
                 VeilFeatureManager.getInstance(ctx).deleteMyStatus(delId);
                 statuses.remove(removedIdx);
             }
@@ -4904,14 +4962,16 @@ public final class WhatsAppStatusUi {
             return false;
         });
 
-        final StatusController.StatusObserver viewerStatusObserver = () -> {
+        final Runnable refreshCurrentStatusLive = () -> {
             handler.post(() -> {
                 if (!dialog.isShowing() || statuses.isEmpty()) return;
                 int curIdx = index[0];
                 if (curIdx < statuses.size()) {
-                    String curId = statuses.get(curIdx).id;
-                    if (StatusController.getInstance(ctx).isStatusPurged(curId)) {
-                        Log.i("WhatsAppStatusUi", "Currently viewed status was deleted remotely: " + curId);
+                    StatusUpdate cur = statuses.get(curIdx);
+                    String curId = cur.id;
+                    if (StatusController.getInstance(ctx).isStatusPurged(curId)
+                            || VeilFeatureManager.getInstance(ctx).isDeletedStatusId(curId)) {
+                        Log.i("WhatsAppStatusUi", "Currently viewed status was deleted: " + curId);
                         statuses.remove(curIdx);
                         if (statuses.isEmpty()) {
                             dialog.dismiss();
@@ -4930,15 +4990,36 @@ public final class WhatsAppStatusUi {
                             paused[0] = false;
                             segmentStart[0] = System.currentTimeMillis();
                         }
+                        return;
+                    }
+                    if (isMineGroup) {
+                        List<StatusUpdate> freshList = VeilFeatureManager.getInstance(ctx).getStatusUpdates(null);
+                        if (freshList != null) {
+                            for (StatusUpdate f : freshList) {
+                                if (f != null && f.id != null && f.id.equals(curId)) {
+                                    cur.viewers = f.viewers;
+                                    cur.viewCount = f.viewCount;
+                                    int totalV = (cur.viewers != null && !cur.viewers.isEmpty())
+                                            ? Math.max(cur.viewCount, cur.viewers.size()) : cur.viewCount;
+                                    tvViews.setText(totalV + (totalV == 1 ? " view" : " views"));
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             });
         };
+
+        final StatusController.StatusObserver viewerStatusObserver = refreshCurrentStatusLive::run;
+        final VeilFeatureManager.StatusChangeListener vfmStatusListener = refreshCurrentStatusLive::run;
         StatusController.getInstance(ctx).addObserver(viewerStatusObserver);
+        VeilFeatureManager.getInstance(ctx).addStatusChangeListener(vfmStatusListener);
 
         dialog.setContentView(root);
         dialog.setOnDismissListener(d -> {
             StatusController.getInstance(ctx).removeObserver(viewerStatusObserver);
+            VeilFeatureManager.getInstance(ctx).removeStatusChangeListener(vfmStatusListener);
             stopViewerAudio.run();
             handler.removeCallbacksAndMessages(null);
             if (listener != null) listener.onStatusesChanged();
@@ -4976,7 +5057,7 @@ public final class WhatsAppStatusUi {
         List<StatusUpdate> freshList = VeilFeatureManager.getInstance(ctx).getStatusUpdates(null);
         if (freshList != null) {
             for (StatusUpdate su : freshList) {
-                if (su.id != null && su.id.equals(status.id)) {
+                if (su != null && su.id != null && su.id.equals(status.id)) {
                     currentStatus = su;
                     break;
                 }
@@ -4986,12 +5067,12 @@ public final class WhatsAppStatusUi {
         List<StatusViewer> viewers = currentStatus.viewers;
         renderViewersList(ctx, container, emptyState, tvTitle, tvSubtitle, viewers, sheet, parentDialog);
 
-        // Realtime local P2P mesh listener for live "Who's Seen" updates (ZERO cloud storage)
+        // Realtime listener for live "Who's Seen" updates
         final VeilFeatureManager.StatusChangeListener liveListener = () -> {
             List<StatusUpdate> liveList = VeilFeatureManager.getInstance(ctx).getStatusUpdates(null);
             if (liveList != null) {
                 for (StatusUpdate su : liveList) {
-                    if (su.id != null && su.id.equals(status.id)) {
+                    if (su != null && su.id != null && su.id.equals(status.id)) {
                         new Handler(Looper.getMainLooper()).post(() -> {
                             if (sheet.isShowing()) {
                                 renderViewersList(ctx, container, emptyState, tvTitle, tvSubtitle, su.viewers, sheet, parentDialog);
@@ -5226,15 +5307,15 @@ public final class WhatsAppStatusUi {
 
             if (tvExcludedSub != null) {
                 int count = up.getStatusAudienceExcluded().size();
-                tvExcludedSub.setText(count + " excluded â€¢ Tap to edit");
+                tvExcludedSub.setText(count + " excluded \u2022 Tap to edit");
             }
             if (tvIncludedSub != null) {
                 int count = up.getStatusAudienceIncluded().size();
-                tvIncludedSub.setText(count + " included â€¢ Tap to select");
+                tvIncludedSub.setText(count + " included \u2022 Tap to select");
             }
             if (tvCloseFriendsSub != null) {
                 int count = up.getStatusAudienceCloseFriends().size();
-                tvCloseFriendsSub.setText(count + " close friends â€¢ Tap to edit");
+                tvCloseFriendsSub.setText(count + " close friends \u2022 Tap to edit");
             }
         };
         updateRadios.run();

@@ -408,4 +408,170 @@ public final class VeilAvatarLoader {
         }
         return String.valueOf(clean.charAt(0)).toUpperCase(Locale.ROOT);
     }
+
+    private static final java.util.Set<String> sFetchedFirestorePeers =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private static final java.util.Map<String, String> sPeerAvatarSourceCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static boolean isCustomAvatarSource(@Nullable String av) {
+        if (av == null) return false;
+        String clean = av.trim();
+        return !clean.isEmpty() && !"null".equalsIgnoreCase(clean)
+                && !"default".equalsIgnoreCase(clean) && !clean.startsWith("avatar_");
+    }
+
+    @Nullable
+    public static String resolvePeerAvatarSource(@NonNull Context context, @Nullable String myUserId, @Nullable String peerId) {
+        if (peerId == null || peerId.trim().isEmpty()) return null;
+        String cleanPeerId = peerId.trim();
+        String cachedSource = sPeerAvatarSourceCache.get(cleanPeerId);
+        if (isCustomAvatarSource(cachedSource)) {
+            return cachedSource;
+        }
+        try {
+            com.m3.veil.database.EncryptedChatDatabase db = com.m3.veil.database.EncryptedChatDatabase.getInstance(context);
+            String myId = myUserId;
+            if (myId == null || myId.isEmpty() || "local_user".equals(myId)) {
+                myId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(context);
+            }
+            if (myId != null && !myId.isEmpty() && !cleanPeerId.startsWith("group_") && !cleanPeerId.startsWith("channel_")) {
+                String directChatId = com.m3.veil.database.EncryptedChatDatabase.generateDirectChatId(myId, cleanPeerId);
+                com.m3.veil.model.Chat directChat = db.getChat(directChatId);
+                if (directChat != null && isCustomAvatarSource(directChat.getAvatar())) {
+                    sPeerAvatarSourceCache.put(cleanPeerId, directChat.getAvatar());
+                    return directChat.getAvatar();
+                }
+            }
+            com.m3.veil.model.Chat byIdChat = db.getChat(cleanPeerId);
+            if (byIdChat != null && isCustomAvatarSource(byIdChat.getAvatar())) {
+                sPeerAvatarSourceCache.put(cleanPeerId, byIdChat.getAvatar());
+                return byIdChat.getAvatar();
+            }
+            String explicitContactAv = db.getExplicitContactAvatar(cleanPeerId);
+            if (isCustomAvatarSource(explicitContactAv)) {
+                sPeerAvatarSourceCache.put(cleanPeerId, explicitContactAv);
+                return explicitContactAv;
+            }
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest = db.getSovereignProfileManifest(cleanPeerId);
+            if (manifest != null && isCustomAvatarSource(manifest.avatarBase64)) {
+                sPeerAvatarSourceCache.put(cleanPeerId, manifest.avatarBase64);
+                return manifest.avatarBase64;
+            }
+            String basePeerId = cleanPeerId.contains("_persona_")
+                    ? cleanPeerId.substring(0, cleanPeerId.indexOf("_persona_")) : cleanPeerId;
+            if (!basePeerId.equals(cleanPeerId)) {
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest baseManifest = db.getSovereignProfileManifest(basePeerId);
+                if (baseManifest != null && isCustomAvatarSource(baseManifest.avatarBase64)) {
+                    sPeerAvatarSourceCache.put(cleanPeerId, baseManifest.avatarBase64);
+                    return baseManifest.avatarBase64;
+                }
+            }
+            java.util.List<com.m3.veil.model.Chat> allChats = db.getAllChats();
+            if (allChats != null) {
+                for (com.m3.veil.model.Chat c : allChats) {
+                    if (c == null || c.isGroup()) continue;
+                    boolean matches = cleanPeerId.equals(c.getId())
+                            || (c.getId() != null && (c.getId().startsWith(cleanPeerId + "_") || c.getId().endsWith("_" + cleanPeerId)))
+                            || (c.getParticipants() != null && c.getParticipants().contains(cleanPeerId));
+                    if (matches && isCustomAvatarSource(c.getAvatar())) {
+                        sPeerAvatarSourceCache.put(cleanPeerId, c.getAvatar());
+                        return c.getAvatar();
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    public static void cachePeerAvatarSource(@Nullable Context context, @Nullable String peerId, @Nullable String avatarSource) {
+        cachePeerAvatarSource(peerId, avatarSource);
+    }
+
+    public static void cachePeerAvatarSource(@Nullable String peerId, @Nullable String avatarSource) {
+        if (peerId != null && !peerId.trim().isEmpty() && isCustomAvatarSource(avatarSource)) {
+            sPeerAvatarSourceCache.put(peerId.trim(), avatarSource.trim());
+        }
+    }
+
+    public static void loadPeerAvatar(@Nullable ImageView imageView,
+                                      @Nullable String peerId,
+                                      @Nullable String fallbackAvatarSource,
+                                      @Nullable String displayName) {
+        if (isCustomAvatarSource(fallbackAvatarSource)) {
+            cachePeerAvatarSource(peerId, fallbackAvatarSource);
+        }
+        loadPeerAvatar(imageView, null, peerId, displayName, false);
+    }
+
+    public static void loadPeerAvatar(@Nullable ImageView imageView,
+                                      @Nullable String myUserId,
+                                      @Nullable String peerId,
+                                      @Nullable String displayName,
+                                      boolean isGroup) {
+        if (imageView == null) return;
+        Context context = imageView.getContext();
+        if (context == null) return;
+
+        String safeName = (displayName != null && !displayName.trim().isEmpty()) ? displayName.trim() : "Veil Contact";
+        String avatarSource = resolvePeerAvatarSource(context, myUserId, peerId);
+
+        if (isGroup) {
+            loadAvatar(imageView, avatarSource, safeName, true);
+            return;
+        }
+
+        loadAvatar(imageView, avatarSource, safeName, false);
+
+        if (!isCustomAvatarSource(avatarSource) && peerId != null && !peerId.trim().isEmpty()
+                && !peerId.startsWith("group_") && !peerId.startsWith("channel_")) {
+            final String cleanPeer = peerId.trim();
+            final String lookupDocId = cleanPeer.contains("_persona_")
+                    ? cleanPeer.substring(0, cleanPeer.indexOf("_persona_")) : cleanPeer;
+            imageView.setTag(cleanPeer);
+            if (sFetchedFirestorePeers.add(cleanPeer)) {
+                final Context appCtx = context.getApplicationContext();
+                try {
+                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            .collection("users").document(lookupDocId).get()
+                            .addOnSuccessListener(doc -> {
+                                if (doc != null && doc.exists()) {
+                                    com.m3.veil.model.User u = doc.toObject(com.m3.veil.model.User.class);
+                                    String remoteAvatar = u != null ? u.getAvatar() : doc.getString("avatar");
+                                    String remoteName = u != null && u.getDisplayName() != null ? u.getDisplayName() : doc.getString("displayName");
+                                    String remoteUser = u != null && u.getUsername() != null ? u.getUsername() : doc.getString("username");
+                                    if (isCustomAvatarSource(remoteAvatar)) {
+                                        sPeerAvatarSourceCache.put(cleanPeer, remoteAvatar);
+                                        sPeerAvatarSourceCache.put(lookupDocId, remoteAvatar);
+                                        try {
+                                            com.m3.veil.database.EncryptedChatDatabase db = com.m3.veil.database.EncryptedChatDatabase.getInstance(appCtx);
+                                            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest cur = db.getSovereignProfileManifest(cleanPeer);
+                                            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest next =
+                                                    cur != null ? cur : new com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest();
+                                            next.uid = cleanPeer;
+                                            next.username = remoteUser != null ? remoteUser : (cur != null && cur.username != null ? cur.username : "");
+                                            next.displayName = remoteName != null ? remoteName : (cur != null && cur.displayName != null ? cur.displayName : safeName);
+                                            next.avatarBase64 = remoteAvatar;
+                                            next.updatedAtTimestamp = System.currentTimeMillis();
+                                            db.saveSovereignProfileManifest(next);
+                                            String myId = myUserId != null ? myUserId : com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(appCtx);
+                                            if (myId != null && !myId.isEmpty()) {
+                                                String dChatId = com.m3.veil.database.EncryptedChatDatabase.generateDirectChatId(myId, cleanPeer);
+                                                com.m3.veil.model.Chat existingChat = db.getChat(dChatId);
+                                                if (existingChat != null) {
+                                                    existingChat.setAvatar(remoteAvatar);
+                                                    db.saveOrUpdateChat(existingChat);
+                                                }
+                                            }
+                                        } catch (Throwable ignored) {}
+                                        imageView.post(() -> {
+                                            loadAvatar(imageView, remoteAvatar, safeName, false);
+                                        });
+                                    }
+                                }
+                            });
+                } catch (Throwable ignored) {}
+            }
+        }
+    }
 }

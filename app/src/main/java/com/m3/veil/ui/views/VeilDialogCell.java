@@ -412,11 +412,35 @@ public class VeilDialogCell extends View {
         this.mChat = chat;
         this.mCurrentUserId = currentUserId != null ? currentUserId : "";
         this.mUseSeparator = useSeparator;
+        String peerIdForTyp = extractPeerId(chat);
+        boolean isBlockedDialog = chat.isBlocked();
+        boolean isUnacceptedDialog = chat.isRequest();
         try {
-            String peerIdForTyp = extractPeerId(chat);
-            if (com.m3.veil.manager.VeilMessagesController.getInstance(getContext())
+            com.m3.veil.database.EncryptedChatDatabase db =
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(getContext());
+            if (db.isPeerOrChatBlocked(chat.getId(), peerIdForTyp)) {
+                isBlockedDialog = true;
+                chat.setBlocked(true);
+            }
+            if (!chat.isGroup() && !"channel".equalsIgnoreCase(chat.getType())
+                    && !db.isDirectChatAcceptedByPeer(chat.getId(), this.mCurrentUserId, peerIdForTyp)) {
+                isUnacceptedDialog = true;
+            }
+            if (isBlockedDialog || isUnacceptedDialog) {
+                chat.setTyping(false);
+                chat.setOnline(false);
+            } else if (com.m3.veil.manager.VeilMessagesController.getInstance(getContext())
                     .isDialogTyping(chat.getId(), peerIdForTyp)) {
                 chat.setTyping(true);
+            }
+            if (!chat.isGroup() && peerIdForTyp != null && !peerIdForTyp.isEmpty()) {
+                String curAv = chat.getAvatar();
+                if (curAv == null || curAv.trim().isEmpty() || curAv.startsWith("avatar_")) {
+                    String resolvedAv = com.m3.veil.utils.VeilAvatarLoader.resolvePeerAvatarSource(getContext(), mCurrentUserId, peerIdForTyp);
+                    if (resolvedAv != null && !resolvedAv.isEmpty()) {
+                        chat.setAvatar(resolvedAv);
+                    }
+                }
             }
         } catch (Throwable ignored) {}
 
@@ -432,11 +456,9 @@ public class VeilDialogCell extends View {
         resolveStoryState(chat);
 
         // Online & Muted progress state
-        boolean isOnline = !chat.isGroup() && chat.isOnline();
-        if (!sameChat) {
-            mOnlineProgress = isOnline ? 1f : 0f;
-            mMutedProgress = chat.isMuted() ? 1f : 0f;
-        }
+        boolean isOnline = !chat.isGroup() && !isBlockedDialog && !isUnacceptedDialog && chat.isOnline();
+        mOnlineProgress = isOnline ? 1f : 0f;
+        mMutedProgress = chat.isMuted() ? 1f : 0f;
 
         // Unread count pop animation when count increments on the same row
         int newUnread = Math.max(0, chat.getUnreadCount());
@@ -798,8 +820,15 @@ public class VeilDialogCell extends View {
             }
         }
 
-        // Detect mention / reaction badges on unread chats
+        // Detect mention / reaction badges on unread chats & ensure lastMessage is decrypted
         String rawLastMsg = mChat.getLastMessage() != null ? mChat.getLastMessage() : "";
+        if (rawLastMsg.startsWith("ENC:v") && mChat.getId() != null) {
+            String dec = com.m3.veil.utils.EncryptionManager.decryptGroupPayload(mChat.getId(), rawLastMsg);
+            if (dec != null && !dec.isEmpty()) {
+                rawLastMsg = dec;
+                mChat.setLastMessage(dec);
+            }
+        }
         mHasMention = (mChat != null && mChat.getUnreadMentionsCount() > 0) || (unreadCount > 0 && (rawLastMsg.contains("@") || rawLastMsg.startsWith("↩️")));
         mHasReactionMention = unreadCount > 0 && (rawLastMsg.contains("reacted ") || rawLastMsg.contains("❤️"));
 

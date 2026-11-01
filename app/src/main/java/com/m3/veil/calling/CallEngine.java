@@ -1410,8 +1410,14 @@ public class CallEngine implements CallSignaling.Listener {
             return;
         }
         try {
-            if (from != null && com.m3.veil.database.EncryptedChatDatabase.getInstance(context).isChatBlocked(from)) {
-                Log.i(TAG, "ignoring invite from blocked peer " + from);
+            com.m3.veil.database.EncryptedChatDatabase db = com.m3.veil.database.EncryptedChatDatabase.getInstance(context);
+            boolean isGroupCall = signal.groupId != null && (signal.groupId.startsWith("group_") || signal.groupId.startsWith("channel_") || signal.groupId.startsWith("lounge_"));
+            String directChatId = isGroupCall ? signal.groupId : com.m3.veil.webrtc.WebRtcManager.getChatId(currentUserId, from);
+            com.m3.veil.model.Chat localChat = directChatId != null ? db.getChat(directChatId) : null;
+            boolean isUnacceptedRequest = !isGroupCall && from != null
+                    && ((localChat != null && localChat.isRequest()) || !db.isDirectChatAcceptedByPeer(directChatId, currentUserId, from));
+            if (from != null && (db.isPeerOrChatBlocked(directChatId, from) || isUnacceptedRequest)) {
+                Log.i(TAG, "ignoring invite from blocked or unaccepted request peer " + from);
                 CallSignal blockedDecline = CallSignal.of(CallSignal.DECLINE, signal.callId, currentUserId).to(from);
                 blockedDecline.payload = reasonPayload(CallEndReason.DECLINED);
                 signaling.send(blockedDecline);

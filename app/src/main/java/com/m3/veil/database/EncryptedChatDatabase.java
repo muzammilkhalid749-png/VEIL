@@ -1414,6 +1414,20 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                             }
                         }
 
+                        if (!chat.isGroup() && !"channel".equalsIgnoreCase(chat.getType())
+                                && !chat.isBlocked() && !chat.isPinned() && !chat.isSecret()
+                                && (chat.getChatLockPin() == null || chat.getChatLockPin().isEmpty())) {
+                            String lm = chat.getLastMessage();
+                            boolean isPlaceholderLm = (lm == null || lm.trim().isEmpty()
+                                    || "Say hello 👋".equals(lm.trim())
+                                    || "Start an encrypted conversation".equals(lm.trim()));
+                            if (isPlaceholderLm && chat.getLastMessageSenderId() == null
+                                    && !hasAnyMessagesInChatInternal(db, chat.getId())) {
+                                ramChatCache.remove(chat.getId());
+                                continue;
+                            }
+                        }
+
                         if (chat.getId() != null) {
                             ramChatCache.put(chat.getId(), chat);
                         }
@@ -1425,6 +1439,46 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             }
         }
         return chats;
+    }
+
+    private boolean hasAnyMessagesInChatInternal(SQLiteDatabase db, String chatId) {
+        if (db == null || chatId == null || chatId.isEmpty()) return false;
+        Cursor c = null;
+        try {
+            c = db.rawQuery("SELECT 1 FROM " + TABLE_MESSAGES + " WHERE " + COL_MSG_CHAT_ID + " = ? LIMIT 1", new String[]{chatId});
+            return c != null && c.moveToFirst();
+        } catch (Exception ignored) {
+            return false;
+        } finally {
+            if (c != null) c.close();
+        }
+    }
+
+    public synchronized boolean hasAnyMessagesInChat(String chatId) {
+        if (chatId == null || chatId.isEmpty()) return false;
+        List<Message> ram = ramMessageListCache.get(chatId);
+        if (ram != null && !ram.isEmpty()) return true;
+        return hasAnyMessagesInChatInternal(getEncryptedDb(), chatId);
+    }
+
+    public synchronized void deleteEmptyDirectChatIfNoMessages(String chatId) {
+        if (chatId == null || chatId.isEmpty() || chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_")) {
+            return;
+        }
+        Chat c = getChat(chatId);
+        if (c != null && (c.isGroup() || c.isBlocked() || c.isPinned() || c.isSecret()
+                || (c.getChatLockPin() != null && !c.getChatLockPin().isEmpty()))) {
+            return;
+        }
+        if (!hasAnyMessagesInChat(chatId)) {
+            ramChatCache.remove(chatId);
+            ramMessageListCache.remove(chatId);
+            try {
+                SQLiteDatabase db = getEncryptedDb();
+                db.delete(TABLE_CHATS, COL_CHAT_ID + " = ?", new String[]{chatId});
+            } catch (Exception ignored) {}
+            notifyChatsChanged();
+        }
     }
 
     public synchronized List<Chat> getSecretChats() {
@@ -1522,16 +1576,66 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         cv.put(COL_CHAT_BLOCKED_BY, blocked ? blockedBy : null);
         db.update(TABLE_CHATS, cv, COL_CHAT_ID + " = ?", new String[]{chatId});
         Chat cached = ramChatCache.get(chatId);
+        if (cached == null) {
+            cached = getChat(chatId);
+        }
         if (cached != null) {
             cached.setBlocked(blocked);
             cached.setBlockedBy(blocked ? blockedBy : null);
+            ramChatCache.put(chatId, cached);
         }
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilBlockedRegistry", Context.MODE_PRIVATE);
+            android.content.SharedPreferences.Editor ed = prefs.edit();
+            if (blocked) {
+                ed.putBoolean("blk_" + chatId, true);
+                if (blockedBy != null) ed.putString("blk_by_" + chatId, blockedBy);
+            } else {
+                ed.remove("blk_" + chatId);
+                ed.remove("blk_by_" + chatId);
+            }
+            String myId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(context);
+            if (cached != null && cached.getParticipants() != null) {
+                for (String p : cached.getParticipants()) {
+                    if (p != null && !p.isEmpty() && !p.equals(myId)) {
+                        if (blocked) {
+                            ed.putBoolean("blk_peer_" + p, true);
+                            if (blockedBy != null) ed.putString("blk_by_" + p, blockedBy);
+                        } else {
+                            ed.remove("blk_peer_" + p);
+                            ed.remove("blk_by_" + p);
+                        }
+                    }
+                }
+            }
+            if (!chatId.startsWith("group_") && !chatId.startsWith("channel_") && chatId.contains("_")) {
+                String[] tokens = chatId.split("_");
+                if (tokens.length == 2) {
+                    for (String t : tokens) {
+                        if (t != null && !t.isEmpty() && !t.equals(myId)) {
+                            if (blocked) {
+                                ed.putBoolean("blk_peer_" + t, true);
+                                if (blockedBy != null) ed.putString("blk_by_" + t, blockedBy);
+                            } else {
+                                ed.remove("blk_peer_" + t);
+                                ed.remove("blk_by_" + t);
+                            }
+                        }
+                    }
+                }
+            }
+            ed.apply();
+        } catch (Exception ignored) {}
         notifyChatsChanged();
     }
 
     public boolean isChatBlocked(String chatIdOrPeerId) {
         if (chatIdOrPeerId == null || chatIdOrPeerId.isEmpty()) return false;
         try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilBlockedRegistry", Context.MODE_PRIVATE);
+            if (prefs.getBoolean("blk_" + chatIdOrPeerId, false) || prefs.getBoolean("blk_peer_" + chatIdOrPeerId, false)) {
+                return true;
+            }
             Chat direct = ramChatCache.get(chatIdOrPeerId);
             if (direct != null && direct.isBlocked()) return true;
             for (Chat c : ramChatCache.values()) {
@@ -1542,9 +1646,262 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     }
                 }
             }
+            SQLiteDatabase db = getEncryptedDb();
+            Cursor cursor = null;
+            try {
+                cursor = db.rawQuery(
+                        "SELECT " + COL_CHAT_ID + ", " + COL_CHAT_BLOCKED_BY + " FROM " + TABLE_CHATS
+                                + " WHERE " + COL_CHAT_IS_BLOCKED + " = 1 AND ("
+                                + COL_CHAT_ID + " = ? OR " + COL_CHAT_PARTICIPANTS + " LIKE ? OR " + COL_CHAT_ID + " LIKE ?) LIMIT 1",
+                        new String[]{chatIdOrPeerId, "%" + chatIdOrPeerId + "%", "%" + chatIdOrPeerId + "%"}
+                );
+                if (cursor != null && cursor.moveToFirst()) {
+                    String foundChatId = cursor.getString(0);
+                    String foundBlockedBy = cursor.getString(1);
+                    android.content.SharedPreferences.Editor ed = prefs.edit();
+                    ed.putBoolean("blk_" + chatIdOrPeerId, true);
+                    if (foundChatId != null) ed.putBoolean("blk_" + foundChatId, true);
+                    if (foundBlockedBy != null) ed.putString("blk_by_" + chatIdOrPeerId, foundBlockedBy);
+                    ed.apply();
+                    return true;
+                }
+            } finally {
+                if (cursor != null) cursor.close();
+            }
         } catch (Exception ignored) {
         }
         return false;
+    }
+
+    public boolean isPeerOrChatBlocked(String chatId, String peerId) {
+        if (chatId != null && !chatId.isEmpty() && isChatBlocked(chatId)) return true;
+        if (peerId != null && !peerId.isEmpty() && isChatBlocked(peerId)) return true;
+        if (peerId != null && !peerId.isEmpty()) {
+            String basePeer = peerId.contains("_persona_") ? peerId.substring(0, peerId.indexOf("_persona_")) : peerId;
+            if (!basePeer.equals(peerId) && isChatBlocked(basePeer)) return true;
+        }
+        return false;
+    }
+
+    public String getChatBlockedBy(String chatId) {
+        return getChatBlockedBy(chatId, null);
+    }
+
+    public String getChatBlockedBy(String chatId, String peerId) {
+        try {
+            if (chatId != null) {
+                Chat c = getChat(chatId);
+                if (c != null && c.isBlocked() && c.getBlockedBy() != null) {
+                    return c.getBlockedBy();
+                }
+            }
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilBlockedRegistry", Context.MODE_PRIVATE);
+            if (chatId != null) {
+                String by = prefs.getString("blk_by_" + chatId, null);
+                if (by != null) return by;
+            }
+            if (peerId != null) {
+                String by = prefs.getString("blk_by_" + peerId, null);
+                if (by != null) return by;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    public static final int MAX_CHAT_REQUEST_MESSAGES = 3;
+
+    public void addExplicitContact(String userId, String displayName, String avatar) {
+        addExplicitContact(userId, displayName, "", avatar);
+    }
+
+    public void addExplicitContact(String userId, String displayName, String username, String avatar) {
+        if (userId == null || userId.trim().isEmpty()) return;
+        String cleanId = userId.trim();
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilExplicitContacts", Context.MODE_PRIVATE);
+            java.util.Set<String> existing = new java.util.HashSet<>(prefs.getStringSet("contact_ids", new java.util.HashSet<>()));
+            existing.add(cleanId);
+            android.content.SharedPreferences.Editor ed = prefs.edit();
+            ed.putStringSet("contact_ids", existing);
+            if (displayName != null && !displayName.trim().isEmpty()) {
+                ed.putString("name_" + cleanId, displayName.trim());
+            }
+            if (username != null && !username.trim().isEmpty()) {
+                ed.putString("username_" + cleanId, username.trim());
+            }
+            if (avatar != null && !avatar.trim().isEmpty()) {
+                ed.putString("avatar_" + cleanId, avatar.trim());
+            }
+            ed.apply();
+
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest current = getSovereignProfileManifest(cleanId);
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest next =
+                    current != null ? current : new com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest();
+            next.uid = cleanId;
+            next.displayName = (displayName != null && !displayName.trim().isEmpty())
+                    ? displayName.trim()
+                    : (current != null && current.displayName != null ? current.displayName : "Veil Contact");
+            next.username = (username != null && !username.trim().isEmpty())
+                    ? username.trim()
+                    : (current != null && current.username != null ? current.username : "");
+            next.avatarBase64 = (avatar != null && !avatar.trim().isEmpty())
+                    ? avatar.trim()
+                    : (current != null && current.avatarBase64 != null ? current.avatarBase64 : "");
+            next.updatedAtTimestamp = System.currentTimeMillis();
+            saveSovereignProfileManifest(next);
+        } catch (Exception ignored) {}
+        notifyChatsChanged();
+    }
+
+    public void removeExplicitContact(String userId) {
+        if (userId == null || userId.trim().isEmpty()) return;
+        String cleanId = userId.trim();
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilExplicitContacts", Context.MODE_PRIVATE);
+            java.util.Set<String> existing = new java.util.HashSet<>(prefs.getStringSet("contact_ids", new java.util.HashSet<>()));
+            existing.remove(cleanId);
+            prefs.edit()
+                    .putStringSet("contact_ids", existing)
+                    .remove("name_" + cleanId)
+                    .remove("username_" + cleanId)
+                    .remove("avatar_" + cleanId)
+                    .apply();
+        } catch (Exception ignored) {}
+        notifyChatsChanged();
+    }
+
+    public boolean isExplicitContact(String userId) {
+        if (userId == null || userId.trim().isEmpty()) return false;
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilExplicitContacts", Context.MODE_PRIVATE);
+            java.util.Set<String> existing = prefs.getStringSet("contact_ids", java.util.Collections.emptySet());
+            return existing != null && existing.contains(userId.trim());
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    public java.util.Set<String> getExplicitContactIds() {
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilExplicitContacts", Context.MODE_PRIVATE);
+            java.util.Set<String> existing = prefs.getStringSet("contact_ids", java.util.Collections.emptySet());
+            return existing != null ? new java.util.HashSet<>(existing) : new java.util.HashSet<>();
+        } catch (Exception ignored) {
+            return new java.util.HashSet<>();
+        }
+    }
+
+    public String getExplicitContactAvatar(String userId) {
+        if (userId == null || userId.trim().isEmpty()) return null;
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilExplicitContacts", Context.MODE_PRIVATE);
+            return prefs.getString("avatar_" + userId.trim(), null);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    public String getExplicitContactName(String userId) {
+        if (userId == null || userId.trim().isEmpty()) return null;
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilExplicitContacts", Context.MODE_PRIVATE);
+            return prefs.getString("name_" + userId.trim(), null);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    public void markDirectChatAccepted(String chatId, String peerId) {
+        if (chatId == null || chatId.isEmpty()) return;
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilRequestAcceptedRegistry", Context.MODE_PRIVATE);
+            android.content.SharedPreferences.Editor ed = prefs.edit();
+            ed.putBoolean("acc_" + chatId, true);
+            ed.apply();
+        } catch (Exception ignored) {}
+        updateChatRequestStatus(chatId, false);
+    }
+
+    public boolean isDirectChatAcceptedByPeer(String chatId, String myUserId, String peerId) {
+        if (chatId == null || chatId.isEmpty()) return false;
+        if (chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_")) {
+            return true;
+        }
+        try {
+            Chat chat = getChat(chatId);
+            if (chat != null && chat.isRequest()) {
+                return false;
+            }
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilRequestAcceptedRegistry", Context.MODE_PRIVATE);
+            if (prefs.getBoolean("acc_" + chatId, false)) {
+                return true;
+            }
+            List<Message> msgs = getMessagesForChat(chatId);
+            if (msgs != null) {
+                for (Message m : msgs) {
+                    if (m == null) continue;
+                    String mType = m.getType() != null ? m.getType() : "text";
+                    if ("system".equals(mType) && m.getText() != null && m.getText().contains("Message request accepted")) {
+                        prefs.edit().putBoolean("acc_" + chatId, true).apply();
+                        return true;
+                    }
+                    String sId = m.getSenderId();
+                    if (sId != null && !sId.isEmpty() && !"system".equalsIgnoreCase(sId)
+                            && !mType.startsWith("system") && !mType.startsWith("action_")) {
+                        if (myUserId != null && !sId.equals(myUserId)) {
+                            prefs.edit().putBoolean("acc_" + chatId, true).apply();
+                            return true;
+                        }
+                        if (peerId != null && sId.equals(peerId)) {
+                            prefs.edit().putBoolean("acc_" + chatId, true).apply();
+                            return true;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    public int getOutboundUserMessageCount(String chatId, String myUserId) {
+        if (chatId == null || chatId.isEmpty() || myUserId == null || myUserId.isEmpty()) return 0;
+        int count = 0;
+        try {
+            List<Message> msgs = getMessagesForChat(chatId);
+            if (msgs != null) {
+                for (Message m : msgs) {
+                    if (m == null) continue;
+                    String mType = m.getType() != null ? m.getType() : "text";
+                    if (mType.startsWith("system") || mType.startsWith("action_")) continue;
+                    if (myUserId.equals(m.getSenderId())) {
+                        count++;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return count;
+    }
+
+    public int getInboundUserMessageCount(String chatId, String peerId) {
+        if (chatId == null || chatId.isEmpty()) return 0;
+        int count = 0;
+        try {
+            List<Message> msgs = getMessagesForChat(chatId);
+            if (msgs != null) {
+                for (Message m : msgs) {
+                    if (m == null) continue;
+                    String mType = m.getType() != null ? m.getType() : "text";
+                    if (mType.startsWith("system") || mType.startsWith("action_")) continue;
+                    String sId = m.getSenderId();
+                    if (sId != null && !"system".equalsIgnoreCase(sId)) {
+                        if (peerId == null || peerId.isEmpty() || peerId.equals(sId)) {
+                            count++;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return count;
     }
 
     public static String generateDirectChatId(String uid1, String uid2) {
@@ -1609,6 +1966,12 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         String id = cursor.getString(cursor.getColumnIndexOrThrow(COL_CHAT_ID));
         String name = cursor.getString(cursor.getColumnIndexOrThrow(COL_CHAT_NAME));
         String lastMessage = cursor.getString(cursor.getColumnIndexOrThrow(COL_CHAT_LAST_MESSAGE));
+        if (lastMessage != null && lastMessage.startsWith("ENC:v") && id != null) {
+            String dec = com.m3.veil.utils.EncryptionManager.decryptGroupPayload(id, lastMessage);
+            if (dec != null && !dec.startsWith("ENC:v")) {
+                lastMessage = dec;
+            }
+        }
         long lastTimeMillis = cursor.getLong(cursor.getColumnIndexOrThrow(COL_CHAT_LAST_MESSAGE_TIME));
         int unreadCount = cursor.getInt(cursor.getColumnIndexOrThrow(COL_CHAT_UNREAD_COUNT));
         boolean isGroup = cursor.getInt(cursor.getColumnIndexOrThrow(COL_CHAT_IS_GROUP)) == 1;
@@ -1744,6 +2107,9 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             if (msgCursor != null && msgCursor.moveToFirst()) {
                 String senderId = msgCursor.getString(0);
                 String text = msgCursor.getString(1);
+                if (text != null && text.startsWith("ENC:v")) {
+                    text = com.m3.veil.utils.EncryptionManager.decryptGroupPayload(cid, text);
+                }
                 String type = msgCursor.getString(2);
                 long timestamp = msgCursor.getLong(3);
                 boolean delivered = msgCursor.getInt(4) == 1;
@@ -2497,6 +2863,70 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             }
         }
         return list;
+    }
+
+    public synchronized List<Message> getAllStarredMessages() {
+        List<Message> list = new ArrayList<>();
+        SQLiteDatabase db = getEncryptedDb();
+        Cursor cursor = db.query(
+                TABLE_MESSAGES,
+                null,
+                COL_MSG_STARRED + "=1",
+                null,
+                null,
+                null,
+                COL_MSG_TIMESTAMP + " DESC"
+        );
+        if (cursor != null) {
+            try {
+                while (cursor.moveToNext()) {
+                    Message m = cursorToMessage(cursor);
+                    if (m != null) {
+                        if (m.getText() != null && m.getText().startsWith("ENC:v") && m.getChatId() != null) {
+                            m.setText(com.m3.veil.utils.EncryptionManager.decryptGroupPayload(m.getChatId(), m.getText()));
+                        }
+                        list.add(m);
+                    }
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+        return list;
+    }
+
+    public synchronized void setMessageStarred(String messageId, boolean starred) {
+        if (messageId == null || messageId.isEmpty()) return;
+        SQLiteDatabase db = getEncryptedDb();
+        ContentValues cv = new ContentValues();
+        cv.put(COL_MSG_STARRED, starred ? 1 : 0);
+        db.update(TABLE_MESSAGES, cv, COL_MSG_ID + "=?", new String[]{messageId});
+
+        Message cachedMsg = ramSingleMessageCache.get(messageId);
+        if (cachedMsg != null) {
+            cachedMsg.setStarred(starred);
+        }
+        for (List<Message> chatMsgs : ramMessageListCache.values()) {
+            if (chatMsgs != null) {
+                for (Message m : chatMsgs) {
+                    if (m != null && messageId.equals(m.getId())) {
+                        m.setStarred(starred);
+                    }
+                }
+            }
+        }
+        Cursor cursor = db.query(TABLE_MESSAGES, new String[]{COL_MSG_CHAT_ID}, COL_MSG_ID + "=?",
+                new String[]{messageId}, null, null, null);
+        if (cursor != null) {
+            try {
+                if (cursor.moveToFirst()) {
+                    String chatId = cursor.getString(0);
+                    notifyMessagesChanged(chatId);
+                }
+            } finally {
+                cursor.close();
+            }
+        }
     }
 
     public synchronized List<Message> getPendingMessages(String peerId) {

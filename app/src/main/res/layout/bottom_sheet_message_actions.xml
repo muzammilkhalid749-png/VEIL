@@ -329,7 +329,38 @@
 
     </LinearLayout>
 
-    <!-- Action: Star / Translate / Smart Suggest -->
+    <!-- Action: Bookmark Message -->
+    <LinearLayout
+        android:id="@+id/actionBookmark"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/ivBookmarkIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_star_outline"
+            app:tint="@color/textPrimary" />
+
+        <TextView
+            android:id="@+id/tvBookmarkTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="18dp"
+            android:text="Bookmark message"
+            android:textColor="@color/textPrimary"
+            android:textSize="15sp" />
+
+    </LinearLayout>
+
+    <!-- Action: Translate Message -->
     <LinearLayout
         android:id="@+id/actionTranslate"
         android:layout_width="match_parent"
@@ -343,16 +374,18 @@
         android:focusable="true">
 
         <ImageView
+            android:id="@+id/ivTranslateIcon"
             android:layout_width="22dp"
             android:layout_height="22dp"
             android:src="@drawable/ic_language"
             app:tint="@color/textPrimary" />
 
         <TextView
+            android:id="@+id/tvTranslateTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="18dp"
-            android:text="Translate, Star &amp; Smart Reply"
+            android:text="Translate message"
             android:textColor="@color/textPrimary"
             android:textSize="15sp" />
 

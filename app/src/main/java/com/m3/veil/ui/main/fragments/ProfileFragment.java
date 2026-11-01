@@ -248,11 +248,13 @@ public class ProfileFragment extends Fragment {
         Context appCtx = requireContext().getApplicationContext();
         statsExecutor.execute(() -> {
             try {
-                EncryptedChatDatabase.ChatCounts counts = EncryptedChatDatabase.getInstance(appCtx).getChatTypeCounts();
+                EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(appCtx);
+                EncryptedChatDatabase.ChatCounts counts = db.getChatTypeCounts();
+                int explicitContacts = db.getExplicitContactIds().size();
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         if (isAdded() && getContext() != null) {
-                            if (contactsCount != null) contactsCount.setText(String.valueOf(counts.direct));
+                            if (contactsCount != null) contactsCount.setText(String.valueOf(explicitContacts));
                             if (groupsCount != null) groupsCount.setText(String.valueOf(counts.groups));
                             if (channelsCount != null) channelsCount.setText(String.valueOf(counts.channels));
                         }
@@ -761,14 +763,14 @@ public class ProfileFragment extends Fragment {
                     btnDelete.setVisibility(View.VISIBLE);
                     btnDelete.setOnClickListener(vDel -> {
                         new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-                                .setTitle("Delete Persona")
-                                .setMessage("Are you sure you want to delete @" + p.getUsername() + "? All local chats and data in this persona vault will be permanently erased.")
+                                .setTitle("Delete Second Persona Permanently?")
+                                .setMessage("Are you sure you want to delete @" + p.getUsername() + "?\n\nWarning: You can only create one second persona per account. Once deleted, you cannot create a new second persona, and all local chats in this persona vault will be permanently erased.")
                                 .setNegativeButton("Cancel", null)
-                                .setPositiveButton("Delete", (d, w) -> {
+                                .setPositiveButton("Delete Permanently", (d, w) -> {
                                     fm.shredAndRemovePersona(p.getPersonaId());
                                     loadUserData();
                                     refreshGamificationAndVaultStats();
-                                    showToast("Persona deleted");
+                                    showToast("Second persona permanently deleted");
                                     dialog.dismiss();
                                     openPersonaManager();
                                 })
@@ -802,16 +804,25 @@ public class ProfileFragment extends Fragment {
             container.addView(cardView);
         }
 
+        if (!billingManager.canCreateNewPersona(personas.size())) {
+            btnAddNew.setAlpha(0.5f);
+            if (btnAddNew instanceof TextView) {
+                if (billingManager.hasDeletedSecondPersona()) {
+                    ((TextView) btnAddNew).setText("Second Persona Slot Used (Deleted)");
+                } else {
+                    ((TextView) btnAddNew).setText("Max 2 Personas Reached (Main + Second)");
+                }
+            }
+        }
         btnAddNew.setOnClickListener(v -> {
-            dialog.dismiss();
             if (!billingManager.canCreateNewPersona(personas.size())) {
-                PremiumUpgradeBottomSheetDialog.showPaywall(
-                        getParentFragmentManager(),
-                        "Create Unlimited Anonymous Personas",
-                        () -> showCreatePersonaDialog(false)
-                );
+                String msg = billingManager.hasDeletedSecondPersona()
+                        ? "You already created and deleted your second persona. Creating another persona is permanently disabled."
+                        : "Maximum limit of 2 personas (Main and Second) reached.";
+                showToast(msg);
                 return;
             }
+            dialog.dismiss();
             showCreatePersonaDialog(false);
         });
 
