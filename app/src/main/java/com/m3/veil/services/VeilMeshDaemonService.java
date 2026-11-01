@@ -504,7 +504,7 @@ public class VeilMeshDaemonService extends Service {
                     peerId = parts[0].equals(myUid) ? parts[1] : parts[0];
                 }
             }
-            if (peerId != null && db.isPeerBlockedInAnyChat(peerId, myUid)) {
+            if (peerId != null && db.isPeerOrChatBlocked(chatId, peerId)) {
                 return;
             }
 
@@ -546,7 +546,8 @@ public class VeilMeshDaemonService extends Service {
                             chatDoc.getString("avatarUrl"), 1, isGroup, false,
                             isGroup ? "group" : "direct",
                             participants != null ? participants : new java.util.ArrayList<>());
-                    if (!isGroup && peerId != null && !db.isContact(peerId) && !db.isChatAccepted(chatId)) {
+                    boolean accepted = db.isDirectChatAcceptedByPeer(chatId, myUid, peerId);
+                    if (!isGroup && peerId != null && !db.isExplicitContact(peerId) && !accepted) {
                         localChat.setRequest(true);
                     }
                     db.saveOrUpdateChat(localChat);
@@ -563,7 +564,7 @@ public class VeilMeshDaemonService extends Service {
                 }
 
                 // Acknowledge delivery back to Firestore so sender sees double-tick immediately even while our screen is locked
-                if (!localChat.isRequest() || db.isChatAccepted(chatId)) {
+                if (!localChat.isRequest() || db.isDirectChatAcceptedByPeer(chatId, myUid, peerId)) {
                     mDoc.getReference().update("delivered", true);
                 }
 

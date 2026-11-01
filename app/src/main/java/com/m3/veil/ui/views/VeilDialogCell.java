@@ -824,9 +824,18 @@ public class VeilDialogCell extends View {
         String rawLastMsg = mChat.getLastMessage() != null ? mChat.getLastMessage() : "";
         if (rawLastMsg.startsWith("ENC:v") && mChat.getId() != null) {
             String dec = com.m3.veil.utils.EncryptionManager.decryptGroupPayload(mChat.getId(), rawLastMsg);
-            if (dec != null && !dec.isEmpty()) {
+            if (dec != null && !dec.startsWith("ENC:v")) {
                 rawLastMsg = dec;
                 mChat.setLastMessage(dec);
+            } else if (mChat.getId().contains("_")) {
+                String[] sp = mChat.getId().split("_");
+                if (sp.length == 2) {
+                    String dec2 = com.m3.veil.utils.EncryptionManager.decryptGroupPayload(sp[1] + "_" + sp[0], rawLastMsg);
+                    if (dec2 != null && !dec2.startsWith("ENC:v")) {
+                        rawLastMsg = dec2;
+                        mChat.setLastMessage(dec2);
+                    }
+                }
             }
         }
         mHasMention = (mChat != null && mChat.getUnreadMentionsCount() > 0) || (unreadCount > 0 && (rawLastMsg.contains("@") || rawLastMsg.startsWith("↩️")));

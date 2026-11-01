@@ -1505,6 +1505,22 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
                                     String gName = doc.getString("groupName");
                                     String lastMsg = doc.getString("lastMessage");
+                                    if (lastMsg != null && lastMsg.startsWith("ENC:v") && gId != null) {
+                                        try {
+                                            String dec = com.m3.veil.utils.EncryptionManager.decryptGroupPayload(gId, lastMsg);
+                                            if (dec != null && !dec.startsWith("ENC:v")) {
+                                                lastMsg = dec;
+                                            } else if (gId.contains("_")) {
+                                                String[] sp = gId.split("_");
+                                                if (sp.length == 2) {
+                                                    String dec2 = com.m3.veil.utils.EncryptionManager.decryptGroupPayload(sp[1] + "_" + sp[0], lastMsg);
+                                                    if (dec2 != null && !dec2.startsWith("ENC:v")) {
+                                                        lastMsg = dec2;
+                                                    }
+                                                }
+                                            }
+                                        } catch (Exception ignored) {}
+                                    }
                                     String chatType = doc.getString("type");
                                     boolean isDirectChat = "direct".equalsIgnoreCase(chatType)
                                             || (!gId.startsWith("group_") && !gId.startsWith("channel_") && !gId.startsWith("lounge_") && gId.contains("_"));
@@ -1925,6 +1941,22 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     }
 
                                     String lastMsg = doc.getString("lastMessage");
+                                    if (lastMsg != null && lastMsg.startsWith("ENC:v") && cId != null) {
+                                        try {
+                                            String dec = com.m3.veil.utils.EncryptionManager.decryptGroupPayload(cId, lastMsg);
+                                            if (dec != null && !dec.startsWith("ENC:v")) {
+                                                lastMsg = dec;
+                                            } else if (cId.contains("_")) {
+                                                String[] sp = cId.split("_");
+                                                if (sp.length == 2) {
+                                                    String dec2 = com.m3.veil.utils.EncryptionManager.decryptGroupPayload(sp[1] + "_" + sp[0], lastMsg);
+                                                    if (dec2 != null && !dec2.startsWith("ENC:v")) {
+                                                        lastMsg = dec2;
+                                                    }
+                                                }
+                                            }
+                                        } catch (Exception ignored) {}
+                                    }
                                     String lastSenderId = doc.getString("lastMessageSenderId");
                                     com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
                                     if (ts == null) ts = com.google.firebase.Timestamp.now();

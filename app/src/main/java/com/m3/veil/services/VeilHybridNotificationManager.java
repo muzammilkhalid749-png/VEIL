@@ -915,18 +915,16 @@ public class VeilHybridNotificationManager {
             long delta = now - mLastReceiveSoundQueuedMs;
             mLastReceiveSoundQueuedMs = now;
 
-            if (delta < 380L) {
-                int burst = mPendingReceiveBurst.addAndGet(count);
-                if (burst > 3) {
-                    // Already queued a multi-chime for this burst window
-                    return;
-                }
+            int burst;
+            if (delta < 500L) {
+                burst = mPendingReceiveBurst.addAndGet(count);
             } else {
                 mPendingReceiveBurst.set(count);
+                burst = count;
             }
 
             final int soundSet = getSelectedReceiveSoundSet(mContext);
-            final int burstCount = Math.max(count, mPendingReceiveBurst.get());
+            final int burstCount = Math.max(1, burst);
             mSoundExecutor.execute(() -> {
                 try {
                     int currentBurst = Math.max(burstCount, mPendingReceiveBurst.getAndSet(0));
@@ -1228,7 +1226,7 @@ public class VeilHybridNotificationManager {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 AudioAttributes attrs = new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build();
                 AudioFormat format = new AudioFormat.Builder()
@@ -1243,7 +1241,7 @@ public class VeilHybridNotificationManager {
                 }
                 track.setVolume(AudioTrack.getMaxVolume());
             } else {
-                track = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
+                track = new AudioTrack(AudioManager.STREAM_NOTIFICATION, sampleRate,
                         AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
                         byteCount, AudioTrack.MODE_STATIC);
                 track.setStereoVolume(AudioTrack.getMaxVolume(), AudioTrack.getMaxVolume());
@@ -1259,7 +1257,11 @@ public class VeilHybridNotificationManager {
                     Thread.sleep(sleepMs);
                 }
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            try {
+                android.media.ToneGenerator tg = new android.media.ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 80);
+                tg.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 120);
+            } catch (Throwable ignored) {}
         } finally {
             if (track != null) {
                 try {

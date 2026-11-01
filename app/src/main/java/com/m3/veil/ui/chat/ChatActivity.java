@@ -947,6 +947,9 @@ public class ChatActivity extends AppCompatActivity {
         vanishHandler.postDelayed(vanishRunnable, 1000);
 
         // Always reconcile with vault asynchronously (16ms VSync window) so Frame 1 draws immediately
+        if (messageList == null || messageList.isEmpty()) {
+            showMinimalLoadingDialog();
+        }
         reloadMessagesFromLocalVault();
 
         // 3. Defer heavy WebRTC, Firestore listeners, and key lookups until 64ms after Frame 1 draws
@@ -1448,17 +1451,7 @@ public class ChatActivity extends AppCompatActivity {
             chipQuickVoiceMask.setOnClickListener(v -> showVoiceFilterDialog());
         }
         if (chipQuickSmartReply != null) {
-            chipQuickSmartReply.setOnClickListener(v -> {
-                Message targetMsg = null;
-                if (messageList != null && !messageList.isEmpty()) {
-                    targetMsg = messageList.get(messageList.size() - 1);
-                }
-                if (targetMsg != null) {
-                    showTranslateAndSmartReplyDialog(targetMsg);
-                } else {
-                    sendTruthOrDarePrompt();
-                }
-            });
+            chipQuickSmartReply.setVisibility(View.GONE);
         }
 
         findViewById(R.id.moreButton).setOnClickListener(v -> {
@@ -5577,13 +5570,42 @@ public class ChatActivity extends AppCompatActivity {
             }
         }
 
-        // Action: Translate, Star & Smart Reply
+        // Action: Bookmark / Star Message
+        View actionBookmark = view.findViewById(R.id.actionBookmark);
+        if (actionBookmark != null) {
+            ImageView ivBookmarkIcon = view.findViewById(R.id.ivBookmarkIcon);
+            TextView tvBookmarkTitle = view.findViewById(R.id.tvBookmarkTitle);
+            boolean isBookmarked = message.isStarred();
+            if (tvBookmarkTitle != null) {
+                tvBookmarkTitle.setText(isBookmarked ? "Remove Bookmark" : "Bookmark Message");
+            }
+            if (ivBookmarkIcon != null) {
+                ivBookmarkIcon.setImageResource(isBookmarked ? R.drawable.ic_star : R.drawable.ic_star_outline);
+                ivBookmarkIcon.setColorFilter(isBookmarked ? 0xFFFFB800 : androidx.core.content.ContextCompat.getColor(this, R.color.textPrimary));
+            }
+            actionBookmark.setOnClickListener(v -> {
+                dialog.dismiss();
+                boolean nextState = !message.isStarred();
+                message.setStarred(nextState);
+                com.m3.veil.database.EncryptedChatDatabase.getInstance(this).setMessageStarred(message.getId(), nextState);
+                if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+                Toast.makeText(this, nextState ? "🔖 Message bookmarked" : "Bookmark removed", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        // Action: Translate Message (Offline Zero-Cloud)
         View actionTranslate = view.findViewById(R.id.actionTranslate);
         if (actionTranslate != null) {
-            actionTranslate.setOnClickListener(v -> {
-                dialog.dismiss();
-                showTranslateAndSmartReplyDialog(message);
-            });
+            boolean hasText = message.getText() != null && !message.getText().trim().isEmpty();
+            if (!hasText) {
+                actionTranslate.setVisibility(View.GONE);
+            } else {
+                actionTranslate.setVisibility(View.VISIBLE);
+                actionTranslate.setOnClickListener(v -> {
+                    dialog.dismiss();
+                    showOfflineTranslateLanguagePicker(message);
+                });
+            }
         }
 
         // Action: Delete
@@ -7760,6 +7782,80 @@ public class ChatActivity extends AppCompatActivity {
         super.onPause();
     }
 
+    private android.app.Dialog mMinimalLoadingDialog;
+
+    private void showMinimalLoadingDialog() {
+        if (isFinishing() || isDestroyed() || mMinimalLoadingDialog != null) return;
+        try {
+            android.app.Dialog d = new android.app.Dialog(this);
+            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+            if (d.getWindow() != null) {
+                d.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+                d.getWindow().setDimAmount(0.35f);
+            }
+            float dp = getResources().getDisplayMetrics().density;
+            LinearLayout root = new LinearLayout(this);
+            root.setOrientation(LinearLayout.VERTICAL);
+            root.setGravity(Gravity.CENTER);
+            int pad = Math.round(24f * dp);
+            root.setPadding(pad, pad, pad, pad);
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(ContextCompat.getColor(this, R.color.colorSurfaceContainerHigh));
+            bg.setCornerRadius(20f * dp);
+            bg.setStroke(Math.max(1, Math.round(1f * dp)), ContextCompat.getColor(this, R.color.colorOutline));
+            root.setBackground(bg);
+
+            android.widget.ProgressBar pb = new android.widget.ProgressBar(this);
+            int pbSize = Math.round(38f * dp);
+            LinearLayout.LayoutParams pbLp = new LinearLayout.LayoutParams(pbSize, pbSize);
+            pbLp.bottomMargin = Math.round(14f * dp);
+            pb.setLayoutParams(pbLp);
+            pb.setIndeterminate(true);
+            if (pb.getIndeterminateDrawable() != null) {
+                pb.getIndeterminateDrawable().setColorFilter(
+                        ContextCompat.getColor(this, R.color.colorPrimary),
+                        android.graphics.PorterDuff.Mode.SRC_IN
+                );
+            }
+            root.addView(pb);
+
+            TextView tv = new TextView(this);
+            tv.setText("Decrypting Vault");
+            tv.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
+            tv.setTextSize(15f);
+            tv.setTypeface(null, Typeface.BOLD);
+            tv.setGravity(Gravity.CENTER);
+            root.addView(tv);
+
+            TextView tvSub = new TextView(this);
+            tvSub.setText("Loading end-to-end encrypted messages...");
+            tvSub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+            tvSub.setTextSize(12f);
+            tvSub.setGravity(Gravity.CENTER);
+            tvSub.setPadding(0, Math.round(4f * dp), 0, 0);
+            root.addView(tvSub);
+
+            d.setContentView(root);
+            d.setCancelable(true);
+            d.setCanceledOnTouchOutside(false);
+            d.show();
+            mMinimalLoadingDialog = d;
+
+            chatDebounceHandler.postDelayed(this::hideMinimalLoadingDialog, 1800L);
+        } catch (Exception ignored) {}
+    }
+
+    private void hideMinimalLoadingDialog() {
+        if (mMinimalLoadingDialog != null) {
+            try {
+                if (mMinimalLoadingDialog.isShowing()) {
+                    mMinimalLoadingDialog.dismiss();
+                }
+            } catch (Exception ignored) {}
+            mMinimalLoadingDialog = null;
+        }
+    }
+
     private void reloadMessagesFromLocalVaultImmediate() {
         chatDebounceHandler.removeCallbacks(reloadVaultRunnable);
         executeReloadMessages();
@@ -7850,6 +7946,23 @@ public class ChatActivity extends AppCompatActivity {
 
                 messageList.clear();
                 messageList.addAll(filtered);
+                hideMinimalLoadingDialog();
+
+                if (newCount > prevCount && prevCount > 0 && isActivityResumed) {
+                    int incomingCount = 0;
+                    for (int i = prevCount; i < newCount; i++) {
+                        Message m = filtered.get(i);
+                        if (m != null && m.getSenderId() != null
+                                && !m.getSenderId().equals(currentUserId)
+                                && !isSenderMe(m.getSenderId(), m)) {
+                            incomingCount++;
+                        }
+                    }
+                    if (incomingCount > 0) {
+                        com.m3.veil.services.VeilHybridNotificationManager.getInstance(ChatActivity.this)
+                                .playMultipleMessagesReceivedSound(incomingCount);
+                    }
+                }
 
                 boolean lastIsOutgoing = newCount > 0
                         && messageList.get(newCount - 1).getSenderId() != null
@@ -9167,6 +9280,7 @@ public class ChatActivity extends AppCompatActivity {
 
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
+                        if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
                         activeStroke = new DoodleStroke();
                         activeStroke.color = curColor[0];
                         activeStroke.width = curWidth[0];
@@ -9178,6 +9292,7 @@ public class ChatActivity extends AppCompatActivity {
                         return true;
 
                     case MotionEvent.ACTION_MOVE:
+                        if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
                         if (activeStroke != null) {
                             float dx = Math.abs(x - lastX);
                             float dy = Math.abs(y - lastY);
@@ -9192,6 +9307,7 @@ public class ChatActivity extends AppCompatActivity {
 
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
+                        if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
                         if (activeStroke != null) {
                             activeStroke.path.lineTo(x, y);
                             strokes.add(activeStroke);
@@ -9483,6 +9599,9 @@ public class ChatActivity extends AppCompatActivity {
         root.addView(actionRow);
 
         sheet.setContentView(root);
+        try {
+            sheet.getBehavior().setDraggable(false);
+        } catch (Exception ignored) {}
         sheet.show();
     }
 
@@ -10729,6 +10848,7 @@ public class ChatActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        hideMinimalLoadingDialog();
         super.onDestroy();
         if (chatId != null && !isGroupChatContext()) {
             try {

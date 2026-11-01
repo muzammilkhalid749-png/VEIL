@@ -1970,6 +1970,14 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             String dec = com.m3.veil.utils.EncryptionManager.decryptGroupPayload(id, lastMessage);
             if (dec != null && !dec.startsWith("ENC:v")) {
                 lastMessage = dec;
+            } else if (id.contains("_")) {
+                String[] sp = id.split("_");
+                if (sp.length == 2) {
+                    String dec2 = com.m3.veil.utils.EncryptionManager.decryptGroupPayload(sp[1] + "_" + sp[0], lastMessage);
+                    if (dec2 != null && !dec2.startsWith("ENC:v")) {
+                        lastMessage = dec2;
+                    }
+                }
             }
         }
         long lastTimeMillis = cursor.getLong(cursor.getColumnIndexOrThrow(COL_CHAT_LAST_MESSAGE_TIME));

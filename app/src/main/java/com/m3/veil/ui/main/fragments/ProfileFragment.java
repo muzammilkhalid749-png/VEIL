@@ -636,6 +636,47 @@ public class ProfileFragment extends Fragment {
             parent.addView(div2, idx + 3);
             parent.addView(juryRow, idx + 4);
 
+            // Bookmarked Messages Row
+            LinearLayout bookmarksRow = new LinearLayout(requireContext());
+            bookmarksRow.setOrientation(LinearLayout.HORIZONTAL);
+            bookmarksRow.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (int) (56 * getResources().getDisplayMetrics().density)));
+            bookmarksRow.setGravity(Gravity.CENTER_VERTICAL);
+            bookmarksRow.setPadding((int) (16 * getResources().getDisplayMetrics().density), 0, (int) (16 * getResources().getDisplayMetrics().density), 0);
+            bookmarksRow.setBackgroundResource(selectableBg);
+            bookmarksRow.setClickable(true);
+            bookmarksRow.setFocusable(true);
+
+            ImageView ivBm = new ImageView(requireContext());
+            ivBm.setLayoutParams(new LinearLayout.LayoutParams(dim, dim));
+            ivBm.setImageResource(R.drawable.ic_star);
+            ivBm.setColorFilter(0xFFFFB800);
+            bookmarksRow.addView(ivBm);
+
+            TextView tvBm = new TextView(requireContext());
+            LinearLayout.LayoutParams tvBmLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            tvBmLp.leftMargin = (int) (14 * getResources().getDisplayMetrics().density);
+            tvBm.setLayoutParams(tvBmLp);
+            tvBm.setText("Bookmarked Messages");
+            tvBm.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
+            tvBm.setTextSize(15f);
+            bookmarksRow.addView(tvBm);
+
+            ImageView ivArrowBm = new ImageView(requireContext());
+            ivArrowBm.setLayoutParams(new LinearLayout.LayoutParams(arrowDim, arrowDim));
+            ivArrowBm.setImageResource(R.drawable.ic_arrow_forward);
+            ivArrowBm.setColorFilter(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
+            bookmarksRow.addView(ivArrowBm);
+
+            bookmarksRow.setOnClickListener(v -> openBookmarkedMessagesDialog());
+
+            View div3 = new View(requireContext());
+            div3.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (int) (1 * getResources().getDisplayMetrics().density)));
+            div3.setBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorOutline));
+
+            bookmarksRow.setTag("veil_bookmarks_row");
+            parent.addView(div3, idx + 5);
+            parent.addView(bookmarksRow, idx + 6);
+
             }
         }
 
@@ -1217,7 +1258,155 @@ public class ProfileFragment extends Fragment {
 
 
         dialog.show();
+    }
 
+    private void openBookmarkedMessagesDialog() {
+        if (getContext() == null) return;
+        List<com.m3.veil.model.Message> bookmarks = EncryptedChatDatabase.getInstance(requireContext()).getAllStarredMessages();
+
+        com.google.android.material.bottomsheet.BottomSheetDialog dialog =
+                new com.google.android.material.bottomsheet.BottomSheetDialog(requireContext(), R.style.ModernBottomSheetDialogTheme);
+        float density = getResources().getDisplayMetrics().density;
+
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        int padH = (int) (20 * density);
+        int padV = (int) (16 * density);
+        root.setPadding(padH, padV, padH, (int) (28 * density));
+
+        View handle = new View(requireContext());
+        LinearLayout.LayoutParams hLp = new LinearLayout.LayoutParams((int) (36 * density), (int) (4 * density));
+        hLp.gravity = Gravity.CENTER_HORIZONTAL;
+        hLp.bottomMargin = (int) (14 * density);
+        handle.setLayoutParams(hLp);
+        handle.setBackgroundResource(R.drawable.bg_voice_circle_incoming);
+        root.addView(handle);
+
+        LinearLayout headerRow = new LinearLayout(requireContext());
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(Gravity.CENTER_VERTICAL);
+        headerRow.setPadding(0, 0, 0, (int) (8 * density));
+
+        TextView tvTitle = new TextView(requireContext());
+        tvTitle.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        tvTitle.setText("🔖 Bookmarked Messages (" + bookmarks.size() + ")");
+        tvTitle.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
+        tvTitle.setTextSize(18f);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        headerRow.addView(tvTitle);
+
+        root.addView(headerRow);
+
+        TextView tvSub = new TextView(requireContext());
+        tvSub.setText("Saved and starred messages stored locally in your encrypted vault.");
+        tvSub.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
+        tvSub.setTextSize(12.5f);
+        tvSub.setPadding(0, 0, 0, (int) (14 * density));
+        root.addView(tvSub);
+
+        ScrollView scroll = new ScrollView(requireContext());
+        scroll.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (int) (380 * density)));
+        LinearLayout container = new LinearLayout(requireContext());
+        container.setOrientation(LinearLayout.VERTICAL);
+
+        if (bookmarks.isEmpty()) {
+            TextView empty = new TextView(requireContext());
+            empty.setText("No bookmarked messages yet.\n\nLong-press any message in a chat and tap 'Bookmark Message' to save it here for fast offline access.");
+            empty.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textSecondary));
+            empty.setTextSize(13.5f);
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding((int) (20 * density), (int) (40 * density), (int) (20 * density), (int) (40 * density));
+            container.addView(empty);
+        } else {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, h:mm a", Locale.getDefault());
+            for (com.m3.veil.model.Message msg : bookmarks) {
+                com.google.android.material.card.MaterialCardView card = new com.google.android.material.card.MaterialCardView(requireContext());
+                card.setCardElevation(0);
+                card.setStrokeWidth((int) (1.2f * density));
+                card.setStrokeColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorOutline));
+                card.setRadius(14 * density);
+                card.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorSurfaceVariant));
+                LinearLayout.LayoutParams cLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                cLp.bottomMargin = (int) (10 * density);
+                card.setLayoutParams(cLp);
+
+                LinearLayout inner = new LinearLayout(requireContext());
+                inner.setOrientation(LinearLayout.VERTICAL);
+                inner.setPadding((int) (14 * density), (int) (12 * density), (int) (14 * density), (int) (12 * density));
+
+                LinearLayout topRow = new LinearLayout(requireContext());
+                topRow.setOrientation(LinearLayout.HORIZONTAL);
+                topRow.setGravity(Gravity.CENTER_VERTICAL);
+
+                TextView tvSender = new TextView(requireContext());
+                tvSender.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                String sName = msg.getSenderName() != null && !msg.getSenderName().isEmpty() ? msg.getSenderName() : "Saved Message";
+                tvSender.setText(sName);
+                tvSender.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.colorPrimary));
+                tvSender.setTextSize(13f);
+                tvSender.setTypeface(null, Typeface.BOLD);
+                topRow.addView(tvSender);
+
+                TextView tvTime = new TextView(requireContext());
+                if (msg.getTimestamp() != null) {
+                    tvTime.setText(sdf.format(msg.getTimestamp().toDate()));
+                } else {
+                    tvTime.setText("");
+                }
+                tvTime.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textTertiary));
+                tvTime.setTextSize(11f);
+                topRow.addView(tvTime);
+
+                ImageView btnUnstar = new ImageView(requireContext());
+                int starDim = (int) (20 * density);
+                LinearLayout.LayoutParams starLp = new LinearLayout.LayoutParams(starDim, starDim);
+                starLp.leftMargin = (int) (10 * density);
+                btnUnstar.setLayoutParams(starLp);
+                btnUnstar.setImageResource(R.drawable.ic_star);
+                btnUnstar.setColorFilter(0xFFFFB800);
+                btnUnstar.setOnClickListener(uv -> {
+                    EncryptedChatDatabase.getInstance(requireContext()).setMessageStarred(msg.getId(), false);
+                    showToast("Bookmark removed");
+                    dialog.dismiss();
+                    openBookmarkedMessagesDialog();
+                });
+                topRow.addView(btnUnstar);
+
+                inner.addView(topRow);
+
+                TextView tvBody = new TextView(requireContext());
+                String body = msg.getText();
+                if (body == null || body.trim().isEmpty()) {
+                    String type = msg.getType() != null ? msg.getType() : "message";
+                    body = "📎 [" + type.toUpperCase(Locale.ROOT) + "]";
+                }
+                tvBody.setText(body);
+                tvBody.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.textPrimary));
+                tvBody.setTextSize(14f);
+                tvBody.setPadding(0, (int) (6 * density), 0, (int) (4 * density));
+                inner.addView(tvBody);
+
+                card.addView(inner);
+
+                card.setOnClickListener(cv -> {
+                    dialog.dismiss();
+                    if (msg.getChatId() != null && !msg.getChatId().isEmpty()) {
+                        Intent intent = new Intent(requireContext(), com.m3.veil.ui.chat.ChatActivity.class);
+                        intent.putExtra("chatId", msg.getChatId());
+                        intent.putExtra("scrollToMessageId", msg.getId());
+                        startActivity(intent);
+                    }
+                });
+
+                container.addView(card);
+            }
+        }
+
+        scroll.addView(container);
+        root.addView(scroll);
+        dialog.setContentView(root);
+        dialog.show();
     }
 
 

@@ -85,7 +85,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         PowerManager.WakeLock wakeLock = null;
         if (pm != null) {
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "veil:fcm_blind_wake");
-            wakeLock.acquire(8_000L);
+            wakeLock.acquire(45_000L);
         }
 
         try {
