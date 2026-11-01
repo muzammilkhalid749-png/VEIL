@@ -42,9 +42,12 @@ public class ChatsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
 
     private List<Chat> chatList;
     private final List<EncryptedChatDatabase.FtsMessageSearchResult> messageSearchResults = new ArrayList<>();
+    private final java.util.Set<String> selectedChatIds = new java.util.LinkedHashSet<>();
+    private boolean selectionMode = false;
     private boolean isSearchActive = false;
     private String activeSearchQuery = "";
     private final OnChatClickListener listener;
+    private OnChatSelectionChangeListener selectionChangeListener;
     private String currentUserId;
 
     public interface OnChatClickListener {
@@ -53,11 +56,101 @@ public class ChatsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         default void onMessageSearchResultClick(EncryptedChatDatabase.FtsMessageSearchResult result) {}
     }
 
+    public interface OnChatSelectionChangeListener {
+        void onSelectionChanged(int count, List<Chat> selectedChats);
+    }
+
     public ChatsAdapter(List<Chat> chatList, OnChatClickListener listener) {
         this.chatList = chatList != null ? chatList : new ArrayList<>();
         this.listener = listener;
         refreshCurrentUserId();
         setHasStableIds(true);
+    }
+
+    public void setOnChatSelectionChangeListener(OnChatSelectionChangeListener listener) {
+        this.selectionChangeListener = listener;
+    }
+
+    public boolean isSelectionMode() {
+        return selectionMode;
+    }
+
+    public int getSelectedCount() {
+        return selectedChatIds.size();
+    }
+
+    public List<Chat> getSelectedChats() {
+        List<Chat> result = new ArrayList<>();
+        if (chatList != null) {
+            for (Chat c : chatList) {
+                if (c != null && c.getId() != null && selectedChatIds.contains(c.getId())) {
+                    result.add(c);
+                }
+            }
+        }
+        return result;
+    }
+
+    public void startSelection(Chat chat) {
+        if (chat == null || chat.getId() == null) return;
+        selectionMode = true;
+        selectedChatIds.clear();
+        selectedChatIds.add(chat.getId());
+        notifyDataSetChanged();
+        notifySelectionChanged();
+    }
+
+    public void toggleSelection(Chat chat) {
+        if (chat == null || chat.getId() == null) return;
+        String id = chat.getId();
+        if (selectedChatIds.contains(id)) {
+            selectedChatIds.remove(id);
+            if (selectedChatIds.isEmpty()) {
+                selectionMode = false;
+            }
+        } else {
+            selectionMode = true;
+            selectedChatIds.add(id);
+        }
+        notifyDataSetChanged();
+        notifySelectionChanged();
+    }
+
+    public void selectAllChats() {
+        if (chatList == null || chatList.isEmpty()) return;
+        boolean allSelected = true;
+        for (Chat c : chatList) {
+            if (c != null && c.getId() != null && !selectedChatIds.contains(c.getId())) {
+                allSelected = false;
+                break;
+            }
+        }
+        if (allSelected) {
+            clearSelection();
+            return;
+        }
+        selectionMode = true;
+        for (Chat c : chatList) {
+            if (c != null && c.getId() != null) {
+                selectedChatIds.add(c.getId());
+            }
+        }
+        notifyDataSetChanged();
+        notifySelectionChanged();
+    }
+
+    public void clearSelection() {
+        if (!selectionMode && selectedChatIds.isEmpty()) return;
+        selectionMode = false;
+        selectedChatIds.clear();
+        notifyDataSetChanged();
+        notifySelectionChanged();
+    }
+
+    private void notifySelectionChanged() {
+        if (selectionChangeListener != null) {
+            selectionChangeListener.onSelectionChanged(selectedChatIds.size(), getSelectedChats());
+        }
     }
 
     public void refreshCurrentUserId() {
@@ -246,15 +339,26 @@ public class ChatsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
         Chat chat = getChatAt(position);
         if (chat == null) return;
         ChatViewHolder ch = (ChatViewHolder) holder;
-        ch.bind(chat, currentUserId);
+        boolean isSelected = selectionMode && chat.getId() != null && selectedChatIds.contains(chat.getId());
+        ch.bind(chat, currentUserId, selectionMode, isSelected);
 
         ch.itemView.setOnClickListener(v -> {
+            if (selectionMode) {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                toggleSelection(chat);
+                return;
+            }
             if (listener != null) {
                 listener.onChatClick(chat);
             }
         });
 
         ch.itemView.setOnLongClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            if (selectionMode) {
+                toggleSelection(chat);
+                return true;
+            }
             if (listener != null) {
                 listener.onChatLongClick(chat);
                 return true;
@@ -305,6 +409,17 @@ public class ChatsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             });
         }
         this.chatList = newChats != null ? newChats : new ArrayList<>();
+        if (selectionMode && !selectedChatIds.isEmpty()) {
+            java.util.Set<String> validIds = new java.util.HashSet<>();
+            for (Chat c : this.chatList) {
+                if (c != null && c.getId() != null) validIds.add(c.getId());
+            }
+            selectedChatIds.retainAll(validIds);
+            if (selectedChatIds.isEmpty()) {
+                selectionMode = false;
+                notifySelectionChanged();
+            }
+        }
         notifyDataSetChanged();
     }
 
@@ -377,8 +492,9 @@ public class ChatsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> 
             this.dialogCell = (VeilDialogCell) itemView;
         }
 
-        public void bind(Chat chat, String currentUserId) {
+        public void bind(Chat chat, String currentUserId, boolean inSelectionMode, boolean isSelected) {
             dialogCell.setChat(chat, currentUserId);
+            dialogCell.setSelectionState(inSelectionMode, isSelected);
         }
     }
 }

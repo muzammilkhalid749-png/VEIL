@@ -486,13 +486,19 @@ public class ChatActivity extends AppCompatActivity {
                 public void onMessageEdited(String dialogId, String messageId, String newText) {
                     if (chatId != null && chatId.equals(dialogId)) {
                         runOnUiThread(() -> {
+                            boolean updatedAny = false;
                             for (int i = 0; i < messageList.size(); i++) {
                                 Message m = messageList.get(i);
-                                if (m.getId() != null && m.getId().equals(messageId)) {
+                                if (m != null && m.getId() != null && m.getId().equals(messageId)) {
                                     m.setText(newText);
                                     m.setEdited(true);
-                                    messagesAdapter.notifyItemChanged(i + 1);
-                                    break;
+                                    updatedAny = true;
+                                }
+                            }
+                            if (messagesAdapter != null) {
+                                messagesAdapter.invalidateMessageCache();
+                                if (updatedAny) {
+                                    messagesAdapter.notifyDataSetChanged();
                                 }
                             }
                         });
@@ -502,7 +508,12 @@ public class ChatActivity extends AppCompatActivity {
                 @Override
                 public void onMessageDeleted(String dialogId, String messageId) {
                     if (chatId != null && chatId.equals(dialogId)) {
-                        runOnUiThread(() -> reloadMessagesFromLocalVault());
+                        runOnUiThread(() -> {
+                            if (messagesAdapter != null) {
+                                messagesAdapter.invalidateMessageCache();
+                            }
+                            reloadMessagesFromLocalVault();
+                        });
                     }
                 }
 
@@ -1337,8 +1348,10 @@ public class ChatActivity extends AppCompatActivity {
                     searchMatchMessageIds.clear();
                     for (int i = 0; i < messageList.size(); i++) {
                         Message m = messageList.get(i);
-                        if (m != null && !"deleted".equals(m.getType()) && m.getText() != null
-                                && m.getText().toLowerCase(Locale.ROOT).contains(q)) {
+                        if (m == null || "deleted".equals(m.getType())) continue;
+                        String searchable = (m.getText() != null ? m.getText() : "")
+                                + " " + (m.getPollJson() != null ? m.getPollJson() : "");
+                        if (searchable.toLowerCase(Locale.ROOT).contains(q)) {
                             searchMatchPositions.add(i + 1); // +1 for encryption header at index 0
                             searchMatchMessageIds.add(m.getId());
                         }
@@ -1349,7 +1362,7 @@ public class ChatActivity extends AppCompatActivity {
                     if (searchMatchPositions.isEmpty()) {
                         currentSearchMatchIdx = -1;
                         if (tvChatSearchCount != null) {
-                            tvChatSearchCount.setText("0/0");
+                            tvChatSearchCount.setText("0 results");
                         }
                         if (btnChatSearchUp != null) btnChatSearchUp.setAlpha(0.38f);
                         if (btnChatSearchDown != null) btnChatSearchDown.setAlpha(0.38f);
@@ -1365,6 +1378,17 @@ public class ChatActivity extends AppCompatActivity {
 
                 @Override
                 public void afterTextChanged(Editable s) {}
+            });
+            etChatSearch.setOnEditorActionListener((v, actionId, event) -> {
+                if (!searchMatchPositions.isEmpty()) {
+                    currentSearchMatchIdx--;
+                    if (currentSearchMatchIdx < 0) {
+                        currentSearchMatchIdx = searchMatchPositions.size() - 1;
+                    }
+                    jumpToCurrentSearchMatch(tvChatSearchCount);
+                    return true;
+                }
+                return false;
             });
         }
 
@@ -4084,6 +4108,9 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void startCall(String type) {
+        if (messagesAdapter != null) {
+            messagesAdapter.stopAudioPlayback();
+        }
         boolean isGrp = isGroupChatContext();
         if (!isGrp) {
             if (isChatBlocked || com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isPeerOrChatBlocked(chatId, recipientId)) {
@@ -4858,7 +4885,7 @@ public class ChatActivity extends AppCompatActivity {
         int adapterPos = searchMatchPositions.get(currentSearchMatchIdx);
         String msgId = searchMatchMessageIds.get(currentSearchMatchIdx);
         if (tvChatSearchCount != null) {
-            tvChatSearchCount.setText((currentSearchMatchIdx + 1) + "/" + searchMatchPositions.size());
+            tvChatSearchCount.setText((currentSearchMatchIdx + 1) + " of " + searchMatchPositions.size());
         }
         if (messagesAdapter != null) {
             messagesAdapter.setSearchHighlightState(activeChatSearchQuery, msgId);
@@ -6857,19 +6884,34 @@ public class ChatActivity extends AppCompatActivity {
             targetRecipientId = targetChat.getId();
         }
 
-        boolean isMedia = "image".equalsIgnoreCase(originalMessage.getType()) || "video".equalsIgnoreCase(originalMessage.getType());
+        String msgType = originalMessage.getType() != null ? originalMessage.getType() : "text";
+        boolean isImageOrVideo = "image".equalsIgnoreCase(msgType) || "video".equalsIgnoreCase(msgType);
+        boolean isVoiceOrAudio = "voice".equalsIgnoreCase(msgType) || "audio".equalsIgnoreCase(msgType);
+        boolean isDocument = "document".equalsIgnoreCase(msgType);
+        boolean isStructuredPayload = isDocument
+                || "poll".equalsIgnoreCase(msgType)
+                || "location".equalsIgnoreCase(msgType)
+                || "contact".equalsIgnoreCase(msgType)
+                || "sticker".equalsIgnoreCase(msgType);
+        boolean isFileMedia = isImageOrVideo || isVoiceOrAudio || isDocument;
+
         String fwdText;
         if (overrideCaption != null) {
             fwdText = overrideCaption;
+        } else if (isImageOrVideo || isVoiceOrAudio) {
+            fwdText = originalMessage.getText() != null ? originalMessage.getText() : "";
+            if ("[image]".equalsIgnoreCase(fwdText) || "[video]".equalsIgnoreCase(fwdText)
+                    || "[voice]".equalsIgnoreCase(fwdText) || "[audio]".equalsIgnoreCase(fwdText)) {
+                fwdText = "";
+            }
         } else {
-            fwdText = isMedia ? "" : (originalMessage.getText() != null ? originalMessage.getText() : "");
+            fwdText = originalMessage.getText() != null ? originalMessage.getText() : "";
         }
-        if (!anonymousForward && !isMedia) {
+        if (!anonymousForward && !isFileMedia && !isStructuredPayload) {
             String origSender = originalMessage.getSenderName() != null ? originalMessage.getSenderName() : "Peer";
             fwdText = "↪️ Forwarded from " + origSender + ":\n" + fwdText;
         }
 
-        String msgType = originalMessage.getType() != null ? originalMessage.getType() : "text";
         Message fwdMessage = new Message(
                 newMsgId,
                 currentUserId,
@@ -6878,8 +6920,26 @@ public class ChatActivity extends AppCompatActivity {
                 Timestamp.now(),
                 msgType
         );
+        fwdMessage.setVoiceFilter(originalMessage.getVoiceFilter());
 
-        String ext = "video".equalsIgnoreCase(msgType) ? ".mp4" : ".jpg";
+        String ext = ".jpg";
+        if ("video".equalsIgnoreCase(msgType)) {
+            ext = ".mp4";
+        } else if ("voice".equalsIgnoreCase(msgType)) {
+            ext = ".m4a";
+        } else if ("audio".equalsIgnoreCase(msgType)) {
+            ext = ".mp3";
+        } else if (isDocument) {
+            ext = ".bin";
+            String docMeta = originalMessage.getText();
+            if (docMeta != null) {
+                String docName = docMeta.contains("|") ? docMeta.split("\\|", 2)[0] : docMeta;
+                int dotIdx = docName.lastIndexOf('.');
+                if (dotIdx >= 0 && dotIdx < docName.length() - 1) {
+                    ext = docName.substring(dotIdx);
+                }
+            }
+        }
         File srcFile = com.m3.veil.utils.FileMediaManager.getDecryptedFile(this, originalMessage, ext);
         if ((srcFile == null || !srcFile.exists()) && originalMessage.getLocalFilePath() != null) {
             File f = new File(originalMessage.getLocalFilePath());
@@ -6932,9 +6992,9 @@ public class ChatActivity extends AppCompatActivity {
         fwdMessage.setMediaUrl(originalMessage.getMediaUrl());
         fwdMessage.setPollJson(originalMessage.getPollJson());
 
-        if (srcFile != null && srcFile.exists() && isMedia) {
+        if (srcFile != null && srcFile.exists() && isFileMedia) {
             com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMediaMessage(
-                    targetChat.getId(), targetRecipientId, msgType, srcFile, fwdText, null, false);
+                    targetChat.getId(), targetRecipientId, msgType, srcFile, fwdText, originalMessage.getVoiceFilter(), false);
         } else {
             com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(targetChat, targetRecipientId, fwdMessage);
         }
@@ -6957,12 +7017,23 @@ public class ChatActivity extends AppCompatActivity {
         confirmDeleteSelectedMessages(singleList);
     }
 
+    private boolean canDeleteMessageForEveryone(Message m) {
+        if (m == null || !isSenderMe(m.getSenderId(), m) || "deleted".equals(m.getType())) {
+            return false;
+        }
+        if (m.getTimestamp() == null || m.getTimestamp().toDate() == null) {
+            return false;
+        }
+        long ageMs = System.currentTimeMillis() - m.getTimestamp().toDate().getTime();
+        return ageMs <= com.m3.veil.manager.VeilMessagesController.DELETE_FOR_EVERYONE_TIME_LIMIT_MS;
+    }
+
     private void confirmDeleteSelectedMessages(List<Message> messagesToDelete) {
         if (messagesToDelete == null || messagesToDelete.isEmpty()) return;
-        boolean allMine = true;
+        boolean allCanDeleteForEveryone = true;
         for (Message m : messagesToDelete) {
-            if (m == null || !isSenderMe(m.getSenderId(), m)) {
-                allMine = false;
+            if (!canDeleteMessageForEveryone(m)) {
+                allCanDeleteForEveryone = false;
                 break;
             }
         }
@@ -6975,12 +7046,19 @@ public class ChatActivity extends AppCompatActivity {
         View btnCancel = sheet.findViewById(R.id.btnCancelDelete);
 
         if (cardEveryone != null) {
-            cardEveryone.setVisibility(allMine ? View.VISIBLE : View.GONE);
+            cardEveryone.setVisibility(allCanDeleteForEveryone ? View.VISIBLE : View.GONE);
             cardEveryone.setOnClickListener(v -> {
                 sheet.dismiss();
                 exitMultiSelectionMode();
                 for (Message m : messagesToDelete) {
                     if (m != null && m.getId() != null) {
+                        m.setType("deleted");
+                        m.setText("🚫 This message was deleted");
+                        m.setLocalFilePath(null);
+                        m.setMediaUrl(null);
+                        m.setThumbnail(null);
+                        m.setPollJson(null);
+                        m.setReactions(null);
                         if (chatId != null) {
                             com.m3.veil.database.EncryptedChatDatabase.getInstance(this)
                                     .markMessageDeletedForEveryone(chatId, m.getId());
@@ -6988,6 +7066,10 @@ public class ChatActivity extends AppCompatActivity {
                         com.m3.veil.manager.VeilMessagesController.getInstance(this)
                                 .deleteMessage(chatId, m.getId(), true);
                     }
+                }
+                if (messagesAdapter != null) {
+                    messagesAdapter.invalidateMessageCache();
+                    messagesAdapter.notifyDataSetChanged();
                 }
                 reloadMessagesFromLocalVault();
                 Toast.makeText(this, count == 1
@@ -7008,6 +7090,7 @@ public class ChatActivity extends AppCompatActivity {
                     }
                 }
                 if (messagesAdapter != null) {
+                    messagesAdapter.invalidateMessageCache();
                     messagesAdapter.notifyDataSetChanged();
                 }
                 checkAndShowJumpToMentionPill();
@@ -8236,6 +8319,9 @@ public class ChatActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         isActivityResumed = false;
+        if (messagesAdapter != null) {
+            messagesAdapter.stopAudioPlayback();
+        }
         com.m3.veil.manager.VeilMessagesController.getInstance(this).setActiveChatIdInForeground(null);
         presenceHandler.removeCallbacks(presenceTicker);
         super.onPause();
@@ -10192,10 +10278,28 @@ public class ChatActivity extends AppCompatActivity {
             }
             String updated = editInput.getText().toString().trim();
             if (!updated.isEmpty()) {
+                message.setText(updated);
+                message.setEdited(true);
+                if (messageList != null && message.getId() != null) {
+                    for (Message m : messageList) {
+                        if (m != null && message.getId().equals(m.getId())) {
+                            m.setText(updated);
+                            m.setEdited(true);
+                        }
+                    }
+                }
+                if (chatId != null && message.getId() != null) {
+                    com.m3.veil.database.EncryptedChatDatabase.getInstance(this)
+                            .updateMessageText(chatId, message.getId(), updated);
+                }
                 com.m3.veil.manager.VeilMessagesController.getInstance(this)
                         .editMessage(chatId, message.getId(), updated);
-                reloadMessagesFromLocalVault();
+                if (messagesAdapter != null) {
+                    messagesAdapter.invalidateMessageCache();
+                    messagesAdapter.notifyDataSetChanged();
+                }
                 sheet.dismiss();
+                Toast.makeText(this, "Message edited", Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -11090,50 +11194,67 @@ public class ChatActivity extends AppCompatActivity {
 
     private void showScheduleMessageDialog() {
         BottomSheetDialog sheet = new BottomSheetDialog(this);
+        float dp = getResources().getDisplayMetrics().density;
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setBackgroundResource(R.drawable.bottom_sheet_background);
-        int pad = (int) (20 * getResources().getDisplayMetrics().density);
+        int pad = (int) (20 * dp);
         layout.setPadding(pad, pad, pad, pad * 2);
 
+        boolean isChannel = currentLocalChat != null && "channel".equalsIgnoreCase(currentLocalChat.getType());
+        boolean isGroup = isGroupChatContext();
+
         TextView title = new TextView(this);
-        title.setText("⏰ Schedule Message / Channel Post");
-        title.setTextColor(Color.WHITE);
+        title.setText(isChannel ? "⏰ Schedule Channel Broadcast" : (isGroup ? "⏰ Schedule Group Message" : "⏰ Schedule Message"));
+        title.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
         title.setTextSize(18);
         title.setTypeface(null, Typeface.BOLD);
         layout.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("Message will automatically be sent at the scheduled time");
+        subtitle.setText(isChannel
+                ? "This post will be automatically published to the channel at the scheduled date and time."
+                : "This encrypted message will be automatically delivered at the scheduled date and time.");
         subtitle.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
         subtitle.setTextSize(13);
-        subtitle.setPadding(0, 4, 0, 16);
+        subtitle.setPadding(0, (int) (4 * dp), 0, (int) (14 * dp));
         layout.addView(subtitle);
 
         EditText etContent = new EditText(this);
         String prefill = messageEditText.getText().toString().trim();
         etContent.setText(prefill);
-        etContent.setHint("Write message or channel post content...");
-        etContent.setTextColor(Color.WHITE);
+        etContent.setSelection(etContent.getText().length());
+        etContent.setHint(isChannel ? "Write channel broadcast content..." : "Write scheduled message...");
+        etContent.setTextColor(ContextCompat.getColor(this, R.color.textPrimary));
         etContent.setHintTextColor(ContextCompat.getColor(this, R.color.textSecondary));
+        etContent.setBackgroundResource(R.drawable.bg_search_input);
+        int inPad = (int) (14 * dp);
+        etContent.setPadding(inPad, inPad, inPad, inPad);
         layout.addView(etContent);
 
         final Calendar scheduleCal = Calendar.getInstance();
         scheduleCal.add(Calendar.HOUR_OF_DAY, 1);
+        scheduleCal.set(Calendar.SECOND, 0);
 
         TextView tvTimeChosen = new TextView(this);
         SimpleDateFormat sdf = new SimpleDateFormat("EEE, d MMM yyyy • h:mm a", Locale.getDefault());
         tvTimeChosen.setText("Scheduled for: " + sdf.format(scheduleCal.getTime()));
         tvTimeChosen.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
         tvTimeChosen.setTextSize(14);
-        tvTimeChosen.setPadding(0, 12, 0, 12);
+        tvTimeChosen.setTypeface(null, Typeface.BOLD);
+        tvTimeChosen.setPadding(0, (int) (12 * dp), 0, (int) (12 * dp));
         layout.addView(tvTimeChosen);
 
-        com.google.android.material.button.MaterialButton btnPickTime = new com.google.android.material.button.MaterialButton(this);
+        com.google.android.material.button.MaterialButton btnPickTime =
+                new com.google.android.material.button.MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
         btnPickTime.setText("📅 Pick Date & Time");
-        btnPickTime.setCornerRadius((int) (20 * getResources().getDisplayMetrics().density));
+        btnPickTime.setCornerRadius((int) (14 * dp));
+        LinearLayout.LayoutParams pickLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        pickLp.bottomMargin = (int) (10 * dp);
+        btnPickTime.setLayoutParams(pickLp);
         btnPickTime.setOnClickListener(v -> {
-            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+            DatePickerDialog dpd = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
                 scheduleCal.set(Calendar.YEAR, year);
                 scheduleCal.set(Calendar.MONTH, month);
                 scheduleCal.set(Calendar.DAY_OF_MONTH, dayOfMonth);
@@ -11141,17 +11262,23 @@ public class ChatActivity extends AppCompatActivity {
                     scheduleCal.set(Calendar.HOUR_OF_DAY, hourOfDay);
                     scheduleCal.set(Calendar.MINUTE, minute);
                     scheduleCal.set(Calendar.SECOND, 0);
-                    tvTimeChosen.setText("Scheduled for: " + sdf.format(scheduleCal.getTime()));
-                }, scheduleCal.get(Calendar.HOUR_OF_DAY), scheduleCal.get(Calendar.MINUTE), true).show();
-            }, scheduleCal.get(Calendar.YEAR), scheduleCal.get(Calendar.MONTH), scheduleCal.get(Calendar.DAY_OF_MONTH)).show();
+                    if (scheduleCal.getTimeInMillis() <= System.currentTimeMillis()) {
+                        tvTimeChosen.setText("⚠️ Selected time is in the past — please pick a future time");
+                        tvTimeChosen.setTextColor(ContextCompat.getColor(this, R.color.statusError));
+                    } else {
+                        tvTimeChosen.setText("Scheduled for: " + sdf.format(scheduleCal.getTime()));
+                        tvTimeChosen.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
+                    }
+                }, scheduleCal.get(Calendar.HOUR_OF_DAY), scheduleCal.get(Calendar.MINUTE), false).show();
+            }, scheduleCal.get(Calendar.YEAR), scheduleCal.get(Calendar.MONTH), scheduleCal.get(Calendar.DAY_OF_MONTH));
+            dpd.getDatePicker().setMinDate(System.currentTimeMillis() - 1000L);
+            dpd.show();
         });
         layout.addView(btnPickTime);
 
-        boolean isChannel = currentLocalChat != null && "channel".equalsIgnoreCase(currentLocalChat.getType());
-
         com.google.android.material.button.MaterialButton btnConfirm = new com.google.android.material.button.MaterialButton(this);
-        btnConfirm.setText("Schedule Broadcast");
-        btnConfirm.setCornerRadius((int) (20 * getResources().getDisplayMetrics().density));
+        btnConfirm.setText(isChannel ? "Schedule Broadcast" : "Schedule Message");
+        btnConfirm.setCornerRadius((int) (14 * dp));
         btnConfirm.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary));
         btnConfirm.setTextColor(Color.WHITE);
         btnConfirm.setOnClickListener(v -> {
@@ -11318,6 +11445,9 @@ public class ChatActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (messagesAdapter != null) {
+            messagesAdapter.stopAudioPlayback();
+        }
         hideMinimalLoadingDialog();
         super.onDestroy();
         if (chatId != null && !isGroupChatContext()) {

@@ -2730,6 +2730,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
     }
 
     public static final long EDIT_MESSAGE_TIME_LIMIT_MS = 15L * 60L * 1000L; // 15 minutes
+    public static final long DELETE_FOR_EVERYONE_TIME_LIMIT_MS = 48L * 60L * 60L * 1000L; // 48 hours
 
     /**
      * Edits an existing sent message across all mesh peers (within 15-minute window).
@@ -2739,6 +2740,9 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
         mStageQueue.post(() -> {
             Message msg = getMessage(messageId);
+            if (msg == null && mDatabase != null) {
+                msg = mDatabase.getMessageById(messageId);
+            }
             if (msg == null) return;
             long tsMs = (msg.getTimestamp() != null && msg.getTimestamp().toDate() != null)
                     ? msg.getTimestamp().toDate().getTime() : 0L;
@@ -2747,19 +2751,20 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 return;
             }
 
-            msg.setText(newText.trim());
-            msg.setEdited(true);
+            final Message targetMsg = msg;
+            targetMsg.setText(newText.trim());
+            targetMsg.setEdited(true);
 
             // Update cache
-            putMessageInCache(dialogId, msg);
+            putMessageInCache(dialogId, targetMsg);
 
             // Update SQLCipher database
             mStorageQueue.execute(() -> {
                 mDatabase.updateMessageText(dialogId, messageId, newText.trim());
-                updateDialogLastMessage(dialogId, msg);
+                updateDialogLastMessage(dialogId, targetMsg);
                 try {
                     PersonaManager pm = PersonaManager.getInstance(mContext);
-                    for (String peerId : resolveTargetPeers(dialogId, null, msg)) {
+                    for (String peerId : resolveTargetPeers(dialogId, null, targetMsg)) {
                         com.m3.veil.model.Persona localP = pm.findLocalPersonaByPeerId(peerId);
                         if (localP != null && !localP.getId().equals(pm.getActivePersonaId())) {
                             EncryptedChatDatabase.getInstance(mContext, localP.getId(), false)
@@ -2779,7 +2784,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             // Transmit binary VEDT frame to all target peers (1:1 or Group/Channel)
             mCryptoQueue.execute(() -> {
                 try {
-                    for (String peerId : resolveTargetPeers(dialogId, null, msg)) {
+                    for (String peerId : resolveTargetPeers(dialogId, null, targetMsg)) {
                         WebRtcManager.getInstance(mContext).sendEditMessage(peerId, dialogId, messageId, newText.trim());
                     }
                     if (dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_")) {
@@ -2814,17 +2819,29 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
 
         mStageQueue.post(() -> {
             Message msg = getMessage(messageId);
+            if (msg == null && mDatabase != null) {
+                msg = mDatabase.getMessageById(messageId);
+            }
             String localPath = msg != null ? msg.getLocalFilePath() : null;
+            boolean canDeleteForEveryone = deleteForEveryone;
+            if (canDeleteForEveryone && msg != null && msg.getTimestamp() != null && msg.getTimestamp().toDate() != null) {
+                long ageMs = System.currentTimeMillis() - msg.getTimestamp().toDate().getTime();
+                if (ageMs > DELETE_FOR_EVERYONE_TIME_LIMIT_MS) {
+                    canDeleteForEveryone = false;
+                }
+            }
+            final boolean effectiveDeleteForEveryone = canDeleteForEveryone;
+            final Message targetMsg = msg;
 
-            if (deleteForEveryone) {
-                if (msg != null) {
-                    msg.setType("deleted");
-                    msg.setText("🚫 This message was deleted");
-                    msg.setLocalFilePath(null);
-                    msg.setMediaUrl(null);
-                    msg.setThumbnail(null);
-                    msg.setPollJson(null);
-                    msg.setReactions(null);
+            if (effectiveDeleteForEveryone) {
+                if (targetMsg != null) {
+                    targetMsg.setType("deleted");
+                    targetMsg.setText("🚫 This message was deleted");
+                    targetMsg.setLocalFilePath(null);
+                    targetMsg.setMediaUrl(null);
+                    targetMsg.setThumbnail(null);
+                    targetMsg.setPollJson(null);
+                    targetMsg.setReactions(null);
                 }
             } else {
                 // Remove from memory cache
@@ -2836,11 +2853,11 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 if (localPath != null) {
                     cryptographicZeroWipe(new File(localPath));
                 }
-                if (deleteForEveryone) {
+                if (effectiveDeleteForEveryone) {
                     mDatabase.markMessageDeletedForEveryone(dialogId, messageId);
                     try {
                         PersonaManager pm = PersonaManager.getInstance(mContext);
-                        for (String peerId : resolveTargetPeers(dialogId, null, msg)) {
+                        for (String peerId : resolveTargetPeers(dialogId, null, targetMsg)) {
                             com.m3.veil.model.Persona localP = pm.findLocalPersonaByPeerId(peerId);
                             if (localP != null && !localP.getId().equals(pm.getActivePersonaId())) {
                                 EncryptedChatDatabase targetDb = EncryptedChatDatabase.getInstance(mContext, localP.getId(), false);
@@ -2864,17 +2881,18 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             });
 
             // Transmit remote delete frame to peers
-            if (deleteForEveryone && msg != null) {
+            if (effectiveDeleteForEveryone && targetMsg != null) {
+                final Message msgRef = targetMsg;
                 mCryptoQueue.execute(() -> {
                     try {
-                        for (String peerId : resolveTargetPeers(dialogId, null, msg)) {
+                        for (String peerId : resolveTargetPeers(dialogId, null, msgRef)) {
                             WebRtcManager.getInstance(mContext).sendDeleteMessageForEveryone(peerId, dialogId, messageId);
                         }
                         Map<String, Object> upd = new HashMap<>();
                         upd.put("type", "deleted");
                         upd.put("text", "🚫 This message was deleted");
-                        if (msg.getSenderId() != null) upd.put("senderId", msg.getSenderId());
-                        if (msg.getReceiverId() != null) upd.put("receiverId", msg.getReceiverId());
+                        if (msgRef.getSenderId() != null) upd.put("senderId", msgRef.getSenderId());
+                        if (msgRef.getReceiverId() != null) upd.put("receiverId", msgRef.getReceiverId());
 
                         if (dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_")) {
                             com.google.firebase.firestore.FirebaseFirestore.getInstance()

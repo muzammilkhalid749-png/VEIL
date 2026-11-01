@@ -79,6 +79,11 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     private final java.util.Set<String> resolvedPeerLookups = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private EditText etSearchChats;
     private ImageView btnClearSearch;
+    private View searchContainer;
+    private View chatMultiSelectBar;
+    private TextView tvChatSelectCount;
+    private TextView btnChatSelectAll;
+    private androidx.activity.OnBackPressedCallback selectionBackCallback;
 
     private TextView chipFilterAll, chipFilterUnread, chipFilterGroups,
             chipFilterRequests, chipFilterVanish, chipFilterPinned, chipFilterSecret, chipFilterStatus;
@@ -330,6 +335,70 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
         etSearchChats = view.findViewById(R.id.etSearchChats);
         btnClearSearch = view.findViewById(R.id.btnClearSearch);
+        searchContainer = view.findViewById(R.id.searchContainer);
+        chatMultiSelectBar = view.findViewById(R.id.chatMultiSelectBar);
+        tvChatSelectCount = view.findViewById(R.id.tvChatSelectCount);
+        btnChatSelectAll = view.findViewById(R.id.btnChatSelectAll);
+
+        View btnChatSelectClose = view.findViewById(R.id.btnChatSelectClose);
+        View btnChatSelectPin = view.findViewById(R.id.btnChatSelectPin);
+        View btnChatSelectMute = view.findViewById(R.id.btnChatSelectMute);
+        View btnChatSelectArchive = view.findViewById(R.id.btnChatSelectArchive);
+        View btnChatSelectDelete = view.findViewById(R.id.btnChatSelectDelete);
+        View btnChatSelectMore = view.findViewById(R.id.btnChatSelectMore);
+
+        if (btnChatSelectClose != null) {
+            btnChatSelectClose.setOnClickListener(v -> {
+                if (chatsAdapter != null) chatsAdapter.clearSelection();
+            });
+        }
+        if (btnChatSelectAll != null) {
+            btnChatSelectAll.setOnClickListener(v -> {
+                if (chatsAdapter != null) chatsAdapter.selectAllChats();
+            });
+        }
+        if (btnChatSelectPin != null) {
+            btnChatSelectPin.setOnClickListener(v -> performBatchPinToggle());
+        }
+        if (btnChatSelectMute != null) {
+            btnChatSelectMute.setOnClickListener(v -> performBatchMuteToggle());
+        }
+        if (btnChatSelectArchive != null) {
+            btnChatSelectArchive.setOnClickListener(v -> performBatchArchiveToggle());
+        }
+        if (btnChatSelectDelete != null) {
+            btnChatSelectDelete.setOnClickListener(v -> {
+                if (chatsAdapter != null) {
+                    List<Chat> selected = chatsAdapter.getSelectedChats();
+                    if (!selected.isEmpty()) {
+                        confirmDeleteSelectedChats(selected);
+                    }
+                }
+            });
+        }
+        if (btnChatSelectMore != null) {
+            btnChatSelectMore.setOnClickListener(v -> {
+                if (chatsAdapter == null) return;
+                List<Chat> selected = chatsAdapter.getSelectedChats();
+                if (selected.size() == 1) {
+                    showSingleChatActionsSheet(selected.get(0));
+                } else if (selected.size() > 1) {
+                    showBatchMoreOptionsSheet(selected);
+                }
+            });
+        }
+
+        selectionBackCallback = new androidx.activity.OnBackPressedCallback(false) {
+            @Override
+            public void handleOnBackPressed() {
+                if (chatsAdapter != null && chatsAdapter.isSelectionMode()) {
+                    chatsAdapter.clearSelection();
+                } else {
+                    setEnabled(false);
+                }
+            }
+        };
+        requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(), selectionBackCallback);
 
         chipFilterAll = view.findViewById(R.id.chipFilterAll);
         chipFilterUnread = view.findViewById(R.id.chipFilterUnread);
@@ -350,15 +419,12 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         if (startChatButton != null) {
             startChatButton.setOnClickListener(v -> startActivity(new Intent(getContext(), NewChatActivity.class)));
         }
-
-
-
-
     }
 
     private void setupRecyclerView() {
         displayedChats = new ArrayList<>();
         chatsAdapter = new ChatsAdapter(displayedChats, this);
+        chatsAdapter.setOnChatSelectionChangeListener((count, selectedChats) -> updateChatMultiSelectBar(count, selectedChats));
 
         chatsRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         chatsRecyclerView.setHasFixedSize(true);
@@ -2359,6 +2425,329 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
 
     @Override
     public void onChatLongClick(Chat chat) {
+        if (chat == null || chat.getId() == null || getContext() == null) return;
+        if (chatsAdapter != null) {
+            chatsAdapter.startSelection(chat);
+        }
+    }
+
+    private void updateChatMultiSelectBar(int count, List<Chat> selectedChats) {
+        boolean active = count > 0 && chatsAdapter != null && chatsAdapter.isSelectionMode();
+        if (selectionBackCallback != null) {
+            selectionBackCallback.setEnabled(active);
+        }
+        if (chatMultiSelectBar != null) {
+            chatMultiSelectBar.setVisibility(active ? View.VISIBLE : View.GONE);
+        }
+        if (searchContainer != null) {
+            searchContainer.setVisibility(active ? View.GONE : View.VISIBLE);
+        }
+        if (active) {
+            if (tvChatSelectCount != null) {
+                tvChatSelectCount.setText(count + " selected");
+            }
+            if (btnChatSelectAll != null) {
+                int total = displayedChats != null ? displayedChats.size() : 0;
+                btnChatSelectAll.setText((total > 0 && count >= total) ? "Clear" : "All");
+            }
+        }
+    }
+
+    private void performBatchPinToggle() {
+        if (chatsAdapter == null || getContext() == null) return;
+        List<Chat> selected = chatsAdapter.getSelectedChats();
+        if (selected.isEmpty()) return;
+        boolean anyUnpinned = false;
+        for (Chat c : selected) {
+            if (c != null && !c.isPinned()) {
+                anyUnpinned = true;
+                break;
+            }
+        }
+        final boolean targetPinned = anyUnpinned;
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(requireContext());
+        for (Chat c : selected) {
+            if (c != null && c.getId() != null) {
+                c.setPinned(targetPinned);
+                db.updateChatPinStatus(c.getId(), targetPinned);
+            }
+        }
+        int count = selected.size();
+        chatsAdapter.clearSelection();
+        loadLocalEncryptedChats();
+        Toast.makeText(getContext(),
+                targetPinned ? ("📌 Pinned " + count + (count == 1 ? " chat" : " chats"))
+                        : ("Unpinned " + count + (count == 1 ? " chat" : " chats")),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void performBatchMuteToggle() {
+        if (chatsAdapter == null || getContext() == null) return;
+        List<Chat> selected = chatsAdapter.getSelectedChats();
+        if (selected.isEmpty()) return;
+        boolean anyUnmuted = false;
+        for (Chat c : selected) {
+            if (c != null && !c.isMuted()) {
+                anyUnmuted = true;
+                break;
+            }
+        }
+        final boolean targetMuted = anyUnmuted;
+        EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(requireContext());
+        for (Chat c : selected) {
+            if (c != null && c.getId() != null) {
+                c.setMuted(targetMuted);
+                db.updateChatMuteStatus(c.getId(), targetMuted);
+            }
+        }
+        int count = selected.size();
+        chatsAdapter.clearSelection();
+        loadLocalEncryptedChats();
+        Toast.makeText(getContext(),
+                targetMuted ? ("🔕 Muted " + count + (count == 1 ? " chat" : " chats"))
+                        : ("🔔 Unmuted " + count + (count == 1 ? " chat" : " chats")),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void performBatchArchiveToggle() {
+        if (chatsAdapter == null || getContext() == null) return;
+        final List<Chat> selected = new ArrayList<>(chatsAdapter.getSelectedChats());
+        if (selected.isEmpty()) return;
+        boolean anyUnarchived = false;
+        for (Chat c : selected) {
+            if (c != null && !c.isArchived()) {
+                anyUnarchived = true;
+                break;
+            }
+        }
+        final boolean targetArchived = anyUnarchived;
+        final EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(requireContext());
+        for (Chat c : selected) {
+            if (c != null && c.getId() != null) {
+                c.setArchived(targetArchived);
+                db.updateChatArchiveStatus(c.getId(), targetArchived);
+            }
+        }
+        int count = selected.size();
+        chatsAdapter.clearSelection();
+        loadLocalEncryptedChats();
+        if (getView() != null) {
+            Snackbar.make(getView(),
+                    targetArchived ? ("📥 Archived " + count + (count == 1 ? " chat" : " chats"))
+                            : ("📤 Unarchived " + count + (count == 1 ? " chat" : " chats")),
+                    Snackbar.LENGTH_LONG)
+                    .setAction("Undo", v -> {
+                        for (Chat c : selected) {
+                            if (c != null && c.getId() != null) {
+                                c.setArchived(!targetArchived);
+                                db.updateChatArchiveStatus(c.getId(), !targetArchived);
+                            }
+                        }
+                        loadLocalEncryptedChats();
+                    }).show();
+        }
+    }
+
+    private void showBatchMoreOptionsSheet(List<Chat> selectedChats) {
+        if (getContext() == null || selectedChats == null || selectedChats.isEmpty()) return;
+        BottomSheetDialog sheet = new BottomSheetDialog(requireContext());
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.bottom_sheet_background);
+        int pad = (int) (20 * dp);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(requireContext());
+        title.setText(selectedChats.size() + " Conversations Selected");
+        title.setTextSize(17.5f);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(ContextCompat.getColor(requireContext(), R.color.textPrimary));
+        title.setPadding(0, 0, 0, (int) (12 * dp));
+        root.addView(title);
+
+        MaterialButton btnMarkRead = new MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnMarkRead.setText("✓✓  Mark All Selected as Read");
+        btnMarkRead.setCornerRadius((int) (12 * dp));
+        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp1.bottomMargin = (int) (8 * dp);
+        btnMarkRead.setLayoutParams(lp1);
+        btnMarkRead.setOnClickListener(v -> {
+            sheet.dismiss();
+            EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(requireContext());
+            for (Chat c : selectedChats) {
+                if (c != null && c.getId() != null) {
+                    c.setUnreadCount(0);
+                    db.updateChatUnreadCount(c.getId(), 0);
+                }
+            }
+            if (chatsAdapter != null) chatsAdapter.clearSelection();
+            loadLocalEncryptedChats();
+            Toast.makeText(getContext(), "Marked " + selectedChats.size() + " chats as read", Toast.LENGTH_SHORT).show();
+        });
+        root.addView(btnMarkRead);
+
+        MaterialButton btnMarkUnread = new MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnMarkUnread.setText("●  Mark All Selected as Unread");
+        btnMarkUnread.setCornerRadius((int) (12 * dp));
+        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp2.bottomMargin = (int) (8 * dp);
+        btnMarkUnread.setLayoutParams(lp2);
+        btnMarkUnread.setOnClickListener(v -> {
+            sheet.dismiss();
+            EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(requireContext());
+            for (Chat c : selectedChats) {
+                if (c != null && c.getId() != null) {
+                    int next = Math.max(1, c.getUnreadCount());
+                    c.setUnreadCount(next);
+                    db.updateChatUnreadCount(c.getId(), next);
+                }
+            }
+            if (chatsAdapter != null) chatsAdapter.clearSelection();
+            loadLocalEncryptedChats();
+            Toast.makeText(getContext(), "Marked " + selectedChats.size() + " chats as unread", Toast.LENGTH_SHORT).show();
+        });
+        root.addView(btnMarkUnread);
+
+        MaterialButton btnMoveVault = new MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnMoveVault.setText("🔒  Move Selected to Secret Vault");
+        btnMoveVault.setCornerRadius((int) (12 * dp));
+        LinearLayout.LayoutParams lp3 = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp3.bottomMargin = (int) (8 * dp);
+        btnMoveVault.setLayoutParams(lp3);
+        btnMoveVault.setOnClickListener(v -> {
+            sheet.dismiss();
+            EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(requireContext());
+            for (Chat c : selectedChats) {
+                if (c != null && c.getId() != null) {
+                    c.setSecret(true);
+                    db.updateChatSecretStatus(c.getId(), true);
+                }
+            }
+            if (chatsAdapter != null) chatsAdapter.clearSelection();
+            loadLocalEncryptedChats();
+            Toast.makeText(getContext(), "🕵️ Moved " + selectedChats.size() + " chats to Secret Vault", Toast.LENGTH_SHORT).show();
+        });
+        root.addView(btnMoveVault);
+
+        MaterialButton btnDeleteBatch = new MaterialButton(requireContext());
+        btnDeleteBatch.setText("🗑️  Delete " + selectedChats.size() + " Selected Chats");
+        btnDeleteBatch.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFEF4444));
+        btnDeleteBatch.setTextColor(Color.WHITE);
+        btnDeleteBatch.setCornerRadius((int) (12 * dp));
+        btnDeleteBatch.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        btnDeleteBatch.setOnClickListener(v -> {
+            sheet.dismiss();
+            confirmDeleteSelectedChats(selectedChats);
+        });
+        root.addView(btnDeleteBatch);
+
+        sheet.setContentView(root);
+        sheet.show();
+    }
+
+    private void confirmDeleteSelectedChats(List<Chat> chatsToDelete) {
+        if (chatsToDelete == null || chatsToDelete.isEmpty() || getContext() == null) return;
+        if (chatsToDelete.size() == 1) {
+            Chat single = chatsToDelete.get(0);
+            boolean isLocked = single.getChatLockPin() != null && !single.getChatLockPin().isEmpty();
+            if (isLocked) {
+                showPinAuthModal("🔒 Verify Chat PIN", "Enter PIN to delete " + single.getName(), "Chat PIN", (enteredPin, pinDialog, layout) -> {
+                    if (single.getChatLockPin().equals(enteredPin)) {
+                        pinDialog.dismiss();
+                        if (chatsAdapter != null) chatsAdapter.clearSelection();
+                        deleteChat(single);
+                    } else {
+                        layout.setError("Incorrect PIN");
+                    }
+                });
+            } else {
+                if (chatsAdapter != null) chatsAdapter.clearSelection();
+                deleteChat(single);
+            }
+            return;
+        }
+
+        final List<Chat> targets = new ArrayList<>(chatsToDelete);
+        BottomSheetDialog confirmSheet = new BottomSheetDialog(requireContext());
+        confirmSheet.setContentView(R.layout.dialog_confirm_destructive_sheet);
+
+        TextView tvTitle = confirmSheet.findViewById(R.id.tvDestructiveTitle);
+        TextView tvMsg = confirmSheet.findViewById(R.id.tvDestructiveMessage);
+        com.google.android.material.checkbox.MaterialCheckBox cbPeer = confirmSheet.findViewById(R.id.cbDeleteForPeer);
+        com.google.android.material.button.MaterialButton btnConfirm = confirmSheet.findViewById(R.id.btnDestructiveConfirm);
+        com.google.android.material.button.MaterialButton btnCancel = confirmSheet.findViewById(R.id.btnDestructiveCancel);
+
+        if (tvTitle != null) tvTitle.setText("Delete " + targets.size() + " Conversations?");
+        if (tvMsg != null) {
+            tvMsg.setText("Are you sure you want to permanently delete these " + targets.size() + " conversations? All messages and attachments will be removed.");
+        }
+        if (cbPeer != null) {
+            cbPeer.setVisibility(View.VISIBLE);
+            cbPeer.setChecked(true);
+            cbPeer.setText("Also delete these conversations for the other participants");
+        }
+        if (btnConfirm != null) {
+            btnConfirm.setText("Delete " + targets.size() + " Chats");
+            btnConfirm.setOnClickListener(cv -> {
+                boolean deleteForBoth = cbPeer != null && cbPeer.isChecked();
+                confirmSheet.dismiss();
+                if (chatsAdapter != null) chatsAdapter.clearSelection();
+                String activePersonaId = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaId();
+                EncryptedChatDatabase db = EncryptedChatDatabase.getInstance(requireContext());
+                com.m3.veil.manager.VeilMessagesController msgCtrl = com.m3.veil.manager.VeilMessagesController.getInstance(requireContext());
+
+                for (Chat chat : targets) {
+                    if (chat == null || chat.getId() == null) continue;
+                    String deletedId = chat.getId();
+                    String targetPeerId = null;
+                    if (!chat.isGroup() && chat.getParticipants() != null) {
+                        for (String p : chat.getParticipants()) {
+                            if (p != null && !p.equals(currentUserId)) {
+                                targetPeerId = p;
+                                break;
+                            }
+                        }
+                    }
+                    if (chat.isGroup() && getContext() != null) {
+                        android.content.SharedPreferences prefs = requireContext().getSharedPreferences("VeilPrefs", 0);
+                        java.util.Set<String> delSet = new java.util.HashSet<>(
+                                prefs.getStringSet("deleted_group_ids", new java.util.HashSet<>()));
+                        delSet.add(deletedId);
+                        prefs.edit().putStringSet("deleted_group_ids", delSet).apply();
+                        if (currentUserId != null && !currentUserId.isEmpty()) {
+                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    .collection("groups").document(deletedId)
+                                    .update("participants", com.google.firebase.firestore.FieldValue.arrayRemove(currentUserId));
+                        }
+                    }
+                    msgCtrl.deleteConversation(deletedId, targetPeerId, deleteForBoth);
+                    db.deleteConversationCascade(deletedId, targetPeerId, activePersonaId);
+                    for (int i = allLocalChats.size() - 1; i >= 0; i--) {
+                        if (deletedId.equals(allLocalChats.get(i).getId())) {
+                            allLocalChats.remove(i);
+                        }
+                    }
+                    for (int i = displayedChats.size() - 1; i >= 0; i--) {
+                        if (deletedId.equals(displayedChats.get(i).getId())) {
+                            displayedChats.remove(i);
+                        }
+                    }
+                }
+                if (chatsAdapter != null) {
+                    chatsAdapter.notifyDataSetChanged();
+                }
+                loadLocalEncryptedChats();
+                Toast.makeText(getContext(), "Deleted " + targets.size() + " conversations", Toast.LENGTH_SHORT).show();
+            });
+        }
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(cv -> confirmSheet.dismiss());
+        }
+        confirmSheet.show();
+    }
+
+    private void showSingleChatActionsSheet(Chat chat) {
         if (chat == null || chat.getId() == null || getContext() == null) return;
         BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(requireContext());
 

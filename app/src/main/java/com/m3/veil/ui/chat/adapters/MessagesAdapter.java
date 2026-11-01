@@ -1336,7 +1336,18 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         this.lastAnimatedPosition = newMessages != null ? newMessages.size() + 1 : 0;
         notifyDataSetChanged();
     }
-    
+
+    public void invalidateMessageCache() {
+        this.lastIndexedSize = -1;
+        this.messageByIdCache.clear();
+    }
+
+    public void stopAudioPlayback() {
+        try {
+            VoicePlayerManager.getInstance().stopPlayback();
+        } catch (Exception ignored) {}
+    }
+
     private Message getMessageById(String id) {
         if (id == null || messages == null) return null;
         if (lastIndexedSize != messages.size()) {
@@ -1349,7 +1360,18 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             }
             lastIndexedSize = messages.size();
         }
-        return messageByIdCache.get(id);
+        Message cached = messageByIdCache.get(id);
+        if (cached != null) {
+            return cached;
+        }
+        for (int i = 0, n = messages.size(); i < n; i++) {
+            Message m = messages.get(i);
+            if (m != null && id.equals(m.getId())) {
+                messageByIdCache.put(id, m);
+                return m;
+            }
+        }
+        return null;
     }
 
     static class NoticeViewHolder extends RecyclerView.ViewHolder {
@@ -4466,7 +4488,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 if (replyQuoteContainer != null) {
                     if (message.getReplyToMessageId() != null) {
                         Message replyTo = getMessageById(message.getReplyToMessageId());
-                        if (replyTo != null && !"deleted".equals(replyTo.getType())) {
+                        boolean isReplyDeleted = replyTo == null
+                                || "deleted".equals(replyTo.getType())
+                                || "🚫 This message was deleted".equals(replyTo.getText());
+                        if (!isReplyDeleted) {
                             replyQuoteContainer.setVisibility(View.VISIBLE);
                             replyQuoteName.setText(resolveReplyQuoteSenderName(message, replyTo));
                             String quoteText = replyTo.getText();
@@ -4488,13 +4513,15 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             } else if ("call".equals(replyTo.getType())) {
                                 boolean isVideo = replyTo.getText() != null && replyTo.getText().toLowerCase().contains("video");
                                 quoteText = (isVideo ? "📹 " : "📞 ") + (replyTo.getText() != null ? replyTo.getText() : "Call");
+                            } else if (replyTo.isEdited() && quoteText != null && !quoteText.isEmpty()) {
+                                quoteText = quoteText + " (edited)";
                             }
                             replyQuoteText.setText(quoteText);
                             replyQuoteText.setTypeface(null, android.graphics.Typeface.NORMAL);
                         } else {
                             replyQuoteContainer.setVisibility(View.VISIBLE);
                             replyQuoteName.setText(resolveReplyQuoteSenderName(message, replyTo));
-                            replyQuoteText.setText("This message was deleted");
+                            replyQuoteText.setText("🚫 This message was deleted");
                             replyQuoteText.setTypeface(null, android.graphics.Typeface.ITALIC);
                         }
                         
@@ -5960,7 +5987,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 if (replyQuoteContainer != null) {
                     if (message.getReplyToMessageId() != null) {
                         Message replyTo = getMessageById(message.getReplyToMessageId());
-                        if (replyTo != null && !"deleted".equals(replyTo.getType())) {
+                        boolean isReplyDeleted = replyTo == null
+                                || "deleted".equals(replyTo.getType())
+                                || "🚫 This message was deleted".equals(replyTo.getText());
+                        if (!isReplyDeleted) {
                             replyQuoteContainer.setVisibility(View.VISIBLE);
                             replyQuoteName.setText(resolveReplyQuoteSenderName(message, replyTo));
                             String quoteText = replyTo.getText();
@@ -5982,13 +6012,15 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                             } else if ("call".equals(replyTo.getType())) {
                                 boolean isVideo = replyTo.getText() != null && replyTo.getText().toLowerCase().contains("video");
                                 quoteText = (isVideo ? "📹 " : "📞 ") + (replyTo.getText() != null ? replyTo.getText() : "Call");
+                            } else if (replyTo.isEdited() && quoteText != null && !quoteText.isEmpty()) {
+                                quoteText = quoteText + " (edited)";
                             }
                             replyQuoteText.setText(quoteText);
                             replyQuoteText.setTypeface(null, android.graphics.Typeface.NORMAL);
                         } else {
                             replyQuoteContainer.setVisibility(View.VISIBLE);
                             replyQuoteName.setText(resolveReplyQuoteSenderName(message, replyTo));
-                            replyQuoteText.setText("This message was deleted");
+                            replyQuoteText.setText("🚫 This message was deleted");
                             replyQuoteText.setTypeface(null, android.graphics.Typeface.ITALIC);
                         }
                         

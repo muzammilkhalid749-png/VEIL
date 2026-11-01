@@ -42,6 +42,9 @@ public class ArchivedChatsActivity extends AppCompatActivity implements ChatsAda
     private boolean isSecretMode = false;
     private TextView tvTitle, tvNoticeText, tvEmptyTitle, tvEmptySubtitle;
     private android.widget.ImageView ivNoticeIcon, ivEmptyIcon;
+    private View appBarLayout, archivedMultiSelectBar;
+    private TextView tvArchivedSelectCount, btnArchivedSelectAll;
+    private androidx.activity.OnBackPressedCallback selectionBackCallback;
 
     private final EncryptedChatDatabase.DatabaseChangeListener dbListener = new EncryptedChatDatabase.DatabaseChangeListener() {
         @Override
@@ -79,13 +82,57 @@ public class ArchivedChatsActivity extends AppCompatActivity implements ChatsAda
         tvEmptyTitle = findViewById(R.id.tvEmptyTitle);
         tvEmptySubtitle = findViewById(R.id.tvEmptySubtitle);
 
+        appBarLayout = findViewById(R.id.appBarLayout);
+        archivedMultiSelectBar = findViewById(R.id.archivedMultiSelectBar);
+        tvArchivedSelectCount = findViewById(R.id.tvArchivedSelectCount);
+        btnArchivedSelectAll = findViewById(R.id.btnArchivedSelectAll);
+        View btnArchivedSelectClose = findViewById(R.id.btnArchivedSelectClose);
+        View btnArchivedSelectMute = findViewById(R.id.btnArchivedSelectMute);
+        View btnArchivedSelectUnarchive = findViewById(R.id.btnArchivedSelectUnarchive);
+        View btnArchivedSelectDelete = findViewById(R.id.btnArchivedSelectDelete);
+
         archivedRecyclerView = findViewById(R.id.archivedRecyclerView);
         emptyState = findViewById(R.id.emptyState);
 
         archivedChats = new ArrayList<>();
         chatsAdapter = new ChatsAdapter(archivedChats, this);
+        chatsAdapter.setOnChatSelectionChangeListener((count, selectedChats) -> updateArchivedMultiSelectBar(count));
         archivedRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         archivedRecyclerView.setAdapter(chatsAdapter);
+
+        if (btnArchivedSelectClose != null) {
+            btnArchivedSelectClose.setOnClickListener(v -> chatsAdapter.clearSelection());
+        }
+        if (btnArchivedSelectAll != null) {
+            btnArchivedSelectAll.setOnClickListener(v -> chatsAdapter.selectAllChats());
+        }
+        if (btnArchivedSelectMute != null) {
+            btnArchivedSelectMute.setOnClickListener(v -> performBatchMuteToggle());
+        }
+        if (btnArchivedSelectUnarchive != null) {
+            btnArchivedSelectUnarchive.setOnClickListener(v -> performBatchUnarchive());
+        }
+        if (btnArchivedSelectDelete != null) {
+            btnArchivedSelectDelete.setOnClickListener(v -> {
+                List<Chat> selected = chatsAdapter.getSelectedChats();
+                if (!selected.isEmpty()) {
+                    confirmDeleteSelectedArchivedChats(selected);
+                }
+            });
+        }
+
+        selectionBackCallback = new androidx.activity.OnBackPressedCallback(false) {
+            @Override
+            public void handleOnBackPressed() {
+                if (chatsAdapter != null && chatsAdapter.isSelectionMode()) {
+                    chatsAdapter.clearSelection();
+                } else {
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                }
+            }
+        };
+        getOnBackPressedDispatcher().addCallback(this, selectionBackCallback);
 
         isSecretMode = getIntent().getBooleanExtra("is_secret", false)
                 || "secret".equals(getIntent().getStringExtra("mode"));
@@ -428,7 +475,7 @@ public class ArchivedChatsActivity extends AppCompatActivity implements ChatsAda
         if (chats != null) {
             archivedChats.addAll(chats);
         }
-        chatsAdapter.notifyDataSetChanged();
+        chatsAdapter.updateChats(archivedChats);
 
         if (archivedChats.isEmpty()) {
             emptyState.setVisibility(View.VISIBLE);
@@ -515,75 +562,134 @@ public class ArchivedChatsActivity extends AppCompatActivity implements ChatsAda
     @Override
     public void onChatLongClick(Chat chat) {
         if (chat == null || chat.getId() == null) return;
-        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
-        View bottomSheetView = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_chat_actions, null);
+        if (chatsAdapter != null) {
+            chatsAdapter.startSelection(chat);
+        }
+    }
 
-        TextView actionPin = bottomSheetView.findViewById(R.id.actionPin);
-        TextView actionMute = bottomSheetView.findViewById(R.id.actionMute);
-        TextView actionArchive = bottomSheetView.findViewById(R.id.actionArchive);
-        TextView actionDelete = bottomSheetView.findViewById(R.id.actionDelete);
+    private void updateArchivedMultiSelectBar(int count) {
+        boolean active = count > 0 && chatsAdapter != null && chatsAdapter.isSelectionMode();
+        if (selectionBackCallback != null) {
+            selectionBackCallback.setEnabled(active);
+        }
+        if (archivedMultiSelectBar != null) {
+            archivedMultiSelectBar.setVisibility(active ? View.VISIBLE : View.GONE);
+        }
+        if (appBarLayout != null) {
+            appBarLayout.setVisibility(active ? View.GONE : View.VISIBLE);
+        }
+        if (active) {
+            if (tvArchivedSelectCount != null) {
+                tvArchivedSelectCount.setText(count + " selected");
+            }
+            if (btnArchivedSelectAll != null) {
+                int total = archivedChats != null ? archivedChats.size() : 0;
+                btnArchivedSelectAll.setText((total > 0 && count >= total) ? "Clear" : "All");
+            }
+        }
+    }
 
-        actionPin.setVisibility(View.GONE);
-        actionMute.setText(chat.isMuted() ? "Unmute notifications" : "Mute notifications");
-        actionArchive.setText(isSecretMode ? "Move out of Secret Vault" : "Unarchive chat");
+    private void performBatchMuteToggle() {
+        List<Chat> selected = chatsAdapter.getSelectedChats();
+        if (selected.isEmpty()) return;
+        boolean anyUnmuted = false;
+        for (Chat c : selected) {
+            if (c != null && !c.isMuted()) {
+                anyUnmuted = true;
+                break;
+            }
+        }
+        boolean targetMuted = anyUnmuted;
+        for (Chat c : selected) {
+            if (c != null && c.getId() != null) {
+                c.setMuted(targetMuted);
+                encryptedDb.updateChatMuteStatus(c.getId(), targetMuted);
+            }
+        }
+        int count = selected.size();
+        chatsAdapter.clearSelection();
+        loadArchivedChats();
+        Toast.makeText(this,
+                targetMuted ? ("🔕 Muted " + count + (count == 1 ? " chat" : " chats"))
+                        : ("🔔 Unmuted " + count + (count == 1 ? " chat" : " chats")),
+                Toast.LENGTH_SHORT).show();
+    }
 
-        actionMute.setOnClickListener(v -> {
-            bottomSheetDialog.dismiss();
-            boolean newMuted = !chat.isMuted();
-            chat.setMuted(newMuted);
-            encryptedDb.updateChatMuteStatus(chat.getId(), newMuted);
-            loadArchivedChats();
-            Toast.makeText(this, newMuted ? "Notifications muted" : "Notifications unmuted", Toast.LENGTH_SHORT).show();
-        });
-
-        actionArchive.setOnClickListener(v -> {
-            bottomSheetDialog.dismiss();
+    private void performBatchUnarchive() {
+        List<Chat> selected = chatsAdapter.getSelectedChats();
+        if (selected.isEmpty()) return;
+        for (Chat c : selected) {
+            if (c == null || c.getId() == null) continue;
             if (isSecretMode) {
-                chat.setSecret(false);
-                encryptedDb.updateChatSecretStatus(chat.getId(), false);
-                loadArchivedChats();
-                Toast.makeText(this, "Moved back to main chats", Toast.LENGTH_SHORT).show();
+                c.setSecret(false);
+                encryptedDb.updateChatSecretStatus(c.getId(), false);
             } else {
-                chat.setArchived(false);
-                chat.setSecret(false);
-                encryptedDb.saveOrUpdateChat(chat);
-                encryptedDb.updateChatArchiveStatus(chat.getId(), false);
+                c.setArchived(false);
+                c.setSecret(false);
+                encryptedDb.saveOrUpdateChat(c);
+                encryptedDb.updateChatArchiveStatus(c.getId(), false);
+            }
+        }
+        int count = selected.size();
+        chatsAdapter.clearSelection();
+        loadArchivedChats();
+        Toast.makeText(this,
+                isSecretMode ? ("Moved " + count + (count == 1 ? " chat" : " chats") + " back to main inbox")
+                        : ("📤 Unarchived " + count + (count == 1 ? " chat" : " chats")),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void confirmDeleteSelectedArchivedChats(List<Chat> selectedChats) {
+        if (selectedChats == null || selectedChats.isEmpty()) return;
+        final List<Chat> targets = new ArrayList<>(selectedChats);
+        BottomSheetDialog confirmSheet = new BottomSheetDialog(this);
+        confirmSheet.setContentView(R.layout.dialog_confirm_destructive_sheet);
+
+        TextView tvConfirmTitle = confirmSheet.findViewById(R.id.tvDestructiveTitle);
+        TextView tvMsg = confirmSheet.findViewById(R.id.tvDestructiveMessage);
+        MaterialButton btnConfirm = confirmSheet.findViewById(R.id.btnDestructiveConfirm);
+        MaterialButton btnCancel = confirmSheet.findViewById(R.id.btnDestructiveCancel);
+
+        int count = targets.size();
+        if (tvConfirmTitle != null) {
+            tvConfirmTitle.setText(count == 1 ? "Delete Chat?" : ("Delete " + count + " Chats?"));
+        }
+        if (tvMsg != null) {
+            tvMsg.setText(count == 1
+                    ? "Are you sure you want to permanently delete this conversation? All messages and attachments will be deleted."
+                    : ("Are you sure you want to permanently delete these " + count + " conversations? All messages and attachments will be deleted."));
+        }
+        if (btnConfirm != null) {
+            btnConfirm.setText(count == 1 ? "Delete Conversation" : ("Delete " + count + " Chats"));
+            btnConfirm.setOnClickListener(cv -> {
+                confirmSheet.dismiss();
+                chatsAdapter.clearSelection();
+                String activePersonaId = com.m3.veil.manager.PersonaManager.getInstance(this).getActivePersonaId();
+                for (Chat c : targets) {
+                    if (c == null || c.getId() == null) continue;
+                    String targetPeerId = null;
+                    if (!c.isGroup() && c.getParticipants() != null) {
+                        for (String p : c.getParticipants()) {
+                            if (p != null && !p.equals(currentUserId)) {
+                                targetPeerId = p;
+                                break;
+                            }
+                        }
+                    }
+                    com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                            .deleteConversation(c.getId(), targetPeerId, true);
+                    encryptedDb.deleteConversationCascade(c.getId(), targetPeerId, activePersonaId);
+                }
                 loadArchivedChats();
-                Toast.makeText(this, "Chat unarchived", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        actionDelete.setOnClickListener(v -> {
-            bottomSheetDialog.dismiss();
-            BottomSheetDialog confirmSheet = new BottomSheetDialog(this);
-            confirmSheet.setContentView(R.layout.dialog_confirm_destructive_sheet);
-
-            TextView tvTitle = confirmSheet.findViewById(R.id.tvDestructiveTitle);
-            TextView tvMsg = confirmSheet.findViewById(R.id.tvDestructiveMessage);
-            MaterialButton btnConfirm = confirmSheet.findViewById(R.id.btnDestructiveConfirm);
-            MaterialButton btnCancel = confirmSheet.findViewById(R.id.btnDestructiveCancel);
-
-            if (tvTitle != null) tvTitle.setText("Delete Chat?");
-            if (tvMsg != null) {
-                tvMsg.setText("Are you sure you want to permanently delete this conversation? All messages and attachments will be deleted.");
-            }
-            if (btnConfirm != null) {
-                btnConfirm.setText("Delete Conversation");
-                btnConfirm.setOnClickListener(cv -> {
-                    confirmSheet.dismiss();
-                    encryptedDb.deleteChat(chat.getId());
-                    loadArchivedChats();
-                    Toast.makeText(this, "Chat deleted from vault", Toast.LENGTH_SHORT).show();
-                });
-            }
-            if (btnCancel != null) {
-                btnCancel.setOnClickListener(cv -> confirmSheet.dismiss());
-            }
-            confirmSheet.show();
-        });
-
-        bottomSheetDialog.setContentView(bottomSheetView);
-        bottomSheetDialog.show();
+                Toast.makeText(this,
+                        count == 1 ? "Chat deleted from vault" : ("Deleted " + count + " chats from vault"),
+                        Toast.LENGTH_SHORT).show();
+            });
+        }
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(cv -> confirmSheet.dismiss());
+        }
+        confirmSheet.show();
     }
 
     @Override

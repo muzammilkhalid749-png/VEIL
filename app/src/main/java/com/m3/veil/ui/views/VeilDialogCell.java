@@ -182,6 +182,8 @@ public class VeilDialogCell extends View {
     private String mCurrentUserId = "";
     private boolean mUseSeparator = true;
     private boolean mUseThreeLines = false;
+    private boolean mInSelectionMode = false;
+    private boolean mIsSelected = false;
     private String mAvatarInitials = "?";
     private int mAvatarColorIndex = 0;
     private LinearGradient mAvatarShader;
@@ -403,6 +405,14 @@ public class VeilDialogCell extends View {
      */
     public void setChat(@NonNull Chat chat, @Nullable String currentUserId) {
         setChat(chat, currentUserId, true);
+    }
+
+    public void setSelectionState(boolean inSelectionMode, boolean isSelected) {
+        if (this.mInSelectionMode != inSelectionMode || this.mIsSelected != isSelected) {
+            this.mInSelectionMode = inSelectionMode;
+            this.mIsSelected = isSelected;
+            invalidate();
+        }
     }
 
     public void setChat(@NonNull Chat chat, @Nullable String currentUserId, boolean useSeparator) {
@@ -1001,8 +1011,13 @@ public class VeilDialogCell extends View {
         int height = getMeasuredHeight();
         boolean needsNextFrame = false;
 
-        // 0. Pinned Dialog Background Highlight
-        if (mDrawPinned) {
+        // 0. Selected or Pinned Dialog Background Highlight
+        if (mIsSelected) {
+            mIconFillPaint.setColor(ColorUtils.setAlphaComponent(mColorPrimary, mIsNightMode ? 48 : 28));
+            canvas.drawRect(0, 0, width, height - (mUseSeparator ? 1 : 0), mIconFillPaint);
+            mIconFillPaint.setColor(mColorPrimary);
+            canvas.drawRect(0, 0, dp(3.5f), height - (mUseSeparator ? 1 : 0), mIconFillPaint);
+        } else if (mDrawPinned) {
             canvas.drawRect(0, 0, width, height - (mUseSeparator ? 1 : 0), mPinnedBgPaint);
         }
 
@@ -1118,7 +1133,28 @@ public class VeilDialogCell extends View {
             needInvalidate = true;
         }
 
-        if (mOnlineProgress > 0f) {
+        if (mInSelectionMode) {
+            float badgeX = avatarLeft + avatarSize - dp(7);
+            float badgeY = avatarTop + avatarSize - dp(7);
+            canvas.drawCircle(badgeX, badgeY, dpf2(10.5f), mOnlineStrokePaint);
+            if (mIsSelected) {
+                mIconFillPaint.setColor(mColorPrimary);
+                canvas.drawCircle(badgeX, badgeY, dpf2(8.8f), mIconFillPaint);
+                mIconStrokePaint.setColor(Color.WHITE);
+                mIconStrokePaint.setStrokeWidth(dpf2(1.8f));
+                mVectorPath.reset();
+                mVectorPath.moveTo(badgeX - dpf2(3.6f), badgeY + dpf2(0.2f));
+                mVectorPath.lineTo(badgeX - dpf2(1.0f), badgeY + dpf2(2.8f));
+                mVectorPath.lineTo(badgeX + dpf2(4.0f), badgeY - dpf2(2.4f));
+                canvas.drawPath(mVectorPath, mIconStrokePaint);
+            } else {
+                mIconFillPaint.setColor(mColorSurface);
+                canvas.drawCircle(badgeX, badgeY, dpf2(8.4f), mIconFillPaint);
+                mIconStrokePaint.setColor(mColorOutline);
+                mIconStrokePaint.setStrokeWidth(dpf2(1.6f));
+                canvas.drawCircle(badgeX, badgeY, dpf2(8.0f), mIconStrokePaint);
+            }
+        } else if (mOnlineProgress > 0f) {
             float dotX = avatarLeft + avatarSize - dp(7);
             float dotY = avatarTop + avatarSize - dp(7);
             canvas.drawCircle(dotX, dotY, dpf2(7.5f) * mOnlineProgress, mOnlineStrokePaint);
