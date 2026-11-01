@@ -163,6 +163,16 @@ public class VeilMeshDaemonService extends Service {
 
     private static void ensureInProcessEnginesInitialized(Context ctx) {
         if (ctx == null) return;
+        final Context appCtx = ctx.getApplicationContext() != null ? ctx.getApplicationContext() : ctx;
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            new Thread(() -> ensureInProcessEnginesInitializedInternal(appCtx), "VeilEngineBoot").start();
+            return;
+        }
+        ensureInProcessEnginesInitializedInternal(appCtx);
+    }
+
+    private static void ensureInProcessEnginesInitializedInternal(Context ctx) {
+        if (ctx == null) return;
         String uid = AuthManager.getInstance().getCurrentUserId(ctx);
         if (uid != null && !uid.isEmpty()) {
             try {

@@ -733,10 +733,23 @@ public class ChatMessageCell extends LinearLayout {
             canvas.drawPath(mBubblePath, mBubbleStrokePaint);
         }
 
-        // 3. Draw Search / Reply Highlight Pulse Overlay
+        // 3. Draw Search / Reply Highlight Pulse Overlay or Multi-Select Overlay
         if (mHighlightAlpha > 0f) {
             mHighlightPaint.setAlpha((int) (255 * mHighlightAlpha));
             canvas.drawPath(mBubblePath, mHighlightPaint);
+        }
+        if (mMessageSelected && !mIsChromeless) {
+            if (mSelectionOverlayPaint == null) {
+                mSelectionOverlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                mSelectionOverlayPaint.setStyle(Paint.Style.FILL);
+                mSelectionStrokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                mSelectionStrokePaint.setStyle(Paint.Style.STROKE);
+            }
+            mSelectionOverlayPaint.setColor(mIsNightMode ? 0x2E818CF8 : 0x226366F1);
+            mSelectionStrokePaint.setColor(mIsNightMode ? 0xCC818CF8 : 0xCC6366F1);
+            mSelectionStrokePaint.setStrokeWidth(dpf2(1.5f));
+            canvas.drawPath(mBubblePath, mSelectionOverlayPaint);
+            canvas.drawPath(mBubblePath, mSelectionStrokePaint);
         }
 
         // 4. Draw Child Views (Text, Reply Quote, Media Cards, Voice Waveform, Polls)
@@ -831,11 +844,123 @@ public class ChatMessageCell extends LinearLayout {
     }
 
     // =========================================================================
-    // SWIPE-TO-REPLY SPRING PHYSICS & TOUCH HANDLING
+    // MULTI-SELECTION STATE & UNIVERSAL LONG-PRESS / SWIPE-TO-REPLY HANDLING
     // =========================================================================
+
+    private boolean mSelectionModeActive = false;
+    private boolean mMessageSelected = false;
+    private Paint mSelectionOverlayPaint;
+    private Paint mSelectionStrokePaint;
+    private float mTouchDownRawX;
+    private float mTouchDownRawY;
+    private boolean mLongPressFired = false;
+    private boolean mLongPressScheduled = false;
+
+    private final Runnable mUniversalLongPressRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!mLongPressScheduled || mIsSwiping) return;
+            mLongPressScheduled = false;
+            mLongPressFired = true;
+            boolean handled = false;
+            try {
+                handled = performLongClick();
+            } catch (Exception ignored) {
+            }
+            if (!handled && getParent() instanceof View) {
+                try {
+                    handled = ((View) getParent()).performLongClick();
+                } catch (Exception ignored) {
+                }
+            }
+            if (handled) {
+                try {
+                    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    };
+
+    public void setSelectionState(boolean selectionModeActive, boolean isSelected) {
+        boolean changed = (this.mSelectionModeActive != selectionModeActive)
+                || (this.mMessageSelected != isSelected);
+        this.mSelectionModeActive = selectionModeActive;
+        this.mMessageSelected = isSelected;
+        if (changed) {
+            invalidate();
+        }
+    }
+
+    public boolean isMessageSelected() {
+        return mMessageSelected;
+    }
+
+    private void cancelScheduledLongPress() {
+        if (mLongPressScheduled) {
+            mLongPressScheduled = false;
+            removeCallbacks(mUniversalLongPressRunnable);
+        }
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        final int action = ev.getActionMasked();
+        switch (action) {
+            case MotionEvent.ACTION_DOWN:
+                mTouchDownRawX = ev.getX();
+                mTouchDownRawY = ev.getY();
+                mLongPressFired = false;
+                cancelScheduledLongPress();
+                mLongPressScheduled = true;
+                postDelayed(mUniversalLongPressRunnable, ViewConfiguration.getLongPressTimeout());
+                break;
+
+            case MotionEvent.ACTION_MOVE:
+                float dx = ev.getX() - mTouchDownRawX;
+                float dy = ev.getY() - mTouchDownRawY;
+                if (Math.hypot(dx, dy) > mTouchSlop) {
+                    cancelScheduledLongPress();
+                }
+                break;
+
+            case MotionEvent.ACTION_POINTER_DOWN:
+            case MotionEvent.ACTION_CANCEL:
+                cancelScheduledLongPress();
+                break;
+
+            case MotionEvent.ACTION_UP:
+                cancelScheduledLongPress();
+                if (mLongPressFired) {
+                    mLongPressFired = false;
+                    MotionEvent cancelEvent = MotionEvent.obtain(ev);
+                    cancelEvent.setAction(MotionEvent.ACTION_CANCEL);
+                    super.dispatchTouchEvent(cancelEvent);
+                    cancelEvent.recycle();
+                    return true;
+                }
+                if (mSelectionModeActive && !mIsSwiping) {
+                    float upDx = ev.getX() - mTouchDownRawX;
+                    float upDy = ev.getY() - mTouchDownRawY;
+                    if (Math.hypot(upDx, upDy) <= mTouchSlop * 1.5f) {
+                        MotionEvent cancelEvent = MotionEvent.obtain(ev);
+                        cancelEvent.setAction(MotionEvent.ACTION_CANCEL);
+                        super.dispatchTouchEvent(cancelEvent);
+                        cancelEvent.recycle();
+                        performClick();
+                        return true;
+                    }
+                }
+                break;
+        }
+        return super.dispatchTouchEvent(ev);
+    }
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
+        if (mSelectionModeActive) {
+            return true;
+        }
         if (mSwipeReplyListener == null) {
             return super.onInterceptTouchEvent(ev);
         }
@@ -854,6 +979,7 @@ public class ChatMessageCell extends LinearLayout {
                 float dx = ev.getX() - mDownX;
                 float dy = ev.getY() - mDownY;
                 if (Math.abs(dx) > mTouchSlop && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                    cancelScheduledLongPress();
                     mIsSwiping = true;
                     if (getParent() != null) {
                         getParent().requestDisallowInterceptTouchEvent(true);
@@ -872,6 +998,9 @@ public class ChatMessageCell extends LinearLayout {
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
+        if (mSelectionModeActive) {
+            return super.onTouchEvent(ev) || true;
+        }
         if (mSwipeReplyListener == null) {
             return super.onTouchEvent(ev);
         }
@@ -884,11 +1013,13 @@ public class ChatMessageCell extends LinearLayout {
             case MotionEvent.ACTION_DOWN:
                 mDownX = ev.getX();
                 mDownY = ev.getY();
+                super.onTouchEvent(ev);
                 return true;
 
             case MotionEvent.ACTION_MOVE:
                 float deltaX = ev.getX() - mDownX;
                 if (!mIsSwiping && Math.abs(deltaX) > mTouchSlop) {
+                    cancelScheduledLongPress();
                     mIsSwiping = true;
                     if (getParent() != null) {
                         getParent().requestDisallowInterceptTouchEvent(true);

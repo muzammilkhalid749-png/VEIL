@@ -394,6 +394,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         void onQuickForwardClick(Message message);
     }
 
+    public interface OnSelectionChangeListener {
+        void onSelectionChanged(int selectedCount, List<Message> selectedMessages);
+    }
+
     public static final int STATE_IDLE = 0;
     public static final int STATE_DOWNLOADING = 1;
     public static final int STATE_RETRY = 2;
@@ -403,6 +407,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     private final java.util.Map<String, Integer> downloadProgresses = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Set<String> autoTriggeredVoiceDownloads = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
     private volatile String pendingAutoPlayMessageId = null;
+
+    private final java.util.LinkedHashSet<String> selectedMessageIds = new java.util.LinkedHashSet<>();
+    private boolean selectionMode = false;
+    private OnSelectionChangeListener selectionChangeListener;
 
     private OnMessageLongClickListener longClickListener;
     private OnReactionClickListener reactionClickListener;
@@ -415,6 +423,105 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     private OnSystemMessageClickListener systemMessageClickListener;
     private OnMediaDownloadClickListener mediaDownloadClickListener;
     private OnQuickForwardClickListener quickForwardClickListener;
+
+    public void setOnSelectionChangeListener(OnSelectionChangeListener listener) {
+        this.selectionChangeListener = listener;
+    }
+
+    public boolean isSelectionMode() {
+        return selectionMode;
+    }
+
+    public int getSelectedCount() {
+        return selectedMessageIds.size();
+    }
+
+    public boolean isMessageSelected(Message message) {
+        return message != null && message.getId() != null && selectedMessageIds.contains(message.getId());
+    }
+
+    public void startSelection(Message initialMessage) {
+        if (initialMessage == null || initialMessage.getId() == null) return;
+        if ("system".equals(initialMessage.getType()) || "date_header".equals(initialMessage.getType())
+                || "unread_divider".equals(initialMessage.getType())) {
+            return;
+        }
+        selectionMode = true;
+        selectedMessageIds.clear();
+        selectedMessageIds.add(initialMessage.getId());
+        notifyDataSetChanged();
+        dispatchSelectionChanged();
+    }
+
+    public void toggleSelection(Message message) {
+        if (message == null || message.getId() == null) return;
+        if ("system".equals(message.getType()) || "date_header".equals(message.getType())
+                || "unread_divider".equals(message.getType())) {
+            return;
+        }
+        String id = message.getId();
+        if (!selectionMode) {
+            selectionMode = true;
+            selectedMessageIds.clear();
+            selectedMessageIds.add(id);
+            notifyDataSetChanged();
+        } else {
+            if (selectedMessageIds.contains(id)) {
+                selectedMessageIds.remove(id);
+            } else {
+                selectedMessageIds.add(id);
+            }
+            if (selectedMessageIds.isEmpty()) {
+                selectionMode = false;
+            }
+            notifyDataSetChanged();
+        }
+        dispatchSelectionChanged();
+    }
+
+    public void selectAllMessages() {
+        if (messages == null || messages.isEmpty()) return;
+        selectionMode = true;
+        for (Message m : messages) {
+            if (m != null && m.getId() != null
+                    && !"system".equals(m.getType())
+                    && !"date_header".equals(m.getType())
+                    && !"unread_divider".equals(m.getType())
+                    && !"deleted".equals(m.getType())) {
+                selectedMessageIds.add(m.getId());
+            }
+        }
+        if (selectedMessageIds.isEmpty()) {
+            selectionMode = false;
+        }
+        notifyDataSetChanged();
+        dispatchSelectionChanged();
+    }
+
+    public void clearSelection() {
+        if (!selectionMode && selectedMessageIds.isEmpty()) return;
+        selectionMode = false;
+        selectedMessageIds.clear();
+        notifyDataSetChanged();
+        dispatchSelectionChanged();
+    }
+
+    public List<Message> getSelectedMessages() {
+        List<Message> result = new java.util.ArrayList<>();
+        if (messages == null || selectedMessageIds.isEmpty()) return result;
+        for (Message m : messages) {
+            if (m != null && m.getId() != null && selectedMessageIds.contains(m.getId())) {
+                result.add(m);
+            }
+        }
+        return result;
+    }
+
+    private void dispatchSelectionChanged() {
+        if (selectionChangeListener != null) {
+            selectionChangeListener.onSelectionChanged(selectedMessageIds.size(), getSelectedMessages());
+        }
+    }
 
     public void setOnSystemMessageClickListener(OnSystemMessageClickListener listener) {
         this.systemMessageClickListener = listener;
@@ -2434,6 +2541,9 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     private void attachDoubleTapAndLongPress(View bubbleView, View rootItemView, Message message) {
         if (bubbleView == null) return;
         bubbleView.setTag(R.id.messageBubble, message);
+        if (rootItemView != null) {
+            rootItemView.setTag(R.id.messageBubble, message);
+        }
         Object existingDetector = bubbleView.getTag(R.id.messageText);
         if (existingDetector == null) {
             final android.view.GestureDetector detector = new android.view.GestureDetector(
@@ -2441,6 +2551,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     new android.view.GestureDetector.SimpleOnGestureListener() {
                         @Override
                         public boolean onDoubleTap(android.view.MotionEvent e) {
+                            if (selectionMode) return false;
                             Object tagObj = bubbleView.getTag(R.id.messageBubble);
                             if (!(tagObj instanceof Message)) return false;
                             Message boundMsg = (Message) tagObj;
@@ -2463,18 +2574,135 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 detector.onTouchEvent(event);
                 return false;
             });
+        }
+        bindMessageSelectionVisuals(bubbleView, rootItemView, message);
+    }
 
-            View.OnLongClickListener longClick = v -> {
-                Object tagObj = bubbleView.getTag(R.id.messageBubble);
-                if (longClickListener != null && tagObj instanceof Message) {
-                    longClickListener.onMessageLongClick((Message) tagObj, rootItemView != null ? rootItemView : bubbleView);
-                    return true;
+    private void bindMessageSelectionVisuals(View bubbleView, View rootItemView, Message message) {
+        if (bubbleView != null) {
+            bubbleView.setTag(R.id.messageBubble, message);
+        }
+        if (rootItemView != null) {
+            rootItemView.setTag(R.id.messageBubble, message);
+        }
+
+        final boolean isSelected = isMessageSelected(message);
+        if (bubbleView instanceof com.m3.veil.ui.views.ChatMessageCell) {
+            ((com.m3.veil.ui.views.ChatMessageCell) bubbleView).setSelectionState(selectionMode, isSelected);
+        }
+
+        View.OnLongClickListener unifiedLongClick = v -> {
+            Object tagObj = (bubbleView != null && bubbleView.getTag(R.id.messageBubble) instanceof Message)
+                    ? bubbleView.getTag(R.id.messageBubble)
+                    : (rootItemView != null ? rootItemView.getTag(R.id.messageBubble) : message);
+            if (!(tagObj instanceof Message)) return false;
+            Message boundMsg = (Message) tagObj;
+            if (selectionMode) {
+                toggleSelection(boundMsg);
+                return true;
+            }
+            if (longClickListener != null) {
+                longClickListener.onMessageLongClick(boundMsg, bubbleView != null ? bubbleView : rootItemView);
+                return true;
+            }
+            return false;
+        };
+
+        View.OnClickListener selectionClick = v -> {
+            if (!selectionMode) return;
+            Object tagObj = (bubbleView != null && bubbleView.getTag(R.id.messageBubble) instanceof Message)
+                    ? bubbleView.getTag(R.id.messageBubble)
+                    : (rootItemView != null ? rootItemView.getTag(R.id.messageBubble) : message);
+            if (tagObj instanceof Message) {
+                try {
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                } catch (Exception ignored) {
                 }
-                return false;
-            };
-            bubbleView.setOnLongClickListener(longClick);
-            if (rootItemView != null) {
-                rootItemView.setOnLongClickListener(longClick);
+                toggleSelection((Message) tagObj);
+            }
+        };
+
+        if (bubbleView != null) {
+            bubbleView.setLongClickable(true);
+            bubbleView.setOnLongClickListener(unifiedLongClick);
+            bubbleView.setOnClickListener(selectionMode ? selectionClick : null);
+            if (!selectionMode) {
+                bubbleView.setClickable(false);
+            }
+        }
+        if (rootItemView != null) {
+            rootItemView.setLongClickable(true);
+            rootItemView.setOnLongClickListener(unifiedLongClick);
+            rootItemView.setOnClickListener(selectionMode ? selectionClick : null);
+            if (!selectionMode) {
+                rootItemView.setClickable(false);
+                rootItemView.setBackground(null);
+            } else {
+                final float density = rootItemView.getResources().getDisplayMetrics().density;
+                final boolean isNight = (rootItemView.getResources().getConfiguration().uiMode
+                        & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                        == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+                final boolean isOutgoingRow = message != null && isSenderMe(message.getSenderId(), message);
+                rootItemView.setBackground(new android.graphics.drawable.Drawable() {
+                    private final android.graphics.Paint fillPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+                    private final android.graphics.Paint barPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+                    private final android.graphics.Paint checkPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+                    private final android.graphics.Path checkPath = new android.graphics.Path();
+
+                    @Override
+                    public void draw(@NonNull android.graphics.Canvas canvas) {
+                        android.graphics.Rect b = getBounds();
+                        if (isSelected) {
+                            fillPaint.setStyle(android.graphics.Paint.Style.FILL);
+                            fillPaint.setColor(isNight ? 0x246366F1 : 0x164F46E5);
+                            canvas.drawRect(b, fillPaint);
+
+                            barPaint.setStyle(android.graphics.Paint.Style.FILL);
+                            barPaint.setColor(isNight ? 0xFF818CF8 : 0xFF6366F1);
+                            if (isOutgoingRow) {
+                                canvas.drawRect(b.right - (3f * density), b.top, b.right, b.bottom, barPaint);
+                            } else {
+                                canvas.drawRect(b.left, b.top, b.left + (3f * density), b.bottom, barPaint);
+                            }
+                        }
+
+                        float r = 9.5f * density;
+                        float cx = isOutgoingRow ? (b.left + 18f * density) : (b.right - 18f * density);
+                        float cy = b.exactCenterY();
+                        if (isSelected) {
+                            barPaint.setStyle(android.graphics.Paint.Style.FILL);
+                            barPaint.setColor(isNight ? 0xFF6366F1 : 0xFF4F46E5);
+                            canvas.drawCircle(cx, cy, r, barPaint);
+
+                            checkPaint.setStyle(android.graphics.Paint.Style.STROKE);
+                            checkPaint.setColor(0xFFFFFFFF);
+                            checkPaint.setStrokeWidth(1.9f * density);
+                            checkPaint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+                            checkPaint.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+                            checkPath.reset();
+                            checkPath.moveTo(cx - 4.0f * density, cy + 0.2f * density);
+                            checkPath.lineTo(cx - 1.1f * density, cy + 3.1f * density);
+                            checkPath.lineTo(cx + 4.3f * density, cy - 2.6f * density);
+                            canvas.drawPath(checkPath, checkPaint);
+                        } else {
+                            checkPaint.setStyle(android.graphics.Paint.Style.STROKE);
+                            checkPaint.setColor(isNight ? 0x5594A3B8 : 0x5564748B);
+                            checkPaint.setStrokeWidth(1.5f * density);
+                            canvas.drawCircle(cx, cy, r, checkPaint);
+                        }
+                    }
+
+                    @Override
+                    public void setAlpha(int alpha) {}
+
+                    @Override
+                    public void setColorFilter(@Nullable android.graphics.ColorFilter colorFilter) {}
+
+                    @Override
+                    public int getOpacity() {
+                        return android.graphics.PixelFormat.TRANSLUCENT;
+                    }
+                });
             }
         }
     }
@@ -4318,14 +4546,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageBubble.requestLayout();
                     messageBubble.invalidate();
                 }
-                itemView.setOnLongClickListener(v -> {
-                    if (longClickListener != null) {
-                        longClickListener.onMessageLongClick(message, itemView);
-                        return true;
-                    }
-                    return false;
-                });
             }
+            bindMessageSelectionVisuals(messageBubble, itemView, message);
         }
     }
 
@@ -5814,14 +6036,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageBubble.requestLayout();
                     messageBubble.invalidate();
                 }
-                itemView.setOnLongClickListener(v -> {
-                    if (longClickListener != null) {
-                        longClickListener.onMessageLongClick(message, itemView);
-                        return true;
-                    }
-                    return false;
-                });
             }
+            bindMessageSelectionVisuals(messageBubble, itemView, message);
         }
     }
 

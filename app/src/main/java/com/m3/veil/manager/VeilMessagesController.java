@@ -2729,8 +2729,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         }
     }
 
+    public static final long EDIT_MESSAGE_TIME_LIMIT_MS = 15L * 60L * 1000L; // 15 minutes
+
     /**
-     * Edits an existing sent message across all mesh peers.
+     * Edits an existing sent message across all mesh peers (within 15-minute window).
      */
     public void editMessage(String dialogId, String messageId, String newText) {
         if (dialogId == null || messageId == null || newText == null) return;
@@ -2738,6 +2740,12 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         mStageQueue.post(() -> {
             Message msg = getMessage(messageId);
             if (msg == null) return;
+            long tsMs = (msg.getTimestamp() != null && msg.getTimestamp().toDate() != null)
+                    ? msg.getTimestamp().toDate().getTime() : 0L;
+            long ageMs = System.currentTimeMillis() - tsMs;
+            if (tsMs <= 0L || ageMs > EDIT_MESSAGE_TIME_LIMIT_MS) {
+                return;
+            }
 
             msg.setText(newText.trim());
             msg.setEdited(true);

@@ -55,6 +55,10 @@ public class CallE2ee {
 
     public CallE2ee() {
         try {
+            try {
+                System.loadLibrary("jingle_peerconnection_so");
+            } catch (Throwable ignored) {
+            }
             keyProvider = FrameCryptorFactory.createFrameCryptorKeyProvider(
                     /* sharedKey= */ true,
                     "veil-call-ratchet".getBytes(StandardCharsets.UTF_8),

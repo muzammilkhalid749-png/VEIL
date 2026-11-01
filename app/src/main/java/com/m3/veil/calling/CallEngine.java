@@ -253,7 +253,17 @@ public class CallEngine implements CallSignaling.Listener {
         }
         initializedUserId = userId;
         this.displayName = getResolvedDisplayName();
-        CallMediaFactory.init(context);
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            diskIo.execute(() -> {
+                try {
+                    CallMediaFactory.init(context);
+                } catch (Throwable t) {
+                    Log.w(TAG, "Background CallMediaFactory.init failed", t);
+                }
+            });
+        } else {
+            CallMediaFactory.init(context);
+        }
         com.m3.veil.webrtc.TurnCredentialManager.getInstance(context).probeAllNodesAsync();
         signaling.addListener(this);
         signaling.start(userId);

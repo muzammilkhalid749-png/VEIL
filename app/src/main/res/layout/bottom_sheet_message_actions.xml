@@ -239,7 +239,7 @@
 
     </LinearLayout>
 
-    <!-- Action: Edit (within time window) -->
+    <!-- Action: Edit (within 15m time window) -->
     <LinearLayout
         android:id="@+id/actionEdit"
         android:layout_width="match_parent"
@@ -259,10 +259,48 @@
             app:tint="@color/textPrimary" />
 
         <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="18dp"
+            android:text="Edit message"
+            android:textColor="@color/textPrimary"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/tvEditRemainingBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/textSecondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+    <!-- Action: Select Multiple Messages -->
+    <LinearLayout
+        android:id="@+id/actionSelectMessages"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_check"
+            app:tint="@color/textPrimary" />
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="18dp"
-            android:text="Edit message"
+            android:text="Select messages"
             android:textColor="@color/textPrimary"
             android:textSize="15sp" />
 

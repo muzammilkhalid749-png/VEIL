@@ -456,7 +456,7 @@ public class ChatActivity extends AppCompatActivity {
                 public void onMessageStatusChanged(String dialogId, String messageId, boolean delivered, boolean read) {
                     runOnUiThread(() -> {
                         boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId));
-                        boolean accepted = isGroupChatContext() || com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId);
+                        boolean accepted = isDirectChatAcceptedFastUi();
                         for (int i = 0; i < messageList.size(); i++) {
                             Message m = messageList.get(i);
                             if (m.getId() != null && m.getId().equals(messageId)) {
@@ -649,7 +649,7 @@ public class ChatActivity extends AppCompatActivity {
         public void onMessageStatusChanged(String messageId, boolean delivered, boolean read) {
             runOnUiThread(() -> {
                 boolean blocked = isChatBlocked || (!isGroupChatContext() && com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId));
-                boolean accepted = isGroupChatContext() || com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId);
+                boolean accepted = isDirectChatAcceptedFastUi();
                 for (int i = 0; i < messageList.size(); i++) {
                     Message m = messageList.get(i);
                     if (m.getId() != null && m.getId().equals(messageId)) {
@@ -1149,6 +1149,10 @@ public class ChatActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
+                if (messagesAdapter != null && messagesAdapter.isSelectionMode()) {
+                    exitMultiSelectionMode();
+                    return;
+                }
                 View chatSearchBar = findViewById(R.id.chatSearchBar);
                 if (chatSearchBar != null && chatSearchBar.getVisibility() == View.VISIBLE) {
                     View btnCloseChatSearch = findViewById(R.id.btnCloseChatSearch);
@@ -1184,7 +1188,7 @@ public class ChatActivity extends AppCompatActivity {
                     Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                if (!isGroupChatContext() && !com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+                if (!isDirectChatAcceptedFastUi()) {
                     Toast.makeText(this, "Calls are disabled until the chat request is accepted", Toast.LENGTH_SHORT).show();
                     return;
                 }
@@ -1198,7 +1202,7 @@ public class ChatActivity extends AppCompatActivity {
                     Toast.makeText(this, "Cannot call a blocked user", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                if (!isGroupChatContext() && !com.m3.veil.database.EncryptedChatDatabase.getInstance(this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+                if (!isDirectChatAcceptedFastUi()) {
                     Toast.makeText(this, "Calls are disabled until the chat request is accepted", Toast.LENGTH_SHORT).show();
                     return;
                 }
@@ -3492,12 +3496,64 @@ public class ChatActivity extends AppCompatActivity {
 
     private boolean isOutboundRequestLimitReached() {
         if (isGroupChatContext() || chatId == null || currentUserId == null) return false;
-        com.m3.veil.database.EncryptedChatDatabase dbLocal = com.m3.veil.database.EncryptedChatDatabase.getInstance(this);
-        if (dbLocal.isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId)) {
+        if (isDirectChatAcceptedFastUi()) {
             return false;
         }
-        int sentCount = dbLocal.getOutboundUserMessageCount(chatId, currentUserId);
+        int sentCount = getOutboundMessageCountFastUi();
         return sentCount >= com.m3.veil.database.EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES;
+    }
+
+    private volatile boolean fastDirectAcceptedCached = false;
+
+    private boolean isDirectChatAcceptedFastUi() {
+        if (isGroupChatContext()) return true;
+        if (fastDirectAcceptedCached) return true;
+        com.m3.veil.database.EncryptedChatDatabase dbLocal = com.m3.veil.database.EncryptedChatDatabase.getInstance(this);
+        if (dbLocal.isDirectChatAcceptedFast(currentLocalChat, chatId)) {
+            fastDirectAcceptedCached = true;
+            return true;
+        }
+        List<Message> msgs = messageList;
+        if (msgs != null && !msgs.isEmpty()) {
+            boolean hasMine = false;
+            boolean hasPeer = false;
+            for (int i = 0; i < msgs.size(); i++) {
+                Message m = msgs.get(i);
+                if (m == null) continue;
+                String t = m.getType();
+                if ("system".equals(t) || "date_header".equals(t) || "unread_divider".equals(t) || "call".equals(t)) {
+                    continue;
+                }
+                if (isSenderMe(m.getSenderId(), m)) {
+                    hasMine = true;
+                } else {
+                    hasPeer = true;
+                }
+                if (hasMine && hasPeer) {
+                    fastDirectAcceptedCached = true;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private int getOutboundMessageCountFastUi() {
+        List<Message> msgs = messageList;
+        if (msgs == null || msgs.isEmpty()) return 0;
+        int count = 0;
+        for (int i = 0; i < msgs.size(); i++) {
+            Message m = msgs.get(i);
+            if (m == null) continue;
+            String t = m.getType();
+            if ("system".equals(t) || "date_header".equals(t) || "unread_divider".equals(t) || "call".equals(t)) {
+                continue;
+            }
+            if (isSenderMe(m.getSenderId(), m)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private void updateRequestLimitComposerState() {
@@ -3512,10 +3568,8 @@ public class ChatActivity extends AppCompatActivity {
             return;
         }
         boolean isGrp = isGroupChatContext();
-        com.m3.veil.database.EncryptedChatDatabase dbLocal = com.m3.veil.database.EncryptedChatDatabase.getInstance(this);
-        boolean isAccepted = isGrp || dbLocal.isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId);
-        int sentCount = (!isGrp && chatId != null && currentUserId != null)
-                ? dbLocal.getOutboundUserMessageCount(chatId, currentUserId) : 0;
+        boolean isAccepted = isGrp || isDirectChatAcceptedFastUi();
+        int sentCount = !isAccepted ? getOutboundMessageCountFastUi() : 0;
         boolean limitReached = !isAccepted && sentCount >= com.m3.veil.database.EncryptedChatDatabase.MAX_CHAT_REQUEST_MESSAGES;
 
         if (btnAudioCall != null) {
@@ -3694,9 +3748,6 @@ public class ChatActivity extends AppCompatActivity {
                     break;
                 }
             }
-        } else if (chatId != null && currentUserId != null) {
-            hasInboundFromPeer = com.m3.veil.database.EncryptedChatDatabase.getInstance(this)
-                    .getInboundUserMessageCount(chatId, currentUserId) > 0;
         }
         if (!hasInboundFromPeer) {
             // Local user is the sender who initiated the request: do not show accept/decline banner
@@ -4377,6 +4428,8 @@ public class ChatActivity extends AppCompatActivity {
         if (recipientId != null) {
             messagesAdapter.setRecipientId(recipientId);
         }
+        messagesAdapter.setOnSelectionChangeListener(this::onMultiSelectionChanged);
+        setupMultiSelectionToolbar();
         messagesAdapter.setOnPollVoteClickListener(this::showPollVotesDetailsSheet);
         messagesAdapter.setOnPollOptionVoteListener(new MessagesAdapter.OnPollOptionVoteListener() {
             @Override
@@ -5365,8 +5418,281 @@ public class ChatActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private static final long EDIT_MESSAGE_TIME_LIMIT_MS = com.m3.veil.manager.VeilMessagesController.EDIT_MESSAGE_TIME_LIMIT_MS;
+
+    private boolean canEditMessage(@Nullable Message message) {
+        if (message == null || message.getId() == null) return false;
+        if (!"text".equals(message.getType()) || message.isBlink()) return false;
+        if (!isSenderMe(message.getSenderId(), message)) return false;
+        long ts = message.getTimestamp() != null ? message.getTimestamp().toDate().getTime() : 0L;
+        if (ts <= 0L) return false;
+        long ageMs = System.currentTimeMillis() - ts;
+        return ageMs >= 0L && ageMs <= EDIT_MESSAGE_TIME_LIMIT_MS;
+    }
+
+    private String formatRemainingEditWindow(@Nullable Message message) {
+        if (message == null || message.getTimestamp() == null) return "";
+        long elapsed = Math.max(0L, System.currentTimeMillis() - message.getTimestamp().toDate().getTime());
+        long remainingMs = Math.max(0L, EDIT_MESSAGE_TIME_LIMIT_MS - elapsed);
+        long mins = (remainingMs + 59_999L) / 60_000L;
+        return mins + "m left";
+    }
+
+    private void setupMultiSelectionToolbar() {
+        View btnClose = findViewById(R.id.btnMultiSelectClose);
+        View btnReply = findViewById(R.id.btnMultiSelectReply);
+        View btnEdit = findViewById(R.id.btnMultiSelectEdit);
+        View btnStar = findViewById(R.id.btnMultiSelectStar);
+        View btnCopy = findViewById(R.id.btnMultiSelectCopy);
+        View btnForward = findViewById(R.id.btnMultiSelectForward);
+        View btnDelete = findViewById(R.id.btnMultiSelectDelete);
+        View btnMore = findViewById(R.id.btnMultiSelectMore);
+        View btnSelectAll = findViewById(R.id.btnMultiSelectAll);
+
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> exitMultiSelectionMode());
+        }
+        if (btnSelectAll != null) {
+            btnSelectAll.setOnClickListener(v -> {
+                if (messagesAdapter != null) {
+                    messagesAdapter.selectAllMessages();
+                }
+            });
+        }
+        if (btnReply != null) {
+            btnReply.setOnClickListener(v -> {
+                if (messagesAdapter == null) return;
+                List<Message> selected = messagesAdapter.getSelectedMessages();
+                exitMultiSelectionMode();
+                if (!selected.isEmpty()) {
+                    replyToMessage(selected.get(0));
+                }
+            });
+        }
+        if (btnEdit != null) {
+            btnEdit.setOnClickListener(v -> {
+                if (messagesAdapter == null) return;
+                List<Message> selected = messagesAdapter.getSelectedMessages();
+                exitMultiSelectionMode();
+                if (!selected.isEmpty()) {
+                    Message target = selected.get(0);
+                    if (canEditMessage(target)) {
+                        showEditMessageDialog(target);
+                    } else {
+                        Toast.makeText(this, "Messages can only be edited within 15 minutes of sending", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
+        if (btnStar != null) {
+            btnStar.setOnClickListener(v -> {
+                if (messagesAdapter == null) return;
+                List<Message> selected = messagesAdapter.getSelectedMessages();
+                if (selected.isEmpty()) return;
+                boolean anyUnstarred = false;
+                for (Message m : selected) {
+                    if (m != null && !m.isStarred()) {
+                        anyUnstarred = true;
+                        break;
+                    }
+                }
+                final boolean targetStar = anyUnstarred;
+                com.m3.veil.database.EncryptedChatDatabase dbLocal = com.m3.veil.database.EncryptedChatDatabase.getInstance(this);
+                for (Message m : selected) {
+                    if (m != null && m.getId() != null) {
+                        m.setStarred(targetStar);
+                        dbLocal.setMessageStarred(m.getId(), targetStar);
+                    }
+                }
+                int count = selected.size();
+                exitMultiSelectionMode();
+                Toast.makeText(this, targetStar
+                        ? (count == 1 ? "🔖 Message bookmarked" : "🔖 " + count + " messages bookmarked")
+                        : (count == 1 ? "Bookmark removed" : "Removed bookmarks from " + count + " messages"), Toast.LENGTH_SHORT).show();
+            });
+        }
+        if (btnCopy != null) {
+            btnCopy.setOnClickListener(v -> {
+                if (messagesAdapter == null) return;
+                List<Message> selected = messagesAdapter.getSelectedMessages();
+                if (selected.isEmpty()) return;
+                StringBuilder sb = new StringBuilder();
+                int copiedCount = 0;
+                for (Message m : selected) {
+                    if (m != null && m.getText() != null && !m.getText().trim().isEmpty()
+                            && !"deleted".equals(m.getType())) {
+                        if (sb.length() > 0) sb.append("\n\n");
+                        if (selected.size() > 1) {
+                            String sender = isSenderMe(m.getSenderId(), m)
+                                    ? "Me"
+                                    : (m.getSenderName() != null && !m.getSenderName().isEmpty()
+                                        ? m.getSenderName()
+                                        : (recipientName != null ? recipientName : "Peer"));
+                            sb.append(sender).append(": ");
+                        }
+                        sb.append(m.getText().trim());
+                        copiedCount++;
+                    }
+                }
+                exitMultiSelectionMode();
+                if (copiedCount > 0) {
+                    ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (clipboard != null) {
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Veil Messages", sb.toString()));
+                        Toast.makeText(this, copiedCount == 1
+                                ? "Message copied to clipboard"
+                                : copiedCount + " messages copied to clipboard", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(this, "No text content to copy in selection", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+        if (btnForward != null) {
+            btnForward.setOnClickListener(v -> {
+                if (messagesAdapter == null) return;
+                List<Message> selected = new ArrayList<>(messagesAdapter.getSelectedMessages());
+                exitMultiSelectionMode();
+                if (selected.size() == 1) {
+                    showForwardMessageSheet(selected.get(0));
+                } else if (selected.size() > 1) {
+                    showBatchForwardMessagesSheet(selected);
+                }
+            });
+        }
+        if (btnDelete != null) {
+            btnDelete.setOnClickListener(v -> {
+                if (messagesAdapter == null) return;
+                List<Message> selected = new ArrayList<>(messagesAdapter.getSelectedMessages());
+                if (!selected.isEmpty()) {
+                    confirmDeleteSelectedMessages(selected);
+                }
+            });
+        }
+        if (btnMore != null) {
+            btnMore.setOnClickListener(v -> {
+                if (messagesAdapter == null) return;
+                List<Message> selected = messagesAdapter.getSelectedMessages();
+                exitMultiSelectionMode();
+                if (!selected.isEmpty()) {
+                    showMessageActionsBottomSheet(selected.get(0));
+                }
+            });
+        }
+
+        int[] quickReactIds = {
+                R.id.quickReactHeart,
+                R.id.quickReactThumbsUp,
+                R.id.quickReactLaugh,
+                R.id.quickReactFire,
+                R.id.quickReactWow,
+                R.id.quickReactPray
+        };
+        View.OnClickListener quickReactClick = v -> {
+            if (messagesAdapter == null || !(v instanceof TextView)) return;
+            List<Message> selected = messagesAdapter.getSelectedMessages();
+            if (selected.isEmpty()) return;
+            Message target = selected.get(0);
+            String emoji = ((TextView) v).getText().toString();
+            String reactorKey = com.m3.veil.manager.VeilFeatureManager.getInstance(this).isAnonymousReactionEnabled()
+                    ? "anon_" + currentUserId.substring(0, Math.min(4, currentUserId.length()))
+                    : currentUserId;
+            String existing = target.getReactions() != null ? target.getReactions().get(reactorKey) : null;
+            String newEmoji = emoji.equals(existing) ? "" : emoji;
+            com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                    .sendReaction(chatId, target.getId(), reactorKey, newEmoji);
+            exitMultiSelectionMode();
+        };
+        for (int id : quickReactIds) {
+            View rv = findViewById(id);
+            if (rv != null) {
+                rv.setOnClickListener(quickReactClick);
+            }
+        }
+    }
+
+    private void exitMultiSelectionMode() {
+        if (messagesAdapter != null) {
+            messagesAdapter.clearSelection();
+        } else {
+            onMultiSelectionChanged(0, java.util.Collections.emptyList());
+        }
+    }
+
+    private void onMultiSelectionChanged(int selectedCount, List<Message> selectedMessages) {
+        View normalToolbar = findViewById(R.id.toolbar);
+        View multiSelectBar = findViewById(R.id.multiSelectBar);
+        View quickReactBar = findViewById(R.id.multiSelectQuickReactBar);
+        TextView tvCount = findViewById(R.id.tvMultiSelectCount);
+        View btnReply = findViewById(R.id.btnMultiSelectReply);
+        View btnEdit = findViewById(R.id.btnMultiSelectEdit);
+        View btnCopy = findViewById(R.id.btnMultiSelectCopy);
+        View btnMore = findViewById(R.id.btnMultiSelectMore);
+        ImageView btnStar = findViewById(R.id.btnMultiSelectStar);
+
+        if (selectedCount <= 0) {
+            if (multiSelectBar != null) multiSelectBar.setVisibility(View.GONE);
+            if (quickReactBar != null) quickReactBar.setVisibility(View.GONE);
+            if (normalToolbar != null) normalToolbar.setVisibility(View.VISIBLE);
+            return;
+        }
+
+        if (normalToolbar != null) normalToolbar.setVisibility(View.GONE);
+        if (multiSelectBar != null) multiSelectBar.setVisibility(View.VISIBLE);
+        if (tvCount != null) {
+            tvCount.setText(selectedCount + " selected");
+        }
+
+        boolean single = (selectedCount == 1 && !selectedMessages.isEmpty());
+        Message first = single ? selectedMessages.get(0) : null;
+
+        if (quickReactBar != null) {
+            quickReactBar.setVisibility(View.VISIBLE);
+            int[] emojiIds = {
+                    R.id.quickReactHeart, R.id.quickReactThumbsUp, R.id.quickReactLaugh,
+                    R.id.quickReactFire, R.id.quickReactWow, R.id.quickReactPray
+            };
+            for (int id : emojiIds) {
+                View ev = findViewById(id);
+                if (ev != null) ev.setVisibility(single ? View.VISIBLE : View.GONE);
+            }
+        }
+
+        if (btnReply != null) btnReply.setVisibility(single ? View.VISIBLE : View.GONE);
+        if (btnMore != null) btnMore.setVisibility(single ? View.VISIBLE : View.GONE);
+        if (btnEdit != null) {
+            btnEdit.setVisibility(single && canEditMessage(first) ? View.VISIBLE : View.GONE);
+        }
+
+        boolean hasAnyText = false;
+        boolean allStarred = !selectedMessages.isEmpty();
+        for (Message m : selectedMessages) {
+            if (m != null && m.getText() != null && !m.getText().trim().isEmpty() && !"deleted".equals(m.getType())) {
+                hasAnyText = true;
+            }
+            if (m != null && !m.isStarred()) {
+                allStarred = false;
+            }
+        }
+        if (btnCopy != null) {
+            btnCopy.setVisibility(hasAnyText ? View.VISIBLE : View.GONE);
+        }
+        if (btnStar != null) {
+            btnStar.setImageResource(allStarred ? R.drawable.ic_star : R.drawable.ic_star_outline);
+        }
+    }
+
     private void showReactionDialog(Message message, View anchorView) {
-        showMessageActionsBottomSheet(message);
+        if (message == null || message.getId() == null || "deleted".equals(message.getType())
+                || "system".equals(message.getType()) || "date_header".equals(message.getType())
+                || "unread_divider".equals(message.getType())) {
+            return;
+        }
+        if (messagesAdapter != null) {
+            messagesAdapter.startSelection(message);
+        } else {
+            showMessageActionsBottomSheet(message);
+        }
     }
 
     private void showMessageActionsBottomSheet(Message message) {
@@ -5454,15 +5780,34 @@ public class ChatActivity extends AppCompatActivity {
             showMessageInfoDialog(message);
         });
 
-        // Action: Edit (within time window for own text messages)
+        // Action: Edit (within 15-minute window for own text messages)
         View actionEdit = view.findViewById(R.id.actionEdit);
+        TextView tvEditRemainingBadge = view.findViewById(R.id.tvEditRemainingBadge);
         if (actionEdit != null) {
-            boolean canEdit = message.getSenderId() != null && message.getSenderId().equals(currentUserId)
-                    && "text".equals(message.getType()) && !message.isBlink();
+            boolean canEdit = canEditMessage(message);
             actionEdit.setVisibility(canEdit ? View.VISIBLE : View.GONE);
+            if (canEdit && tvEditRemainingBadge != null) {
+                tvEditRemainingBadge.setText(formatRemainingEditWindow(message));
+                tvEditRemainingBadge.setVisibility(View.VISIBLE);
+            }
             actionEdit.setOnClickListener(v -> {
                 dialog.dismiss();
-                showEditMessageDialog(message);
+                if (canEditMessage(message)) {
+                    showEditMessageDialog(message);
+                } else {
+                    Toast.makeText(this, "Edit time limit (15 minutes) has expired", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        // Action: Select Multiple Messages
+        View actionSelectMessages = view.findViewById(R.id.actionSelectMessages);
+        if (actionSelectMessages != null) {
+            actionSelectMessages.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (messagesAdapter != null) {
+                    messagesAdapter.startSelection(message);
+                }
             });
         }
 
@@ -6428,13 +6773,22 @@ public class ChatActivity extends AppCompatActivity {
                 String customCaption = etForwardCaption.getText() != null
                         ? etForwardCaption.getText().toString().trim()
                         : "";
-                List<String> names = new ArrayList<>();
+                List<Message> batch = pendingBatchForwardMessages;
+                pendingBatchForwardMessages = null;
                 for (Chat target : selectedChats.values()) {
-                    names.add(target.getName() != null ? target.getName() : target.getId());
-                    forwardMessageToChat(message, target, hideSenderTag[0], customCaption);
+                    if (batch != null && batch.size() > 1) {
+                        for (Message m : batch) {
+                            if (m != null) {
+                                forwardMessageToChat(m, target, hideSenderTag[0], null);
+                            }
+                        }
+                    } else {
+                        forwardMessageToChat(message, target, hideSenderTag[0], customCaption);
+                    }
                 }
                 sheet.dismiss();
             });
+            sheet.setOnDismissListener(d -> pendingBatchForwardMessages = null);
             composerBar.addView(btnConfirmForward);
             rootGroup.addView(composerBar);
         }
@@ -6588,8 +6942,31 @@ public class ChatActivity extends AppCompatActivity {
         Toast.makeText(this, (anonymousForward ? "🕵️ Anonymously forwarded to " : "Forwarded to ") + targetChat.getName(), Toast.LENGTH_SHORT).show();
     }
 
+    private List<Message> pendingBatchForwardMessages = null;
+
+    private void showBatchForwardMessagesSheet(List<Message> messagesToForward) {
+        if (messagesToForward == null || messagesToForward.isEmpty() || isFinishing()) return;
+        pendingBatchForwardMessages = new ArrayList<>(messagesToForward);
+        showForwardMessageSheet(messagesToForward.get(0));
+    }
+
     private void confirmDeleteMessage(Message message) {
-        boolean isMine = message.getSenderId().equals(currentUserId);
+        if (message == null) return;
+        List<Message> singleList = new ArrayList<>();
+        singleList.add(message);
+        confirmDeleteSelectedMessages(singleList);
+    }
+
+    private void confirmDeleteSelectedMessages(List<Message> messagesToDelete) {
+        if (messagesToDelete == null || messagesToDelete.isEmpty()) return;
+        boolean allMine = true;
+        for (Message m : messagesToDelete) {
+            if (m == null || !isSenderMe(m.getSenderId(), m)) {
+                allMine = false;
+                break;
+            }
+        }
+        final int count = messagesToDelete.size();
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         sheet.setContentView(R.layout.dialog_message_delete_sheet);
 
@@ -6598,17 +6975,45 @@ public class ChatActivity extends AppCompatActivity {
         View btnCancel = sheet.findViewById(R.id.btnCancelDelete);
 
         if (cardEveryone != null) {
-            cardEveryone.setVisibility(isMine ? View.VISIBLE : View.GONE);
+            cardEveryone.setVisibility(allMine ? View.VISIBLE : View.GONE);
             cardEveryone.setOnClickListener(v -> {
                 sheet.dismiss();
-                deleteMessageForEveryone(message);
+                exitMultiSelectionMode();
+                for (Message m : messagesToDelete) {
+                    if (m != null && m.getId() != null) {
+                        if (chatId != null) {
+                            com.m3.veil.database.EncryptedChatDatabase.getInstance(this)
+                                    .markMessageDeletedForEveryone(chatId, m.getId());
+                        }
+                        com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                                .deleteMessage(chatId, m.getId(), true);
+                    }
+                }
+                reloadMessagesFromLocalVault();
+                Toast.makeText(this, count == 1
+                        ? "Message deleted for everyone"
+                        : count + " messages deleted for everyone", Toast.LENGTH_SHORT).show();
             });
         }
 
         if (cardMe != null) {
             cardMe.setOnClickListener(v -> {
                 sheet.dismiss();
-                deleteMessageForMe(message);
+                exitMultiSelectionMode();
+                for (Message m : messagesToDelete) {
+                    if (m != null && m.getId() != null) {
+                        com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                                .deleteMessage(chatId, m.getId(), false);
+                        messageList.remove(m);
+                    }
+                }
+                if (messagesAdapter != null) {
+                    messagesAdapter.notifyDataSetChanged();
+                }
+                checkAndShowJumpToMentionPill();
+                Toast.makeText(this, count == 1
+                        ? "Message deleted for you"
+                        : count + " messages deleted for you", Toast.LENGTH_SHORT).show();
             });
         }
 
@@ -7518,7 +7923,7 @@ public class ChatActivity extends AppCompatActivity {
                     } else {
                         // Incoming message from peer: mark direct chat accepted if we had previously sent a request
                         com.m3.veil.database.EncryptedChatDatabase dbInst = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this);
-                        if (dbInst.getOutboundUserMessageCount(chatId, currentUserId) > 0) {
+                        if (!isDirectAccepted && getOutboundMessageCountFastUi() > 0) {
                             dbInst.markDirectChatAccepted(chatId, sId != null ? sId : recipientId);
                             isDirectAccepted = true;
                         }
@@ -7579,13 +7984,16 @@ public class ChatActivity extends AppCompatActivity {
                         } else {
                             if (mediaUrl != null && !mediaUrl.isEmpty()
                                     && (existing.getLocalFilePath() == null || !new File(existing.getLocalFilePath()).exists())) {
+                                boolean urlUpdated = !mediaUrl.equals(existing.getMediaUrl());
                                 existing.setMediaUrl(mediaUrl);
                                 if (thumbnail != null && !thumbnail.isEmpty()) existing.setThumbnail(thumbnail);
                                 File decoded = com.m3.veil.manager.VeilMessagesController.ensureMediaDecodedOrAutoDownloaded(
                                         ChatActivity.this, chatId, existing, this::reloadMessagesFromLocalVault);
-                                com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveMessage(chatId, existing);
-                                if (decoded != null && decoded.exists()) {
-                                    changed = true;
+                                if ((decoded != null && decoded.exists()) || urlUpdated) {
+                                    com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveMessage(chatId, existing);
+                                    if (decoded != null && decoded.exists()) {
+                                        changed = true;
+                                    }
                                 }
                             }
                             if (existing.getText() != null && existing.getText().startsWith("ENC:v")
@@ -9720,6 +10128,10 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showEditMessageDialog(Message message) {
+        if (!canEditMessage(message)) {
+            Toast.makeText(this, "Messages can only be edited within 15 minutes of sending", Toast.LENGTH_SHORT).show();
+            return;
+        }
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -9746,7 +10158,7 @@ public class ChatActivity extends AppCompatActivity {
         layout.addView(tvTitle);
 
         TextView tvSub = new TextView(this);
-        tvSub.setText("Drawings and sketches are shared live with this chat.");
+        tvSub.setText("You can edit this message within 15 minutes of sending (" + formatRemainingEditWindow(message) + ").");
         tvSub.setTextColor(ContextCompat.getColor(this, R.color.textSecondary));
         tvSub.setTextSize(13);
         tvSub.setPadding(0, (int) (4 * getResources().getDisplayMetrics().density), 0, (int) (16 * getResources().getDisplayMetrics().density));
@@ -9773,6 +10185,11 @@ public class ChatActivity extends AppCompatActivity {
         layout.addView(btnSave);
 
         btnSave.setOnClickListener(v -> {
+            if (!canEditMessage(message)) {
+                Toast.makeText(this, "Edit time limit (15 minutes) has expired", Toast.LENGTH_SHORT).show();
+                sheet.dismiss();
+                return;
+            }
             String updated = editInput.getText().toString().trim();
             if (!updated.isEmpty()) {
                 com.m3.veil.manager.VeilMessagesController.getInstance(this)
