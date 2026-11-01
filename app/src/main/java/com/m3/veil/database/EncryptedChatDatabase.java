@@ -2260,8 +2260,16 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             // Auto-create chat in TABLE_CHATS if not present so it immediately surfaces in chat list
             String chatTitle = message.getSenderName() != null && !message.getSenderName().isEmpty() ? message.getSenderName() : "Direct Chat";
             boolean isGroup = chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_");
+            String activeUid = com.m3.veil.manager.PersonaManager.getInstance(this.context).getActivePersonaPeerId();
+            if (activeUid == null || activeUid.isEmpty()) {
+                activeUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+            }
+            String extractedPeer = !isGroup ? com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(chatId, activeUid) : null;
             List<String> participants = new ArrayList<>();
-            if (chatId.contains("_") && !isGroup) {
+            if (!isGroup && extractedPeer != null && !extractedPeer.isEmpty()) {
+                if (activeUid != null && !activeUid.isEmpty()) participants.add(activeUid);
+                if (!participants.contains(extractedPeer)) participants.add(extractedPeer);
+            } else if (chatId.contains("_") && !isGroup) {
                 String[] sp = chatId.split("_");
                 Collections.addAll(participants, sp);
             }
@@ -2277,6 +2285,14 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     isGroup ? "group" : "direct",
                     participants
             );
+            if (!isGroup) {
+                String senderId = message.getSenderId();
+                boolean isInbound = senderId != null && !senderId.isEmpty() && !senderId.equals(activeUid) && !"system".equals(senderId);
+                String checkPeer = (extractedPeer != null && !extractedPeer.isEmpty()) ? extractedPeer : senderId;
+                if (isInbound && checkPeer != null && !com.m3.veil.webrtc.WebRtcManager.getInstance(this.context).isKnownPeerOrContact(checkPeer, null)) {
+                    autoChat.setRequest(true);
+                }
+            }
             saveOrUpdateChat(autoChat);
         }
 

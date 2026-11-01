@@ -48,7 +48,8 @@ public class CallParticipant {
 
     /** The track that should be rendered for this participant, screen share wins. */
     public VideoTrack renderTrack() {
-        return screenTrack != null ? screenTrack : videoTrack;
+        if (screenSharing && screenTrack != null) return screenTrack;
+        return videoEnabled ? videoTrack : null;
     }
 
     @Override

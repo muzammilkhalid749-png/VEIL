@@ -531,9 +531,9 @@ public class VeilDialogCell extends View {
         }
         String id = chat.getId();
         if (id != null && id.contains("_")) {
-            String[] parts = id.split("_");
-            if (parts.length == 2) {
-                return parts[0].equals(mCurrentUserId) ? parts[1] : parts[0];
+            String extracted = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(id, mCurrentUserId);
+            if (extracted != null && !extracted.isEmpty()) {
+                return extracted;
             }
         }
         return id;

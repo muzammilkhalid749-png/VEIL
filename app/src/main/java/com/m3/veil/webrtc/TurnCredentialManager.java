@@ -304,6 +304,15 @@ public class TurnCredentialManager {
     // WEBRTC ICE SERVERS BUILDER (TIER 1 & TIER 2 MESH RELAYS)
     // =========================================================================
 
+    public boolean hasHealthyTurnRelay() {
+        for (RelayNode node : mRelayFleet) {
+            if (node != null && node.isHealthy && node.hostname != null && node.hostname.contains("metered.ca")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Assembles the optimized, multi-tier ICE server list for WebRTC PeerConnections.
      *
@@ -317,7 +326,8 @@ public class TurnCredentialManager {
         boolean strictRelay = false;
         if (mContext != null) {
             try {
-                strictRelay = com.m3.veil.utils.VeilTorProxyBridge.getInstance(mContext).isStrictRelayEnforced();
+                strictRelay = com.m3.veil.utils.VeilTorProxyBridge.getInstance(mContext).isStrictRelayEnforced()
+                        && hasHealthyTurnRelay();
             } catch (Throwable ignored) {}
         }
 

@@ -596,7 +596,8 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                PeerConnection.RTCConfiguration rtcConfig = new PeerConnection.RTCConfiguration(this.getIceServers(true));
                rtcConfig.sdpSemantics = SdpSemantics.UNIFIED_PLAN;
                rtcConfig.continualGatheringPolicy = ContinualGatheringPolicy.GATHER_CONTINUALLY;
-               if (VeilTorProxyBridge.getInstance(this.context).isStrictRelayEnforced()) {
+               if (VeilTorProxyBridge.getInstance(this.context).isStrictRelayEnforced()
+                       && TurnCredentialManager.getInstance(this.context).hasHealthyTurnRelay()) {
                   rtcConfig.iceTransportsType = IceTransportsType.RELAY;
                }
 
@@ -740,7 +741,8 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          }
       }
 
-      boolean strictRelay = VeilTorProxyBridge.getInstance(this.context).isStrictRelayEnforced();
+      boolean strictRelay = VeilTorProxyBridge.getInstance(this.context).isStrictRelayEnforced()
+              && TurnCredentialManager.getInstance(this.context).hasHealthyTurnRelay();
       PeerConnection.RTCConfiguration rtcConfig = new PeerConnection.RTCConfiguration(this.getIceServers(true));
       rtcConfig.sdpSemantics = SdpSemantics.UNIFIED_PLAN;
       rtcConfig.continualGatheringPolicy = ContinualGatheringPolicy.GATHER_CONTINUALLY;
@@ -1089,6 +1091,10 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                byte[] p = packet.getPayload();
                boolean isTyping = p != null && p.length > 0 && p[0] == 1;
                this.peerTypingStates.put(peerId, isTyping);
+               if (this.currentUserId != null && peerId != null) {
+                  com.m3.veil.manager.VeilMessagesController.getInstance(this.context)
+                          .onPeerTypingInDialog(getChatId(this.currentUserId, peerId), peerId, isTyping);
+               }
                this.mainHandler.post(() -> {
                   for(P2PEventListener l : WebRtcManager.this.listeners) {
                      l.onPeerTyping(peerId, isTyping);
@@ -1374,6 +1380,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             long expiresAt = p.optLong("expiresAt", 0L);
 
             EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(this.context, chatId, peerId);
+            if (targetDb.isChatBlocked(chatId) || (peerId != null && targetDb.isChatBlocked(peerId))) {
+               return;
+            }
             Message existingMsg = targetDb.getMessageById(msgId);
             if (existingMsg != null) {
                this.sendReceipt(peerId, msgId, true, existingMsg.isRead());
@@ -1433,6 +1442,12 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
 
                targetDb.saveOrUpdateChat(newChat);
             } else {
+               if (!isGroup && incomingParts.size() > (existingChat.getParticipants() != null ? existingChat.getParticipants().size() : 0)) {
+                  existingChat.setParticipants(incomingParts);
+               }
+               if (!isGroup && !existingChat.isRequest() && !hasAcceptedOrRepliedInChat(targetDb, chatId)) {
+                  existingChat.setRequest(true);
+               }
                if (isGroup && incomingParts.size() > (existingChat.getParticipants() != null ? existingChat.getParticipants().size() : 0)) {
                   existingChat.setParticipants(incomingParts);
                }
@@ -1825,12 +1840,23 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                );
             } else if ("request_accepted".equals(type) || ("control".equals(type) && "request_accepted".equals(json.optString("action")))) {
                String targetChatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
-               EncryptedChatDatabase.getInstance(this.context).updateChatRequestStatus(targetChatId, false);
-               Chat c = EncryptedChatDatabase.getInstance(this.context).getChat(targetChatId);
+               EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(this.context, targetChatId, peerId);
+               targetDb.updateChatRequestStatus(targetChatId, false);
+               Chat c = targetDb.getChat(targetChatId);
                if (c != null) {
                    c.setRequest(false);
-                   EncryptedChatDatabase.getInstance(this.context).saveOrUpdateChat(c);
+                   targetDb.saveOrUpdateChat(c);
                }
+               Message sysMsg = new Message(
+                       "sys_req_acc_" + System.currentTimeMillis(),
+                       "system",
+                       this.currentUserId != null ? this.currentUserId : "",
+                       "Message request accepted. You can now chat freely.",
+                       Timestamp.now(),
+                       "system"
+               );
+               sysMsg.setChatId(targetChatId);
+               targetDb.saveMessage(targetChatId, sysMsg);
                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
                    android.widget.Toast.makeText(this.context, "Your message request was accepted! 🤝", android.widget.Toast.LENGTH_SHORT).show();
                });
@@ -1839,6 +1865,11 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                        l.onRequestAccepted(peerId, targetChatId);
                    }
                });
+            } else if ("block_status".equals(type) || ("control".equals(type) && "block_status".equals(json.optString("action")))) {
+               String targetChatId = json.optString("chatId", getChatId(this.currentUserId, peerId));
+               boolean isBlocked = json.optBoolean("blocked", false);
+               EncryptedChatDatabase targetDb = EncryptedChatDatabase.getDatabaseForTarget(this.context, targetChatId, peerId);
+               targetDb.setChatBlocked(targetChatId, isBlocked, isBlocked ? peerId : null);
             } else if (!"gossip_post".equals(type) && !"gossip_sync".equals(type)) {
                if ("call_signal".equals(type)) {
                   String action = json.optString("action");
@@ -1847,6 +1878,9 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   boolean isVideo = json.optBoolean("isVideo", false);
                   String callTypeStr = isVideo ? "video" : "audio";
                   if ("invite".equals(action)) {
+                     if (EncryptedChatDatabase.getInstance(this.context).isChatBlocked(peerId)) {
+                        return;
+                     }
                      this.onCallInviteReceived(peerId, callId, callerName, callTypeStr);
                   } else if ("ringing".equals(action)) {
                      this.onCallRingingReceived(peerId, callId);
@@ -3231,22 +3265,11 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
                sentJsonOverDc = dc.send(new DataChannel.Buffer(ByteBuffer.wrap(bytes), false));
             }
-            // Always dispatch via sub-50ms Nostr/WebSocket ephemeral signal so typing works
-            // even when peer is on HomeFragment chat list or WebRTC ICE is still connecting
-            JSONObject sig = new JSONObject();
-            sig.put("signalId", "typ_" + this.currentUserId + "_" + System.nanoTime());
-            sig.put("type", "p2p_action");
-            sig.put("from", this.currentUserId != null ? this.currentUserId : "");
-            sig.put("to", peerId);
-            sig.put("timestamp", System.currentTimeMillis());
-            sig.put("payload", json.toString());
-            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context)
-                    .sendEphemeralSignal(peerId, sig, null);
-            if (!sentBinary && !sentJsonOverDc) {
-               SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", json);
-               if (isTyping) {
-                  this.initiateConnection(peerId);
-               }
+            // Always dispatch via dual-path signaling (Nostr + Firestore ephemeral signal)
+            // so typing works even when peer is on HomeFragment chat list or WebRTC ICE is still connecting
+            SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", json);
+            if (!sentBinary && !sentJsonOverDc && isTyping) {
+               this.initiateConnection(peerId);
             }
          } catch (Exception ignored) {
          }
@@ -3835,6 +3858,45 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       }
    }
 
+   /**
+    * Safely extracts the remote 1:1 peer UID from any chatId format, including
+    * Sovereign "veil_<hexA>_veil_<hexB>" IDs where UIDs themselves contain underscores.
+    */
+   public static String extractPeerIdFromChatId(String chatId, String myUserId) {
+      if (chatId == null || chatId.isEmpty()
+              || chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_")) {
+         return null;
+      }
+      String clean = chatId.startsWith("chat_") ? chatId.substring(5) : chatId;
+      if (myUserId != null && !myUserId.isEmpty()) {
+         if (clean.equals(myUserId)) return null;
+         if (clean.startsWith(myUserId + "_")) {
+            return clean.substring((myUserId + "_").length());
+         }
+         if (clean.endsWith("_" + myUserId)) {
+            return clean.substring(0, clean.length() - ("_" + myUserId).length());
+         }
+      }
+      int veilSep = clean.indexOf("_veil_");
+      if (clean.startsWith("veil_") && veilSep > 0) {
+         String first = clean.substring(0, veilSep);
+         String second = clean.substring(veilSep + 1);
+         if (myUserId != null && first.equals(myUserId)) return second;
+         if (myUserId != null && second.equals(myUserId)) return first;
+         return first;
+      }
+      if (clean.startsWith("veil_") && !clean.substring(5).contains("_")) {
+         return (myUserId != null && clean.equals(myUserId)) ? null : clean;
+      }
+      if (clean.contains("_")) {
+         String[] parts = clean.split("_");
+         if (parts.length == 2) {
+            return (myUserId != null && parts[0].equals(myUserId)) ? parts[1] : parts[0];
+         }
+      }
+      return null;
+   }
+
    public interface P2PEventListener {
       void onMessageReceived(String var1, Message var2);
 
@@ -4090,18 +4152,39 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
       });
    }
 
+    public boolean hasAcceptedOrRepliedInChat(EncryptedChatDatabase db, String chatId) {
+        if (db == null || chatId == null) return false;
+        try {
+            List<Message> msgs = db.getMessagesForChat(chatId);
+            if (msgs != null) {
+                for (Message m : msgs) {
+                    if (m == null) continue;
+                    if (this.currentUserId != null && this.currentUserId.equals(m.getSenderId())) {
+                        return true;
+                    }
+                    if ("system".equals(m.getType()) && m.getText() != null && m.getText().contains("Message request accepted")) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
     public boolean isKnownPeerOrContact(String peerId, String senderName) {
         if (peerId == null) return false;
         try {
             List<Chat> chats = EncryptedChatDatabase.getInstance(this.context).getAllChats();
             if (chats != null) {
                 for (Chat c : chats) {
-                    if (c != null && !c.isRequest() && c.getParticipants() != null && c.getParticipants().contains(peerId)) {
-                        return true;
+                    if (c != null && !c.isGroup() && !c.isRequest() && c.getParticipants() != null && c.getParticipants().contains(peerId)) {
+                        if (hasAcceptedOrRepliedInChat(EncryptedChatDatabase.getInstance(this.context), c.getId())) {
+                            return true;
+                        }
                     }
                 }
             }
-            if (androidx.core.content.ContextCompat.checkSelfPermission(this.context, android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            if (!peerId.contains("_persona_") && androidx.core.content.ContextCompat.checkSelfPermission(this.context, android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 if (senderName != null && !senderName.isEmpty()) {
                     android.net.Uri uri = android.net.Uri.withAppendedPath(android.provider.ContactsContract.Contacts.CONTENT_FILTER_URI, android.net.Uri.encode(senderName));
                     try (android.database.Cursor cursor = this.context.getContentResolver().query(uri, new String[]{android.provider.ContactsContract.Contacts._ID}, null, null, null)) {
@@ -4123,6 +4206,21 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             json.put("action", "request_accepted");
             json.put("chatId", chatId);
             json.put("peerId", this.currentUserId);
+            json.put("timestamp", System.currentTimeMillis());
+            SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", json);
+            this.depositOfflineActionEnvelope(peerId, json.toString());
+        } catch (Exception ignored) {}
+    }
+
+    public void sendBlockStatus(String peerId, String chatId, boolean blocked) {
+        if (peerId == null) return;
+        try {
+            JSONObject json = new JSONObject();
+            json.put("type", "block_status");
+            json.put("action", "block_status");
+            json.put("chatId", chatId);
+            json.put("peerId", this.currentUserId);
+            json.put("blocked", blocked);
             json.put("timestamp", System.currentTimeMillis());
             SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", json);
             this.depositOfflineActionEnvelope(peerId, json.toString());

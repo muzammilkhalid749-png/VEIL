@@ -163,13 +163,25 @@ public class CallVideoDevice {
             height = targetHeight;
             fps = targetFps;
 
-            cameraHelper = SurfaceTextureHelper.create("VeilCameraThread", eglBase.getEglBaseContext());
-            cameraSource = CallMediaFactory.createVideoSource(false);
+            if (cameraHelper == null) {
+                cameraHelper = SurfaceTextureHelper.create("VeilCameraThread", eglBase.getEglBaseContext());
+            }
+            if (cameraSource == null) {
+                cameraSource = CallMediaFactory.createVideoSource(false);
+            }
+            if (cameraCapturer != null) {
+                try { cameraCapturer.stopCapture(); } catch (Throwable ignored) { }
+                try { cameraCapturer.dispose(); } catch (Throwable ignored) { }
+                cameraCapturer = null;
+            }
             cameraCapturer = camEnum.createCapturer(currentCameraName, cameraEvents);
             if (cameraCapturer == null) return false;
             cameraCapturer.initialize(cameraHelper, context, createAnonymizingObserver(cameraSource.getCapturerObserver()));
             cameraCapturer.startCapture(width, height, fps);
-            cameraTrack = CallMediaFactory.createVideoTrack(cameraSource, "veil_camera");
+            if (cameraTrack == null || cameraTrack.state() == org.webrtc.MediaStreamTrack.State.ENDED) {
+                cameraTrack = CallMediaFactory.createVideoTrack(cameraSource, "veil_camera");
+            }
+            cameraTrack.setEnabled(true);
             cameraSource.adaptOutputFormat(width, height, fps);
             cameraRunning = true;
             Log.i(TAG, "camera started " + width + "x" + height + "@" + fps);
@@ -183,6 +195,11 @@ public class CallVideoDevice {
 
     public void stopCamera() {
         cameraRunning = false;
+        if (cameraTrack != null) {
+            try {
+                cameraTrack.setEnabled(false);
+            } catch (Throwable ignored) { }
+        }
         if (cameraCapturer != null) {
             try {
                 cameraCapturer.stopCapture();
@@ -194,21 +211,8 @@ public class CallVideoDevice {
         }
         if (cameraHelper != null) {
             try {
-                cameraHelper.dispose();
+                cameraHelper.stopListening();
             } catch (Throwable ignored) { }
-            cameraHelper = null;
-        }
-        if (cameraSource != null) {
-            try {
-                cameraSource.dispose();
-            } catch (Throwable ignored) { }
-            cameraSource = null;
-        }
-        if (cameraTrack != null) {
-            try {
-                cameraTrack.dispose();
-            } catch (Throwable ignored) { }
-            cameraTrack = null;
         }
     }
 
@@ -373,6 +377,24 @@ public class CallVideoDevice {
     public void dispose() {
         stopScreenCapture();
         stopCamera();
+        if (cameraHelper != null) {
+            try {
+                cameraHelper.dispose();
+            } catch (Throwable ignored) { }
+            cameraHelper = null;
+        }
+        if (cameraSource != null) {
+            try {
+                cameraSource.dispose();
+            } catch (Throwable ignored) { }
+            cameraSource = null;
+        }
+        if (cameraTrack != null) {
+            try {
+                cameraTrack.dispose();
+            } catch (Throwable ignored) { }
+            cameraTrack = null;
+        }
     }
 
     private static boolean contains(String[] values, String target) {

@@ -1128,11 +1128,24 @@ public class UserProfileActivity extends AppCompatActivity {
         if (chatId == null) return;
         Chat chat = EncryptedChatDatabase.getInstance(this).getChat(chatId);
         isUserBlocked = !isUserBlocked;
+        EncryptedChatDatabase.getInstance(this).setChatBlocked(chatId, isUserBlocked, isUserBlocked ? currentUserId : null);
         if (chat != null) {
             chat.setBlocked(isUserBlocked);
             chat.setBlockedBy(isUserBlocked ? currentUserId : null);
             EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
         }
+        if (peerUserId != null && !peerUserId.isEmpty()) {
+            com.m3.veil.webrtc.WebRtcManager.getInstance(this).sendBlockStatus(peerUserId, chatId, isUserBlocked);
+        }
+        com.m3.veil.model.Message sysMsg = new com.m3.veil.model.Message();
+        sysMsg.setId("sys_" + System.currentTimeMillis());
+        sysMsg.setChatId(chatId);
+        sysMsg.setSenderId(currentUserId != null ? currentUserId : "system");
+        sysMsg.setReceiverId(peerUserId != null ? peerUserId : "");
+        sysMsg.setText(isUserBlocked ? "You blocked this person. Tap to unblock." : "You unblocked this person.");
+        sysMsg.setType(isUserBlocked ? "system_block" : "system");
+        sysMsg.setTimestamp(com.google.firebase.Timestamp.now());
+        EncryptedChatDatabase.getInstance(this).saveMessage(chatId, sysMsg);
         updateBlockUI();
         Toast.makeText(this, isUserBlocked ? "User blocked" : "User unblocked", Toast.LENGTH_SHORT).show();
     }

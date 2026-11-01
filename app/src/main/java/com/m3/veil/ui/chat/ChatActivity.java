@@ -821,10 +821,7 @@ public class ChatActivity extends AppCompatActivity {
             recipientId = null;
         } else if (recipientId == null && chatId != null) {
             // Resolve missing recipient details from chatId if launched from notification or 1-on-1 chat
-            String[] parts = chatId.split("_");
-            if (parts.length == 2) {
-                recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
-            }
+            recipientId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(chatId, currentUserId);
         }
         if (chatId == null && recipientId != null && currentUserId != null) {
             chatId = com.m3.veil.webrtc.WebRtcManager.getChatId(currentUserId, recipientId);
@@ -840,6 +837,13 @@ public class ChatActivity extends AppCompatActivity {
             if (currentLocalChat != null) {
                 if (currentLocalChat.isGroup() || "group".equalsIgnoreCase(currentLocalChat.getType()) || "channel".equalsIgnoreCase(currentLocalChat.getType())) {
                     recipientId = null;
+                } else if (recipientId == null && currentLocalChat.getParticipants() != null) {
+                    for (String p : currentLocalChat.getParticipants()) {
+                        if (p != null && !p.isEmpty() && !p.equals(currentUserId)) {
+                            recipientId = p;
+                            break;
+                        }
+                    }
                 }
                 currentVanishTimer = currentLocalChat.getVanishTimer();
                 if (currentLocalChat.getVanishMode() != null) {
@@ -1092,11 +1096,15 @@ public class ChatActivity extends AppCompatActivity {
         btnVideoCall = findViewById(R.id.btnVideoCall);
         if (btnAudioCall != null) {
             UiAnimator.attachSpringPress(btnAudioCall);
-            btnAudioCall.setOnClickListener(v -> showCallConfirmationDialog("audio"));
+            btnAudioCall.setOnClickListener(v -> {
+                if (!isChatBlocked) showCallConfirmationDialog("audio");
+            });
         }
         if (btnVideoCall != null) {
             UiAnimator.attachSpringPress(btnVideoCall);
-            btnVideoCall.setOnClickListener(v -> showCallConfirmationDialog("video"));
+            btnVideoCall.setOnClickListener(v -> {
+                if (!isChatBlocked) showCallConfirmationDialog("video");
+            });
         }
 
         // In-Chat Message Search Bar (WhatsApp / Telegram Style with Up/Down Navigation & Highlight)
@@ -1546,20 +1554,26 @@ public class ChatActivity extends AppCompatActivity {
         // Attachment Button: Opens modern Material 3 Bottom Sheet Dialog
         ImageView attachmentButton = findViewById(R.id.attachmentButton);
         UiAnimator.attachSpringPress(attachmentButton);
-        attachmentButton.setOnClickListener(v -> showAttachmentBottomSheet());
+        attachmentButton.setOnClickListener(v -> {
+            if (!isChatBlocked) showAttachmentBottomSheet();
+        });
 
         // Emoji & Sticker Picker
         ImageView emojiButton = findViewById(R.id.emojiButton);
         if (emojiButton != null) {
             UiAnimator.attachSpringPress(emojiButton);
-            emojiButton.setOnClickListener(v -> showEmojiBottomSheet());
+            emojiButton.setOnClickListener(v -> {
+                if (!isChatBlocked) showEmojiBottomSheet();
+            });
         }
 
         // In-app Built-in Camera & Gallery Quick Launcher (WhatsApp & Signal Style)
         ImageView cameraButton = findViewById(R.id.cameraButton);
         if (cameraButton != null) {
             UiAnimator.attachSpringPress(cameraButton);
-            cameraButton.setOnClickListener(v -> openCameraGallery());
+            cameraButton.setOnClickListener(v -> {
+                if (!isChatBlocked) openCameraGallery();
+            });
         }
 
         inputContainer = findViewById(R.id.inputContainer);
@@ -1703,6 +1717,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showAttachmentBottomSheet() {
+        if (isChatBlocked) return;
         AttachmentBottomSheet bottomSheet = new AttachmentBottomSheet();
         bottomSheet.setAttachmentSelectionListener(new AttachmentBottomSheet.AttachmentSelectionListener() {
             @Override
@@ -1758,6 +1773,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void openCameraGallery(boolean startInGallery) {
+        if (isChatBlocked) return;
         Intent intent = new Intent(this, CameraGalleryActivity.class);
         intent.putExtra(CameraGalleryActivity.EXTRA_START_IN_GALLERY, startInGallery);
         startActivityForResult(intent, REQ_CAMERA_GALLERY);
@@ -2490,6 +2506,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void uploadAndSendMediaWithMetadata(File rawFile, String mediaType, String caption, @Nullable String customMetadataJson) {
+        if (isChatBlocked) return;
         if (rawFile == null || !rawFile.exists()) return;
 
         if (isGroupChatContext() && chatId != null) {
@@ -3321,19 +3338,19 @@ public class ChatActivity extends AppCompatActivity {
 
     private void updateBlockedState(boolean blocked, String blockedBy) {
         if (messageEditText == null || sendButton == null) return;
-        boolean blockedByMe = currentUserId != null && currentUserId.equals(blockedBy);
         if (blocked) {
+            if (isRecording) {
+                cancelRecordingUI();
+            }
+            messageEditText.setText("");
             messageEditText.setEnabled(false);
             messageEditText.setFocusable(false);
-            messageEditText.setClickable(blockedByMe);
-            messageEditText.setHint(blockedByMe ? "You blocked this user" : "You cannot reply to this conversation");
-            if (blockedByMe) {
-                messageEditText.setOnClickListener(v -> confirmBlockUser());
-            } else {
-                messageEditText.setOnClickListener(null);
-            }
+            messageEditText.setClickable(false);
+            messageEditText.setOnClickListener(null);
+            messageEditText.setHint("You cannot reply to this conversation");
             sendButton.setEnabled(false);
-            sendButton.setAlpha(0.3f);
+            sendButton.setClickable(false);
+            sendButton.setAlpha(0.38f);
         } else {
             messageEditText.setEnabled(true);
             messageEditText.setFocusable(true);
@@ -3342,29 +3359,37 @@ public class ChatActivity extends AppCompatActivity {
             messageEditText.setOnClickListener(null);
             messageEditText.setHint(R.string.type_message);
             sendButton.setEnabled(true);
+            sendButton.setClickable(true);
             sendButton.setAlpha(1.0f);
         }
 
-        // Keep emojiButton, quickFeaturesScrollView, and toolbar call buttons working per requirement
-        View emojiBtn = findViewById(R.id.emojiButton);
-        if (emojiBtn != null) {
-            emojiBtn.setEnabled(true);
-            emojiBtn.setAlpha(1.0f);
+        int[] interactiveButtonIds = {
+                R.id.emojiButton,
+                R.id.attachmentButton,
+                R.id.cameraButton,
+                R.id.btnAudioCall,
+                R.id.btnVideoCall,
+                R.id.chipQuickBlink,
+                R.id.chipQuickPoll,
+                R.id.chipQuickDoodle,
+                R.id.chipQuickVoiceMask,
+                R.id.chipQuickSmartReply
+        };
+        for (int viewId : interactiveButtonIds) {
+            View v = findViewById(viewId);
+            if (v != null) {
+                v.setEnabled(!blocked);
+                v.setClickable(!blocked);
+                v.setAlpha(blocked ? 0.38f : 1.0f);
+            }
         }
         View quickFeatures = findViewById(R.id.quickFeaturesScrollView);
         if (quickFeatures != null) {
-            quickFeatures.setVisibility(View.VISIBLE);
-            quickFeatures.setEnabled(true);
+            quickFeatures.setEnabled(!blocked);
+            quickFeatures.setAlpha(blocked ? 0.38f : 1.0f);
         }
-        View btnAudio = findViewById(R.id.btnAudioCall);
-        if (btnAudio != null) {
-            btnAudio.setEnabled(true);
-            btnAudio.setAlpha(1.0f);
-        }
-        View btnVideo = findViewById(R.id.btnVideoCall);
-        if (btnVideo != null) {
-            btnVideo.setEnabled(true);
-            btnVideo.setAlpha(1.0f);
+        if (blocked && layoutSmartReplies != null) {
+            layoutSmartReplies.setVisibility(View.GONE);
         }
     }
 
@@ -3457,6 +3482,7 @@ public class ChatActivity extends AppCompatActivity {
             com.m3.veil.webrtc.WebRtcManager.getInstance(this).sendRequestAcceptedAck(recipientId, chatId);
         }
         if (layoutMessageRequestBanner != null) layoutMessageRequestBanner.setVisibility(View.GONE);
+        insertLocalSystemMessage("Message request accepted. You can now chat freely.", "system");
         updatePresenceAndToolbarStatus();
         Toast.makeText(this, "Message request accepted", Toast.LENGTH_SHORT).show();
     }
@@ -3863,10 +3889,15 @@ public class ChatActivity extends AppCompatActivity {
         btnConfirm.setOnClickListener(v -> {
             sheet.dismiss();
             isChatBlocked = !isChatBlocked;
+            com.m3.veil.database.EncryptedChatDatabase.getInstance(this)
+                    .setChatBlocked(chatId, isChatBlocked, isChatBlocked ? currentUserId : null);
             if (currentLocalChat != null) {
                 currentLocalChat.setBlocked(isChatBlocked);
                 currentLocalChat.setBlockedBy(isChatBlocked ? currentUserId : null);
                 com.m3.veil.database.EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(currentLocalChat);
+            }
+            if (recipientId != null && !recipientId.isEmpty()) {
+                com.m3.veil.webrtc.WebRtcManager.getInstance(this).sendBlockStatus(recipientId, chatId, isChatBlocked);
             }
             updateBlockedState(isChatBlocked, isChatBlocked ? currentUserId : null);
             if (isChatBlocked) {
@@ -6331,6 +6362,7 @@ public class ChatActivity extends AppCompatActivity {
 
     private void setupClickListeners() {
         sendButton.setOnTouchListener((v, event) -> {
+            if (isChatBlocked) return true;
             String text = messageEditText.getText().toString().trim();
             if (!text.isEmpty()) {
                 if (event.getAction() == MotionEvent.ACTION_DOWN) {
@@ -6522,6 +6554,7 @@ public class ChatActivity extends AppCompatActivity {
     private long lastGroupSlowModeSentMs = 0L;
 
     private void sendMessage() {
+        if (isChatBlocked) return;
         String text = messageEditText.getText().toString().trim();
         if (text.isEmpty()) return;
         if (currentLocalChat != null && currentLocalChat.isRequest()) {
@@ -6965,7 +6998,7 @@ public class ChatActivity extends AppCompatActivity {
         if (docs == null || docs.isEmpty()) return;
         final boolean hasFocusNow = hasWindowFocus();
         dbExecutor.execute(() -> {
-            if (chatId == null) return;
+            if (chatId == null || isChatBlocked) return;
             boolean changed = false;
             android.content.SharedPreferences privacyPrefs = getSharedPreferences("veil_privacy_prefs", Context.MODE_PRIVATE);
             boolean sendReadReceipt = privacyPrefs.getBoolean("read_receipts_enabled", true);
@@ -7317,8 +7350,14 @@ public class ChatActivity extends AppCompatActivity {
             dbExecutor.execute(() -> com.m3.veil.webrtc.WebRtcManager.getInstance(ChatActivity.this).fetchAndProcessOfflineInboxOnce(currentUserId));
         }
         if (chatId != null) {
+            Chat latestChat = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChat(chatId);
+            if (latestChat != null) {
+                currentLocalChat = latestChat;
+                isChatBlocked = latestChat.isBlocked();
+                updateBlockedState(isChatBlocked, latestChat.getBlockedBy());
+            }
             com.m3.veil.manager.VeilMessagesController.getInstance(this).setActiveChatIdInForeground(chatId);
-            if (isChatUnlocked()) {
+            if (isChatUnlocked() && !isChatBlocked) {
                 sendReadReceiptsForUnreadMessages();
                 dbExecutor.execute(() -> com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).markAllAsRead(chatId, currentUserId));
             }
@@ -7542,7 +7581,8 @@ public class ChatActivity extends AppCompatActivity {
                         break;
                     }
                 }
-                updateSmartReplySuggestions(lastIncoming);
+                 updateSmartReplySuggestions(lastIncoming);
+                 initMessageRequestBanner();
             });
         });
     }
@@ -7577,7 +7617,7 @@ public class ChatActivity extends AppCompatActivity {
 
     private void updateSmartReplySuggestions(Message lastMsg) {
         if (layoutSmartReplies == null || containerSmartReplies == null) return;
-        if (lastMsg == null || lastMsg.getText() == null || lastMsg.getText().trim().isEmpty() || "deleted".equals(lastMsg.getType())) {
+        if (isChatBlocked || lastMsg == null || lastMsg.getText() == null || lastMsg.getText().trim().isEmpty() || "deleted".equals(lastMsg.getType())) {
             layoutSmartReplies.setVisibility(View.GONE);
             return;
         }
@@ -7813,6 +7853,7 @@ public class ChatActivity extends AppCompatActivity {
     // =========================================================
 
     private void toggleBlinkMode() {
+        if (isChatBlocked) return;
         isBlinkModeActive = !isBlinkModeActive;
         updateBlinkModeChipUI();
         if (isBlinkModeActive) {
@@ -8216,7 +8257,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void handleCallMessageClick(Message message) {
-        if (message == null) return;
+        if (message == null || isChatBlocked) return;
         boolean isVideo = false;
         try {
             if (message.getPollJson() != null && !message.getPollJson().isEmpty()) {
@@ -8231,6 +8272,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showCreateInlinePollDialog() {
+        if (isChatBlocked) return;
         if (isGroupChatContext() && chatId != null) {
             boolean isAdmin = currentLocalChat == null || currentUserId == null || currentLocalChat.isAdmin(currentUserId);
             if (!isAdmin) {
@@ -8586,6 +8628,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showDoodlePadDialog() {
+        if (isChatBlocked) return;
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         float dp = getResources().getDisplayMetrics().density;
 
@@ -9066,6 +9109,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showVoiceFilterDialog() {
+        if (isChatBlocked) return;
         String[] labels = {"🎙️ Normal Voice", "🤖 Robot Vocoder", "🕵️ Deep Anonymous Mask", "🐿️ Helium / Chipmunk"};
         String[] values = {"normal", "robot", "deep", "chipmunk"};
 
@@ -9193,6 +9237,7 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void showTranslateAndSmartReplyDialog(Message message) {
+        if (isChatBlocked) return;
         String text = message.getText() != null ? message.getText() : "";
         List<String> suggestions = com.m3.veil.utils.VeilLocalIntelligenceEngine.getInstance().generateSmartReplies(text);
 

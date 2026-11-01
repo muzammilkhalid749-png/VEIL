@@ -1523,16 +1523,19 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                         }
                                     }
                                     if (peerId == null && gId.contains("_")) {
-                                        String[] split = gId.split("_");
-                                        if (split.length == 2) {
-                                            if (isSelfId(appCtx, split[0]) && !isSelfId(appCtx, split[1])) {
-                                                peerId = split[1];
-                                            } else if (isSelfId(appCtx, split[1]) && !isSelfId(appCtx, split[0])) {
-                                                peerId = split[0];
-                                            } else if (!isSelfId(appCtx, split[1])) {
-                                                peerId = split[1];
-                                            } else if (!isSelfId(appCtx, split[0])) {
-                                                peerId = split[0];
+                                        peerId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(gId, uid);
+                                        if (peerId == null) {
+                                            String[] split = gId.split("_");
+                                            if (split.length == 2) {
+                                                if (isSelfId(appCtx, split[0]) && !isSelfId(appCtx, split[1])) {
+                                                    peerId = split[1];
+                                                } else if (isSelfId(appCtx, split[1]) && !isSelfId(appCtx, split[0])) {
+                                                    peerId = split[0];
+                                                } else if (!isSelfId(appCtx, split[1])) {
+                                                    peerId = split[1];
+                                                } else if (!isSelfId(appCtx, split[0])) {
+                                                    peerId = split[0];
+                                                }
                                             }
                                         }
                                     }
@@ -1541,6 +1544,8 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                     Chat existing = targetDb.getChat(gId);
                                     String myPersonaName = VeilFeatureManager.getInstance(appCtx).getActivePersona().getDisplayName();
                                     String chatTitle = gName;
+                                    String lastSenderId = doc.getString("lastMessageSenderId");
+                                    String lastSenderName = doc.getString("lastMessageSenderName");
                                     if (isDirectChat) {
                                         String resolvedPeerName = null;
                                         Object pNamesObj = doc.get("participantNames");
@@ -1550,8 +1555,6 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 resolvedPeerName = (String) val;
                                             }
                                         }
-                                        String lastSenderId = doc.getString("lastMessageSenderId");
-                                        String lastSenderName = doc.getString("lastMessageSenderName");
                                         if ((resolvedPeerName == null || resolvedPeerName.isEmpty())
                                                 && peerId != null && peerId.equals(lastSenderId)
                                                 && lastSenderName != null && !lastSenderName.isEmpty()) {
@@ -1594,6 +1597,12 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                         if (description != null) newGroup.setDescription(description);
                                         if (isPublicObj != null) newGroup.setPublic(isPublicObj);
                                         if (handle != null) newGroup.setHandle(handle);
+                                        if (isDirectChat) {
+                                            boolean initiatedByMe = lastSenderId != null && isSelfId(appCtx, lastSenderId);
+                                            if (!initiatedByMe && peerId != null && !com.m3.veil.webrtc.WebRtcManager.getInstance(appCtx).isKnownPeerOrContact(peerId, null)) {
+                                                newGroup.setRequest(true);
+                                            }
+                                        }
                                         targetDb.saveOrUpdateChat(newGroup);
                                         updated = true;
                                         shouldSyncMessages = true;
@@ -1850,14 +1859,18 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                         }
                                     }
                                     if (peerId == null && cId.contains("_")) {
-                                        String[] split = cId.split("_");
-                                        if (split.length == 2) {
-                                            peerId = split[0].equals(uid) ? split[1] : split[0];
+                                        peerId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(cId, uid);
+                                        if (peerId == null) {
+                                            String[] split = cId.split("_");
+                                            if (split.length == 2) {
+                                                peerId = split[0].equals(uid) ? split[1] : split[0];
+                                            }
                                         }
                                     }
                                     if (peerId == null) continue;
 
                                     String lastMsg = doc.getString("lastMessage");
+                                    String lastSenderId = doc.getString("lastMessageSenderId");
                                     com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
                                     if (ts == null) ts = com.google.firebase.Timestamp.now();
 
@@ -1877,6 +1890,10 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                 "direct",
                                                 parts != null ? parts : new java.util.ArrayList<>()
                                         );
+                                        boolean initiatedByMe = lastSenderId != null && isSelfId(appCtx, lastSenderId);
+                                        if (!initiatedByMe && !com.m3.veil.webrtc.WebRtcManager.getInstance(appCtx).isKnownPeerOrContact(peerId, null)) {
+                                            newChat.setRequest(true);
+                                        }
                                         targetDb.saveOrUpdateChat(newChat);
                                         updated = true;
                                         shouldSyncDirectMsgs = true;

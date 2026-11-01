@@ -1727,6 +1727,8 @@ public class CallActivity extends AppCompatActivity {
 
         isVideoActive = info.isVideoEnabled() || info.isScreenSharing();
 
+        callType = info.getType() == CallType.VIDEO ? "video" : "audio";
+
 
 
         if (info.getState() != CallState.NONE) {
@@ -1762,6 +1764,12 @@ public class CallActivity extends AppCompatActivity {
                 com.m3.veil.calling.CallVideoDevice.removeSink(localVideoView, attachedLocalTrack);
 
                 attachedLocalTrack = null;
+
+            }
+
+            if (localVideoView != null) {
+
+                localVideoView.setVisibility(View.GONE);
 
             }
 
@@ -1814,6 +1822,12 @@ public class CallActivity extends AppCompatActivity {
             if (avatarContainer != null) {
 
                 avatarContainer.setVisibility(View.VISIBLE);
+
+            }
+
+            if (!isVideoActive) {
+
+                updateCallThemeForVideoMode(false);
 
             }
 
@@ -2348,6 +2362,14 @@ public class CallActivity extends AppCompatActivity {
         engine.setVideoEnabled(enable);
 
         isVideoActive = enable;
+
+        if (!enable) {
+
+            callType = "audio";
+
+            updateCallThemeForVideoMode(false);
+
+        }
 
         updateToggle(btnToggleVideo, ivToggleVideo, tvToggleVideo, isVideoActive, "Video");
 

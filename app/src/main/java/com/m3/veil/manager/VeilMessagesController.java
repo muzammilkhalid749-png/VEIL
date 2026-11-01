@@ -985,12 +985,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 }
             }
             if (finalRecipientId == null || finalRecipientId.isEmpty()) {
-                if (dialogId.contains("_")) {
-                    String[] parts = dialogId.split("_");
-                    if (parts.length == 2) {
-                        finalRecipientId = parts[0].equals(myId) ? parts[1] : parts[0];
-                    }
-                }
+                finalRecipientId = WebRtcManager.extractPeerIdFromChatId(dialogId, myId);
             }
         }
         if (!isGroupOrChannel && (finalRecipientId == null || finalRecipientId.isEmpty())) return;
@@ -1129,10 +1124,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                         }
                     }
                 }
-                if ((effectiveRecipientId == null || effectiveRecipientId.equals(dialogId)) && dialogId.contains("_")) {
-                    String[] parts = dialogId.split("_");
-                    if (parts.length == 2) {
-                        effectiveRecipientId = parts[0].equals(myId) ? parts[1] : parts[0];
+                if ((effectiveRecipientId == null || effectiveRecipientId.equals(dialogId)) && dialogId != null) {
+                    String extracted = WebRtcManager.extractPeerIdFromChatId(dialogId, myId);
+                    if (extracted != null && !extracted.isEmpty()) {
+                        effectiveRecipientId = extracted;
                     }
                 }
             }
@@ -1272,7 +1267,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
         }
         boolean isGroup = (chat != null && chat.isGroupChat())
                 || (dialogId != null && (dialogId.startsWith("group_") || dialogId.startsWith("channel_") || dialogId.startsWith("lounge_")));
-        if (isGroup && chat != null && chat.getParticipants() != null) {
+        if (chat != null && chat.getParticipants() != null) {
             List<String> connectedPeers = new ArrayList<>();
             List<String> offlinePeers = new ArrayList<>();
             for (String pId : chat.getParticipants()) {
@@ -1286,22 +1281,29 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
                 }
             }
             for (String pId : connectedPeers) {
-                if (targets.size() >= MAX_DIRECT_P2P_GROUP_FANOUT) break;
+                if (isGroup && targets.size() >= MAX_DIRECT_P2P_GROUP_FANOUT) break;
                 targets.add(pId);
             }
             for (String pId : offlinePeers) {
-                if (targets.size() >= MAX_DIRECT_P2P_GROUP_FANOUT) break;
+                if (isGroup && targets.size() >= MAX_DIRECT_P2P_GROUP_FANOUT) break;
                 targets.add(pId);
             }
         }
-        if (targets.isEmpty()) {
+        if (targets.isEmpty() && !isGroup) {
             if (explicitRecipientId != null && !explicitRecipientId.isEmpty()
-                    && !explicitRecipientId.equals(dialogId) && !explicitRecipientId.equals(myId)) {
-                targets.add(explicitRecipientId);
+                    && !explicitRecipientId.equals(myId)) {
+                String extractedExplicit = WebRtcManager.extractPeerIdFromChatId(explicitRecipientId, myId);
+                targets.add(extractedExplicit != null ? extractedExplicit : explicitRecipientId);
             } else if (msg != null) {
                 String candidate = (myId != null && myId.equals(msg.getReceiverId())) ? msg.getSenderId() : msg.getReceiverId();
                 if (candidate != null && !candidate.isEmpty() && !candidate.equals(dialogId) && !candidate.equals(myId)) {
                     targets.add(candidate);
+                }
+            }
+            if (targets.isEmpty() && dialogId != null) {
+                String extracted = WebRtcManager.extractPeerIdFromChatId(dialogId, myId);
+                if (extracted != null && !extracted.isEmpty() && !extracted.equals(myId)) {
+                    targets.add(extracted);
                 }
             }
         }
@@ -1582,12 +1584,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             String myId = getCurrentUserId();
             String targetPeer = (recipientId != null && !recipientId.isEmpty()) ? recipientId : msg.getReceiverId();
             if (targetPeer == null || targetPeer.isEmpty()) {
-                if (dialogId != null && dialogId.contains("_")) {
-                    String[] parts = dialogId.split("_");
-                    if (parts.length == 2) {
-                        targetPeer = parts[0].equals(myId) ? parts[1] : parts[0];
-                    }
-                }
+                targetPeer = WebRtcManager.extractPeerIdFromChatId(dialogId, myId);
             }
             if (targetPeer == null || targetPeer.isEmpty()) {
                 targetPeer = dialogId;
@@ -1644,10 +1641,10 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             List<String> participants = new ArrayList<>();
             if (myId != null && !myId.isEmpty()) participants.add(myId);
             if (targetPeer != null && !targetPeer.isEmpty() && !participants.contains(targetPeer)) participants.add(targetPeer);
-            if (participants.size() < 2 && directChatId.contains("_")) {
-                String[] p = directChatId.split("_");
-                for (String part : p) {
-                    if (part != null && !part.isEmpty() && !participants.contains(part)) participants.add(part);
+            if (participants.size() < 2 && directChatId != null) {
+                String extracted = WebRtcManager.extractPeerIdFromChatId(directChatId, myId);
+                if (extracted != null && !extracted.isEmpty() && !participants.contains(extracted)) {
+                    participants.add(extracted);
                 }
             }
             chatSummary.put("participants", participants);
@@ -2926,9 +2923,15 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
      */
     public void sendTyping(String dialogId, String recipientId, boolean isTyping) {
         if (dialogId == null && recipientId == null) return;
-        mCryptoQueue.execute(() -> {
+        mStageQueue.post(() -> {
             try {
                 List<String> targets = resolveTargetPeers(dialogId, recipientId, null);
+                if (targets.isEmpty() && dialogId != null) {
+                    String fallbackPeer = WebRtcManager.extractPeerIdFromChatId(dialogId, getCurrentUserId());
+                    if (fallbackPeer != null && !fallbackPeer.isEmpty()) {
+                        targets.add(fallbackPeer);
+                    }
+                }
                 for (String peer : targets) {
                     WebRtcManager.getInstance(mContext).sendTyping(peer, dialogId, isTyping);
                 }
