@@ -1443,6 +1443,10 @@ public class VeilBoardController implements EncryptedChatDatabase.DatabaseChange
     // =========================================================================
 
     private String getCurrentUserId() {
+        try {
+            String pId = com.m3.veil.manager.PersonaManager.getInstance(mContext).getActivePersonaPeerId();
+            if (pId != null && !pId.isEmpty()) return pId;
+        } catch (Throwable ignored) {}
         String uid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(mContext);
         if (uid != null && !uid.isEmpty()) return uid;
         FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();

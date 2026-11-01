@@ -145,7 +145,10 @@ public class CreatePostActivity extends AppCompatActivity {
         } catch (Exception ignored) {
             db = null;
         }
-        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(this).getActivePersonaPeerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        }
         if (currentUserId == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
             currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
         }

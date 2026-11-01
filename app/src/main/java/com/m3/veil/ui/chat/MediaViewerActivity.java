@@ -2469,7 +2469,7 @@ public class MediaViewerActivity extends AppCompatActivity {
             }
         };
 
-        trimVideoView.setVideoPath(videoFile.getAbsolutePath());
+        trimVideoView.setVideoURI(android.net.Uri.fromFile(videoFile));
         trimVideoView.setOnPreparedListener(mp -> {
             activeTrimPlayer[0] = mp;
             mp.setLooping(true);
@@ -4385,7 +4385,7 @@ public class MediaViewerActivity extends AppCompatActivity {
                 holder.pagePhoto.setVisibility(View.GONE);
                 holder.pageVideoWrap.setVisibility(View.VISIBLE);
                 if (f.exists()) {
-                    holder.pageVideo.setVideoPath(f.getAbsolutePath());
+                    holder.pageVideo.setVideoURI(android.net.Uri.fromFile(f));
                     final int boundPosition = pos;
                     holder.pageVideo.setOnPreparedListener(mp -> {
                         int dur = mp.getDuration();
@@ -4541,7 +4541,7 @@ public class MediaViewerActivity extends AppCompatActivity {
         if (videoControlsBar != null) videoControlsBar.setVisibility(View.VISIBLE);
         viewerProgressBar.setVisibility(View.VISIBLE);
 
-        videoViewer.setVideoPath(file.getAbsolutePath());
+        videoViewer.setVideoURI(android.net.Uri.fromFile(file));
         videoViewer.setOnPreparedListener(mp -> {
             activeMediaPlayer = mp;
             fitVideoViewToAspectRatio(videoViewer, videoContainer, mp.getVideoWidth(), mp.getVideoHeight());

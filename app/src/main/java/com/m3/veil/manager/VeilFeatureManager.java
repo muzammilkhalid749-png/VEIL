@@ -1354,7 +1354,17 @@ public class VeilFeatureManager {
         statusChangeListeners.remove(l);
     }
 
+    private volatile List<StatusUpdate> cachedNullChatStatuses = null;
+    private volatile long cachedNullChatStatusesTimeMs = 0L;
+    private volatile String cachedNullChatStatusesPersonaSuffix = "";
+
+    public void invalidateStatusCache() {
+        cachedNullChatStatuses = null;
+        cachedNullChatStatusesTimeMs = 0L;
+    }
+
     public void notifyStatusListeners() {
+        invalidateStatusCache();
         for (StatusChangeListener l : statusChangeListeners) {
             try { l.onStatusesChanged(); } catch (Exception ignored) {}
         }
@@ -1647,8 +1657,16 @@ public class VeilFeatureManager {
     }
 
     public List<StatusUpdate> getStatusUpdates(List<com.m3.veil.model.Chat> localChats) {
-        List<StatusUpdate> result = new ArrayList<>();
         long now = System.currentTimeMillis();
+        String activeSuffix = getActivePersonaScopeSuffix();
+        if (localChats == null) {
+            List<StatusUpdate> cached = cachedNullChatStatuses;
+            if (cached != null && activeSuffix.equals(cachedNullChatStatusesPersonaSuffix)
+                    && (now - cachedNullChatStatusesTimeMs) < 1500L) {
+                return cached;
+            }
+        }
+        List<StatusUpdate> result = new ArrayList<>();
         long dayMs = 24L * 60L * 60L * 1000L;
         java.util.Set<String> myIds = new java.util.HashSet<>();
         try {
@@ -1900,6 +1918,11 @@ public class VeilFeatureManager {
             }
         } catch (Throwable ignored) {}
 
+        if (localChats == null) {
+            cachedNullChatStatusesPersonaSuffix = activeSuffix;
+            cachedNullChatStatusesTimeMs = now;
+            cachedNullChatStatuses = new ArrayList<>(result);
+        }
         return result;
     }
 

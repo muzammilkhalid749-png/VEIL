@@ -86,7 +86,10 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_search);
 
-        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(this).getActivePersonaPeerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        }
         if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
         }
@@ -537,9 +540,12 @@ public class SearchActivity extends AppCompatActivity implements ChatsAdapter.On
             }
         }
         if ((recipientId == null || recipientId.trim().isEmpty()) && chat.getId() != null && !chat.isGroup()) {
-            String[] parts = chat.getId().split("_");
-            if (parts.length == 2) {
-                recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+            recipientId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(chat.getId(), currentUserId);
+            if (recipientId == null || recipientId.trim().isEmpty()) {
+                String[] parts = chat.getId().split("_");
+                if (parts.length == 2) {
+                    recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+                }
             }
         }
         if (recipientId != null && !recipientId.trim().isEmpty()) {

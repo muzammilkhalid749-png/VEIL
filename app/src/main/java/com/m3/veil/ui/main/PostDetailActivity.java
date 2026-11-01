@@ -221,7 +221,10 @@ public class PostDetailActivity extends AppCompatActivity {
             return;
         }
 
-        currentUserId = AuthManager.getInstance().getCurrentUserId(this);
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(this).getActivePersonaPeerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = AuthManager.getInstance().getCurrentUserId(this);
+        }
         if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = SovereignIdentityAndDirectoryEngine.getInstance(this).getCurrentUserId();
         }

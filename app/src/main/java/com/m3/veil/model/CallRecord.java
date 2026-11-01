@@ -63,7 +63,14 @@ public class CallRecord {
     private void resolvePeerInfo() {
         String currentUid = null;
         try {
-            if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+            android.content.Context appCtx = com.m3.veil.VeilApplication.getInstance();
+            if (appCtx != null) {
+                currentUid = com.m3.veil.manager.PersonaManager.getInstance(appCtx).getActivePersonaPeerId();
+            }
+        } catch (Throwable ignored) {}
+        try {
+            if ((currentUid == null || currentUid.isEmpty())
+                    && com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
                 currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid();
             }
         } catch (Throwable ignored) {}

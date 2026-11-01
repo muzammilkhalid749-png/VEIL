@@ -2284,7 +2284,13 @@ public class SovereignIdentityAndDirectoryEngine {
         mExecutor.execute(() -> {
             List<User> results = Collections.synchronizedList(new ArrayList<>());
             Set<String> seenUids = Collections.synchronizedSet(new HashSet<>());
-            String currentUid = AuthManager.getInstance().getCurrentUserId(mContext);
+            String currentUid = null;
+            try {
+                currentUid = com.m3.veil.manager.PersonaManager.getInstance(mContext).getActivePersonaPeerId();
+            } catch (Throwable ignored) {}
+            if (currentUid == null || currentUid.isEmpty()) {
+                currentUid = AuthManager.getInstance().getCurrentUserId(mContext);
+            }
             if (currentUid == null || currentUid.isEmpty()) {
                 currentUid = getCurrentUserId();
             }
@@ -2294,6 +2300,38 @@ public class SovereignIdentityAndDirectoryEngine {
 
             String raw = query != null ? query.trim().toLowerCase(Locale.ROOT) : "";
             final String clean = raw.startsWith("@") ? raw.substring(1) : raw;
+
+            // 0. Match other local personas on this device so cross-persona search works instantaneously (online or offline)
+            try {
+                com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(mContext);
+                List<com.m3.veil.model.Persona> localPersonas = pm.getPersonas();
+                if (localPersonas != null) {
+                    for (com.m3.veil.model.Persona lp : localPersonas) {
+                        if (lp == null) continue;
+                        String lpPeerId = pm.getPersonaPeerId(lp);
+                        if (lpPeerId == null || lpPeerId.isEmpty() || lpPeerId.equals(currentUid)) continue;
+                        String lpUname = lp.getUsername() != null ? lp.getUsername().trim() : "";
+                        String lpDname = lp.getDisplayName() != null ? lp.getDisplayName().trim() : "";
+                        boolean match = clean.isEmpty()
+                                || lpUname.toLowerCase(Locale.ROOT).contains(clean)
+                                || lpDname.toLowerCase(Locale.ROOT).contains(clean)
+                                || lpPeerId.toLowerCase(Locale.ROOT).contains(clean);
+                        if (match && seenUids.add(lpPeerId)) {
+                            User u = new User();
+                            u.setUserId(lpPeerId);
+                            u.setUsername(!lpUname.isEmpty() ? lpUname : lpPeerId);
+                            u.setDisplayName(!lpDname.isEmpty() ? lpDname : u.getUsername());
+                            u.setBio(lp.getBio() != null && !lp.getBio().isEmpty() ? lp.getBio() : "🛡️ Encrypted on Veil");
+                            if (lp.getPhotoUrl() != null && !lp.getPhotoUrl().isEmpty()) {
+                                u.setAvatar(lp.getPhotoUrl());
+                                u.setPhotoUrl(lp.getPhotoUrl());
+                            }
+                            u.setOnline(true);
+                            results.add(u);
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
 
             // 1. Query Firebase Firestore ("usernames" exact/prefix + "users" collection)
             try {

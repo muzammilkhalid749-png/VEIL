@@ -7666,6 +7666,9 @@ public class ChatActivity extends AppCompatActivity {
                     }
                 }
                 if (recipientId == null) {
+                    recipientId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(targetChatId, currentUserId);
+                }
+                if (recipientId == null) {
                     String[] parts = targetChatId.split("_");
                     if (parts.length == 2) {
                         recipientId = parts[0].equals(currentUserId) ? parts[1] : parts[0];

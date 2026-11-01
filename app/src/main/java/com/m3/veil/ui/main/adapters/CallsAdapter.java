@@ -82,7 +82,7 @@ public class CallsAdapter extends RecyclerView.Adapter<CallsAdapter.CallViewHold
 
         public void bind(CallRecord record, String currentUserId, OnCallItemClickListener listener) {
             String myId = (currentUserId != null && !currentUserId.isEmpty() && !"local_user".equals(currentUserId))
-                    ? currentUserId : com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(itemView.getContext());
+                    ? currentUserId : com.m3.veil.manager.PersonaManager.getInstance(itemView.getContext()).getActivePersonaPeerId();
             if (myId == null) myId = "";
             android.content.Context ctx = itemView.getContext();
 

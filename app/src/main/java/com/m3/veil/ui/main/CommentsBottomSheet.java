@@ -86,7 +86,10 @@ public class CommentsBottomSheet extends BottomSheetDialogFragment {
             postId = getArguments().getString(ARG_POST_ID);
             postAuthor = getArguments().getString(ARG_POST_AUTHOR);
         }
-        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        }
         if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(requireContext()).getCurrentUserId();
         }

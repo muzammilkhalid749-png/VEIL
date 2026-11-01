@@ -1,0 +1,669 @@
+2026-11-01 23:47:06.376 21850-32219 Finsky                  com.android.vending                  E  [18142] VerifyApps: Unable to get APK Analysis scan result. package=com.m3.veil
+                                                                                                    java.util.concurrent.CancellationException: Task was cancelled.
+                                                                                                    	at btqz.h(PG:31)
+                                                                                                    	at btrg.s(PG:24)
+                                                                                                    	at cjqh.get(PG:3)
+                                                                                                    	at btsq.get(PG:3)
+                                                                                                    	at a.E(PG:2)
+                                                                                                    	at btsv.run(PG:31)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+                                                                                                    	at bhcv.run(PG:504)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1571)
+2026-11-01 23:47:07.161  2049-2271  TABE-TranT...ponentImpl system_server                        E  SEND_INSTALL_INFO_MSG: 1 ,infoPkgInstallInfo{mPackageName='com.m3.veil', mPackageVersionCode=1, mPackageSize=0, mCode=1, mInstaller='[INSTALL_FROM_ADB]', mInstallDurationTimes=17720s, mDataLoader=0}
+2026-11-01 23:47:07.673  7913-7987  phonemaster_log         com.transsion.phonemaster            E  NetworkProvider: APP_UPDATE action packageName=com.m3.veil
+2026-11-01 23:47:11.817  2049-3970  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+---------------------------- PROCESS STARTED (31668) for package com.m3.veil ----------------------------
+2026-11-01 23:47:12.586 31668-31668 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f71410898) locale list changing from [] to [en-US]
+2026-11-01 23:47:12.601 31668-31668 LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsion.thub.res
+2026-11-01 23:47:12.601 31668-31668 LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsion.theme.icon
+2026-11-01 23:47:12.601 31668-31668 LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsionui
+2026-11-01 23:47:12.844 31668-31668 VeilPerfController      com.m3.veil                          I  VeilPerformanceController active: class=AVERAGE (CPU=8 cores @2050MHz, RAM=7687MB, RefreshRate=60.0Hz)
+2026-11-01 23:47:12.973 31668-31668 VeilIntegrityGuard      com.m3.veil                          I  Runtime integrity verified. APK Cert SHA-256: D0:F9:6F:C5:10:3D:DB:37:1D:06:C7:55:7A:44:7C:31:83:E4:FF:37:00:A4:D2:5F:68:B8:45:05:13:90:15:B9
+2026-11-01 23:47:12.988 27747-28449 TranMultil...PluginBase com.transsion.tranradionet           E  [onTaskStackChanged] Get running tasks:android.content.pm.PackageManager$NameNotFoundException: com.m3.veil
+2026-11-01 23:47:12.991 31668-31668 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->get()Ldalvik/system/CloseGuard; (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-01 23:47:12.992 31668-31668 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->open(Ljava/lang/String;)V (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-01 23:47:12.992 31668-31668 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->warnIfOpen()V (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-01 23:47:13.022 31668-31668 PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-11-01 23:47:13.023 31668-31668 PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-11-01 23:47:13.023 31668-31668 M-ProMotion             com.m3.veil                          I  M-ProMotion is disabled
+2026-11-01 23:47:13.036 31668-332   DisplayManager          com.m3.veil                          I  Choreographer implicitly registered for the refresh rate.
+2026-11-01 23:47:13.038 31668-31668 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f7140d9b8) locale list changing from [] to [en-US]
+2026-11-01 23:47:13.046 31668-332   mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-11-01 23:47:13.057 31668-332   mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-11-01 23:47:13.067 31668-31668 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f71405678) locale list changing from [] to [en-US]
+2026-11-01 23:47:13.069 31668-31668 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f71410bb8) locale list changing from [] to [en-US]
+2026-11-01 23:47:13.073 31668-31668 ashmem                  com.m3.veil                          E  Pinning is deprecated since Android Q. Please use trim or other methods.
+2026-11-01 23:47:13.138 31668-31668 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-01 23:47:13.549 31668-350   StatusController        com.m3.veil                          I  Initializing StatusController (100% Pure P2P WebRTC Mesh)...
+2026-11-01 23:47:13.560 31668-31668 QT                      com.m3.veil                          W  qt_process_init() called
+2026-11-01 23:47:13.561 31668-31668 QT                      com.m3.veil                          E  [QT]file does not exist
+2026-11-01 23:47:13.561 31668-31668 QT                      com.m3.veil                          W  Support!!
+2026-11-01 23:47:13.564 31668-31668 libMEOW_gift            com.m3.veil                          I  open /vendor/etc/vconfig/gift/arc.ini
+2026-11-01 23:47:13.565 31668-31668 QT                      com.m3.veil                          E  [QT]file does not exist
+2026-11-01 23:47:13.568 31668-31668 mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-11-01 23:47:13.577 31668-31668 org.webrtc.Logging      com.m3.veil                          I  EglBase14Impl: Using OpenGL ES version 2
+2026-11-01 23:47:13.590 31668-385   org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Loading native library: jingle_peerconnection_so
+2026-11-01 23:47:13.590 31668-385   org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Loading library: jingle_peerconnection_so
+2026-11-01 23:47:13.593 31668-385   org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: PeerConnectionFactory was initialized without an injected Loggable. Any existing Loggable will be deleted.
+2026-11-01 23:47:13.598 31668-31668 VeilMessagesCtrl        com.m3.veil                          I  VeilMessagesController initialized successfully.
+2026-11-01 23:47:13.612 31668-313   VeilSchedulerDaemon     com.m3.veil                          I  Starting VeilSchedulerDaemon tick loop...
+2026-11-01 23:47:13.626 31668-31668 libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.tgpa_resolution_tuner"
+2026-11-01 23:47:13.626 31668-330   PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-11-01 23:47:13.635 31668-31668 libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.scaler_version"
+2026-11-01 23:47:13.636 31668-31668 libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.scaler_version"
+2026-11-01 23:47:13.640 31668-31668 os.SingleLiceFactory    com.m3.veil                          W  instance failed. com.transsion.triplefingerscreenshot.TripleFingerScreenshotLiceFactory  from android.view.IViewRootImplLice
+2026-11-01 23:47:13.640 31668-31668 os.SingleLiceFactory    com.m3.veil                          W  instance failed. com.transsion.server.threefingerslideup.ThreeFingerSlideUpServiceLiceFactory  from android.view.IViewRootImplLice
+2026-11-01 23:47:13.659 31668-385   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-01 23:47:13.660 31668-385   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-01 23:47:13.660 31668-385   org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: createAudioDeviceModule
+2026-11-01 23:47:13.660 31668-385   org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW NS will be used.
+2026-11-01 23:47:13.661 31668-385   org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW AEC will be used.
+2026-11-01 23:47:13.663 31668-385   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: ctor@[name=VeilRtcWorker, id=19002]
+2026-11-01 23:47:13.663 31668-385   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: ctor@[name=VeilRtcWorker, id=19002]
+2026-11-01 23:47:13.666 31668-385   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioTrackExternal: ctor@[name=VeilRtcWorker, id=19002]
+2026-11-01 23:47:13.686 31668-31668 com.m3.veil             com.m3.veil                          E  [perfctl] 31668 31668 FPSGO ver:7
+2026-11-01 23:47:13.686 31668-31668 com.m3.veil             com.m3.veil                          E  [perfctl] 1 1 1 0
+2026-11-01 23:47:13.710 31668-332   GrallocExtra            com.m3.veil                          I  gralloc_extra_query:is_SW3D 0
+2026-11-01 23:47:13.710 31668-415   org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Native library has already been loaded.
+2026-11-01 23:47:13.710 31668-415   org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: PeerConnectionFactory was initialized without an injected Loggable. Any existing Loggable will be deleted.
+2026-11-01 23:47:13.711 31668-415   org.webrtc.Logging      com.m3.veil                          I  EglBase14Impl: Using OpenGL ES version 2
+2026-11-01 23:47:13.722 31668-415   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-01 23:47:13.723 31668-415   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-01 23:47:13.724 31668-415   org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: createAudioDeviceModule
+2026-11-01 23:47:13.725 31668-415   org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW NS will be used.
+2026-11-01 23:47:13.725 31668-415   org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW AEC will be used.
+2026-11-01 23:47:13.727 31668-415   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: ctor@[name=pool-5-thread-1, id=19009]
+2026-11-01 23:47:13.728 31668-415   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: ctor@[name=pool-5-thread-1, id=19009]
+2026-11-01 23:47:13.729 31668-415   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioTrackExternal: ctor@[name=pool-5-thread-1, id=19009]
+2026-11-01 23:47:13.751 31668-385   VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:13.752 31668-385   VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:13.756 31668-385   VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-01 23:47:13.769 31668-332   GrallocExtra            com.m3.veil                          I  gralloc_extra_query:is_SW3D 0
+2026-11-01 23:47:13.773 31668-31668 Choreographer           com.m3.veil                          W  Already have a pending vsync event.  There should only be one at a time.
+2026-11-01 23:47:13.814 31668-385   VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:13.820 31668-385   VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:13.828 31668-385   VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-01 23:47:13.850 11409-25723 OsTheme-IconUtil        usap64                               E  getFullResIcon: e = android.content.pm.PackageManager$NameNotFoundException: ComponentInfo{com.m3.veil/com.m3.veil.ui.splash.SplashActivity}
+2026-11-01 23:47:13.851 11409-25723 OsTheme-IconUtil        usap64                               E  getFullResIconByApplicationInfo android.content.pm.PackageManager$NameNotFoundException: com.m3.veil
+2026-11-01 23:47:13.851 11409-25723 OsTheme-XThemeImpl      usap64                               E  obtain: icon is null, cn = ComponentInfo{com.m3.veil/com.m3.veil.ui.splash.SplashActivity}
+2026-11-01 23:47:13.926 31668-385   VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:13.929 31668-385   VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:13.945 31668-385   VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-01 23:47:13.992 31668-385   VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:13.993 31668-385   VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:14.001 31668-385   VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-01 23:47:14.028 31668-478   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInAEC(true)
+2026-11-01 23:47:14.031 31668-478   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setAEC(true)
+2026-11-01 23:47:14.032 31668-478   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInNS(true)
+2026-11-01 23:47:14.032 31668-478   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setNS(true)
+2026-11-01 23:47:14.033 31668-445   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInAEC(true)
+2026-11-01 23:47:14.033 31668-445   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setAEC(true)
+2026-11-01 23:47:14.033 31668-445   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInNS(true)
+2026-11-01 23:47:14.033 31668-445   org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setNS(true)
+2026-11-01 23:47:14.037 31668-445   org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onWorkerThreadReady
+2026-11-01 23:47:14.037 31668-443   org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onNetworkThreadReady
+2026-11-01 23:47:14.038 31668-446   org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onSignalingThreadReady
+2026-11-01 23:47:14.039 31668-415   CallMediaFactory        com.m3.veil                          I  WebRTC call stack initialised
+2026-11-01 23:47:14.043 31668-477   org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onNetworkThreadReady
+2026-11-01 23:47:14.043 31668-478   org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onWorkerThreadReady
+2026-11-01 23:47:14.043 31668-480   org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onSignalingThreadReady
+2026-11-01 23:47:14.110 31668-31668 CallEngine              com.m3.veil                          I  CallEngine ready for veil_2f580686a121fb51977179e92c04 (e2ee=true, turn=true)
+2026-11-01 23:47:14.138 31668-351   VeilMeshDaemon          com.m3.veil                          I  Network available -> re-syncing signaling & draining P2P outbox
+2026-11-01 23:47:14.159 31668-31668 ImeTracker              com.m3.veil                          I  com.m3.veil:c5d216f3: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+2026-11-01 23:47:14.190 31668-385   TurnCredentialManager   com.m3.veil                          I  Rotated RFC 5389 Ephemeral TURN Credentials: TurnCredentials{user='1793602034:e7d0b836d8e5fd25', ttlRemaining=719m}
+2026-11-01 23:47:14.301 31668-443   org.webrtc.Logging      com.m3.veil                          I  NetworkMonitor: Start monitoring with native observer -5476376670924911088 fieldTrialsString: 
+2026-11-01 23:47:14.356 31668-351   org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: Network handle: 712075300877 becomes available: 165
+2026-11-01 23:47:14.382 31668-442   SovereignIdentity       com.m3.veil                          I  Subscribed to ephemeral signals on wss://relay.damus.io for veil_2f580686a121fb51977179e92c04
+2026-11-01 23:47:14.396 31668-351   org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 712075300877 capabilities changed: [ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED LinkUpBandwidth>=12000Kbps LinkDnBandwidth>=60000Kbps TransportInfo: <SSID: <unknown ssid>, BSSID: 02:00:00:00:00:00, MAC: 02:00:00:00:00:00, IP: /192.168.1.4, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 11ac, RSSI: -59, Link speed: 86Mbps, Tx Link speed: 86Mbps, Max Supported Tx Link speed: 96Mbps, Calculated Tx : 0Mbps, Rx Link speed: 72Mbps, Max Supported Rx Link speed: 96Mbps, Calculated Rx : 0Mbps, Frequency: 5825MHz, Net ID: -1, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: -1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>> SignalStrength: -59 UnderlyingNetworks: Null]
+2026-11-01 23:47:14.424 31668-351   org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 712075300877 link properties changed
+2026-11-01 23:47:14.783 31668-452   SovereignIdentity       com.m3.veil                          I  Subscribed to ephemeral signals on wss://relay.primal.net for veil_2f580686a121fb51977179e92c04
+2026-11-01 23:47:15.936 31668-32737 com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 39MB AllocSpace bytes, 96(3288KB) LOS objects, 50% free, 11MB/23MB, paused 1.945ms,6.530ms total 258.007ms
+2026-11-01 23:47:15.973 31668-31668 FinalizerDaemon         com.m3.veil                          W  type=1400 audit(0.0:147262): avc:  denied  { getopt } for  path="/dev/socket/usap_pool_primary" scontext=u:r:untrusted_app:s0:c69,c257,c512,c768 tcontext=u:r:zygote:s0 tclass=unix_stream_socket permissive=0 app=com.m3.veil
+2026-11-01 23:47:16.122  2049-2132  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-11-01 23:47:16.195 31668-31668 PowerHalMgrImpl         com.m3.veil                          I  perfLockAcq is supported. 
+2026-11-01 23:47:16.261 31668-32737 com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 10MB AllocSpace bytes, 14(464KB) LOS objects, 59% free, 9877KB/23MB, paused 1.425ms,10.268ms total 168.493ms
+2026-11-01 23:47:16.296 31668-31668 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f714557b8) locale list changing from [] to [en-US]
+2026-11-01 23:47:16.699 31668-31668 MessageQueue-JNI        com.m3.veil                          E  Exception in MessageQueue callback: dispatchVsync
+2026-11-01 23:47:16.708 31668-31668 MessageQueue-JNI        com.m3.veil                          E  android.view.InflateException: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Error inflating class <unknown>
+                                                                                                    Caused by: android.view.InflateException: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Error inflating class <unknown>
+                                                                                                    Caused by: java.lang.reflect.InvocationTargetException
+                                                                                                    	at java.lang.reflect.Constructor.newInstance0(Native Method)
+                                                                                                    	at java.lang.reflect.Constructor.newInstance(Constructor.java:341)
+                                                                                                    	at android.view.LayoutInflater.createView(LayoutInflater.java:743)
+                                                                                                    	at android.view.LayoutInflater.createViewFromTag(LayoutInflater.java:899)
+                                                                                                    	at android.view.LayoutInflater.createViewFromTag(LayoutInflater.java:850)
+                                                                                                    	at android.view.LayoutInflater.rInflate(LayoutInflater.java:1029)
+                                                                                                    	at android.view.LayoutInflater.rInflateChildren(LayoutInflater.java:990)
+                                                                                                    	at android.view.LayoutInflater.rInflate(LayoutInflater.java:1032)
+                                                                                                    	at android.view.LayoutInflater.rInflateChildren(LayoutInflater.java:990)
+                                                                                                    	at android.view.LayoutInflater.inflate(LayoutInflater.java:571)
+                                                                                                    	at android.view.LayoutInflater.inflate(LayoutInflater.java:462)
+                                                                                                    	at com.m3.veil.ui.main.fragments.HomeFragment.onCreateView(HomeFragment.java:282)
+                                                                                                    	at androidx.fragment.app.Fragment.performCreateView(Fragment.java:3104)
+                                                                                                    	at androidx.fragment.app.FragmentStateManager.createView(FragmentStateManager.java:524)
+                                                                                                    	at androidx.fragment.app.FragmentStateManager.moveToExpectedState(FragmentStateManager.java:261)
+                                                                                                    	at androidx.fragment.app.FragmentManager.executeOpsTogether(FragmentManager.java:1899)
+                                                                                                    	at androidx.fragment.app.FragmentManager.removeRedundantOperationsAndExecute(FragmentManager.java:1817)
+                                                                                                    	at androidx.fragment.app.FragmentManager.execSingleAction(FragmentManager.java:1729)
+                                                                                                    	at androidx.fragment.app.BackStackRecord.commitNow(BackStackRecord.java:317)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.placeFragmentInViewHolder(FragmentStateAdapter.java:341)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.onViewAttachedToWindow(FragmentStateAdapter.java:276)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.onViewAttachedToWindow(FragmentStateAdapter.java:67)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchChildAttached(RecyclerView.java:7867)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$5.addView(RecyclerView.java:893)
+                                                                                                    	at androidx.recyclerview.widget.ChildHelper.addView(ChildHelper.java:107)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addViewInt(RecyclerView.java:8902)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addView(RecyclerView.java:8860)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addView(RecyclerView.java:8848)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.layoutChunk(LinearLayoutManager.java:1645)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.fill(LinearLayoutManager.java:1591)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.onLayoutChildren(LinearLayoutManager.java:668)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchLayoutStep2(RecyclerView.java:4309)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchLayout(RecyclerView.java:4012)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.onLayout(RecyclerView.java:4578)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at androidx.viewpager2.widget.ViewPager2.onLayout(ViewPager2.java:527)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at com.google.android.material.appbar.HeaderScrollingViewBehavior.layoutChild(HeaderScrollingViewBehavior.java:145)
+                                                                                                    	at com.google.android.material.appbar.ViewOffsetBehavior.onLayoutChild(ViewOffsetBehavior.java:43)
+                                                                                                    	at com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior.onLayoutChild(AppBarLayout.java:2461)
+                                                                                                    	at androidx.coordinatorlayout.widget.CoordinatorLayout.onLayout(CoordinatorLayout.java:953)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+2026-11-01 23:47:16.708 31668-31668 MessageQueue-JNI        com.m3.veil                          E  	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.LinearLayout.setChildFrame(LinearLayout.java:1891)
+                                                                                                    	at android.widget.LinearLayout.layoutVertical(LinearLayout.java:1729)
+                                                                                                    	at android.widget.LinearLayout.onLayout(LinearLayout.java:1638)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.LinearLayout.setChildFrame(LinearLayout.java:1891)
+                                                                                                    	at android.widget.LinearLayout.layoutVertical(LinearLayout.java:1729)
+                                                                                                    	at android.widget.LinearLayout.onLayout(LinearLayout.java:1638)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at com.android.internal.policy.DecorView.onLayout(DecorView.java:833)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.view.ViewRootImpl.performLayout(ViewRootImpl.java:5452)
+                                                                                                    	at android.view.ViewRootImpl.performTraversals(ViewRootImpl.java:4596)
+                                                                                                    	at android.view.ViewRootImpl.doTraversal(ViewRootImpl.java:3405)
+                                                                                                    	at android.view.ViewRootImpl$TraversalRunnable.run(ViewRootImpl.java:11381)
+                                                                                                    	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1808)
+                                                                                                    	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1817)
+                                                                                                    	at android.view.Choreographer.doCallbacks(Choreographer.java:1354)
+                                                                                                    	at android.view.Choreographer.doFrame(Choreographer.java:1237)
+                                                                                                    	at android.view.Choreographer$FrameDisplayEventReceiver.triggerInsetFirstVsync(Choreographer.java:1789)
+                                                                                                    	at android.view.Choreographer$FrameDisplayEventReceiver.onVsync(Choreographer.java:1762)
+                                                                                                    	at android.view.DisplayEventReceiver.dispatchVsync(DisplayEventReceiver.java:374)
+                                                                                                    	at android.os.MessageQueue.nativePollOnce(Native Method)
+                                                                                                    	at android.os.MessageQueue.nextLegacy(MessageQueue.java:925)
+                                                                                                    	at android.os.MessageQueue.next(MessageQueue.java:1037)
+                                                                                                    	at android.os.Looper.loopOnce(Looper.java:253)
+                                                                                                    	at android.os.Looper.loop(Looper.java:440)
+                                                                                                    	at android.app.ActivityThread.main(ActivityThread.java:9398)
+                                                                                                    	at java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:629)
+                                                                                                    	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1024)
+                                                                                                    Caused by: java.lang.NullPointerException: Attempt to invoke virtual method 'void androidx.core.view.NestedScrollingChildHelper.setNestedScrollingEnabled(boolean)' on a null object reference
+                                                                                                    	at androidx.core.widget.NestedScrollView.setNestedScrollingEnabled(NestedScrollView.java:325)
+                                                                                                    	at android.view.View.<init>(View.java:6391)
+                                                                                                    	at android.view.ViewGroup.<init>(ViewGroup.java:723)
+                                                                                                    	at android.widget.FrameLayout.<init>(FrameLayout.java:99)
+                                                                                                    	at android.widget.FrameLayout.<init>(FrameLayout.java:94)
+                                                                                                    	at androidx.core.widget.NestedScrollView.<init>(NestedScrollView.java:249)
+                                                                                                    	at androidx.core.widget.NestedScrollView.<init>(NestedScrollView.java:244)
+                                                                                                    	... 88 more
+2026-11-01 23:47:16.715 31668-31668 AndroidRuntime          com.m3.veil                          E  FATAL EXCEPTION: main
+                                                                                                    Process: com.m3.veil, PID: 31668
+                                                                                                    android.view.InflateException: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Error inflating class <unknown>
+                                                                                                    Caused by: android.view.InflateException: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Error inflating class <unknown>
+                                                                                                    Caused by: java.lang.reflect.InvocationTargetException
+                                                                                                    	at java.lang.reflect.Constructor.newInstance0(Native Method)
+                                                                                                    	at java.lang.reflect.Constructor.newInstance(Constructor.java:341)
+                                                                                                    	at android.view.LayoutInflater.createView(LayoutInflater.java:743)
+                                                                                                    	at android.view.LayoutInflater.createViewFromTag(LayoutInflater.java:899)
+                                                                                                    	at android.view.LayoutInflater.createViewFromTag(LayoutInflater.java:850)
+                                                                                                    	at android.view.LayoutInflater.rInflate(LayoutInflater.java:1029)
+                                                                                                    	at android.view.LayoutInflater.rInflateChildren(LayoutInflater.java:990)
+                                                                                                    	at android.view.LayoutInflater.rInflate(LayoutInflater.java:1032)
+                                                                                                    	at android.view.LayoutInflater.rInflateChildren(LayoutInflater.java:990)
+                                                                                                    	at android.view.LayoutInflater.inflate(LayoutInflater.java:571)
+                                                                                                    	at android.view.LayoutInflater.inflate(LayoutInflater.java:462)
+                                                                                                    	at com.m3.veil.ui.main.fragments.HomeFragment.onCreateView(HomeFragment.java:282)
+                                                                                                    	at androidx.fragment.app.Fragment.performCreateView(Fragment.java:3104)
+                                                                                                    	at androidx.fragment.app.FragmentStateManager.createView(FragmentStateManager.java:524)
+                                                                                                    	at androidx.fragment.app.FragmentStateManager.moveToExpectedState(FragmentStateManager.java:261)
+                                                                                                    	at androidx.fragment.app.FragmentManager.executeOpsTogether(FragmentManager.java:1899)
+                                                                                                    	at androidx.fragment.app.FragmentManager.removeRedundantOperationsAndExecute(FragmentManager.java:1817)
+                                                                                                    	at androidx.fragment.app.FragmentManager.execSingleAction(FragmentManager.java:1729)
+                                                                                                    	at androidx.fragment.app.BackStackRecord.commitNow(BackStackRecord.java:317)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.placeFragmentInViewHolder(FragmentStateAdapter.java:341)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.onViewAttachedToWindow(FragmentStateAdapter.java:276)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.onViewAttachedToWindow(FragmentStateAdapter.java:67)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchChildAttached(RecyclerView.java:7867)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$5.addView(RecyclerView.java:893)
+                                                                                                    	at androidx.recyclerview.widget.ChildHelper.addView(ChildHelper.java:107)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addViewInt(RecyclerView.java:8902)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addView(RecyclerView.java:8860)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addView(RecyclerView.java:8848)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.layoutChunk(LinearLayoutManager.java:1645)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.fill(LinearLayoutManager.java:1591)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.onLayoutChildren(LinearLayoutManager.java:668)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchLayoutStep2(RecyclerView.java:4309)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchLayout(RecyclerView.java:4012)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.onLayout(RecyclerView.java:4578)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at androidx.viewpager2.widget.ViewPager2.onLayout(ViewPager2.java:527)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at com.google.android.material.appbar.HeaderScrollingViewBehavior.layoutChild(HeaderScrollingViewBehavior.java:145)
+                                                                                                    	at com.google.android.material.appbar.ViewOffsetBehavior.onLayoutChild(ViewOffsetBehavior.java:43)
+                                                                                                    	at com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior.onLayoutChild(AppBarLayout.java:2461)
+                                                                                                    	at androidx.coordinatorlayout.widget.CoordinatorLayout.onLayout(CoordinatorLayout.java:953)
+2026-11-01 23:47:16.717 31668-31668 AndroidRuntime          com.m3.veil                          E  	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.LinearLayout.setChildFrame(LinearLayout.java:1891)
+                                                                                                    	at android.widget.LinearLayout.layoutVertical(LinearLayout.java:1729)
+                                                                                                    	at android.widget.LinearLayout.onLayout(LinearLayout.java:1638)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.LinearLayout.setChildFrame(LinearLayout.java:1891)
+                                                                                                    	at android.widget.LinearLayout.layoutVertical(LinearLayout.java:1729)
+                                                                                                    	at android.widget.LinearLayout.onLayout(LinearLayout.java:1638)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at com.android.internal.policy.DecorView.onLayout(DecorView.java:833)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.view.ViewRootImpl.performLayout(ViewRootImpl.java:5452)
+                                                                                                    	at android.view.ViewRootImpl.performTraversals(ViewRootImpl.java:4596)
+                                                                                                    	at android.view.ViewRootImpl.doTraversal(ViewRootImpl.java:3405)
+                                                                                                    	at android.view.ViewRootImpl$TraversalRunnable.run(ViewRootImpl.java:11381)
+                                                                                                    	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1808)
+                                                                                                    	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1817)
+                                                                                                    	at android.view.Choreographer.doCallbacks(Choreographer.java:1354)
+                                                                                                    	at android.view.Choreographer.doFrame(Choreographer.java:1237)
+                                                                                                    	at android.view.Choreographer$FrameDisplayEventReceiver.triggerInsetFirstVsync(Choreographer.java:1789)
+                                                                                                    	at android.view.Choreographer$FrameDisplayEventReceiver.onVsync(Choreographer.java:1762)
+                                                                                                    	at android.view.DisplayEventReceiver.dispatchVsync(DisplayEventReceiver.java:374)
+                                                                                                    	at android.os.MessageQueue.nativePollOnce(Native Method)
+                                                                                                    	at android.os.MessageQueue.nextLegacy(MessageQueue.java:925)
+                                                                                                    	at android.os.MessageQueue.next(MessageQueue.java:1037)
+                                                                                                    	at android.os.Looper.loopOnce(Looper.java:253)
+                                                                                                    	at android.os.Looper.loop(Looper.java:440)
+                                                                                                    	at android.app.ActivityThread.main(ActivityThread.java:9398)
+                                                                                                    	at java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:629)
+                                                                                                    	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1024)
+                                                                                                    Caused by: java.lang.NullPointerException: Attempt to invoke virtual method 'void androidx.core.view.NestedScrollingChildHelper.setNestedScrollingEnabled(boolean)' on a null object reference
+                                                                                                    	at androidx.core.widget.NestedScrollView.setNestedScrollingEnabled(NestedScrollView.java:325)
+                                                                                                    	at android.view.View.<init>(View.java:6391)
+                                                                                                    	at android.view.ViewGroup.<init>(ViewGroup.java:723)
+                                                                                                    	at android.widget.FrameLayout.<init>(FrameLayout.java:99)
+                                                                                                    	at android.widget.FrameLayout.<init>(FrameLayout.java:94)
+                                                                                                    	at androidx.core.widget.NestedScrollView.<init>(NestedScrollView.java:249)
+                                                                                                    	at androidx.core.widget.NestedScrollView.<init>(NestedScrollView.java:244)
+                                                                                                    	... 88 more
+2026-11-01 23:47:16.728 31668-32732 com.m3.veil             com.m3.veil                          I  Compiler allocated 6828KB to compile void android.view.ViewRootImpl.performTraversals()
+2026-11-01 23:47:16.839 31668-32737 com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 15MB AllocSpace bytes, 30(872KB) LOS objects, 49% free, 13MB/27MB, paused 1.924ms,5.256ms total 212.621ms
+2026-11-01 23:47:20.008 31668-388   TurnCredentialManager   com.m3.veil                          I  Completed Multi-Region Edge Relay Probing. Fleet Status:
+2026-11-01 23:47:20.011 31668-388   TurnCredentialManager   com.m3.veil                          I    -> RelayNode[cloudflare-stun (Cloudflare Anycast STUN): stun.cloudflare.com, rtt=16ms]
+2026-11-01 23:47:20.011 31668-388   TurnCredentialManager   com.m3.veil                          I    -> RelayNode[google-stun-1 (Google Global STUN 1): stun.l.google.com, rtt=48ms]
+2026-11-01 23:47:20.011 31668-388   TurnCredentialManager   com.m3.veil                          I    -> RelayNode[anycast-global (Global Anycast Edge): openrelay.metered.ca, rtt=UNREACHABLE]
+2026-11-01 23:47:20.011 31668-388   TurnCredentialManager   com.m3.veil                          I    -> RelayNode[global-standard (Global Standard Relay): standard.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-01 23:47:20.011 31668-388   TurnCredentialManager   com.m3.veil                          I    -> RelayNode[us-edge-1 (North America Edge): us.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-01 23:47:20.011 31668-388   TurnCredentialManager   com.m3.veil                          I    -> RelayNode[eu-edge-1 (Europe Central Edge): eu.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-01 23:47:20.011 31668-388   TurnCredentialManager   com.m3.veil                          I    -> RelayNode[ap-edge-1 (Asia-Pacific Edge): ap.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-01 23:47:25.566 31668-32737 com.m3.veil             com.m3.veil                          W  Suspending all threads took: 8.719ms
+---------------------------- PROCESS ENDED (31668) for package com.m3.veil ----------------------------
+2026-11-01 23:47:45.952  2049-2421  AppOps                  system_server                        E  Operation not started: uid=10325 pkg=com.m3.veil(null) op=WAKE_LOCK
+2026-11-01 23:47:46.568  2049-2191  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-11-01 23:47:46.596  2049-2976  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:1
+---------------------------- PROCESS STARTED (16100) for package com.m3.veil ----------------------------
+2026-11-01 23:47:47.277 16100-16100 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f71410898) locale list changing from [] to [en-US]
+2026-11-01 23:47:47.285 16100-16100 LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsion.thub.res
+2026-11-01 23:47:47.285 16100-16100 LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsion.theme.icon
+2026-11-01 23:47:47.286 16100-16100 LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsionui
+2026-11-01 23:47:47.509 16100-16100 VeilPerfController      com.m3.veil                          I  VeilPerformanceController active: class=AVERAGE (CPU=8 cores @2050MHz, RAM=7687MB, RefreshRate=60.0Hz)
+2026-11-01 23:47:47.636 16100-16100 VeilIntegrityGuard      com.m3.veil                          I  Runtime integrity verified. APK Cert SHA-256: D0:F9:6F:C5:10:3D:DB:37:1D:06:C7:55:7A:44:7C:31:83:E4:FF:37:00:A4:D2:5F:68:B8:45:05:13:90:15:B9
+2026-11-01 23:47:47.657 16100-16100 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->get()Ldalvik/system/CloseGuard; (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-01 23:47:47.657 16100-16100 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->open(Ljava/lang/String;)V (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-01 23:47:47.657 16100-16100 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->warnIfOpen()V (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-01 23:47:47.667 16100-14227 com.m3.veil             com.m3.veil                          W  Monitor::Inflate: Install failed 0x3256578
+2026-11-01 23:47:47.688 16100-16100 PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-11-01 23:47:47.689 16100-16100 PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-11-01 23:47:47.689 16100-16100 M-ProMotion             com.m3.veil                          I  M-ProMotion is disabled
+2026-11-01 23:47:47.698 16100-14243 DisplayManager          com.m3.veil                          I  Choreographer implicitly registered for the refresh rate.
+2026-11-01 23:47:47.699 16100-16100 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f7140d9b8) locale list changing from [] to [en-US]
+2026-11-01 23:47:47.702 16100-14243 mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-11-01 23:47:47.710 16100-14243 mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-11-01 23:47:47.730 16100-16100 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f71412af8) locale list changing from [] to [en-US]
+2026-11-01 23:47:47.732 16100-16100 com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f7140ff38) locale list changing from [] to [en-US]
+2026-11-01 23:47:47.735 16100-16100 ashmem                  com.m3.veil                          E  Pinning is deprecated since Android Q. Please use trim or other methods.
+2026-11-01 23:47:47.755 27747-28449 TranMultil...PluginBase com.transsion.tranradionet           E  [onTaskStackChanged] Get running tasks:android.content.pm.PackageManager$NameNotFoundException: com.m3.veil
+2026-11-01 23:47:47.794 16100-16100 com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-01 23:47:48.170 16100-14230 QT                      com.m3.veil                          W  qt_process_init() called
+2026-11-01 23:47:48.170 16100-14230 QT                      com.m3.veil                          E  [QT]file does not exist
+2026-11-01 23:47:48.170 16100-14230 QT                      com.m3.veil                          W  Support!!
+2026-11-01 23:47:48.171 16100-14230 libMEOW_gift            com.m3.veil                          I  open /vendor/etc/vconfig/gift/arc.ini
+2026-11-01 23:47:48.171 16100-14230 QT                      com.m3.veil                          E  [QT]file does not exist
+2026-11-01 23:47:48.172 16100-14230 mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-11-01 23:47:48.176 16100-14265 StatusController        com.m3.veil                          I  Initializing StatusController (100% Pure P2P WebRTC Mesh)...
+2026-11-01 23:47:48.179 16100-14230 org.webrtc.Logging      com.m3.veil                          I  EglBase14Impl: Using OpenGL ES version 2
+2026-11-01 23:47:48.190 16100-14287 org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Loading native library: jingle_peerconnection_so
+2026-11-01 23:47:48.191 16100-14287 org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Loading library: jingle_peerconnection_so
+2026-11-01 23:47:48.194 16100-14287 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: PeerConnectionFactory was initialized without an injected Loggable. Any existing Loggable will be deleted.
+2026-11-01 23:47:48.201 16100-14230 VeilMessagesCtrl        com.m3.veil                          I  VeilMessagesController initialized successfully.
+2026-11-01 23:47:48.207 16100-14230 VeilSchedulerDaemon     com.m3.veil                          I  Starting VeilSchedulerDaemon tick loop...
+2026-11-01 23:47:48.214 16100-14287 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-01 23:47:48.215 16100-14287 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-01 23:47:48.216 16100-14287 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: createAudioDeviceModule
+2026-11-01 23:47:48.217 16100-14287 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW NS will be used.
+2026-11-01 23:47:48.217 16100-14287 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW AEC will be used.
+2026-11-01 23:47:48.217 16100-14232 PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-11-01 23:47:48.220 16100-16100 libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.tgpa_resolution_tuner"
+2026-11-01 23:47:48.221 16100-14287 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: ctor@[name=VeilRtcWorker, id=19005]
+2026-11-01 23:47:48.221 16100-14287 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: ctor@[name=VeilRtcWorker, id=19005]
+2026-11-01 23:47:48.225 16100-16100 libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.scaler_version"
+2026-11-01 23:47:48.226 16100-16100 libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.scaler_version"
+2026-11-01 23:47:48.226 16100-14287 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioTrackExternal: ctor@[name=VeilRtcWorker, id=19005]
+2026-11-01 23:47:48.231 16100-16100 os.SingleLiceFactory    com.m3.veil                          W  instance failed. com.transsion.triplefingerscreenshot.TripleFingerScreenshotLiceFactory  from android.view.IViewRootImplLice
+2026-11-01 23:47:48.232 16100-16100 os.SingleLiceFactory    com.m3.veil                          W  instance failed. com.transsion.server.threefingerslideup.ThreeFingerSlideUpServiceLiceFactory  from android.view.IViewRootImplLice
+2026-11-01 23:47:48.262 16100-14287 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:48.263 16100-14287 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:48.266 16100-14306 org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Native library has already been loaded.
+2026-11-01 23:47:48.268 16100-14306 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: PeerConnectionFactory was initialized without an injected Loggable. Any existing Loggable will be deleted.
+2026-11-01 23:47:48.270 16100-14306 org.webrtc.Logging      com.m3.veil                          I  EglBase14Impl: Using OpenGL ES version 2
+2026-11-01 23:47:48.270 16100-14287 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-01 23:47:48.276 16100-16100 com.m3.veil             com.m3.veil                          E  [perfctl] 16100 16100 FPSGO ver:7
+2026-11-01 23:47:48.276 16100-16100 com.m3.veil             com.m3.veil                          E  [perfctl] 1 1 1 0
+2026-11-01 23:47:48.292 16100-14306 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-01 23:47:48.293 16100-14306 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-01 23:47:48.293 16100-14306 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: createAudioDeviceModule
+2026-11-01 23:47:48.293 16100-14306 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW NS will be used.
+2026-11-01 23:47:48.293 16100-14306 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW AEC will be used.
+2026-11-01 23:47:48.294 16100-14306 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: ctor@[name=pool-4-thread-1, id=19017]
+2026-11-01 23:47:48.294 16100-14306 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: ctor@[name=pool-4-thread-1, id=19017]
+2026-11-01 23:47:48.294 16100-14306 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioTrackExternal: ctor@[name=pool-4-thread-1, id=19017]
+2026-11-01 23:47:48.297 16100-14243 GrallocExtra            com.m3.veil                          I  gralloc_extra_query:is_SW3D 0
+2026-11-01 23:47:48.310 16100-14287 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:48.313 16100-14287 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:48.319 16100-14287 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-01 23:47:48.334 16100-14243 GrallocExtra            com.m3.veil                          I  gralloc_extra_query:is_SW3D 0
+2026-11-01 23:47:48.338 16100-16100 Choreographer           com.m3.veil                          W  Already have a pending vsync event.  There should only be one at a time.
+2026-11-01 23:47:48.374 16100-14287 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:48.375 16100-14287 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:48.382 16100-14287 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-01 23:47:48.413 16100-14287 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:48.414 16100-14287 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-01 23:47:48.424 16100-14287 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-01 23:47:48.455 16100-14331 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInAEC(true)
+2026-11-01 23:47:48.459 16100-14331 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setAEC(true)
+2026-11-01 23:47:48.459 16100-14331 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInNS(true)
+2026-11-01 23:47:48.460 16100-14331 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setNS(true)
+2026-11-01 23:47:48.460 16100-14340 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInAEC(true)
+2026-11-01 23:47:48.461 16100-14340 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setAEC(true)
+2026-11-01 23:47:48.461 16100-14340 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInNS(true)
+2026-11-01 23:47:48.461 16100-14340 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setNS(true)
+2026-11-01 23:47:48.463 16100-14306 CallMediaFactory        com.m3.veil                          I  WebRTC call stack initialised
+2026-11-01 23:47:48.464 16100-14330 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onNetworkThreadReady
+2026-11-01 23:47:48.464 16100-14334 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onSignalingThreadReady
+2026-11-01 23:47:48.465 16100-14339 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onNetworkThreadReady
+2026-11-01 23:47:48.467 16100-14341 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onSignalingThreadReady
+2026-11-01 23:47:48.467 16100-14340 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onWorkerThreadReady
+2026-11-01 23:47:48.468 16100-14331 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onWorkerThreadReady
+2026-11-01 23:47:48.483 16100-16100 CallEngine              com.m3.veil                          I  CallEngine ready for veil_2f580686a121fb51977179e92c04 (e2ee=true, turn=true)
+2026-11-01 23:47:48.517 16100-14269 VeilMeshDaemon          com.m3.veil                          I  Network available -> re-syncing signaling & draining P2P outbox
+2026-11-01 23:47:48.528 16100-16100 ImeTracker              com.m3.veil                          I  com.m3.veil:d785116e: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+2026-11-01 23:47:48.577 16100-14287 TurnCredentialManager   com.m3.veil                          I  Rotated RFC 5389 Ephemeral TURN Credentials: TurnCredentials{user='1793602068:4e92e8c866533264', ttlRemaining=719m}
+2026-11-01 23:47:48.722 16100-14330 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitor: Start monitoring with native observer -5476376670924913104 fieldTrialsString: 
+2026-11-01 23:47:48.816 16100-14269 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: Network handle: 712075300877 becomes available: 165
+2026-11-01 23:47:48.824 16100-14269 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 712075300877 capabilities changed: [ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED LinkUpBandwidth>=12000Kbps LinkDnBandwidth>=60000Kbps TransportInfo: <SSID: <unknown ssid>, BSSID: 02:00:00:00:00:00, MAC: 02:00:00:00:00:00, IP: /192.168.1.4, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 11ac, RSSI: -59, Link speed: 86Mbps, Tx Link speed: 86Mbps, Max Supported Tx Link speed: 96Mbps, Calculated Tx : 0Mbps, Rx Link speed: 72Mbps, Max Supported Rx Link speed: 96Mbps, Calculated Rx : 0Mbps, Frequency: 5825MHz, Net ID: -1, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: -1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>> SignalStrength: -59 UnderlyingNetworks: Null]
+2026-11-01 23:47:48.838 16100-14269 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 712075300877 link properties changed
+2026-11-01 23:47:48.873 16100-14316 SovereignIdentity       com.m3.veil                          I  Subscribed to ephemeral signals on wss://relay.damus.io for veil_2f580686a121fb51977179e92c04
+2026-11-01 23:47:49.830 16100-14321 SovereignIdentity       com.m3.veil                          I  Subscribed to ephemeral signals on wss://relay.primal.net for veil_2f580686a121fb51977179e92c04
+2026-11-01 23:47:50.771  2049-3095  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-11-01 23:47:50.798 16100-16100 PowerHalMgrImpl         com.m3.veil                          I  perfLockAcq is supported. 
+2026-11-01 23:47:51.179 16100-16100 MessageQueue-JNI        com.m3.veil                          E  Exception in MessageQueue callback: dispatchVsync
+2026-11-01 23:47:51.181 16100-16100 MessageQueue-JNI        com.m3.veil                          E  android.view.InflateException: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Error inflating class <unknown>
+                                                                                                    Caused by: android.view.InflateException: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Error inflating class <unknown>
+                                                                                                    Caused by: java.lang.reflect.InvocationTargetException
+                                                                                                    	at java.lang.reflect.Constructor.newInstance0(Native Method)
+                                                                                                    	at java.lang.reflect.Constructor.newInstance(Constructor.java:341)
+                                                                                                    	at android.view.LayoutInflater.createView(LayoutInflater.java:743)
+                                                                                                    	at android.view.LayoutInflater.createViewFromTag(LayoutInflater.java:899)
+                                                                                                    	at android.view.LayoutInflater.createViewFromTag(LayoutInflater.java:850)
+                                                                                                    	at android.view.LayoutInflater.rInflate(LayoutInflater.java:1029)
+                                                                                                    	at android.view.LayoutInflater.rInflateChildren(LayoutInflater.java:990)
+                                                                                                    	at android.view.LayoutInflater.rInflate(LayoutInflater.java:1032)
+                                                                                                    	at android.view.LayoutInflater.rInflateChildren(LayoutInflater.java:990)
+                                                                                                    	at android.view.LayoutInflater.inflate(LayoutInflater.java:571)
+                                                                                                    	at android.view.LayoutInflater.inflate(LayoutInflater.java:462)
+                                                                                                    	at com.m3.veil.ui.main.fragments.HomeFragment.onCreateView(HomeFragment.java:282)
+                                                                                                    	at androidx.fragment.app.Fragment.performCreateView(Fragment.java:3104)
+                                                                                                    	at androidx.fragment.app.FragmentStateManager.createView(FragmentStateManager.java:524)
+                                                                                                    	at androidx.fragment.app.FragmentStateManager.moveToExpectedState(FragmentStateManager.java:261)
+                                                                                                    	at androidx.fragment.app.FragmentManager.executeOpsTogether(FragmentManager.java:1899)
+                                                                                                    	at androidx.fragment.app.FragmentManager.removeRedundantOperationsAndExecute(FragmentManager.java:1817)
+                                                                                                    	at androidx.fragment.app.FragmentManager.execSingleAction(FragmentManager.java:1729)
+                                                                                                    	at androidx.fragment.app.BackStackRecord.commitNow(BackStackRecord.java:317)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.placeFragmentInViewHolder(FragmentStateAdapter.java:341)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.onViewAttachedToWindow(FragmentStateAdapter.java:276)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.onViewAttachedToWindow(FragmentStateAdapter.java:67)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchChildAttached(RecyclerView.java:7867)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$5.addView(RecyclerView.java:893)
+                                                                                                    	at androidx.recyclerview.widget.ChildHelper.addView(ChildHelper.java:107)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addViewInt(RecyclerView.java:8902)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addView(RecyclerView.java:8860)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addView(RecyclerView.java:8848)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.layoutChunk(LinearLayoutManager.java:1645)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.fill(LinearLayoutManager.java:1591)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.onLayoutChildren(LinearLayoutManager.java:668)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchLayoutStep2(RecyclerView.java:4309)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchLayout(RecyclerView.java:4012)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.onLayout(RecyclerView.java:4578)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at androidx.viewpager2.widget.ViewPager2.onLayout(ViewPager2.java:527)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at com.google.android.material.appbar.HeaderScrollingViewBehavior.layoutChild(HeaderScrollingViewBehavior.java:145)
+                                                                                                    	at com.google.android.material.appbar.ViewOffsetBehavior.onLayoutChild(ViewOffsetBehavior.java:43)
+                                                                                                    	at com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior.onLayoutChild(AppBarLayout.java:2461)
+                                                                                                    	at androidx.coordinatorlayout.widget.CoordinatorLayout.onLayout(CoordinatorLayout.java:953)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+2026-11-01 23:47:51.181 16100-16100 MessageQueue-JNI        com.m3.veil                          E  	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.LinearLayout.setChildFrame(LinearLayout.java:1891)
+                                                                                                    	at android.widget.LinearLayout.layoutVertical(LinearLayout.java:1729)
+                                                                                                    	at android.widget.LinearLayout.onLayout(LinearLayout.java:1638)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.LinearLayout.setChildFrame(LinearLayout.java:1891)
+                                                                                                    	at android.widget.LinearLayout.layoutVertical(LinearLayout.java:1729)
+                                                                                                    	at android.widget.LinearLayout.onLayout(LinearLayout.java:1638)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at com.android.internal.policy.DecorView.onLayout(DecorView.java:833)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.view.ViewRootImpl.performLayout(ViewRootImpl.java:5452)
+                                                                                                    	at android.view.ViewRootImpl.performTraversals(ViewRootImpl.java:4596)
+                                                                                                    	at android.view.ViewRootImpl.doTraversal(ViewRootImpl.java:3405)
+                                                                                                    	at android.view.ViewRootImpl$TraversalRunnable.run(ViewRootImpl.java:11381)
+                                                                                                    	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1808)
+                                                                                                    	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1817)
+                                                                                                    	at android.view.Choreographer.doCallbacks(Choreographer.java:1354)
+                                                                                                    	at android.view.Choreographer.doFrame(Choreographer.java:1237)
+                                                                                                    	at android.view.Choreographer$FrameDisplayEventReceiver.triggerInsetFirstVsync(Choreographer.java:1789)
+                                                                                                    	at android.view.Choreographer$FrameDisplayEventReceiver.onVsync(Choreographer.java:1762)
+                                                                                                    	at android.view.DisplayEventReceiver.dispatchVsync(DisplayEventReceiver.java:374)
+                                                                                                    	at android.os.MessageQueue.nativePollOnce(Native Method)
+                                                                                                    	at android.os.MessageQueue.nextLegacy(MessageQueue.java:925)
+                                                                                                    	at android.os.MessageQueue.next(MessageQueue.java:1037)
+                                                                                                    	at android.os.Looper.loopOnce(Looper.java:253)
+                                                                                                    	at android.os.Looper.loop(Looper.java:440)
+                                                                                                    	at android.app.ActivityThread.main(ActivityThread.java:9398)
+                                                                                                    	at java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:629)
+                                                                                                    	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1024)
+                                                                                                    Caused by: java.lang.NullPointerException: Attempt to invoke virtual method 'void androidx.core.view.NestedScrollingChildHelper.setNestedScrollingEnabled(boolean)' on a null object reference
+                                                                                                    	at androidx.core.widget.NestedScrollView.setNestedScrollingEnabled(NestedScrollView.java:325)
+                                                                                                    	at android.view.View.<init>(View.java:6391)
+                                                                                                    	at android.view.ViewGroup.<init>(ViewGroup.java:723)
+                                                                                                    	at android.widget.FrameLayout.<init>(FrameLayout.java:99)
+                                                                                                    	at android.widget.FrameLayout.<init>(FrameLayout.java:94)
+                                                                                                    	at androidx.core.widget.NestedScrollView.<init>(NestedScrollView.java:249)
+                                                                                                    	at androidx.core.widget.NestedScrollView.<init>(NestedScrollView.java:244)
+                                                                                                    	... 88 more
+2026-11-01 23:47:51.184 16100-16100 AndroidRuntime          com.m3.veil                          E  FATAL EXCEPTION: main
+                                                                                                    Process: com.m3.veil, PID: 16100
+                                                                                                    android.view.InflateException: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Error inflating class <unknown>
+                                                                                                    Caused by: android.view.InflateException: Binary XML file line #381 in com.m3.veil:layout/fragment_home: Error inflating class <unknown>
+                                                                                                    Caused by: java.lang.reflect.InvocationTargetException
+                                                                                                    	at java.lang.reflect.Constructor.newInstance0(Native Method)
+                                                                                                    	at java.lang.reflect.Constructor.newInstance(Constructor.java:341)
+                                                                                                    	at android.view.LayoutInflater.createView(LayoutInflater.java:743)
+                                                                                                    	at android.view.LayoutInflater.createViewFromTag(LayoutInflater.java:899)
+                                                                                                    	at android.view.LayoutInflater.createViewFromTag(LayoutInflater.java:850)
+                                                                                                    	at android.view.LayoutInflater.rInflate(LayoutInflater.java:1029)
+                                                                                                    	at android.view.LayoutInflater.rInflateChildren(LayoutInflater.java:990)
+                                                                                                    	at android.view.LayoutInflater.rInflate(LayoutInflater.java:1032)
+                                                                                                    	at android.view.LayoutInflater.rInflateChildren(LayoutInflater.java:990)
+                                                                                                    	at android.view.LayoutInflater.inflate(LayoutInflater.java:571)
+                                                                                                    	at android.view.LayoutInflater.inflate(LayoutInflater.java:462)
+                                                                                                    	at com.m3.veil.ui.main.fragments.HomeFragment.onCreateView(HomeFragment.java:282)
+                                                                                                    	at androidx.fragment.app.Fragment.performCreateView(Fragment.java:3104)
+                                                                                                    	at androidx.fragment.app.FragmentStateManager.createView(FragmentStateManager.java:524)
+                                                                                                    	at androidx.fragment.app.FragmentStateManager.moveToExpectedState(FragmentStateManager.java:261)
+                                                                                                    	at androidx.fragment.app.FragmentManager.executeOpsTogether(FragmentManager.java:1899)
+                                                                                                    	at androidx.fragment.app.FragmentManager.removeRedundantOperationsAndExecute(FragmentManager.java:1817)
+                                                                                                    	at androidx.fragment.app.FragmentManager.execSingleAction(FragmentManager.java:1729)
+                                                                                                    	at androidx.fragment.app.BackStackRecord.commitNow(BackStackRecord.java:317)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.placeFragmentInViewHolder(FragmentStateAdapter.java:341)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.onViewAttachedToWindow(FragmentStateAdapter.java:276)
+                                                                                                    	at androidx.viewpager2.adapter.FragmentStateAdapter.onViewAttachedToWindow(FragmentStateAdapter.java:67)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchChildAttached(RecyclerView.java:7867)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$5.addView(RecyclerView.java:893)
+                                                                                                    	at androidx.recyclerview.widget.ChildHelper.addView(ChildHelper.java:107)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addViewInt(RecyclerView.java:8902)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addView(RecyclerView.java:8860)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView$LayoutManager.addView(RecyclerView.java:8848)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.layoutChunk(LinearLayoutManager.java:1645)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.fill(LinearLayoutManager.java:1591)
+                                                                                                    	at androidx.recyclerview.widget.LinearLayoutManager.onLayoutChildren(LinearLayoutManager.java:668)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchLayoutStep2(RecyclerView.java:4309)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.dispatchLayout(RecyclerView.java:4012)
+                                                                                                    	at androidx.recyclerview.widget.RecyclerView.onLayout(RecyclerView.java:4578)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at androidx.viewpager2.widget.ViewPager2.onLayout(ViewPager2.java:527)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at com.google.android.material.appbar.HeaderScrollingViewBehavior.layoutChild(HeaderScrollingViewBehavior.java:145)
+                                                                                                    	at com.google.android.material.appbar.ViewOffsetBehavior.onLayoutChild(ViewOffsetBehavior.java:43)
+                                                                                                    	at com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior.onLayoutChild(AppBarLayout.java:2461)
+                                                                                                    	at androidx.coordinatorlayout.widget.CoordinatorLayout.onLayout(CoordinatorLayout.java:953)
+2026-11-01 23:47:51.187 16100-16100 AndroidRuntime          com.m3.veil                          E  	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.LinearLayout.setChildFrame(LinearLayout.java:1891)
+                                                                                                    	at android.widget.LinearLayout.layoutVertical(LinearLayout.java:1729)
+                                                                                                    	at android.widget.LinearLayout.onLayout(LinearLayout.java:1638)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.LinearLayout.setChildFrame(LinearLayout.java:1891)
+                                                                                                    	at android.widget.LinearLayout.layoutVertical(LinearLayout.java:1729)
+                                                                                                    	at android.widget.LinearLayout.onLayout(LinearLayout.java:1638)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.widget.FrameLayout.layoutChildren(FrameLayout.java:332)
+                                                                                                    	at android.widget.FrameLayout.onLayout(FrameLayout.java:270)
+                                                                                                    	at com.android.internal.policy.DecorView.onLayout(DecorView.java:833)
+                                                                                                    	at android.view.View.layout(View.java:25856)
+                                                                                                    	at android.view.ViewGroup.layout(ViewGroup.java:6553)
+                                                                                                    	at android.view.ViewRootImpl.performLayout(ViewRootImpl.java:5452)
+                                                                                                    	at android.view.ViewRootImpl.performTraversals(ViewRootImpl.java:4596)
+                                                                                                    	at android.view.ViewRootImpl.doTraversal(ViewRootImpl.java:3405)
+                                                                                                    	at android.view.ViewRootImpl$TraversalRunnable.run(ViewRootImpl.java:11381)
+                                                                                                    	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1808)
+                                                                                                    	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1817)
+                                                                                                    	at android.view.Choreographer.doCallbacks(Choreographer.java:1354)
+                                                                                                    	at android.view.Choreographer.doFrame(Choreographer.java:1237)
+                                                                                                    	at android.view.Choreographer$FrameDisplayEventReceiver.triggerInsetFirstVsync(Choreographer.java:1789)
+                                                                                                    	at android.view.Choreographer$FrameDisplayEventReceiver.onVsync(Choreographer.java:1762)
+                                                                                                    	at android.view.DisplayEventReceiver.dispatchVsync(DisplayEventReceiver.java:374)
+                                                                                                    	at android.os.MessageQueue.nativePollOnce(Native Method)
+                                                                                                    	at android.os.MessageQueue.nextLegacy(MessageQueue.java:925)
+                                                                                                    	at android.os.MessageQueue.next(MessageQueue.java:1037)
+                                                                                                    	at android.os.Looper.loopOnce(Looper.java:253)
+                                                                                                    	at android.os.Looper.loop(Looper.java:440)
+                                                                                                    	at android.app.ActivityThread.main(ActivityThread.java:9398)
+                                                                                                    	at java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:629)
+                                                                                                    	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1024)
+                                                                                                    Caused by: java.lang.NullPointerException: Attempt to invoke virtual method 'void androidx.core.view.NestedScrollingChildHelper.setNestedScrollingEnabled(boolean)' on a null object reference
+                                                                                                    	at androidx.core.widget.NestedScrollView.setNestedScrollingEnabled(NestedScrollView.java:325)
+                                                                                                    	at android.view.View.<init>(View.java:6391)
+                                                                                                    	at android.view.ViewGroup.<init>(ViewGroup.java:723)
+                                                                                                    	at android.widget.FrameLayout.<init>(FrameLayout.java:99)
+                                                                                                    	at android.widget.FrameLayout.<init>(FrameLayout.java:94)
+                                                                                                    	at androidx.core.widget.NestedScrollView.<init>(NestedScrollView.java:249)
+                                                                                                    	at androidx.core.widget.NestedScrollView.<init>(NestedScrollView.java:244)
+                                                                                                    	... 88 more
+2026-11-01 23:47:51.449 16100-14210 com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 46MB AllocSpace bytes, 119(3900KB) LOS objects, 50% free, 17MB/34MB, paused 7.708ms,3.059ms total 562.978ms
+2026-11-01 23:47:51.553 16100-16100 FinalizerDaemon         com.m3.veil                          W  type=1400 audit(0.0:147277): avc:  denied  { getopt } for  path="/dev/socket/usap_pool_primary" scontext=u:r:untrusted_app:s0:c69,c257,c512,c768 tcontext=u:r:zygote:s0 tclass=unix_stream_socket permissive=0 app=com.m3.veil
+2026-11-01 23:47:51.968 16100-14210 com.m3.veil             com.m3.veil                          W  Suspending all threads took: 10.581ms
+2026-11-01 23:47:52.094 16100-14295 TurnCredentialManager   com.m3.veil                          I  Completed Multi-Region Edge Relay Probing. Fleet Status:
+2026-11-01 23:47:52.096 16100-14295 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[cloudflare-stun (Cloudflare Anycast STUN): stun.cloudflare.com, rtt=33ms]
+2026-11-01 23:47:52.098 16100-14295 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[google-stun-1 (Google Global STUN 1): stun.l.google.com, rtt=44ms]
+2026-11-01 23:47:52.102 16100-14295 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[anycast-global (Global Anycast Edge): openrelay.metered.ca, rtt=UNREACHABLE]
+2026-11-01 23:47:52.104 16100-14295 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[global-standard (Global Standard Relay): standard.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-01 23:47:52.106 16100-14295 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[us-edge-1 (North America Edge): us.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-01 23:47:52.108 16100-14295 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[eu-edge-1 (Europe Central Edge): eu.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-01 23:47:52.110 16100-14295 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[ap-edge-1 (Asia-Pacific Edge): ap.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-01 23:47:52.501 16100-14210 com.m3.veil             com.m3.veil                          W  Suspending all threads took: 6.859ms
+2026-11-01 23:47:52.726 16100-14209 com.m3.veil             com.m3.veil                          I  Compiler allocated 6828KB to compile void android.view.ViewRootImpl.performTraversals()
+2026-11-01 23:47:55.850 11409-25723 OsTheme-IconUtil        usap64                               E  getFullResIcon: e = android.content.pm.PackageManager$NameNotFoundException: ComponentInfo{com.m3.veil/com.m3.veil.ui.splash.SplashActivity}
+2026-11-01 23:47:55.852 11409-25723 OsTheme-IconUtil        usap64                               E  getFullResIconByApplicationInfo android.content.pm.PackageManager$NameNotFoundException: com.m3.veil
+2026-11-01 23:47:55.852 11409-25723 OsTheme-XThemeImpl      usap64                               E  obtain: icon is null, cn = ComponentInfo{com.m3.veil/com.m3.veil.ui.splash.SplashActivity}
+2026-11-01 23:48:01.927 16100-14210 com.m3.veil             com.m3.veil                          W  Suspending all threads took: 8.887ms

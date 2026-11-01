@@ -66,7 +66,10 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_calls, container, false);
 
-        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        }
         if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(requireContext()).getCurrentUserId();
         }
@@ -92,6 +95,7 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
     private final com.m3.veil.manager.PersonaManager.PersonaSwitchListener personaSwitchListener = newActivePersona -> {
         if (isAdded() && getContext() != null) {
             currentUserId = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+            EncryptedChatDatabase.getInstance(requireContext()).addListener(dbListener);
             loadLocalCalls();
         }
     };
@@ -102,6 +106,7 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
         if (getContext() != null) {
             com.m3.veil.manager.PersonaManager.getInstance(requireContext()).addPersonaSwitchListener(personaSwitchListener);
             currentUserId = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+            EncryptedChatDatabase.getInstance(requireContext()).addListener(dbListener);
         }
         loadLocalCalls();
     }
@@ -505,8 +510,8 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
     private void showCallConfirmationDialog(CallRecord call) {
         if (call == null || getContext() == null) return;
         String myUid = (currentUserId != null && !currentUserId.isEmpty() && !"local_user".equals(currentUserId))
-                ? currentUserId : (com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext()) != null
-                ? com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext()) : "local_user");
+                ? currentUserId : com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+        if (myUid == null || myUid.isEmpty()) myUid = "local_user";
 
         boolean isOutgoing = "outgoing".equalsIgnoreCase(call.getStatus())
                 || (call.getCallerId() != null && call.getCallerId().equals(myUid))
@@ -593,8 +598,8 @@ public class CallsFragment extends Fragment implements CallsAdapter.OnCallItemCl
     private void startCall(CallRecord call) {
         if (call == null || getContext() == null) return;
         String myUid = (currentUserId != null && !currentUserId.isEmpty() && !"local_user".equals(currentUserId))
-                ? currentUserId : (com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext()) != null
-                ? com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext()) : "local_user");
+                ? currentUserId : com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+        if (myUid == null || myUid.isEmpty()) myUid = "local_user";
 
         boolean isOutgoing = "outgoing".equalsIgnoreCase(call.getStatus())
                 || (call.getCallerId() != null && call.getCallerId().equals(myUid))

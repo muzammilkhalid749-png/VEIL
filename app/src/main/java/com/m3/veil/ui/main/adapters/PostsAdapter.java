@@ -284,9 +284,12 @@ public class PostsAdapter extends RecyclerView.Adapter<PostsAdapter.PostViewHold
                 time.setText(relativeTime + catTag);
             }
 
-            String currentUid = FirebaseAuth.getInstance().getCurrentUser() != null
-                    ? FirebaseAuth.getInstance().getCurrentUser().getUid()
-                    : SovereignIdentityAndDirectoryEngine.getInstance(context).getCurrentUserId();
+            String currentUid = com.m3.veil.manager.PersonaManager.getInstance(context).getActivePersonaPeerId();
+            if (currentUid == null || currentUid.isEmpty()) {
+                currentUid = FirebaseAuth.getInstance().getCurrentUser() != null
+                        ? FirebaseAuth.getInstance().getCurrentUser().getUid()
+                        : SovereignIdentityAndDirectoryEngine.getInstance(context).getCurrentUserId();
+            }
 
             boolean isLiked = post.getLikedBy() != null && post.getLikedBy().contains(currentUid);
             if (isLiked) {

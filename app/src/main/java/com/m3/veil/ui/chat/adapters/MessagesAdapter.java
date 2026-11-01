@@ -591,9 +591,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                                     }
                                 }
                                 if (peerId == null && c.getId() != null) {
-                                    String[] parts = c.getId().split("_");
-                                    if (parts.length == 2) {
-                                        peerId = parts[0].equals(myUid) ? parts[1] : parts[0];
+                                    peerId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(c.getId(), myUid);
+                                    if (peerId == null || peerId.isEmpty()) {
+                                        String[] parts = c.getId().split("_");
+                                        if (parts.length == 2) {
+                                            peerId = parts[0].equals(myUid) ? parts[1] : parts[0];
+                                        }
                                     }
                                 }
                                 openChatWithPeer(context, myUid, peerId != null ? peerId : "veil_peer_" + targetHandle.toLowerCase(java.util.Locale.ROOT), c.getName(), c.getAvatar());

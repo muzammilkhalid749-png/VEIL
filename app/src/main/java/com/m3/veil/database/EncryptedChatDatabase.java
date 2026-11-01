@@ -1828,15 +1828,45 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         }
     }
 
+    private String getScopedRequestAcceptedKey(String chatId) {
+        return "acc_" + getActivePersonaIdForDb() + "_" + chatId;
+    }
+
     public void markDirectChatAccepted(String chatId, String peerId) {
         if (chatId == null || chatId.isEmpty()) return;
         try {
             android.content.SharedPreferences prefs = context.getSharedPreferences("VeilRequestAcceptedRegistry", Context.MODE_PRIVATE);
             android.content.SharedPreferences.Editor ed = prefs.edit();
-            ed.putBoolean("acc_" + chatId, true);
+            ed.putBoolean(getScopedRequestAcceptedKey(chatId), true);
             ed.apply();
         } catch (Exception ignored) {}
         updateChatRequestStatus(chatId, false);
+    }
+
+    /**
+     * Fast, non-blocking check suitable for RecyclerView / VeilDialogCell on the main UI thread.
+     * Avoids synchronous SQLCipher message table scans & AES decryptions during scrolling.
+     */
+    public boolean isDirectChatAcceptedFast(Chat chat, String chatId) {
+        if (chatId == null || chatId.isEmpty()) return false;
+        if (chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_")) {
+            return true;
+        }
+        if (chat != null && chat.isRequest()) {
+            return false;
+        }
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilRequestAcceptedRegistry", Context.MODE_PRIVATE);
+            String scopedKey = getScopedRequestAcceptedKey(chatId);
+            if (prefs.getBoolean(scopedKey, false)) {
+                return true;
+            }
+            if (com.m3.veil.manager.PersonaManager.PRIMARY_PERSONA_ID.equals(getActivePersonaIdForDb())
+                    && prefs.getBoolean("acc_" + chatId, false)) {
+                return true;
+            }
+        } catch (Exception ignored) {}
+        return chat != null && !chat.isRequest();
     }
 
     public boolean isDirectChatAcceptedByPeer(String chatId, String myUserId, String peerId) {
@@ -1850,7 +1880,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                 return false;
             }
             android.content.SharedPreferences prefs = context.getSharedPreferences("VeilRequestAcceptedRegistry", Context.MODE_PRIVATE);
-            if (prefs.getBoolean("acc_" + chatId, false)) {
+            String scopedKey = getScopedRequestAcceptedKey(chatId);
+            if (prefs.getBoolean(scopedKey, false)) {
                 return true;
             }
             List<Message> msgs = getMessagesForChat(chatId);
@@ -1859,18 +1890,18 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     if (m == null) continue;
                     String mType = m.getType() != null ? m.getType() : "text";
                     if ("system".equals(mType) && m.getText() != null && m.getText().contains("Message request accepted")) {
-                        prefs.edit().putBoolean("acc_" + chatId, true).apply();
+                        prefs.edit().putBoolean(scopedKey, true).apply();
                         return true;
                     }
                     String sId = m.getSenderId();
                     if (sId != null && !sId.isEmpty() && !"system".equalsIgnoreCase(sId)
                             && !mType.startsWith("system") && !mType.startsWith("action_")) {
                         if (myUserId != null && !sId.equals(myUserId)) {
-                            prefs.edit().putBoolean("acc_" + chatId, true).apply();
+                            prefs.edit().putBoolean(scopedKey, true).apply();
                             return true;
                         }
                         if (peerId != null && sId.equals(peerId)) {
-                            prefs.edit().putBoolean("acc_" + chatId, true).apply();
+                            prefs.edit().putBoolean(scopedKey, true).apply();
                             return true;
                         }
                     }

@@ -423,7 +423,7 @@ public class VeilDialogCell extends View {
                 chat.setBlocked(true);
             }
             if (!chat.isGroup() && !"channel".equalsIgnoreCase(chat.getType())
-                    && !db.isDirectChatAcceptedByPeer(chat.getId(), this.mCurrentUserId, peerIdForTyp)) {
+                    && !db.isDirectChatAcceptedFast(chat, chat.getId())) {
                 isUnacceptedDialog = true;
             }
             if (isBlockedDialog || isUnacceptedDialog) {

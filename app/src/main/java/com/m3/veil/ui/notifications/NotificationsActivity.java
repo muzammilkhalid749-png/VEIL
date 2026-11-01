@@ -104,7 +104,10 @@ public class NotificationsActivity extends AppCompatActivity {
 
         chatDb = EncryptedChatDatabase.getInstance(this);
         featureManager = VeilFeatureManager.getInstance(this);
-        currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        currentUserId = com.m3.veil.manager.PersonaManager.getInstance(this).getActivePersonaPeerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this);
+        }
         if (currentUserId == null) currentUserId = "me";
         activePersonaName = featureManager.getActivePersona().getDisplayName();
 
@@ -315,9 +318,14 @@ public class NotificationsActivity extends AppCompatActivity {
             } else {
                 intent.putExtra("chatId", item.chatId);
                 if (!item.isGroup && !item.isChannel && item.chatId.contains("_")) {
-                    String[] parts = item.chatId.split("_");
-                    if (parts.length == 2) {
-                        String peerId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+                    String peerId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(item.chatId, currentUserId);
+                    if (peerId == null || peerId.isEmpty()) {
+                        String[] parts = item.chatId.split("_");
+                        if (parts.length == 2) {
+                            peerId = parts[0].equals(currentUserId) ? parts[1] : parts[0];
+                        }
+                    }
+                    if (peerId != null && !peerId.isEmpty()) {
                         intent.putExtra("recipientId", peerId);
                     }
                 }
