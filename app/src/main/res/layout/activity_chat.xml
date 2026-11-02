@@ -246,18 +246,18 @@
         <LinearLayout
             android:id="@+id/multiSelectBar"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="@dimen/_48sdp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
+            android:paddingStart="@dimen/_4sdp"
+            android:paddingEnd="@dimen/_4sdp"
             android:visibility="gone">
 
             <ImageView
                 android:id="@+id/btnMultiSelectClose"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:padding="9dp"
+                android:layout_width="@dimen/_36sdp"
+                android:layout_height="@dimen/_36sdp"
+                android:padding="@dimen/_8sdp"
                 android:src="@drawable/ic_close"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -268,9 +268,9 @@
             <!-- Recipient User DP (shown when NO active call) -->
             <de.hdodenhof.circleimageview.CircleImageView
                 android:id="@+id/multiSelectAvatar"
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:layout_marginStart="4dp"
+                android:layout_width="@dimen/_30sdp"
+                android:layout_height="@dimen/_30sdp"
+                android:layout_marginStart="@dimen/_4sdp"
                 android:src="@drawable/ic_person"
                 android:clickable="true"
                 android:focusable="true"
@@ -280,12 +280,12 @@
             <LinearLayout
                 android:id="@+id/multiSelectCallMicroPill"
                 android:layout_width="wrap_content"
-                android:layout_height="30dp"
-                android:layout_marginStart="6dp"
+                android:layout_height="@dimen/_26sdp"
+                android:layout_marginStart="@dimen/_5sdp"
                 android:gravity="center_vertical"
                 android:background="@drawable/bg_appbar_call_micropill"
-                android:paddingStart="9dp"
-                android:paddingEnd="10dp"
+                android:paddingStart="@dimen/_8sdp"
+                android:paddingEnd="@dimen/_9sdp"
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground"
@@ -293,10 +293,10 @@
 
                 <View
                     android:id="@+id/multiSelectCallPulseDot"
-                    android:layout_width="7dp"
-                    android:layout_height="7dp"
+                    android:layout_width="@dimen/_6sdp"
+                    android:layout_height="@dimen/_6sdp"
                     android:background="@drawable/bg_green_pulse_dot"
-                    android:layout_marginEnd="6dp" />
+                    android:layout_marginEnd="@dimen/_5sdp" />
 
                 <TextView
                     android:id="@+id/tvMultiSelectCallPillText"
@@ -304,7 +304,7 @@
                     android:layout_height="wrap_content"
                     android:text="00:00"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="12sp"
+                    android:textSize="@dimen/_11ssp"
                     android:fontFamily="sans-serif-medium"
                     android:textStyle="bold"
                     android:singleLine="true"
@@ -314,15 +314,15 @@
             <TextView
                 android:id="@+id/tvMultiSelectCount"
                 android:layout_width="wrap_content"
-                android:layout_height="28dp"
-                android:layout_marginStart="8dp"
+                android:layout_height="@dimen/_24sdp"
+                android:layout_marginStart="@dimen/_7sdp"
                 android:gravity="center"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
+                android:paddingStart="@dimen/_9sdp"
+                android:paddingEnd="@dimen/_9sdp"
                 android:background="@drawable/bg_selection_count_pill"
                 android:text="1 selected"
                 android:textColor="@color/colorPrimary"
-                android:textSize="12sp"
+                android:textSize="@dimen/_11ssp"
                 android:fontFamily="sans-serif-medium"
                 android:textStyle="bold"
                 android:fontFeatureSettings="tnum"
@@ -336,9 +336,9 @@
 
             <ImageView
                 android:id="@+id/btnMultiSelectReply"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:padding="8dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
+                android:padding="@dimen/_7sdp"
                 android:src="@drawable/ic_reply"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -348,9 +348,9 @@
 
             <ImageView
                 android:id="@+id/btnMultiSelectEdit"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:padding="8dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
+                android:padding="@dimen/_7sdp"
                 android:src="@drawable/ic_edit"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -361,9 +361,9 @@
 
             <ImageView
                 android:id="@+id/btnMultiSelectStar"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:padding="8dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
+                android:padding="@dimen/_7sdp"
                 android:src="@drawable/ic_star_outline"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -373,9 +373,9 @@
 
             <ImageView
                 android:id="@+id/btnMultiSelectCopy"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:padding="8dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
+                android:padding="@dimen/_7sdp"
                 android:src="@drawable/ic_copy"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -385,9 +385,9 @@
 
             <ImageView
                 android:id="@+id/btnMultiSelectForward"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:padding="8dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
+                android:padding="@dimen/_7sdp"
                 android:src="@drawable/ic_forward"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -397,9 +397,9 @@
 
             <ImageView
                 android:id="@+id/btnMultiSelectDelete"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:padding="8dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
+                android:padding="@dimen/_7sdp"
                 android:src="@drawable/ic_delete"
                 app:tint="#EF4444"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -409,9 +409,9 @@
 
             <ImageView
                 android:id="@+id/btnMultiSelectMore"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:padding="8dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
+                android:padding="@dimen/_7sdp"
                 android:src="@drawable/ic_more_vert"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless"

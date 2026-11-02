@@ -455,8 +455,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     public void startSelection(Message initialMessage) {
         if (initialMessage == null || initialMessage.getId() == null) return;
-        if ("system".equals(initialMessage.getType()) || "date_header".equals(initialMessage.getType())
-                || "unread_divider".equals(initialMessage.getType()) || "call".equals(initialMessage.getType())) {
+        if ("system".equals(initialMessage.getType()) || "action_vanish".equals(initialMessage.getType())
+                || "date_header".equals(initialMessage.getType()) || "unread_divider".equals(initialMessage.getType())) {
             return;
         }
         selectionMode = true;
@@ -468,8 +468,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
 
     public void toggleSelection(Message message) {
         if (message == null || message.getId() == null) return;
-        if ("system".equals(message.getType()) || "date_header".equals(message.getType())
-                || "unread_divider".equals(message.getType()) || "call".equals(message.getType())) {
+        if ("system".equals(message.getType()) || "action_vanish".equals(message.getType())
+                || "date_header".equals(message.getType()) || "unread_divider".equals(message.getType())) {
             return;
         }
         String id = message.getId();
@@ -498,10 +498,10 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         for (Message m : messages) {
             if (m != null && m.getId() != null
                     && !"system".equals(m.getType())
+                    && !"action_vanish".equals(m.getType())
                     && !"date_header".equals(m.getType())
                     && !"unread_divider".equals(m.getType())
-                    && !"deleted".equals(m.getType())
-                    && !"call".equals(m.getType())) {
+                    && !"deleted".equals(m.getType())) {
                 selectedMessageIds.add(m.getId());
             }
         }
@@ -2644,7 +2644,6 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         }
 
         final boolean isSelectableType = message != null
-                && !"call".equals(message.getType())
                 && !"system".equals(message.getType())
                 && !"action_vanish".equals(message.getType())
                 && !"date_header".equals(message.getType())
@@ -2661,7 +2660,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     : (rootItemView != null ? rootItemView.getTag(R.id.messageBubble) : message);
             if (!(tagObj instanceof Message)) return false;
             Message boundMsg = (Message) tagObj;
-            if ("call".equals(boundMsg.getType()) || "system".equals(boundMsg.getType())
+            if ("system".equals(boundMsg.getType())
                     || "action_vanish".equals(boundMsg.getType())
                     || "date_header".equals(boundMsg.getType()) || "unread_divider".equals(boundMsg.getType())) {
                 return false;
@@ -2684,7 +2683,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     : (rootItemView != null ? rootItemView.getTag(R.id.messageBubble) : message);
             if (tagObj instanceof Message) {
                 Message boundMsg = (Message) tagObj;
-                if ("call".equals(boundMsg.getType()) || "system".equals(boundMsg.getType())
+                if ("system".equals(boundMsg.getType())
                         || "action_vanish".equals(boundMsg.getType())
                         || "date_header".equals(boundMsg.getType()) || "unread_divider".equals(boundMsg.getType())) {
                     return;
@@ -3141,8 +3140,22 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             }
         }
 
+        if (title != null) {
+            title.setTextIsSelectable(false);
+        }
+        if (subtitle != null) {
+            subtitle.setTextIsSelectable(false);
+        }
+
         final boolean finalIsVideo = isVideo;
         View.OnClickListener clickListener = v -> {
+            if (isSelectionMode()) {
+                try {
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                } catch (Exception ignored) {}
+                toggleSelection(message);
+                return;
+            }
             if (callMessageClickListener != null) {
                 callMessageClickListener.onCallMessageClick(message);
             } else {
@@ -3173,6 +3186,17 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             }
         };
         container.setOnClickListener(clickListener);
+        container.setOnLongClickListener(v -> {
+            try {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            } catch (Exception ignored) {}
+            if (!isSelectionMode()) {
+                startSelection(message);
+            } else {
+                toggleSelection(message);
+            }
+            return true;
+        });
     }
 
     private String formatDuration(int durationSeconds) {

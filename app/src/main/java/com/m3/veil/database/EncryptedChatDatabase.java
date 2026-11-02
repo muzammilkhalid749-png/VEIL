@@ -4228,9 +4228,12 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     }
 
     public synchronized void deleteCall(String callId) {
+        if (callId == null) return;
         SQLiteDatabase db = getEncryptedDb();
         if (db == null || !db.isOpen()) return;
         db.delete(TABLE_CALLS, COL_CALL_ID + " = ?", new String[]{callId});
+        deleteSingleMessage("call_" + callId);
+        deleteSingleMessage(callId);
         notifyCallsChanged();
     }
 
@@ -4238,6 +4241,48 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         SQLiteDatabase db = getEncryptedDb();
         if (db == null || !db.isOpen()) return;
         db.delete(TABLE_CALLS, null, null);
+
+        // Also delete call messages from all conversations
+        java.util.Set<String> affectedChatIds = new java.util.HashSet<>();
+        Cursor c = null;
+        try {
+            c = db.query(true, TABLE_MESSAGES, new String[]{COL_MSG_CHAT_ID},
+                    COL_MSG_TYPE + " = ?", new String[]{"call"}, null, null, null, null);
+            if (c != null && c.moveToFirst()) {
+                do {
+                    String cId = c.getString(0);
+                    if (cId != null && !cId.isEmpty()) {
+                        affectedChatIds.add(cId);
+                    }
+                } while (c.moveToNext());
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (c != null) c.close();
+        }
+
+        db.delete(TABLE_MESSAGES, COL_MSG_TYPE + " = ?", new String[]{"call"});
+
+        for (String cId : affectedChatIds) {
+            List<Message> cachedList = ramMessageListCache.get(cId);
+            if (cachedList != null) {
+                for (int i = cachedList.size() - 1; i >= 0; i--) {
+                    Message m = cachedList.get(i);
+                    if (m != null && "call".equals(m.getType())) {
+                        cachedList.remove(i);
+                    }
+                }
+            }
+            updateChatLastMessageSummary(db, cId);
+            Chat cachedChat = ramChatCache.get(cId);
+            if (cachedChat != null) {
+                populateLastMessageMetadata(cachedChat);
+            }
+            notifyMessagesChanged(cId);
+        }
+        if (!affectedChatIds.isEmpty()) {
+            notifyChatsChanged();
+        }
         notifyCallsChanged();
     }
 

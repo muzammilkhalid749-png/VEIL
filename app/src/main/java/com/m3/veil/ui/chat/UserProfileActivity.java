@@ -1350,6 +1350,23 @@ public class UserProfileActivity extends AppCompatActivity {
             WebRtcManager.getInstance(this).sendChatSettingPacket(
                     peerUserId, chatId, currentVanishTimer, currentVanishMode, null, null);
         }
+
+        String dur = com.m3.veil.manager.VeilMessagesController.formatVanishDuration(currentVanishTimer);
+        String sysText = (currentVanishTimer <= 0 || "off".equalsIgnoreCase(currentVanishMode))
+                ? "You turned off disappearing messages. Tap to change."
+                : "You changed the disappearing messages timer to " + dur + ". Tap to change.";
+        Message sysMsg = new Message();
+        sysMsg.setId("sys_" + System.currentTimeMillis() + "_" + java.util.UUID.randomUUID().toString().substring(0, 5));
+        sysMsg.setChatId(chatId);
+        sysMsg.setSenderId(currentUserId != null ? currentUserId : "system");
+        sysMsg.setReceiverId(peerUserId != null ? peerUserId : "");
+        sysMsg.setText(sysText);
+        sysMsg.setType("action_vanish");
+        sysMsg.setVanishTimer(currentVanishTimer);
+        sysMsg.setVanishMode(currentVanishMode);
+        sysMsg.setTimestamp(com.google.firebase.Timestamp.now());
+        com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(chat, peerUserId, sysMsg);
+
         updateVanishModeUI();
         Toast.makeText(this, "Vanish mode set to " + label, Toast.LENGTH_SHORT).show();
     }
@@ -1441,6 +1458,23 @@ public class UserProfileActivity extends AppCompatActivity {
                     WebRtcManager.getInstance(this).sendChatSettingPacket(
                             peerUserId, chatId, currentVanishTimer, currentVanishMode, null, null);
                 }
+
+                String dur = com.m3.veil.manager.VeilMessagesController.formatVanishDuration(currentVanishTimer);
+                String sysText = (currentVanishTimer <= 0)
+                        ? "You turned off disappearing messages. Tap to change."
+                        : "You changed the disappearing messages timer to " + dur + ". Tap to change.";
+                Message sysMsg = new Message();
+                sysMsg.setId("sys_" + System.currentTimeMillis() + "_" + java.util.UUID.randomUUID().toString().substring(0, 5));
+                sysMsg.setChatId(chatId);
+                sysMsg.setSenderId(currentUserId != null ? currentUserId : "system");
+                sysMsg.setReceiverId(peerUserId != null ? peerUserId : "");
+                sysMsg.setText(sysText);
+                sysMsg.setType("action_vanish");
+                sysMsg.setVanishTimer(currentVanishTimer);
+                sysMsg.setVanishMode(currentVanishMode);
+                sysMsg.setTimestamp(com.google.firebase.Timestamp.now());
+                com.m3.veil.manager.VeilMessagesController.getInstance(this).sendMessage(chat, peerUserId, sysMsg);
+
                 updateVanishTimerUI();
                 Toast.makeText(this, "Vanish schedule set to " + label, Toast.LENGTH_SHORT).show();
             });

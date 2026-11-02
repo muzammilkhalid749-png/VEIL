@@ -5642,7 +5642,7 @@ public class ChatActivity extends AppCompatActivity {
                 int copiedCount = 0;
                 for (Message m : selected) {
                     if (m != null && m.getText() != null && !m.getText().trim().isEmpty()
-                            && !"deleted".equals(m.getType())) {
+                            && !"deleted".equals(m.getType()) && !"call".equals(m.getType())) {
                         if (sb.length() > 0) sb.append("\n\n");
                         if (selected.size() > 1) {
                             String sender = isSenderMe(m.getSenderId(), m)
@@ -5845,7 +5845,8 @@ public class ChatActivity extends AppCompatActivity {
         boolean hasAnyText = false;
         boolean allStarred = !selectedMessages.isEmpty();
         for (Message m : selectedMessages) {
-            if (m != null && m.getText() != null && !m.getText().trim().isEmpty() && !"deleted".equals(m.getType())) {
+            if (m != null && m.getText() != null && !m.getText().trim().isEmpty()
+                    && !"deleted".equals(m.getType()) && !"call".equals(m.getType())) {
                 hasAnyText = true;
             }
             if (m != null && !m.isStarred()) {
@@ -5915,8 +5916,8 @@ public class ChatActivity extends AppCompatActivity {
                 boolean isSelectedReaction = (userReaction != null && userReaction.equals(emoji));
                 if (isSelectedReaction) {
                     ev.setBackgroundResource(R.drawable.bg_selected_reaction_highlight);
-                    ev.setScaleX(1.15f);
-                    ev.setScaleY(1.15f);
+                    ev.setScaleX(1.10f);
+                    ev.setScaleY(1.10f);
                 } else {
                     if (defaultBgRes != 0) {
                         ev.setBackgroundResource(defaultBgRes);
@@ -5996,7 +5997,7 @@ public class ChatActivity extends AppCompatActivity {
     private void showReactionDialog(Message message, View anchorView) {
         if (message == null || message.getId() == null || "deleted".equals(message.getType())
                 || "system".equals(message.getType()) || "date_header".equals(message.getType())
-                || "unread_divider".equals(message.getType()) || "call".equals(message.getType())
+                || "unread_divider".equals(message.getType())
                 || "action_vanish".equals(message.getType())) {
             return;
         }
@@ -6008,7 +6009,9 @@ public class ChatActivity extends AppCompatActivity {
         if (messagesAdapter != null) {
             messagesAdapter.startSelection(message);
         }
-        showFloatingReactionBarAboveMessage(message, anchorView);
+        if (!"call".equals(message.getType())) {
+            showFloatingReactionBarAboveMessage(message, anchorView);
+        }
     }
 
     private void showMessageActionsBottomSheet(Message message) {
@@ -6069,7 +6072,7 @@ public class ChatActivity extends AppCompatActivity {
 
         // Action: Copy
         View actionCopy = view.findViewById(R.id.actionCopy);
-        if (message.getText() != null && !message.getText().isEmpty()) {
+        if (message.getText() != null && !message.getText().isEmpty() && !"call".equals(message.getType())) {
             actionCopy.setVisibility(View.VISIBLE);
             actionCopy.setOnClickListener(v -> {
                 dialog.dismiss();
@@ -9098,6 +9101,9 @@ public class ChatActivity extends AppCompatActivity {
 
     private void sendVanishSystemMessage(long timer, String mode) {
         if (chatId == null) return;
+        if ((recipientId == null || recipientId.isEmpty()) && !isGroupChatContext()) {
+            recipientId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(chatId, currentUserId);
+        }
         currentVanishTimer = timer;
         currentVanishMode = mode;
         if (currentLocalChat != null) {

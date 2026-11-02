@@ -1447,7 +1447,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             boolean isGroup = p.optBoolean("isGroup", false)
                     || (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_")));
             Chat existingChat = targetDb.getChat(chatId);
-            if (!isGroup && !"system".equalsIgnoreCase(msgType)) {
+            if (!isGroup && !"system".equalsIgnoreCase(msgType) && !"action_vanish".equalsIgnoreCase(msgType)) {
                boolean willBeRequest = false;
                if (existingChat == null) {
                   boolean isKnown = isKnownPeerOrContact(peerId, senderName);
@@ -1816,6 +1816,13 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                }
                String setting = json.optString("setting");
                Chat chat = csDb.getChat(chatId);
+               if (chat == null && peerId != null) {
+                  chat = csDb.getChat(getChatId(this.currentUserId, peerId));
+               }
+               if (chat == null && chatId != null && peerId != null) {
+                  String alt = extractPeerIdFromChatId(chatId, this.currentUserId);
+                  if (alt != null) chat = csDb.getChat(alt);
+               }
                if ("group_invite".equals(setting) || "group_update".equals(setting)) {
                   String gName = json.optString("groupName", chat != null ? chat.getName() : "Encrypted Group");
                   String gType = json.optString("groupType", chat != null ? chat.getType() : "group");
@@ -1883,6 +1890,31 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      sysMsg.setReceiverId(this.currentUserId);
                      sysMsg.setText(sysText);
                      sysMsg.setType("action_vanish");
+                     sysMsg.setVanishTimer(vTimer);
+                     sysMsg.setVanishMode(vMode);
+                     sysMsg.setTimestamp(Timestamp.now());
+                     csDb.saveMessage(chatId, sysMsg);
+
+                     this.mainHandler.post(() -> {
+                        for (P2PEventListener l : WebRtcManager.this.listeners) {
+                           l.onMessageReceived(peerId, sysMsg);
+                        }
+                     });
+                  } else if ("security_code_verified".equals(setting)) {
+                     if (chat != null) {
+                        chat.setTrustScore(100);
+                        csDb.saveOrUpdateChat(chat);
+                     }
+                     String senderPeerName = (chat != null && chat.getName() != null && !chat.getName().trim().isEmpty())
+                             ? chat.getName() : "Contact";
+                     String sysText = senderPeerName + " verified your security code.";
+                     Message sysMsg = new Message();
+                     sysMsg.setId("sys_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 5));
+                     sysMsg.setChatId(chatId);
+                     sysMsg.setSenderId(peerId);
+                     sysMsg.setReceiverId(this.currentUserId);
+                     sysMsg.setText(sysText);
+                     sysMsg.setType("system");
                      sysMsg.setTimestamp(Timestamp.now());
                      csDb.saveMessage(chatId, sysMsg);
 
@@ -2743,6 +2775,16 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
          json.put("chatId", chatId);
          json.put("vanishMode", vanishMode);
          json.put("vanishTimer", vanishTimer);
+         return json;
+      });
+   }
+
+   public void sendSecurityCodeVerified(String peerId, String chatId) {
+      this.sendJsonToPeer(peerId, () -> {
+         JSONObject json = new JSONObject();
+         json.put("type", "chat_setting");
+         json.put("setting", "security_code_verified");
+         json.put("chatId", chatId);
          return json;
       });
    }
