@@ -5773,11 +5773,7 @@ public class ChatActivity extends AppCompatActivity {
                 || "unread_divider".equals(message.getType())) {
             return;
         }
-        if (messagesAdapter != null) {
-            messagesAdapter.startSelection(message);
-        } else {
-            showMessageActionsBottomSheet(message);
-        }
+        showMessageActionsBottomSheet(message);
     }
 
     private void showMessageActionsBottomSheet(Message message) {

@@ -919,7 +919,7 @@ public class ChatMessageCell extends LinearLayout {
             case MotionEvent.ACTION_MOVE:
                 float dx = ev.getX() - mTouchDownRawX;
                 float dy = ev.getY() - mTouchDownRawY;
-                if (Math.hypot(dx, dy) > mTouchSlop) {
+                if (Math.hypot(dx, dy) > mTouchSlop * 2.5f) {
                     cancelScheduledLongPress();
                 }
                 break;

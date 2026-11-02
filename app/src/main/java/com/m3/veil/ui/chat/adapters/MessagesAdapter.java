@@ -2614,7 +2614,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         bindMessageSelectionVisuals(bubbleView, rootItemView, message);
     }
 
-    private void bindMessageSelectionVisuals(View bubbleView, View rootItemView, Message message) {
+    private void bindMessageSelectionVisuals(View bubbleView, View rootItemView, Message message, View... extraViews) {
         if (bubbleView != null) {
             bubbleView.setTag(R.id.messageBubble, message);
         }
@@ -2739,6 +2739,18 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         return android.graphics.PixelFormat.TRANSLUCENT;
                     }
                 });
+            }
+        }
+
+        if (extraViews != null) {
+            for (View extra : extraViews) {
+                if (extra == null) continue;
+                extra.setTag(R.id.messageBubble, message);
+                extra.setLongClickable(true);
+                extra.setOnLongClickListener(unifiedLongClick);
+                if (selectionMode) {
+                    extra.setOnClickListener(selectionClick);
+                }
             }
         }
     }
@@ -4588,7 +4600,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageBubble.invalidate();
                 }
             }
-            bindMessageSelectionVisuals(messageBubble, itemView, message);
+            bindMessageSelectionVisuals(messageBubble, itemView, message,
+                    messageText, imageCardView, imageMessageContainer,
+                    videoCardView, videoMessageContainer, voiceMessageContainer,
+                    documentMessageContainer, locationMessageContainer,
+                    contactMessageContainer, callMessageContainer, pollMessageContainer,
+                    replyQuoteContainer, linkPreviewContainer);
         }
     }
 
@@ -6083,7 +6100,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     messageBubble.invalidate();
                 }
             }
-            bindMessageSelectionVisuals(messageBubble, itemView, message);
+            bindMessageSelectionVisuals(messageBubble, itemView, message,
+                    messageText, imageCardView, imageMessageContainer,
+                    videoCardView, videoMessageContainer, voiceMessageContainer,
+                    documentMessageContainer, locationMessageContainer,
+                    contactMessageContainer, callMessageContainer, pollMessageContainer,
+                    replyQuoteContainer, linkPreviewContainer);
         }
     }
 

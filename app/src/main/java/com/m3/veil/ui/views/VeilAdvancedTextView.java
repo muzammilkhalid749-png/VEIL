@@ -16,6 +16,7 @@ import android.text.style.UpdateAppearance;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.HapticFeedbackConstants;
+import android.view.View;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 import android.widget.Toast;
@@ -171,6 +172,30 @@ public class VeilAdvancedTextView extends AppCompatTextView {
     private boolean mIsOutgoing = false;
     private boolean mIsDarkTheme = false;
     private OnEntityClickListener mEntityClickListener;
+
+    private final Runnable mEntityLongPressRunnable = () -> {
+        if (mPressedSpan != null && !mTouchMoved) {
+            mPressedSpan = null;
+            invalidate();
+            if (getParent() != null) {
+                getParent().requestDisallowInterceptTouchEvent(false);
+            }
+            try {
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            } catch (Exception ignored) {
+            }
+            boolean handled = performLongClick();
+            if (!handled && getParent() instanceof View) {
+                ((View) getParent()).performLongClick();
+            }
+        }
+    };
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        removeCallbacks(mEntityLongPressRunnable);
+    }
 
     public VeilAdvancedTextView(@NonNull Context context) {
         super(context);
@@ -484,6 +509,7 @@ public class VeilAdvancedTextView extends AppCompatTextView {
                         getParent().requestDisallowInterceptTouchEvent(true);
                     }
                     invalidate();
+                    postDelayed(mEntityLongPressRunnable, ViewConfiguration.getLongPressTimeout());
                     return true;
                 }
                 mPressedSpan = null;
@@ -495,7 +521,8 @@ public class VeilAdvancedTextView extends AppCompatTextView {
             case MotionEvent.ACTION_MOVE: {
                 if (mPressedSpan != null) {
                     float dist = (float) Math.hypot(event.getX() - mDownX, event.getY() - mDownY);
-                    if (dist > mTouchSlop) {
+                    if (dist > mTouchSlop * 2.5f) {
+                        removeCallbacks(mEntityLongPressRunnable);
                         mTouchMoved = true;
                         mPressedSpan = null;
                         if (getParent() != null) {
@@ -509,6 +536,7 @@ public class VeilAdvancedTextView extends AppCompatTextView {
             }
 
             case MotionEvent.ACTION_UP: {
+                removeCallbacks(mEntityLongPressRunnable);
                 if (mPressedSpan != null && !mTouchMoved) {
                     EntitySpan spanToClick = mPressedSpan;
                     mPressedSpan = null;
@@ -524,6 +552,7 @@ public class VeilAdvancedTextView extends AppCompatTextView {
             }
 
             case MotionEvent.ACTION_CANCEL: {
+                removeCallbacks(mEntityLongPressRunnable);
                 if (mPressedSpan != null) {
                     mPressedSpan = null;
                     invalidate();
