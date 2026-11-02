@@ -5205,13 +5205,46 @@ public final class WhatsAppStatusUi {
         }
     }
 
+    private static final android.util.LruCache<String, Bitmap> STATUS_IMAGE_CACHE =
+            new android.util.LruCache<String, Bitmap>(24) {
+                @Override
+                protected int sizeOf(String key, Bitmap value) {
+                    return 1;
+                }
+            };
+    private static final java.util.concurrent.ExecutorService STATUS_IMAGE_EXECUTOR =
+            java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+                Thread t = new Thread(r, "VeilStatusImg");
+                t.setDaemon(true);
+                return t;
+            });
+
     private static void loadStatusImage(Context ctx, String uriString, ImageView target) {
         if (ctx == null || uriString == null || target == null) return;
-        new Thread(() -> {
+        final String cacheKey = uriString.length() > 256
+                ? uriString.substring(0, 128) + "#" + uriString.length() + "#" + uriString.hashCode()
+                : uriString;
+        Bitmap cached = STATUS_IMAGE_CACHE.get(cacheKey);
+        if (cached != null && !cached.isRecycled()) {
+            target.setImageBitmap(cached);
+            return;
+        }
+        target.setTag(cacheKey);
+        final Context appCtx = ctx.getApplicationContext() != null ? ctx.getApplicationContext() : ctx;
+        STATUS_IMAGE_EXECUTOR.execute(() -> {
             try {
+                Bitmap already = STATUS_IMAGE_CACHE.get(cacheKey);
+                if (already != null && !already.isRecycled()) {
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (cacheKey.equals(target.getTag())) {
+                            target.setImageBitmap(already);
+                        }
+                    });
+                    return;
+                }
                 Bitmap bmp = null;
                 if (isVideoStatusUri(uriString)) {
-                    bmp = extractVideoFrameBitmap(ctx, uriString);
+                    bmp = extractVideoFrameBitmap(appCtx, uriString);
                 } else if (uriString.startsWith("data:image") || (uriString.length() > 500 && !uriString.contains("://"))) {
                     String base64Data = uriString.contains(",") ? uriString.substring(uriString.indexOf(",") + 1) : uriString;
                     byte[] decoded = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT);
@@ -5231,7 +5264,7 @@ public final class WhatsAppStatusUi {
                 } else {
                     Uri uri = Uri.parse(uriString);
                     if ("content".equalsIgnoreCase(uri.getScheme())) {
-                        try (InputStream is = ctx.getContentResolver().openInputStream(uri)) {
+                        try (InputStream is = appCtx.getContentResolver().openInputStream(uri)) {
                             BitmapFactory.Options opts = new BitmapFactory.Options();
                             opts.inSampleSize = 2;
                             bmp = BitmapFactory.decodeStream(is, null, opts);
@@ -5246,15 +5279,20 @@ public final class WhatsAppStatusUi {
                         }
                     }
                     if (bmp == null) {
-                        bmp = extractVideoFrameBitmap(ctx, uriString);
+                        bmp = extractVideoFrameBitmap(appCtx, uriString);
                     }
                 }
                 if (bmp != null) {
+                    STATUS_IMAGE_CACHE.put(cacheKey, bmp);
                     final Bitmap finalBmp = bmp;
-                    new Handler(Looper.getMainLooper()).post(() -> target.setImageBitmap(finalBmp));
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (cacheKey.equals(target.getTag())) {
+                            target.setImageBitmap(finalBmp);
+                        }
+                    });
                 }
             } catch (Exception ignored) {}
-        }).start();
+        });
     }
 
     public interface OnAudienceSelectedCallback {

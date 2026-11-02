@@ -183,7 +183,13 @@ public class VeilMeshDaemonService extends Service {
 
     private static void ensureInProcessEnginesInitializedInternal(Context ctx) {
         if (ctx == null) return;
-        String uid = AuthManager.getInstance().getCurrentUserId(ctx);
+        String uid = null;
+        try {
+            uid = com.m3.veil.manager.PersonaManager.getInstance(ctx).getActivePersonaPeerId();
+        } catch (Throwable ignored) {}
+        if (uid == null || uid.isEmpty()) {
+            uid = AuthManager.getInstance().getCurrentUserId(ctx);
+        }
         if (uid != null && !uid.isEmpty()) {
             try {
                 WebRtcManager.getInstance(ctx).init(uid);
@@ -724,7 +730,13 @@ public class VeilMeshDaemonService extends Service {
 
         meshExecutor.execute(() -> {
             try {
-                String myUid = AuthManager.getInstance().getCurrentUserId(getCtx());
+                String myUid = null;
+                try {
+                    myUid = com.m3.veil.manager.PersonaManager.getInstance(getCtx()).getActivePersonaPeerId();
+                } catch (Throwable ignored) {}
+                if (myUid == null || myUid.isEmpty()) {
+                    myUid = AuthManager.getInstance().getCurrentUserId(getCtx());
+                }
                 if (myUid != null && !myUid.isEmpty()) {
                     WebRtcManager rtc = WebRtcManager.getInstance(getCtx());
                     rtc.init(myUid);

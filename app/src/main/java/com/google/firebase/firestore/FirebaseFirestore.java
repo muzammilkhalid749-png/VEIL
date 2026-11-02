@@ -77,8 +77,8 @@ public class FirebaseFirestore {
     private static final FirebaseFirestore INSTANCE = new FirebaseFirestore();
 
     private final ExecutorService ioExecutor = new java.util.concurrent.ThreadPoolExecutor(
-            6, 12, 30L, TimeUnit.SECONDS,
-            new java.util.concurrent.LinkedBlockingQueue<>(1024),
+            2, 4, 30L, TimeUnit.SECONDS,
+            new java.util.concurrent.LinkedBlockingQueue<>(512),
             r -> {
                 Thread t = new Thread(r, "VeilFirestoreIO");
                 t.setDaemon(true);
@@ -86,15 +86,15 @@ public class FirebaseFirestore {
             },
             new java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy());
     private final ExecutorService writeExecutor = new java.util.concurrent.ThreadPoolExecutor(
-            4, 8, 30L, TimeUnit.SECONDS,
-            new java.util.concurrent.LinkedBlockingQueue<>(1024),
+            1, 2, 30L, TimeUnit.SECONDS,
+            new java.util.concurrent.LinkedBlockingQueue<>(512),
             r -> {
                 Thread t = new Thread(r, "VeilFirestoreWrite");
                 t.setDaemon(true);
                 return t;
             },
             new java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy());
-    private final ScheduledExecutorService pollExecutor = Executors.newScheduledThreadPool(2, r -> {
+    private final ScheduledExecutorService pollExecutor = Executors.newScheduledThreadPool(1, r -> {
         Thread t = new Thread(r, "VeilFirestorePoll");
         t.setDaemon(true);
         return t;
@@ -549,7 +549,7 @@ public class FirebaseFirestore {
             Map<String, Object> existingLocal = localStore.get(normPath);
             Long lastDocPoll = lastDocHttpPollMs.get(normPath);
             boolean skipDocHttp = (existingLocal != null && !existingLocal.isEmpty()
-                    && lastDocPoll != null && (nowMs - lastDocPoll) < 10_000L);
+                    && lastDocPoll != null && (nowMs - lastDocPoll) < 25_000L);
             if (!skipDocHttp && isFirestoreRestAvailable()) {
                 lastDocHttpPollMs.put(normPath, nowMs);
                 try {
@@ -717,12 +717,12 @@ public class FirebaseFirestore {
                     break;
                 }
             }
-            boolean skipRemoteHttp = (lastPoll != null && (nowMs - lastPoll) < 3_000L && hasCollectionDocsLocally);
+            boolean skipRemoteHttp = (lastPoll != null && (nowMs - lastPoll) < 18_000L && hasCollectionDocsLocally);
             boolean restSucceeded = false;
             if (!skipRemoteHttp && isFirestoreRestAvailable()) {
                 try {
                     boolean hasFilterOrSort = (filters != null && !filters.isEmpty()) || (orderByField != null && !orderByField.isEmpty());
-                    int pageSize = hasFilterOrSort ? 150 : ((limitCount > 0 && limitCount < 150) ? (int) limitCount : 150);
+                    int pageSize = hasFilterOrSort ? 80 : ((limitCount > 0 && limitCount < 80) ? (int) limitCount : 80);
                     String url = BASE_URL + "/" + normCollection + "?pageSize=" + pageSize;
                     Request req = new Request.Builder().url(url).get().build();
                     try (Response resp = httpClient.newCall(req).execute()) {
@@ -865,7 +865,7 @@ public class FirebaseFirestore {
                     }
                 });
             });
-        }, 2000, 15000, TimeUnit.MILLISECONDS);
+        }, 5000, 30000, TimeUnit.MILLISECONDS);
 
         return () -> {
             future.cancel(false);
@@ -954,7 +954,7 @@ public class FirebaseFirestore {
         ScheduledFuture<?> future = pollExecutor.scheduleWithFixedDelay(() -> {
             queryCollectionAsync(normCollection, filters, orderByField, orderDirection, limitCount)
                     .addOnSuccessListener(querySnap -> evaluateAndEmit.run());
-        }, 0, 8000, TimeUnit.MILLISECONDS);
+        }, 1000, 20000, TimeUnit.MILLISECONDS);
 
         return () -> {
             future.cancel(false);
@@ -1389,6 +1389,9 @@ public class FirebaseFirestore {
 
         String skHex = bytesToHex(seckey32);
         BigInteger d0 = new BigInteger(1, seckey32).mod(SECP_N.subtract(BigInteger.ONE)).add(BigInteger.ONE);
+        if (pubkeyPointCache.size() > 256) {
+            pubkeyPointCache.clear();
+        }
         BigInteger[] P_pt = pubkeyPointCache.computeIfAbsent(skHex, k -> pointMul(SECP_G, d0));
         BigInteger d = P_pt[1].testBit(0) ? SECP_N.subtract(d0) : d0;
         byte[] pkBytes = toBytes32(P_pt[0]);

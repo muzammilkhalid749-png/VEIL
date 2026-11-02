@@ -976,6 +976,9 @@ public class SovereignIdentityAndDirectoryEngine {
                     SovereignProfileManifest m = SovereignProfileManifest.fromJson(obj);
                     if (m != null && uid.equals(m.uid)) {
                         Log.i(TAG, "Successfully loaded surviving backup file from: " + file.getAbsolutePath());
+                        try {
+                            EncryptedChatDatabase.getInstance(mContext).saveSovereignProfileManifest(m);
+                        } catch (Throwable ignored) {}
                         return m;
                     }
                 }
@@ -2118,7 +2121,7 @@ public class SovereignIdentityAndDirectoryEngine {
                 String sigType = signalPayload.optString("type", "message");
                 long createdAt = System.currentTimeMillis() / 1000L;
 
-                byte[] seckey32 = com.google.firebase.firestore.FirebaseFirestore.sha256Bytes("veil_sig_v3:" + senderUid + ":" + System.nanoTime());
+                byte[] seckey32 = com.google.firebase.firestore.FirebaseFirestore.sha256Bytes("veil_sig_v3:" + senderUid);
                 List<String[]> tags = new ArrayList<>(5);
                 tags.add(new String[]{"t", signalTagForUid(recipientUid)});
                 tags.add(new String[]{"p", hexPubTagForUid(recipientUid)});

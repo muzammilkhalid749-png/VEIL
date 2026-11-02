@@ -114,6 +114,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     private String activeFilter = "all"; // "all", "unread", "groups", "vanish", "pinned", "secret"
     private String searchQuery = "";
     private boolean isSecretVaultUnlocked = false;
+    private java.util.Set<String> lastUnreadStatusAuthors = new java.util.HashSet<>();
 
     private final androidx.activity.result.ActivityResultLauncher<Intent> statusMediaLauncher =
             registerForActivityResult(
@@ -1426,7 +1427,7 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         com.m3.veil.ui.main.status.WhatsAppStatusUi.renderTray(
                 requireContext(), statusTilesContainer, statuses, statusActionListener, this::launchPhotoStatusPicker);
 
-        if (statusFeedContainer != null) {
+        if (statusFeedContainer != null && statusFeedScrollView != null && statusFeedScrollView.getVisibility() == View.VISIBLE) {
             com.m3.veil.ui.main.status.WhatsAppStatusUi.renderVerticalStatusList(
                     requireContext(), statusFeedContainer, statuses, statusActionListener,
                     this::launchPhotoStatusPicker, this::openStatusCreationChooser);
@@ -1440,8 +1441,11 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
         if (chipFilterStatus != null) {
             chipFilterStatus.setText(unread > 0 ? "🟢 Status (" + unread + ")" : "🟢 Status");
         }
-        if (chatsAdapter != null) {
-            chatsAdapter.notifyDataSetChanged();
+        if (!unreadAuthors.equals(lastUnreadStatusAuthors)) {
+            lastUnreadStatusAuthors = new java.util.HashSet<>(unreadAuthors);
+            if (chatsAdapter != null) {
+                chatsAdapter.notifyDataSetChanged();
+            }
         }
     }
 
@@ -1792,16 +1796,34 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                             changed = true;
                                             shouldSyncMessages = true;
                                         }
-                                        if (parts != null) {
+                                        if (parts != null && (existing.getParticipants() == null || !existing.getParticipants().equals(parts))) {
                                             existing.setParticipants(parts);
                                             changed = true;
                                         }
-                                        if (adminId != null) existing.setAdminId(adminId);
-                                        if (adminIds != null) existing.setAdminIds(adminIds);
-                                        if (description != null) existing.setDescription(description);
-                                        if (avatar != null) existing.setAvatar(avatar);
-                                        if (isPublicObj != null) existing.setPublic(isPublicObj);
-                                        if (handle != null) existing.setHandle(handle);
+                                        if (adminId != null && !adminId.equals(existing.getAdminId())) {
+                                            existing.setAdminId(adminId);
+                                            changed = true;
+                                        }
+                                        if (adminIds != null && (existing.getAdminIds() == null || !existing.getAdminIds().equals(adminIds))) {
+                                            existing.setAdminIds(adminIds);
+                                            changed = true;
+                                        }
+                                        if (description != null && !description.equals(existing.getDescription())) {
+                                            existing.setDescription(description);
+                                            changed = true;
+                                        }
+                                        if (avatar != null && !avatar.equals(existing.getAvatar())) {
+                                            existing.setAvatar(avatar);
+                                            changed = true;
+                                        }
+                                        if (isPublicObj != null && isPublicObj != existing.isPublic()) {
+                                            existing.setPublic(isPublicObj);
+                                            changed = true;
+                                        }
+                                        if (handle != null && !handle.equals(existing.getHandle())) {
+                                            existing.setHandle(handle);
+                                            changed = true;
+                                        }
                                         existing.setType(chatType);
                                         existing.setGroup(!isDirectChat);
                                         if (changed) {

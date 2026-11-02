@@ -235,7 +235,7 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                com.m3.veil.calling.CallEngine.getInstance(this.context).init(userId);
             } catch (Throwable ignored) {}
          });
-         VeilMeshDaemonService.start(this.context);
+         VeilMeshDaemonService.getInstance(this.context);
          this.syncAllPendingMessages();
       }
    }

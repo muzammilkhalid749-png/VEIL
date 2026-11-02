@@ -97,10 +97,38 @@ public class Query {
     }
 
     public ListenerRegistration addSnapshotListener(android.app.Activity activity, EventListener<QuerySnapshot> listener) {
-        return addSnapshotListener(listener);
+        if (activity != null && (activity.isFinishing() || activity.isDestroyed())) {
+            return () -> {};
+        }
+        final ListenerRegistration reg = addSnapshotListener(listener);
+        if (activity != null && activity.getApplication() != null) {
+            final android.app.Application app = activity.getApplication();
+            final android.app.Application.ActivityLifecycleCallbacks callbacks = new android.app.Application.ActivityLifecycleCallbacks() {
+                @Override public void onActivityCreated(android.app.Activity a, android.os.Bundle b) {}
+                @Override public void onActivityStarted(android.app.Activity a) {}
+                @Override public void onActivityResumed(android.app.Activity a) {}
+                @Override public void onActivityPaused(android.app.Activity a) {}
+                @Override public void onActivityStopped(android.app.Activity a) {}
+                @Override public void onActivitySaveInstanceState(android.app.Activity a, android.os.Bundle b) {}
+                @Override public void onActivityDestroyed(android.app.Activity a) {
+                    if (a == activity) {
+                        reg.remove();
+                        app.unregisterActivityLifecycleCallbacks(this);
+                    }
+                }
+            };
+            app.registerActivityLifecycleCallbacks(callbacks);
+            return () -> {
+                reg.remove();
+                try {
+                    app.unregisterActivityLifecycleCallbacks(callbacks);
+                } catch (Exception ignored) {}
+            };
+        }
+        return reg;
     }
 
     public ListenerRegistration addSnapshotListener(android.app.Activity activity, MetadataChanges metadata, EventListener<QuerySnapshot> listener) {
-        return addSnapshotListener(listener);
+        return addSnapshotListener(activity, listener);
     }
 }
