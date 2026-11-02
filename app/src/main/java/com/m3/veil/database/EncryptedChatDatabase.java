@@ -1758,8 +1758,12 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             if (username != null && !username.trim().isEmpty()) {
                 ed.putString("username_" + cleanId, username.trim());
             }
-            if (avatar != null && !avatar.trim().isEmpty()) {
-                ed.putString("avatar_" + cleanId, avatar.trim());
+            if (avatar != null) {
+                if (!avatar.trim().isEmpty()) {
+                    ed.putString("avatar_" + cleanId, avatar.trim());
+                } else {
+                    ed.remove("avatar_" + cleanId);
+                }
             }
             ed.apply();
 
@@ -1773,9 +1777,11 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             next.username = (username != null && !username.trim().isEmpty())
                     ? username.trim()
                     : (current != null && current.username != null ? current.username : "");
-            next.avatarBase64 = (avatar != null && !avatar.trim().isEmpty())
-                    ? avatar.trim()
-                    : (current != null && current.avatarBase64 != null ? current.avatarBase64 : "");
+            if (avatar != null) {
+                next.avatarBase64 = avatar.trim();
+            } else {
+                next.avatarBase64 = (current != null && current.avatarBase64 != null) ? current.avatarBase64 : "";
+            }
             next.updatedAtTimestamp = System.currentTimeMillis();
             saveSovereignProfileManifest(next);
         } catch (Exception ignored) {}
@@ -1828,6 +1834,56 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    public synchronized void clearPeerAvatarEverywhere(String peerId) {
+        if (peerId == null || peerId.trim().isEmpty()) return;
+        String cleanId = peerId.trim();
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences("VeilExplicitContacts", Context.MODE_PRIVATE);
+            if (prefs.contains("avatar_" + cleanId)) {
+                prefs.edit().remove("avatar_" + cleanId).apply();
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest m = manifestCache.get(cleanId);
+            if (m != null) {
+                m.avatarBase64 = "";
+                manifestCache.put(cleanId, m);
+            }
+            SQLiteDatabase db = getEncryptedDb();
+            ensureManifestTable(db);
+            ContentValues mCv = new ContentValues();
+            mCv.put(COL_SM_AVATAR_BASE64, "");
+            db.update(TABLE_SOVEREIGN_MANIFEST, mCv, COL_SM_UID + " = ?", new String[]{cleanId});
+
+            ContentValues gmCv = new ContentValues();
+            gmCv.put("avatar_uri", "");
+            db.update("group_members", gmCv, "user_id = ?", new String[]{cleanId});
+
+            String myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(this.context);
+            String directChatId = (myUid != null && !myUid.isEmpty()) ? generateDirectChatId(myUid, cleanId) : null;
+            for (Chat c : ramChatCache.values()) {
+                if (c != null && !c.isGroupChat()) {
+                    boolean match = cleanId.equals(c.getId())
+                            || (directChatId != null && directChatId.equals(c.getId()))
+                            || (c.getParticipants() != null && c.getParticipants().contains(cleanId) && c.getParticipants().size() <= 2);
+                    if (match && c.getAvatar() != null && !c.getAvatar().isEmpty()) {
+                        c.setAvatar("");
+                    }
+                }
+            }
+            ContentValues chatCv = new ContentValues();
+            chatCv.put(COL_CHAT_AVATAR, "");
+            if (directChatId != null) {
+                db.update(TABLE_CHATS, chatCv, COL_CHAT_IS_GROUP + " = 0 AND (" + COL_CHAT_ID + " = ? OR " + COL_CHAT_ID + " = ?)",
+                        new String[]{directChatId, cleanId});
+            } else {
+                db.update(TABLE_CHATS, chatCv, COL_CHAT_IS_GROUP + " = 0 AND " + COL_CHAT_ID + " = ?",
+                        new String[]{cleanId});
+            }
+        } catch (Exception ignored) {}
     }
 
     public String getExplicitContactName(String userId) {
@@ -4361,16 +4417,26 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         List<OutboxItem> list = new ArrayList<>();
         SQLiteDatabase db = getEncryptedDb();
         Cursor cursor = null;
+        int safeLimit = Math.max(1, Math.min(limit, 25));
+        long minTimestamp = System.currentTimeMillis() - 24 * 3600_000L;
         try {
-            cursor = db.rawQuery("SELECT * FROM " + TABLE_OUTBOX + " ORDER BY " + COL_OUTBOX_TIMESTAMP + " ASC LIMIT " + limit, null);
+            db.delete(TABLE_OUTBOX,
+                    COL_OUTBOX_RETRY_COUNT + " > 25 OR " + COL_OUTBOX_TIMESTAMP + " < ? OR length(" + COL_OUTBOX_PAYLOAD + ") > 2097152",
+                    new String[]{String.valueOf(minTimestamp)});
+        } catch (Exception ignored) {}
+        try {
+            cursor = db.rawQuery("SELECT * FROM " + TABLE_OUTBOX + " WHERE length(" + COL_OUTBOX_PAYLOAD + ") <= 2097152 ORDER BY " + COL_OUTBOX_TIMESTAMP + " ASC LIMIT " + safeLimit, null);
             if (cursor != null && cursor.moveToFirst()) {
                 do {
                     OutboxItem item = mapCursorToOutboxItem(cursor);
                     if (item != null) list.add(item);
                 } while (cursor.moveToNext());
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "Error fetching pending outbox items", e);
+            try {
+                db.delete(TABLE_OUTBOX, "length(" + COL_OUTBOX_PAYLOAD + ") > 524288", null);
+            } catch (Exception ignored) {}
         } finally {
             if (cursor != null) cursor.close();
         }

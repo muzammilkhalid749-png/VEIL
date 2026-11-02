@@ -885,8 +885,17 @@ public class ChatActivity extends AppCompatActivity {
         }
         recipientName = getIntent().getStringExtra("recipientName");
 
-        boolean intentIsGroup = getIntent().getBooleanExtra("isGroup", false)
-                || (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_")));
+        boolean hasStatusReplyIntent = getIntent().hasExtra("statusReplyText");
+        if (hasStatusReplyIntent && recipientId != null && !recipientId.isEmpty() && currentUserId != null && !currentUserId.isEmpty()) {
+            // Status reactions and replies are strictly 1:1 direct messages; never route them to a group/channel
+            if (chatId == null || chatId.isEmpty() || chatId.equals(recipientId)
+                    || chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_")) {
+                chatId = com.m3.veil.webrtc.WebRtcManager.getChatId(currentUserId, recipientId);
+            }
+        }
+
+        boolean intentIsGroup = !hasStatusReplyIntent && (getIntent().getBooleanExtra("isGroup", false)
+                || (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_") || chatId.startsWith("lounge_"))));
         if (intentIsGroup) {
             // Never allow a single 1:1 peer ID to contaminate a group/channel chat context
             recipientId = null;
@@ -894,7 +903,7 @@ public class ChatActivity extends AppCompatActivity {
             // Resolve missing recipient details from chatId if launched from notification or 1-on-1 chat
             recipientId = com.m3.veil.webrtc.WebRtcManager.extractPeerIdFromChatId(chatId, currentUserId);
         }
-        if (chatId == null && recipientId != null && currentUserId != null) {
+        if ((chatId == null || chatId.equals(recipientId)) && recipientId != null && currentUserId != null) {
             chatId = com.m3.veil.webrtc.WebRtcManager.getChatId(currentUserId, recipientId);
         }
         // Recipient display name lookup is deferred to post-Frame-1 startup below to keep onCreate 0ms
@@ -1020,10 +1029,22 @@ public class ChatActivity extends AppCompatActivity {
                                     }
                                 }
                                 String remoteAvatar = doc.getString("avatar");
-                                if (remoteAvatar != null && !remoteAvatar.isEmpty()) {
+                                if (remoteAvatar != null && !remoteAvatar.trim().isEmpty()) {
                                     com.m3.veil.utils.VeilAvatarLoader.cachePeerAvatarSource(ChatActivity.this, recipientId, remoteAvatar);
                                     if (currentLocalChat != null) {
                                         currentLocalChat.setAvatar(remoteAvatar);
+                                        if (com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).hasAnyMessagesInChat(chatId)) {
+                                            com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveOrUpdateChat(currentLocalChat);
+                                        }
+                                    }
+                                } else {
+                                    com.m3.veil.utils.VeilAvatarLoader.evictPeerAvatar(ChatActivity.this, recipientId);
+                                    if (cachedRecipientUser != null) {
+                                        cachedRecipientUser.setAvatar("");
+                                        cachedRecipientUser.setPhotoUrl("");
+                                    }
+                                    if (currentLocalChat != null && currentLocalChat.getAvatar() != null && !currentLocalChat.getAvatar().isEmpty()) {
+                                        currentLocalChat.setAvatar("");
                                         if (com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).hasAnyMessagesInChat(chatId)) {
                                             com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).saveOrUpdateChat(currentLocalChat);
                                         }
@@ -3014,10 +3035,20 @@ public class ChatActivity extends AppCompatActivity {
                 chatMetaUpdated = true;
             }
         }
-        if (user.getAvatar() != null && !user.getAvatar().isEmpty()) {
+        if (user.getAvatar() != null && !user.getAvatar().trim().isEmpty()) {
             com.m3.veil.utils.VeilAvatarLoader.cachePeerAvatarSource(this, recipientId, user.getAvatar());
             if (currentLocalChat != null && !user.getAvatar().equals(currentLocalChat.getAvatar())) {
                 currentLocalChat.setAvatar(user.getAvatar());
+                chatMetaUpdated = true;
+            }
+        } else {
+            com.m3.veil.utils.VeilAvatarLoader.evictPeerAvatar(this, recipientId);
+            if (cachedRecipientUser != null) {
+                cachedRecipientUser.setAvatar("");
+                cachedRecipientUser.setPhotoUrl("");
+            }
+            if (currentLocalChat != null && currentLocalChat.getAvatar() != null && !currentLocalChat.getAvatar().isEmpty()) {
+                currentLocalChat.setAvatar("");
                 chatMetaUpdated = true;
             }
         }

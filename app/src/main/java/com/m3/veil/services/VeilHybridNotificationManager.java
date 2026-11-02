@@ -320,14 +320,39 @@ public class VeilHybridNotificationManager {
                     : WebRtcManager.getChatId(myId, peerId));
         if (resolvedChatId == null || resolvedChatId.isEmpty()) return;
 
+        // 0. Reject already-read messages or stale historical messages (> 3 minutes old)
+        if (message.isRead()) {
+            return;
+        }
+        long msgTs = message.getTimestamp() != null ? message.getTimestamp().toDate().getTime() : System.currentTimeMillis();
+        long nowMs = System.currentTimeMillis();
+        if (msgTs > 0L && (nowMs - msgTs) > 180_000L) {
+            markMessageNotified(message.getId());
+            return;
+        }
+        long chatReadWatermark = getChatReadWatermark(resolvedChatId);
+        if (chatReadWatermark > 0L && msgTs <= chatReadWatermark) {
+            markMessageNotified(message.getId());
+            return;
+        }
+        try {
+            Message existingInDb = EncryptedChatDatabase.getInstance(mContext).getMessageById(message.getId());
+            if (existingInDb != null && existingInDb.isRead()) {
+                markMessageNotified(message.getId());
+                return;
+            }
+        } catch (Throwable ignored) {}
+
         // 1. Strict Cross-Transport Deduplication (prevents duplicate alerts from P2P + Firebase)
         if (!markMessageNotified(message.getId())) {
             return;
         }
+        updateChatNotifiedWatermark(resolvedChatId, msgTs);
 
         // 2. Check if this exact conversation is open in the foreground
         String activeForegroundChat = VeilMessagesController.getInstance(mContext).getActiveChatIdInForeground();
         if (resolvedChatId.equals(activeForegroundChat)) {
+            updateChatReadWatermark(resolvedChatId, Math.max(nowMs, msgTs));
             triggerInAppFeedbackIfEnabled();
             return;
         }
@@ -450,6 +475,26 @@ public class VeilHybridNotificationManager {
                 return;
             }
 
+            long pushTs = System.currentTimeMillis();
+            String tsStr = data.get("timestamp");
+            if (tsStr != null && !tsStr.isEmpty()) {
+                try {
+                    pushTs = Long.parseLong(tsStr.trim());
+                } catch (NumberFormatException ignored) {}
+            }
+            if ((System.currentTimeMillis() - pushTs) > 180_000L) {
+                markMessageNotified(msgId);
+                return;
+            }
+
+            try {
+                Message existing = EncryptedChatDatabase.getInstance(mContext).getMessageById(msgId);
+                if (existing != null) {
+                    markMessageNotified(msgId);
+                    return;
+                }
+            } catch (Throwable ignored) {}
+
             String decryptedPreview = "";
             if (encPreview != null && !encPreview.isEmpty()) {
                 try {
@@ -465,7 +510,7 @@ public class VeilHybridNotificationManager {
                     senderId != null ? senderId : "peer",
                     VeilMessagesController.getInstance(mContext).getCurrentUserId(),
                     decryptedPreview,
-                    com.google.firebase.Timestamp.now(),
+                    new com.google.firebase.Timestamp(new java.util.Date(pushTs)),
                     msgType != null ? msgType : "text");
             synthetic.setChatId(chatId);
             synthetic.setSenderName(senderName != null && !senderName.isEmpty() ? senderName : "Contact");
@@ -683,7 +728,17 @@ public class VeilHybridNotificationManager {
      */
     public void clearChatNotification(@Nullable String chatId) {
         if (chatId == null || chatId.isEmpty()) return;
-        mActiveChatHistory.remove(chatId);
+        updateChatReadWatermark(chatId, System.currentTimeMillis());
+        List<NotifMessageEntry> removed = mActiveChatHistory.remove(chatId);
+        if (removed != null) {
+            synchronized (removed) {
+                for (NotifMessageEntry entry : removed) {
+                    if (entry != null && entry.messageId != null) {
+                        markMessageNotified(entry.messageId);
+                    }
+                }
+            }
+        }
         if (mNotificationManager != null) {
             mNotificationManager.cancel(getNotificationIdForChat(chatId));
             if (mActiveChatHistory.isEmpty()) {
@@ -773,7 +828,7 @@ public class VeilHybridNotificationManager {
     private void persistRecentNotifiedIdsToPrefs() {
         try {
             List<String> snapshot = new ArrayList<>(mNotifiedMessageIds);
-            int start = Math.max(0, snapshot.size() - 120);
+            int start = Math.max(0, snapshot.size() - 1500);
             StringBuilder sb = new StringBuilder();
             for (int i = start; i < snapshot.size(); i++) {
                 if (sb.length() > 0) sb.append(',');
@@ -783,6 +838,35 @@ public class VeilHybridNotificationManager {
                     .edit()
                     .putString("recent_ids", sb.toString())
                     .apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private long getChatReadWatermark(@NonNull String chatId) {
+        try {
+            SharedPreferences prefs = mContext.getSharedPreferences("veil_hybrid_notif_dedup", Context.MODE_PRIVATE);
+            return prefs.getLong("read_wm_" + chatId, 0L);
+        } catch (Throwable ignored) {
+            return 0L;
+        }
+    }
+
+    private void updateChatReadWatermark(@NonNull String chatId, long tsMs) {
+        try {
+            SharedPreferences prefs = mContext.getSharedPreferences("veil_hybrid_notif_dedup", Context.MODE_PRIVATE);
+            long prev = prefs.getLong("read_wm_" + chatId, 0L);
+            if (tsMs > prev) {
+                prefs.edit().putLong("read_wm_" + chatId, tsMs).apply();
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void updateChatNotifiedWatermark(@NonNull String chatId, long tsMs) {
+        try {
+            SharedPreferences prefs = mContext.getSharedPreferences("veil_hybrid_notif_dedup", Context.MODE_PRIVATE);
+            long prev = prefs.getLong("notif_wm_" + chatId, 0L);
+            if (tsMs > prev) {
+                prefs.edit().putLong("notif_wm_" + chatId, tsMs).apply();
+            }
         } catch (Throwable ignored) {}
     }
 

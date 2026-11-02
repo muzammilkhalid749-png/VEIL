@@ -489,7 +489,7 @@ public class VeilDialogCell extends View {
     private void resolveStoryState(@NonNull Chat chat) {
         mHasActiveStory = false;
         mHasUnreadStory = false;
-        if (chat.isGroup() || "channel".equalsIgnoreCase(chat.getType())) return;
+        if (chat.isGroupChat() || chat.isChannel()) return;
         if (chat.isBlocked()) return;
         try {
             Context ctx = getContext();
@@ -556,6 +556,9 @@ public class VeilDialogCell extends View {
     }
 
     private String extractPeerId(@NonNull Chat chat) {
+        if (chat.isGroupChat() || chat.isChannel()) {
+            return null;
+        }
         if (chat.getParticipants() != null) {
             for (String p : chat.getParticipants()) {
                 if (p != null && !p.equals(mCurrentUserId)) return p;
@@ -668,7 +671,26 @@ public class VeilDialogCell extends View {
                     new com.m3.veil.ui.main.status.WhatsAppStatusUi.StatusActionListener() {
                         @Override
                         public void onReplyToStatus(com.m3.veil.manager.VeilFeatureManager.StatusUpdate status, String replyText) {
-                            performClick();
+                            if (status == null || status.authorId == null || status.authorId.trim().isEmpty()) {
+                                return;
+                            }
+                            String targetPeerId = status.authorId.trim();
+                            String myUid = mCurrentUserId != null && !mCurrentUserId.isEmpty()
+                                    ? mCurrentUserId
+                                    : com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(ctx);
+                            String directChatId = (myUid != null && !myUid.isEmpty())
+                                    ? com.m3.veil.webrtc.WebRtcManager.getChatId(myUid, targetPeerId)
+                                    : targetPeerId;
+                            android.content.Intent intent = new android.content.Intent(ctx, com.m3.veil.ui.chat.ChatActivity.class);
+                            intent.putExtra("chatId", directChatId);
+                            intent.putExtra("recipientId", targetPeerId);
+                            intent.putExtra("recipientName", status.authorName != null ? status.authorName : chatName);
+                            intent.putExtra("isGroup", false);
+                            intent.putExtra("statusReplyText", replyText);
+                            String quote = (status.contentText != null && !status.contentText.trim().isEmpty())
+                                    ? status.contentText.trim() : "📷 Status Photo";
+                            intent.putExtra("statusQuoteText", quote);
+                            ctx.startActivity(intent);
                         }
 
                         @Override
