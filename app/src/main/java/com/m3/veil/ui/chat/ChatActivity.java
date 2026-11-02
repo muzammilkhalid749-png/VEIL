@@ -5797,9 +5797,6 @@ public class ChatActivity extends AppCompatActivity {
 
         if (normalToolbar != null) normalToolbar.setVisibility(View.GONE);
         if (multiSelectBar != null) multiSelectBar.setVisibility(View.VISIBLE);
-        if (tvCount != null) {
-            tvCount.setText(String.valueOf(selectedCount));
-        }
 
         // Show Call Micro-Pill if in call, otherwise show User DP
         CallEngine engine = CallEngine.getInstance(this);
@@ -5807,6 +5804,14 @@ public class ChatActivity extends AppCompatActivity {
         CallInfo info = inCall ? engine.getCallInfo() : null;
         if (info == null || info.getState() == null || info.getState().isEnded()) {
             inCall = false;
+        }
+
+        if (tvCount != null) {
+            if (inCall) {
+                tvCount.setText(String.valueOf(selectedCount));
+            } else {
+                tvCount.setText(selectedCount == 1 ? "1 selected" : selectedCount + " selected");
+            }
         }
 
         if (inCall) {
@@ -5879,12 +5884,14 @@ public class ChatActivity extends AppCompatActivity {
                 R.id.floatingReactPray
         };
 
+        String reactorKey = com.m3.veil.manager.VeilFeatureManager.getInstance(this).isAnonymousReactionEnabled()
+                ? "anon_" + currentUserId.substring(0, Math.min(4, currentUserId.length()))
+                : currentUserId;
+        String userReaction = (message.getReactions() != null) ? message.getReactions().get(reactorKey) : null;
+
         View.OnClickListener emojiClick = v -> {
             if (!(v instanceof TextView)) return;
             String emoji = ((TextView) v).getText().toString();
-            String reactorKey = com.m3.veil.manager.VeilFeatureManager.getInstance(this).isAnonymousReactionEnabled()
-                    ? "anon_" + currentUserId.substring(0, Math.min(4, currentUserId.length()))
-                    : currentUserId;
             String existing = message.getReactions() != null ? message.getReactions().get(reactorKey) : null;
             String newEmoji = emoji.equals(existing) ? "" : emoji;
             com.m3.veil.manager.VeilMessagesController.getInstance(this)
@@ -5896,9 +5903,29 @@ public class ChatActivity extends AppCompatActivity {
             exitMultiSelectionMode();
         };
 
+        android.util.TypedValue rippleValue = new android.util.TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, rippleValue, true);
+        int defaultBgRes = rippleValue.resourceId;
+
         for (int id : reactIds) {
             View ev = popupView.findViewById(id);
-            if (ev != null) {
+            if (ev instanceof TextView) {
+                TextView tvEmoji = (TextView) ev;
+                String emoji = tvEmoji.getText().toString();
+                boolean isSelectedReaction = (userReaction != null && userReaction.equals(emoji));
+                if (isSelectedReaction) {
+                    ev.setBackgroundResource(R.drawable.bg_selected_reaction_highlight);
+                    ev.setScaleX(1.15f);
+                    ev.setScaleY(1.15f);
+                } else {
+                    if (defaultBgRes != 0) {
+                        ev.setBackgroundResource(defaultBgRes);
+                    } else {
+                        ev.setBackground(null);
+                    }
+                    ev.setScaleX(1.0f);
+                    ev.setScaleY(1.0f);
+                }
                 UiAnimator.attachSpringPress(ev);
                 ev.setOnClickListener(emojiClick);
             }
@@ -5969,7 +5996,8 @@ public class ChatActivity extends AppCompatActivity {
     private void showReactionDialog(Message message, View anchorView) {
         if (message == null || message.getId() == null || "deleted".equals(message.getType())
                 || "system".equals(message.getType()) || "date_header".equals(message.getType())
-                || "unread_divider".equals(message.getType())) {
+                || "unread_divider".equals(message.getType()) || "call".equals(message.getType())
+                || "action_vanish".equals(message.getType())) {
             return;
         }
         try {
@@ -9013,15 +9041,7 @@ public class ChatActivity extends AppCompatActivity {
                 }
                 currentVanishTimer = selectedTimer;
                 if (selectedTimer == 0) {
-                    currentVanishMode = "off";
-                    if (currentLocalChat != null) {
-                        currentLocalChat.setVanishTimer(0);
-                        currentLocalChat.setVanishMode("off");
-                    }
-                    com.m3.veil.manager.VeilMessagesController.getInstance(this)
-                            .setDialogVanishSettings(chatId, recipientId, 0, "off");
-                    updatePresenceAndToolbarStatus();
-                    insertLocalSystemMessage("You turned off disappearing messages. Tap to change.", "action_vanish");
+                    sendVanishSystemMessage(0, "off");
                     Toast.makeText(this, "Vanish timer turned Off", Toast.LENGTH_SHORT).show();
                 } else {
                     if ("off".equals(currentVanishMode) || currentVanishMode == null) {
@@ -9076,22 +9096,48 @@ public class ChatActivity extends AppCompatActivity {
         showVanishModePickerSubDialog(currentVanishTimer);
     }
 
+    private void sendVanishSystemMessage(long timer, String mode) {
+        if (chatId == null) return;
+        currentVanishTimer = timer;
+        currentVanishMode = mode;
+        if (currentLocalChat != null) {
+            currentLocalChat.setVanishTimer(timer);
+            currentLocalChat.setVanishMode(mode);
+        }
+        com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                .setDialogVanishSettings(chatId, recipientId, timer, mode);
+        updatePresenceAndToolbarStatus();
+
+        String dur = com.m3.veil.manager.VeilMessagesController.formatVanishDuration(timer);
+        String sysText = (timer <= 0 || "off".equalsIgnoreCase(mode))
+                ? "You turned off disappearing messages. Tap to change."
+                : "You changed the disappearing messages timer to " + dur + ". Tap to change.";
+
+        Message msg = new Message();
+        msg.setId("sys_" + System.currentTimeMillis() + "_" + java.util.UUID.randomUUID().toString().substring(0, 5));
+        msg.setChatId(chatId);
+        msg.setSenderId(currentUserId != null ? currentUserId : "system");
+        msg.setReceiverId(recipientId != null ? recipientId : "");
+        String myName = "You";
+        try {
+            myName = com.m3.veil.manager.VeilFeatureManager.getInstance(this).getActivePersona().getDisplayName();
+        } catch (Exception ignored) {}
+        msg.setSenderName(myName);
+        msg.setText(sysText);
+        msg.setType("action_vanish");
+        msg.setVanishTimer(timer);
+        msg.setVanishMode(mode);
+        msg.setTimestamp(com.google.firebase.Timestamp.now());
+
+        com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                .sendMessage(currentLocalChat, isGroupChatContext() ? null : recipientId, msg);
+    }
+
     private void commitVanishSettings(String modeLabel) {
         if (isChatBlocked) {
             return;
         }
-        if (currentLocalChat != null) {
-            currentLocalChat.setVanishTimer(currentVanishTimer);
-            currentLocalChat.setVanishMode(currentVanishMode);
-        }
-        com.m3.veil.manager.VeilMessagesController.getInstance(this)
-                .setDialogVanishSettings(chatId, recipientId, currentVanishTimer, currentVanishMode);
-        updatePresenceAndToolbarStatus();
-        String dur = com.m3.veil.manager.VeilMessagesController.formatVanishDuration(currentVanishTimer);
-        String sysText = (currentVanishTimer <= 0)
-                ? "You turned off disappearing messages. Tap to change."
-                : "You changed the disappearing messages timer to " + dur + ". Tap to change.";
-        insertLocalSystemMessage(sysText, "action_vanish");
+        sendVanishSystemMessage(currentVanishTimer, currentVanishMode);
         Toast.makeText(this, "Vanish set: " + modeLabel, Toast.LENGTH_SHORT).show();
     }
 
@@ -11864,6 +11910,17 @@ public class ChatActivity extends AppCompatActivity {
         View multiSelectBar = findViewById(R.id.multiSelectBar);
         boolean isMultiSelectActive = (multiSelectBar != null && multiSelectBar.getVisibility() == View.VISIBLE);
         if (isMultiSelectActive) {
+            TextView tvCount = findViewById(R.id.tvMultiSelectCount);
+            if (tvCount != null && messagesAdapter != null) {
+                int count = messagesAdapter.getSelectedCount();
+                if (count > 0) {
+                    if (inCall) {
+                        tvCount.setText(String.valueOf(count));
+                    } else {
+                        tvCount.setText(count == 1 ? "1 selected" : count + " selected");
+                    }
+                }
+            }
             if (inCall) {
                 if (multiSelectCallMicroPill != null) {
                     multiSelectCallMicroPill.setVisibility(View.VISIBLE);

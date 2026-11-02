@@ -456,7 +456,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     public void startSelection(Message initialMessage) {
         if (initialMessage == null || initialMessage.getId() == null) return;
         if ("system".equals(initialMessage.getType()) || "date_header".equals(initialMessage.getType())
-                || "unread_divider".equals(initialMessage.getType())) {
+                || "unread_divider".equals(initialMessage.getType()) || "call".equals(initialMessage.getType())) {
             return;
         }
         selectionMode = true;
@@ -469,7 +469,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     public void toggleSelection(Message message) {
         if (message == null || message.getId() == null) return;
         if ("system".equals(message.getType()) || "date_header".equals(message.getType())
-                || "unread_divider".equals(message.getType())) {
+                || "unread_divider".equals(message.getType()) || "call".equals(message.getType())) {
             return;
         }
         String id = message.getId();
@@ -500,7 +500,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     && !"system".equals(m.getType())
                     && !"date_header".equals(m.getType())
                     && !"unread_divider".equals(m.getType())
-                    && !"deleted".equals(m.getType())) {
+                    && !"deleted".equals(m.getType())
+                    && !"call".equals(m.getType())) {
                 selectedMessageIds.add(m.getId());
             }
         }
@@ -1219,7 +1220,8 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         String dateLabel = showDate ? formatDateHeader(message.getTimestamp()) : "";
 
         if (holder instanceof SystemMessageViewHolder) {
-            ((SystemMessageViewHolder) holder).bind(message, showDate, dateLabel, systemMessageClickListener);
+            boolean isMe = isSenderMe(message.getSenderId(), message);
+            ((SystemMessageViewHolder) holder).bind(message, showDate, dateLabel, systemMessageClickListener, isMe);
             return;
         }
 
@@ -1410,7 +1412,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             bubbleLayout = itemView.findViewById(R.id.llSystemMessageBubble);
         }
 
-        public void bind(Message message, boolean showDate, String dateLabel, OnSystemMessageClickListener listener) {
+        public void bind(Message message, boolean showDate, String dateLabel, OnSystemMessageClickListener listener, boolean isMe) {
             if (dateHeaderContainer != null && dateHeaderText != null) {
                 if (showDate && dateLabel != null && !dateLabel.isEmpty()) {
                     dateHeaderContainer.setVisibility(View.VISIBLE);
@@ -1421,7 +1423,26 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             }
             if (message == null) return;
             if (tvText != null) {
-                tvText.setText(message.getText());
+                if ("action_vanish".equalsIgnoreCase(message.getType())) {
+                    long vTimer = message.getVanishTimer();
+                    String vMode = message.getVanishMode();
+                    String dur = com.m3.veil.manager.VeilMessagesController.formatVanishDuration(vTimer);
+                    String senderName = message.getSenderName();
+                    if (senderName == null || senderName.trim().isEmpty()) {
+                        senderName = "Contact";
+                    }
+                    if (vTimer <= 0 || "off".equalsIgnoreCase(vMode)) {
+                        tvText.setText(isMe ? "You turned off disappearing messages. Tap to change."
+                                : senderName + " turned off disappearing messages. Tap to change.");
+                    } else if (vTimer > 0) {
+                        tvText.setText(isMe ? "You changed the disappearing messages timer to " + dur + ". Tap to change."
+                                : senderName + " changed the disappearing messages timer to " + dur + ". Tap to change.");
+                    } else {
+                        tvText.setText(message.getText());
+                    }
+                } else {
+                    tvText.setText(message.getText());
+                }
             }
             if (ivIcon != null) {
                 ivIcon.setVisibility(View.GONE);
@@ -2622,9 +2643,16 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             rootItemView.setTag(R.id.messageBubble, message);
         }
 
-        final boolean isSelected = isMessageSelected(message);
+        final boolean isSelectableType = message != null
+                && !"call".equals(message.getType())
+                && !"system".equals(message.getType())
+                && !"action_vanish".equals(message.getType())
+                && !"date_header".equals(message.getType())
+                && !"unread_divider".equals(message.getType());
+
+        final boolean isSelected = isSelectableType && isMessageSelected(message);
         if (bubbleView instanceof com.m3.veil.ui.views.ChatMessageCell) {
-            ((com.m3.veil.ui.views.ChatMessageCell) bubbleView).setSelectionState(selectionMode, isSelected);
+            ((com.m3.veil.ui.views.ChatMessageCell) bubbleView).setSelectionState(selectionMode && isSelectableType, isSelected);
         }
 
         View.OnLongClickListener unifiedLongClick = v -> {
@@ -2633,6 +2661,11 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     : (rootItemView != null ? rootItemView.getTag(R.id.messageBubble) : message);
             if (!(tagObj instanceof Message)) return false;
             Message boundMsg = (Message) tagObj;
+            if ("call".equals(boundMsg.getType()) || "system".equals(boundMsg.getType())
+                    || "action_vanish".equals(boundMsg.getType())
+                    || "date_header".equals(boundMsg.getType()) || "unread_divider".equals(boundMsg.getType())) {
+                return false;
+            }
             if (selectionMode) {
                 toggleSelection(boundMsg);
                 return true;
@@ -2650,6 +2683,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     ? bubbleView.getTag(R.id.messageBubble)
                     : (rootItemView != null ? rootItemView.getTag(R.id.messageBubble) : message);
             if (tagObj instanceof Message) {
+                Message boundMsg = (Message) tagObj;
+                if ("call".equals(boundMsg.getType()) || "system".equals(boundMsg.getType())
+                        || "action_vanish".equals(boundMsg.getType())
+                        || "date_header".equals(boundMsg.getType()) || "unread_divider".equals(boundMsg.getType())) {
+                    return;
+                }
                 try {
                     v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
                 } catch (Exception ignored) {
@@ -2659,18 +2698,18 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         };
 
         if (bubbleView != null) {
-            bubbleView.setLongClickable(true);
-            bubbleView.setOnLongClickListener(unifiedLongClick);
-            bubbleView.setOnClickListener(selectionMode ? selectionClick : null);
-            if (!selectionMode) {
+            bubbleView.setLongClickable(isSelectableType);
+            bubbleView.setOnLongClickListener(isSelectableType ? unifiedLongClick : null);
+            bubbleView.setOnClickListener((selectionMode && isSelectableType) ? selectionClick : null);
+            if (!selectionMode || !isSelectableType) {
                 bubbleView.setClickable(false);
             }
         }
         if (rootItemView != null) {
-            rootItemView.setLongClickable(true);
-            rootItemView.setOnLongClickListener(unifiedLongClick);
-            rootItemView.setOnClickListener(selectionMode ? selectionClick : null);
-            if (!selectionMode) {
+            rootItemView.setLongClickable(isSelectableType);
+            rootItemView.setOnLongClickListener(isSelectableType ? unifiedLongClick : null);
+            rootItemView.setOnClickListener((selectionMode && isSelectableType) ? selectionClick : null);
+            if (!selectionMode || !isSelectableType) {
                 rootItemView.setClickable(false);
                 rootItemView.setBackground(null);
             } else {
@@ -2746,10 +2785,12 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             for (View extra : extraViews) {
                 if (extra == null) continue;
                 extra.setTag(R.id.messageBubble, message);
-                extra.setLongClickable(true);
-                extra.setOnLongClickListener(unifiedLongClick);
-                if (selectionMode) {
+                extra.setLongClickable(isSelectableType);
+                extra.setOnLongClickListener(isSelectableType ? unifiedLongClick : null);
+                if (selectionMode && isSelectableType) {
                     extra.setOnClickListener(selectionClick);
+                } else if (!isSelectableType) {
+                    extra.setClickable(false);
                 }
             }
         }

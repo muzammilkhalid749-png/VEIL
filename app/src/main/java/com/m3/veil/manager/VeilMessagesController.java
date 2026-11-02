@@ -1054,19 +1054,21 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             long lamport = nextLamportClock();
             int seq = nextDialogSeq(dialogId);
 
-            long vanishTimer = message.getVanishTimer();
-            if (vanishTimer <= 0 && resolvedChatRef != null && resolvedChatRef.getVanishTimer() > 0) {
-                vanishTimer = resolvedChatRef.getVanishTimer();
-                message.setVanishTimer(vanishTimer);
-            }
-            String vanishMode = message.getVanishMode();
-            if (vanishMode == null && resolvedChatRef != null && resolvedChatRef.getVanishMode() != null) {
-                vanishMode = resolvedChatRef.getVanishMode();
-                message.setVanishMode(vanishMode);
-            }
-            if (vanishTimer > 0 && "after_send".equals(vanishMode) && message.getExpiresAt() == null) {
-                long expiresAt = System.currentTimeMillis() + vanishTimer;
-                message.setExpiresAt(new Timestamp(new Date(expiresAt)));
+            if (!"action_vanish".equals(message.getType()) && !"system".equals(message.getType()) && !"system_block".equals(message.getType())) {
+                long vanishTimer = message.getVanishTimer();
+                if (vanishTimer <= 0 && resolvedChatRef != null && resolvedChatRef.getVanishTimer() > 0) {
+                    vanishTimer = resolvedChatRef.getVanishTimer();
+                    message.setVanishTimer(vanishTimer);
+                }
+                String vanishMode = message.getVanishMode();
+                if (vanishMode == null && resolvedChatRef != null && resolvedChatRef.getVanishMode() != null) {
+                    vanishMode = resolvedChatRef.getVanishMode();
+                    message.setVanishMode(vanishMode);
+                }
+                if (vanishTimer > 0 && "after_send".equals(vanishMode) && message.getExpiresAt() == null) {
+                    long expiresAt = System.currentTimeMillis() + vanishTimer;
+                    message.setExpiresAt(new Timestamp(new Date(expiresAt)));
+                }
             }
 
             File localFile = (message.getLocalFilePath() != null && !message.getLocalFilePath().isEmpty())
@@ -1354,7 +1356,7 @@ public class VeilMessagesController implements WebRtcManager.P2PEventListener {
             updateDialogLastMessage(dialogId, msg);
 
             // Register vanish task if expiresAt is set
-            if (msg.getExpiresAt() != null && msg.getExpiresAt().toDate().getTime() > 0) {
+            if (msg.getExpiresAt() != null && msg.getExpiresAt().toDate().getTime() > 0 && !"action_vanish".equals(msg.getType()) && !"system".equals(msg.getType())) {
                 long expireAt = msg.getExpiresAt().toDate().getTime();
                 long duration = msg.getVanishTimer() > 0 ? msg.getVanishTimer() : 60000;
                 mActiveVanishTasks.put(msg.getId(), new VanishEntry(

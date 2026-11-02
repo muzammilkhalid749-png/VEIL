@@ -1584,7 +1584,14 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             String msgVanishMode = p.optString("vanishMode", existingChat != null ? existingChat.getVanishMode() : "after_send");
             message.setVanishTimer(msgVanishTimer);
             message.setVanishMode(msgVanishMode);
-            if ("after_send".equals(msgVanishMode) && msgVanishTimer > 0L) {
+            if ("action_vanish".equalsIgnoreCase(msgType) || "system".equalsIgnoreCase(msgType)) {
+               message.setExpiresAt((Timestamp)null);
+               if ("action_vanish".equalsIgnoreCase(msgType) && existingChat != null) {
+                  existingChat.setVanishTimer(msgVanishTimer);
+                  existingChat.setVanishMode(msgVanishMode);
+                  targetDb.saveOrUpdateChat(existingChat);
+               }
+            } else if ("after_send".equals(msgVanishMode) && msgVanishTimer > 0L) {
                if (expiresAt > 0L) {
                   message.setExpiresAt(new Timestamp(new Date(expiresAt)));
                } else {
@@ -3017,7 +3024,8 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                   }
 
                   String type = msg.getType();
-                  if (!"text".equals(type) && !"location".equals(type) && !"contact".equals(type) && !"poll".equals(type)) {
+                  if (!"text".equals(type) && !"location".equals(type) && !"contact".equals(type) && !"poll".equals(type)
+                          && !"action_vanish".equals(type) && !"system".equals(type) && !"system_block".equals(type)) {
                      if (msg.getLocalFilePath() != null) {
                         File file = new File(msg.getLocalFilePath());
                         if (file.exists()) {
@@ -3051,6 +3059,8 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                      p.put("voiceFilter", msg.getVoiceFilter());
                      p.put("pollJson", msg.getPollJson());
                      p.put("expiresAt", msg.getExpiresAt() != null ? msg.getExpiresAt().toDate().getTime() : 0L);
+                     p.put("vanishTimer", msg.getVanishTimer());
+                     p.put("vanishMode", msg.getVanishMode());
                      p.put("isGroup", isGrp);
                      if (resolvedChat != null) {
                         if (isGrp && resolvedChat.getName() != null) p.put("chatName", resolvedChat.getName());
