@@ -11,10 +11,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:scrollbars="none"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="6dp"
+        android:paddingStart="@dimen/_16sdp"
+        android:paddingEnd="@dimen/_16sdp"
+        android:paddingTop="@dimen/_8sdp"
+        android:paddingBottom="@dimen/_6sdp"
         android:clipToPadding="false"
         android:background="@color/colorBackground">
 
@@ -122,8 +122,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:paddingTop="8dp"
-                android:paddingBottom="96dp" />
+                android:paddingTop="@dimen/_8sdp"
+                android:paddingBottom="@dimen/_96sdp" />
 
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
@@ -135,13 +135,13 @@
             android:orientation="vertical"
             android:gravity="center"
             android:visibility="gone"
-            android:padding="32dp">
+            android:padding="@dimen/_32sdp">
 
             <ImageView
-                android:layout_width="72dp"
-                android:layout_height="72dp"
+                android:layout_width="@dimen/_72sdp"
+                android:layout_height="@dimen/_72sdp"
                 android:src="@drawable/ic_discover_empty"
-                android:layout_marginBottom="20dp"
+                android:layout_marginBottom="@dimen/_20sdp"
                 app:tint="@color/textSecondary"
                 android:contentDescription="@string/no_veils" />
 
@@ -150,18 +150,18 @@
                 android:layout_height="wrap_content"
                 android:text="@string/no_veils"
                 android:textColor="@color/textPrimary"
-                android:textSize="20sp"
+                android:textSize="@dimen/_20ssp"
                 android:fontFamily="sans-serif-medium"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="@dimen/_8sdp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/be_first_share"
                 android:textColor="@color/textSecondary"
-                android:textSize="14sp"
+                android:textSize="@dimen/_14ssp"
                 android:gravity="center"
-                android:lineSpacingExtra="2dp" />
+                android:lineSpacingExtra="@dimen/_2sdp" />
 
         </LinearLayout>
 
@@ -183,12 +183,12 @@
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
-        android:layout_marginEnd="20dp"
-        android:layout_marginBottom="96dp"
+        android:layout_marginEnd="@dimen/_20sdp"
+        android:layout_marginBottom="@dimen/_96sdp"
         android:src="@drawable/ic_edit"
         app:backgroundTint="@color/colorPrimary"
         app:tint="@android:color/white"
-        app:elevation="4dp"
+        app:elevation="@dimen/_4sdp"
         app:borderWidth="0dp"
         android:contentDescription="@string/create_veil"
         android:visibility="gone" />

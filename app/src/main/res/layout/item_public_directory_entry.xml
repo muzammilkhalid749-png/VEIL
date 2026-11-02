@@ -5,18 +5,18 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingStart="8dp"
-    android:paddingEnd="8dp"
-    android:paddingTop="10dp"
-    android:paddingBottom="10dp"
+    android:paddingStart="@dimen/_8sdp"
+    android:paddingEnd="@dimen/_8sdp"
+    android:paddingTop="@dimen/_10sdp"
+    android:paddingBottom="@dimen/_10sdp"
     android:background="?attr/selectableItemBackground">
 
     <de.hdodenhof.circleimageview.CircleImageView
         android:id="@+id/ivDirAvatar"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
+        android:layout_width="@dimen/_48sdp"
+        android:layout_height="@dimen/_48sdp"
         android:src="@drawable/ic_channel"
-        app:civ_border_width="1dp"
+        app:civ_border_width="@dimen/_1sdp"
         app:civ_border_color="@color/colorOutline" />
 
     <LinearLayout
@@ -24,8 +24,8 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:layout_marginStart="12dp"
-        android:layout_marginEnd="12dp">
+        android:layout_marginStart="@dimen/_12sdp"
+        android:layout_marginEnd="@dimen/_12sdp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -40,7 +40,7 @@
                 android:layout_weight="1"
                 android:text="Channel Name"
                 android:textColor="@color/textPrimary"
-                android:textSize="15.5sp"
+                android:textSize="@dimen/_16ssp"
                 android:textStyle="bold"
                 android:singleLine="true"
                 android:ellipsize="end" />
@@ -50,13 +50,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_filter_chip"
-                android:paddingStart="6dp"
-                android:paddingEnd="6dp"
-                android:paddingTop="2dp"
-                android:paddingBottom="2dp"
+                android:paddingStart="@dimen/_6sdp"
+                android:paddingEnd="@dimen/_6sdp"
+                android:paddingTop="@dimen/_2sdp"
+                android:paddingBottom="@dimen/_2sdp"
                 android:text="Channel"
                 android:textColor="@color/colorPrimary"
-                android:textSize="10.5sp"
+                android:textSize="@dimen/_11ssp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -66,17 +66,17 @@
             android:layout_height="wrap_content"
             android:text="@channel_handle • 120 subscribers"
             android:textColor="@color/textSecondary"
-            android:textSize="12sp"
+            android:textSize="@dimen/_12ssp"
             android:singleLine="true" />
 
         <TextView
             android:id="@+id/tvDirDesc"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="@dimen/_2sdp"
             android:text="Channel description text..."
             android:textColor="@color/textSecondary"
-            android:textSize="12sp"
+            android:textSize="@dimen/_12ssp"
             android:maxLines="2"
             android:ellipsize="end" />
     </LinearLayout>
@@ -85,11 +85,11 @@
         android:id="@+id/btnDirJoin"
         style="@style/Widget.Material3.Button.TonalButton"
         android:layout_width="wrap_content"
-        android:layout_height="36dp"
+        android:layout_height="@dimen/_36sdp"
         android:text="Join"
-        android:textSize="12sp"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        app:cornerRadius="10dp" />
+        android:textSize="@dimen/_12ssp"
+        android:paddingStart="@dimen/_12sdp"
+        android:paddingEnd="@dimen/_12sdp"
+        app:cornerRadius="@dimen/_10sdp" />
 
 </LinearLayout>

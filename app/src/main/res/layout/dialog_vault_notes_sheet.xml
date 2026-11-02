@@ -5,41 +5,41 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="24dp"
-    android:paddingEnd="24dp"
-    android:paddingTop="14dp"
-    android:paddingBottom="28dp">
+    android:paddingStart="@dimen/_24sdp"
+    android:paddingEnd="@dimen/_24sdp"
+    android:paddingTop="@dimen/_14sdp"
+    android:paddingBottom="@dimen/_28sdp">
 
     <!-- Handle Bar -->
     <View
-        android:layout_width="36dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_36sdp"
+        android:layout_height="@dimen/_4sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="@dimen/_16sdp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Private Notes Vault"
         android:textColor="@color/textPrimary"
-        android:textSize="19sp"
+        android:textSize="@dimen/_19ssp"
         android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="4dp" />
+        android:layout_marginBottom="@dimen/_4sdp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Private notes stored securely on your device:"
         android:textColor="@color/textSecondary"
-        android:textSize="13sp"
-        android:layout_marginBottom="16dp" />
+        android:textSize="@dimen/_13ssp"
+        android:layout_marginBottom="@dimen/_16sdp" />
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:maxHeight="240dp"
-        android:layout_marginBottom="14dp">
+        android:maxHeight="@dimen/_240sdp"
+        android:layout_marginBottom="@dimen/_14sdp">
 
         <LinearLayout
             android:id="@+id/vaultNotesContainer"
@@ -52,40 +52,40 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginBottom="8dp">
+        android:layout_marginBottom="@dimen/_8sdp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnAddVaultNote"
             style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="@dimen/_48sdp"
             android:layout_weight="1"
-            android:layout_marginEnd="8dp"
+            android:layout_marginEnd="@dimen/_8sdp"
             android:text="Add Note"
             app:icon="@drawable/ic_add"
             app:iconGravity="textStart"
-            app:cornerRadius="12dp" />
+            app:cornerRadius="@dimen/_12sdp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnFutureCapsule"
             style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="@dimen/_48sdp"
             android:layout_weight="1"
             android:text="Future Capsule"
             app:icon="@drawable/ic_timer"
             app:iconGravity="textStart"
-            app:cornerRadius="12dp" />
+            app:cornerRadius="@dimen/_12sdp" />
     </LinearLayout>
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnExportVaultBackup"
         style="@style/Widget.Material3.Button"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="@dimen/_48sdp"
         android:text="Export Encrypted Vault Backup"
         app:icon="@drawable/ic_download"
         app:iconGravity="textStart"
-        app:cornerRadius="12dp" />
+        app:cornerRadius="@dimen/_12sdp" />
 
 </LinearLayout>

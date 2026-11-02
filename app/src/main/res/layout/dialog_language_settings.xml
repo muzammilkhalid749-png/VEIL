@@ -5,17 +5,17 @@
     android:layout_height="wrap_content"
     android:background="@drawable/bottom_sheet_background"
     android:orientation="vertical"
-    android:paddingStart="20dp"
-    android:paddingTop="12dp"
-    android:paddingEnd="20dp"
-    android:paddingBottom="28dp">
+    android:paddingStart="@dimen/_20sdp"
+    android:paddingTop="@dimen/_12sdp"
+    android:paddingEnd="@dimen/_20sdp"
+    android:paddingBottom="@dimen/_28sdp">
 
     <!-- Minimal Drag Handle -->
     <View
-        android:layout_width="36dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_36sdp"
+        android:layout_height="@dimen/_4sdp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="@dimen/_16sdp"
         android:background="@drawable/bg_persona_drag_handle" />
 
     <TextView
@@ -23,25 +23,25 @@
         android:layout_height="wrap_content"
         android:text="Choose Language"
         android:textColor="@color/textPrimary"
-        android:textSize="20sp"
+        android:textSize="@dimen/_20ssp"
         android:fontFamily="sans-serif-medium" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:layout_marginBottom="18dp"
+        android:layout_marginTop="@dimen/_3sdp"
+        android:layout_marginBottom="@dimen/_18sdp"
         android:text="Select your preferred application display language"
         android:textColor="@color/textSecondary"
-        android:textSize="13sp" />
+        android:textSize="@dimen/_13ssp" />
 
     <!-- Grouped Language Card -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="16dp"
+        app:cardCornerRadius="@dimen/_16sdp"
         app:cardElevation="0dp"
-        app:strokeWidth="1dp"
+        app:strokeWidth="@dimen/_1sdp"
         app:strokeColor="@color/colorOutline"
         app:cardBackgroundColor="@color/colorSurfaceContainerLow">
 
@@ -55,21 +55,21 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
-                android:paddingStart="16dp"
-                android:paddingTop="14dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="14dp"
+                android:paddingStart="@dimen/_16sdp"
+                android:paddingTop="@dimen/_14sdp"
+                android:paddingEnd="@dimen/_16sdp"
+                android:paddingBottom="@dimen/_14sdp"
                 android:text="English"
                 android:textColor="@color/textPrimary"
-                android:textSize="15sp"
+                android:textSize="@dimen/_15ssp"
                 android:fontFamily="sans-serif-medium"
                 app:buttonTint="@color/colorPrimary" />
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
+                android:layout_height="@dimen/_1sdp"
+                android:layout_marginStart="@dimen/_16sdp"
+                android:layout_marginEnd="@dimen/_16sdp"
                 android:background="@color/colorOutline" />
 
             <RadioButton
@@ -77,21 +77,21 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
-                android:paddingStart="16dp"
-                android:paddingTop="14dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="14dp"
+                android:paddingStart="@dimen/_16sdp"
+                android:paddingTop="@dimen/_14sdp"
+                android:paddingEnd="@dimen/_16sdp"
+                android:paddingBottom="@dimen/_14sdp"
                 android:text="Español (Spanish)"
                 android:textColor="@color/textPrimary"
-                android:textSize="15sp"
+                android:textSize="@dimen/_15ssp"
                 android:fontFamily="sans-serif-medium"
                 app:buttonTint="@color/colorPrimary" />
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
+                android:layout_height="@dimen/_1sdp"
+                android:layout_marginStart="@dimen/_16sdp"
+                android:layout_marginEnd="@dimen/_16sdp"
                 android:background="@color/colorOutline" />
 
             <RadioButton
@@ -99,21 +99,21 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
-                android:paddingStart="16dp"
-                android:paddingTop="14dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="14dp"
+                android:paddingStart="@dimen/_16sdp"
+                android:paddingTop="@dimen/_14sdp"
+                android:paddingEnd="@dimen/_16sdp"
+                android:paddingBottom="@dimen/_14sdp"
                 android:text="Français (French)"
                 android:textColor="@color/textPrimary"
-                android:textSize="15sp"
+                android:textSize="@dimen/_15ssp"
                 android:fontFamily="sans-serif-medium"
                 app:buttonTint="@color/colorPrimary" />
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
+                android:layout_height="@dimen/_1sdp"
+                android:layout_marginStart="@dimen/_16sdp"
+                android:layout_marginEnd="@dimen/_16sdp"
                 android:background="@color/colorOutline" />
 
             <RadioButton
@@ -121,21 +121,21 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
-                android:paddingStart="16dp"
-                android:paddingTop="14dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="14dp"
+                android:paddingStart="@dimen/_16sdp"
+                android:paddingTop="@dimen/_14sdp"
+                android:paddingEnd="@dimen/_16sdp"
+                android:paddingBottom="@dimen/_14sdp"
                 android:text="Deutsch (German)"
                 android:textColor="@color/textPrimary"
-                android:textSize="15sp"
+                android:textSize="@dimen/_15ssp"
                 android:fontFamily="sans-serif-medium"
                 app:buttonTint="@color/colorPrimary" />
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
+                android:layout_height="@dimen/_1sdp"
+                android:layout_marginStart="@dimen/_16sdp"
+                android:layout_marginEnd="@dimen/_16sdp"
                 android:background="@color/colorOutline" />
 
             <RadioButton
@@ -143,21 +143,21 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
-                android:paddingStart="16dp"
-                android:paddingTop="14dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="14dp"
+                android:paddingStart="@dimen/_16sdp"
+                android:paddingTop="@dimen/_14sdp"
+                android:paddingEnd="@dimen/_16sdp"
+                android:paddingBottom="@dimen/_14sdp"
                 android:text="العربية (Arabic)"
                 android:textColor="@color/textPrimary"
-                android:textSize="15sp"
+                android:textSize="@dimen/_15ssp"
                 android:fontFamily="sans-serif-medium"
                 app:buttonTint="@color/colorPrimary" />
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
+                android:layout_height="@dimen/_1sdp"
+                android:layout_marginStart="@dimen/_16sdp"
+                android:layout_marginEnd="@dimen/_16sdp"
                 android:background="@color/colorOutline" />
 
             <RadioButton
@@ -165,13 +165,13 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="?attr/selectableItemBackground"
-                android:paddingStart="16dp"
-                android:paddingTop="14dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="14dp"
+                android:paddingStart="@dimen/_16sdp"
+                android:paddingTop="@dimen/_14sdp"
+                android:paddingEnd="@dimen/_16sdp"
+                android:paddingBottom="@dimen/_14sdp"
                 android:text="اردو (Urdu)"
                 android:textColor="@color/textPrimary"
-                android:textSize="15sp"
+                android:textSize="@dimen/_15ssp"
                 android:fontFamily="sans-serif-medium"
                 app:buttonTint="@color/colorPrimary" />
 

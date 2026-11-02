@@ -5,18 +5,18 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bg_bottom_sheet_modern"
-    android:paddingStart="20dp"
-    android:paddingEnd="20dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="24dp">
+    android:paddingStart="@dimen/_20sdp"
+    android:paddingEnd="@dimen/_20sdp"
+    android:paddingTop="@dimen/_12sdp"
+    android:paddingBottom="@dimen/_24sdp">
 
     <!-- Drag Handle Bar -->
     <View
-        android:layout_width="36dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_36sdp"
+        android:layout_height="@dimen/_4sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="@dimen/_16sdp" />
 
     <!-- Header Row -->
     <LinearLayout
@@ -24,17 +24,17 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="12dp">
+        android:layout_marginBottom="@dimen/_12sdp">
 
         <FrameLayout
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:layout_marginEnd="12dp"
+            android:layout_width="@dimen/_38sdp"
+            android:layout_height="@dimen/_38sdp"
+            android:layout_marginEnd="@dimen/_12sdp"
             android:background="@drawable/bg_status_quick_btn">
 
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="@dimen/_20sdp"
+                android:layout_height="@dimen/_20sdp"
                 android:layout_gravity="center"
                 android:src="@drawable/ic_visibility"
                 app:tint="@color/veil_accent" />
@@ -52,7 +52,7 @@
                 android:layout_height="wrap_content"
                 android:text="Viewed by 0"
                 android:textColor="@color/colorTextPrimary"
-                android:textSize="17sp"
+                android:textSize="@dimen/_17ssp"
                 android:fontFamily="sans-serif-medium"
                 android:textStyle="bold" />
 
@@ -60,33 +60,33 @@
                 android:id="@+id/tvStatusViewersSubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="@dimen/_2sdp"
                 android:text="0 contacts viewed this update"
                 android:textColor="@color/colorTextSecondary"
-                android:textSize="12.5sp" />
+                android:textSize="@dimen/_13ssp" />
         </LinearLayout>
 
         <ImageView
             android:id="@+id/btnShareStatusSheet"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="@dimen/_38sdp"
+            android:layout_height="@dimen/_38sdp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
-            android:padding="8dp"
+            android:padding="@dimen/_8sdp"
             android:src="@drawable/ic_share"
             app:tint="@color/colorTextSecondary"
             android:contentDescription="Share Status"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginEnd="@dimen/_4sdp" />
 
         <ImageView
             android:id="@+id/btnDeleteStatusSheet"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="@dimen/_38sdp"
+            android:layout_height="@dimen/_38sdp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:focusable="true"
-            android:padding="8dp"
+            android:padding="@dimen/_8sdp"
             android:src="@drawable/ic_delete"
             app:tint="#EF4444"
             android:contentDescription="Delete Status" />
@@ -94,15 +94,15 @@
 
     <View
         android:layout_width="match_parent"
-        android:layout_height="1dp"
+        android:layout_height="@dimen/_1sdp"
         android:background="@color/colorOutline"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="@dimen/_12sdp" />
 
     <!-- Viewers List Container inside ScrollView -->
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:maxHeight="320dp">
+        android:maxHeight="@dimen/_320sdp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -116,34 +116,34 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:paddingTop="28dp"
-                android:paddingBottom="28dp"
+                android:paddingTop="@dimen/_28sdp"
+                android:paddingBottom="@dimen/_28sdp"
                 android:visibility="gone">
 
                 <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="@dimen/_40sdp"
+                    android:layout_height="@dimen/_40sdp"
                     android:src="@drawable/ic_visibility"
                     app:tint="@color/colorTextSecondary"
                     android:alpha="0.6"
-                    android:layout_marginBottom="10dp" />
+                    android:layout_marginBottom="@dimen/_10sdp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="No views yet"
                     android:textColor="@color/colorTextPrimary"
-                    android:textSize="15.5sp"
+                    android:textSize="@dimen/_16ssp"
                     android:fontFamily="sans-serif-medium"
                     android:textStyle="bold"
-                    android:layout_marginBottom="4dp" />
+                    android:layout_marginBottom="@dimen/_4sdp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="When contacts view your status,\ntheir names and view times will appear here."
                     android:textColor="@color/colorTextSecondary"
-                    android:textSize="13sp"
+                    android:textSize="@dimen/_13ssp"
                     android:gravity="center" />
             </LinearLayout>
 

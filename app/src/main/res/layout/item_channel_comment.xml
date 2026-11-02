@@ -4,25 +4,25 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp">
+    android:paddingTop="@dimen/_8sdp"
+    android:paddingBottom="@dimen/_8sdp">
 
     <de.hdodenhof.circleimageview.CircleImageView
         android:id="@+id/ivCommentAvatar"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
+        android:layout_width="@dimen/_36sdp"
+        android:layout_height="@dimen/_36sdp"
         android:src="@drawable/ic_account"
         app:civ_border_color="@color/colorOutline"
-        app:civ_border_width="1dp" />
+        app:civ_border_width="@dimen/_1sdp" />
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
+        android:layout_marginStart="@dimen/_10sdp"
         android:layout_weight="1"
         android:background="@drawable/bg_message_received"
         android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="@dimen/_10sdp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -37,17 +37,17 @@
                 android:layout_weight="1"
                 android:text="Subscriber Name"
                 android:textColor="@color/colorPrimary"
-                android:textSize="13sp"
+                android:textSize="@dimen/_13ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvCommentTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="@dimen/_8sdp"
                 android:text="12:45"
                 android:textColor="@color/textSecondary"
-                android:textSize="11sp" />
+                android:textSize="@dimen/_11ssp" />
 
         </LinearLayout>
 
@@ -55,10 +55,10 @@
             android:id="@+id/tvCommentText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="@dimen/_3sdp"
             android:text="Comment text goes here..."
             android:textColor="@color/textPrimary"
-            android:textSize="13.5sp" />
+            android:textSize="@dimen/_14ssp" />
 
     </LinearLayout>
 

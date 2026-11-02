@@ -9,14 +9,14 @@
     <!-- Back Button -->
     <ImageView
         android:id="@+id/backButton"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="@dimen/_40sdp"
+        android:layout_height="@dimen/_40sdp"
         android:layout_gravity="top|start"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginStart="@dimen/_16sdp"
+        android:layout_marginTop="@dimen/_12sdp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/back"
-        android:padding="8dp"
+        android:padding="@dimen/_8sdp"
         android:src="@drawable/ic_arrow_back"
         android:visibility="gone"
         app:tint="@color/textPrimary" />
@@ -34,17 +34,17 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:gravity="center_horizontal"
-            android:maxWidth="440dp"
+            android:maxWidth="@dimen/_440sdp"
             android:orientation="vertical"
-            android:paddingHorizontal="24dp"
-            android:paddingTop="48dp"
-            android:paddingBottom="24dp">
+            android:paddingHorizontal="@dimen/_24sdp"
+            android:paddingTop="@dimen/_48sdp"
+            android:paddingBottom="@dimen/_24sdp">
 
             <!-- App Logo Header -->
             <ImageView
-                android:layout_width="72dp"
-                android:layout_height="72dp"
-                android:layout_marginBottom="16dp"
+                android:layout_width="@dimen/_72sdp"
+                android:layout_height="@dimen/_72sdp"
+                android:layout_marginBottom="@dimen/_16sdp"
                 android:contentDescription="@string/app_name"
                 android:scaleType="fitCenter"
                 android:src="@drawable/veil_logo" />
@@ -57,72 +57,72 @@
                 android:letterSpacing="0.01"
                 android:text="@string/welcome_to_veil"
                 android:textColor="@color/textPrimary"
-                android:textSize="24sp"
+                android:textSize="@dimen/_24ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:layout_marginBottom="28dp"
+                android:layout_marginTop="@dimen/_6sdp"
+                android:layout_marginBottom="@dimen/_28sdp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
                 android:text="@string/tagline"
                 android:textColor="@color/textSecondary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/_14ssp" />
 
             <!-- Phone Input Label -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
+                android:layout_marginBottom="@dimen/_8sdp"
                 android:fontFamily="sans-serif-medium"
                 android:text="@string/enter_phone_number"
                 android:textColor="@color/textPrimary"
-                android:textSize="14sp"
+                android:textSize="@dimen/_14ssp"
                 android:textStyle="bold" />
 
             <!-- Country Picker and Phone Input Container -->
             <LinearLayout
                 android:id="@+id/countryPickerContainer"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="@dimen/_56sdp"
                 android:background="@drawable/input_background"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="14dp">
+                android:paddingHorizontal="@dimen/_14sdp">
 
                 <TextView
                     android:id="@+id/flagEmoji"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginEnd="@dimen/_8sdp"
                     android:text="🇺🇸"
-                    android:textSize="18sp" />
+                    android:textSize="@dimen/_18ssp" />
 
                 <TextView
                     android:id="@+id/countryCodeText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="6dp"
+                    android:layout_marginEnd="@dimen/_6sdp"
                     android:fontFamily="sans-serif-medium"
                     android:text="+1"
                     android:textColor="@color/textPrimary"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/_15ssp"
                     android:textStyle="bold" />
 
                 <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
+                    android:layout_width="@dimen/_14sdp"
+                    android:layout_height="@dimen/_14sdp"
                     android:contentDescription="Select Country"
                     android:src="@drawable/ic_arrow_down"
                     app:tint="@color/textSecondary" />
 
                 <View
-                    android:layout_width="1dp"
-                    android:layout_height="22dp"
-                    android:layout_marginStart="12dp"
-                    android:layout_marginEnd="12dp"
+                    android:layout_width="@dimen/_1sdp"
+                    android:layout_height="@dimen/_22sdp"
+                    android:layout_marginStart="@dimen/_12sdp"
+                    android:layout_marginEnd="@dimen/_12sdp"
                     android:background="@color/colorOutline" />
 
                 <!-- Phone Number Edit -->
@@ -140,7 +140,7 @@
                     android:padding="0dp"
                     android:textColor="@color/textPrimary"
                     android:textColorHint="@color/textSecondary"
-                    android:textSize="15sp" />
+                    android:textSize="@dimen/_15ssp" />
 
             </LinearLayout>
 
@@ -148,29 +148,29 @@
                 android:id="@+id/exampleText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="@dimen/_6sdp"
                 android:text="Example: XXX-XXXXXXX"
                 android:textColor="@color/textSecondary"
-                android:textSize="12sp"
+                android:textSize="@dimen/_12ssp"
                 android:visibility="gone" />
 
             <!-- Terms Text -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="20dp"
+                android:layout_marginTop="@dimen/_16sdp"
+                android:layout_marginBottom="@dimen/_20sdp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
-                android:lineSpacingExtra="2dp"
+                android:lineSpacingExtra="@dimen/_2sdp"
                 android:text="@string/terms_agreement"
                 android:textColor="@color/textSecondary"
-                android:textSize="12sp" />
+                android:textSize="@dimen/_12ssp" />
 
             <!-- Primary Continue Button with Centered In-Button Spinner -->
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp">
+                android:layout_height="@dimen/_52sdp">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/continueButton"
@@ -181,15 +181,15 @@
                     android:text="@string/continue_text"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/_15ssp"
                     android:textStyle="bold"
                     app:backgroundTint="@color/colorPrimary"
-                    app:cornerRadius="14dp" />
+                    app:cornerRadius="@dimen/_14sdp" />
 
                 <ProgressBar
                     android:id="@+id/progressBar"
-                    android:layout_width="26dp"
-                    android:layout_height="26dp"
+                    android:layout_width="@dimen/_26sdp"
+                    android:layout_height="@dimen/_26sdp"
                     android:layout_gravity="center"
                     android:indeterminate="true"
                     android:indeterminateTint="@android:color/white"
@@ -200,29 +200,29 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginVertical="18dp"
+                android:layout_marginVertical="@dimen/_18sdp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <View
                     android:layout_width="0dp"
-                    android:layout_height="1dp"
+                    android:layout_height="@dimen/_1sdp"
                     android:layout_weight="1"
                     android:background="@color/colorOutline" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="12dp"
+                    android:layout_marginHorizontal="@dimen/_12sdp"
                     android:fontFamily="sans-serif-medium"
                     android:text="@string/or_text"
                     android:textColor="@color/textSecondary"
-                    android:textSize="12sp"
+                    android:textSize="@dimen/_12ssp"
                     android:textStyle="bold" />
 
                 <View
                     android:layout_width="0dp"
-                    android:layout_height="1dp"
+                    android:layout_height="@dimen/_1sdp"
                     android:layout_weight="1"
                     android:background="@color/colorOutline" />
             </LinearLayout>
@@ -230,7 +230,7 @@
             <!-- Anonymous Mode Join Button with Centered In-Button Spinner -->
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp">
+                android:layout_height="@dimen/_52sdp">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/anonymousJoinButton"
@@ -241,16 +241,16 @@
                     android:text="@string/join_anonymously"
                     android:textAllCaps="false"
                     android:textColor="@color/veil_accent"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/_15ssp"
                     android:textStyle="bold"
-                    app:cornerRadius="14dp"
+                    app:cornerRadius="@dimen/_14sdp"
                     app:strokeColor="@color/veil_accent"
-                    app:strokeWidth="1.5dp" />
+                    app:strokeWidth="@dimen/_2sdp" />
 
                 <ProgressBar
                     android:id="@+id/anonymousProgressBar"
-                    android:layout_width="26dp"
-                    android:layout_height="26dp"
+                    android:layout_width="@dimen/_26sdp"
+                    android:layout_height="@dimen/_26sdp"
                     android:layout_gravity="center"
                     android:indeterminate="true"
                     android:indeterminateTint="@color/veil_accent"
@@ -262,28 +262,28 @@
                 android:id="@+id/restoreAccountText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="@dimen/_14sdp"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
                 android:fontFamily="sans-serif-medium"
-                android:padding="8dp"
+                android:padding="@dimen/_8sdp"
                 android:text="Restore Anonymous Account"
                 android:textColor="@color/veil_accent"
-                android:textSize="13sp" />
+                android:textSize="@dimen/_13ssp" />
 
             <!-- Privacy Shield Badge -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="@dimen/_24sdp"
                 android:drawableStart="@drawable/ic_shield"
-                android:drawablePadding="6dp"
+                android:drawablePadding="@dimen/_6sdp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
                 android:text="@string/privacy_priority"
                 android:textColor="@color/veil_accent"
-                android:textSize="12sp"
+                android:textSize="@dimen/_12ssp"
                 app:drawableTint="@color/veil_accent" />
 
         </LinearLayout>

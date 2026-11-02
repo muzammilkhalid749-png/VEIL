@@ -5,27 +5,27 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="24dp"
-    android:paddingEnd="24dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="28dp">
+    android:paddingStart="@dimen/_24sdp"
+    android:paddingEnd="@dimen/_24sdp"
+    android:paddingTop="@dimen/_12sdp"
+    android:paddingBottom="@dimen/_28sdp">
 
     <!-- Modern Drag Handle -->
     <View
-        android:layout_width="36dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_36sdp"
+        android:layout_height="@dimen/_4sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="@dimen/_16sdp" />
         
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Your Personas"
         android:textColor="@color/textPrimary"
-        android:textSize="20sp"
+        android:textSize="@dimen/_20ssp"
         android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="4dp" />
+        android:layout_marginBottom="@dimen/_4sdp" />
 
     <TextView
         android:id="@+id/currentPersonaText"
@@ -33,25 +33,25 @@
         android:layout_height="wrap_content"
         android:text="Current: @username"
         android:textColor="@color/colorPrimary"
-        android:textSize="14sp"
-        android:layout_marginBottom="16dp" />
+        android:textSize="@dimen/_14ssp"
+        android:layout_marginBottom="@dimen/_16sdp" />
 
     <View
         android:layout_width="match_parent"
-        android:layout_height="1dp"
+        android:layout_height="@dimen/_1sdp"
         android:background="@color/colorOutline"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="@dimen/_12sdp" />
 
     <TextView
         android:id="@+id/actionCreatePersona"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="@dimen/_48sdp"
         android:gravity="center_vertical"
         android:text="Create New Persona"
         android:textColor="@color/colorPrimary"
-        android:textSize="15sp"
+        android:textSize="@dimen/_15ssp"
         android:fontFamily="sans-serif-medium"
-        android:drawablePadding="16dp"
+        android:drawablePadding="@dimen/_16sdp"
         app:drawableStartCompat="@drawable/ic_add"
         app:drawableTint="@color/colorPrimary"
         android:background="?attr/selectableItemBackground"

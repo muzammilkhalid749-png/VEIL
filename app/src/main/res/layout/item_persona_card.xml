@@ -4,32 +4,32 @@
     android:id="@+id/personaCardRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
+    android:layout_marginBottom="@dimen/_8sdp"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
     app:cardBackgroundColor="@color/colorSurfaceContainerLow"
-    app:cardCornerRadius="16dp"
+    app:cardCornerRadius="@dimen/_16sdp"
     app:cardElevation="0dp"
     app:strokeColor="@color/colorOutline"
-    app:strokeWidth="1dp">
+    app:strokeWidth="@dimen/_1sdp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="14dp"
-        android:paddingTop="12dp"
-        android:paddingEnd="14dp"
-        android:paddingBottom="12dp">
+        android:paddingStart="@dimen/_14sdp"
+        android:paddingTop="@dimen/_12sdp"
+        android:paddingEnd="@dimen/_14sdp"
+        android:paddingBottom="@dimen/_12sdp">
 
         <!-- Persona Monogram / Icon Badge -->
         <FrameLayout
             android:id="@+id/flPersonaAvatar"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:layout_marginEnd="12dp">
+            android:layout_width="@dimen/_42sdp"
+            android:layout_height="@dimen/_42sdp"
+            android:layout_marginEnd="@dimen/_12sdp">
 
             <View
                 android:id="@+id/vPersonaAvatarBg"
@@ -43,7 +43,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:textColor="@color/colorPrimary"
-                android:textSize="18sp"
+                android:textSize="@dimen/_18ssp"
                 android:fontFamily="sans-serif-medium" />
         </FrameLayout>
 
@@ -68,28 +68,28 @@
                     android:fontFamily="sans-serif-medium"
                     android:maxLines="1"
                     android:textColor="@color/textPrimary"
-                    android:textSize="15sp" />
+                    android:textSize="@dimen/_15ssp" />
 
                 <TextView
                     android:id="@+id/tvPersonaHandle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
+                    android:layout_marginStart="@dimen/_6sdp"
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:textColor="@color/textSecondary"
-                    android:textSize="13sp" />
+                    android:textSize="@dimen/_13ssp" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/tvPersonaSubtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="@dimen/_2sdp"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="@color/textTertiary"
-                android:textSize="12sp" />
+                android:textSize="@dimen/_12ssp" />
         </LinearLayout>
 
         <!-- Status / Action Pill -->
@@ -97,24 +97,24 @@
             android:id="@+id/flStatusContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp">
+            android:layout_marginStart="@dimen/_8sdp">
 
             <!-- Active Check Badge -->
             <LinearLayout
                 android:id="@+id/llActiveBadge"
                 android:layout_width="wrap_content"
-                android:layout_height="26dp"
+                android:layout_height="@dimen/_26sdp"
                 android:background="@drawable/bg_persona_active_pill"
                 android:gravity="center"
                 android:orientation="horizontal"
-                android:paddingStart="8dp"
-                android:paddingEnd="10dp"
+                android:paddingStart="@dimen/_8sdp"
+                android:paddingEnd="@dimen/_10sdp"
                 android:visibility="gone">
 
                 <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:layout_marginEnd="4dp"
+                    android:layout_width="@dimen/_14sdp"
+                    android:layout_height="@dimen/_14sdp"
+                    android:layout_marginEnd="@dimen/_4sdp"
                     android:src="@drawable/ic_check"
                     app:tint="@color/colorPrimary" />
 
@@ -124,25 +124,25 @@
                     android:fontFamily="sans-serif-medium"
                     android:text="Active"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/_11ssp" />
             </LinearLayout>
 
             <!-- Locked Pro Badge -->
             <LinearLayout
                 android:id="@+id/llLockedBadge"
                 android:layout_width="wrap_content"
-                android:layout_height="26dp"
+                android:layout_height="@dimen/_26sdp"
                 android:background="@drawable/bg_persona_locked_pill"
                 android:gravity="center"
                 android:orientation="horizontal"
-                android:paddingStart="8dp"
-                android:paddingEnd="10dp"
+                android:paddingStart="@dimen/_8sdp"
+                android:paddingEnd="@dimen/_10sdp"
                 android:visibility="gone">
 
                 <ImageView
-                    android:layout_width="12dp"
-                    android:layout_height="12dp"
-                    android:layout_marginEnd="4dp"
+                    android:layout_width="@dimen/_12sdp"
+                    android:layout_height="@dimen/_12sdp"
+                    android:layout_marginEnd="@dimen/_4sdp"
                     android:src="@drawable/ic_lock"
                     app:tint="@color/textSecondary" />
 
@@ -152,14 +152,14 @@
                     android:fontFamily="sans-serif-medium"
                     android:text="PRO"
                     android:textColor="@color/textSecondary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/_11ssp" />
             </LinearLayout>
 
             <!-- Inactive Subtle Radio Circle -->
             <View
                 android:id="@+id/vInactiveIndicator"
-                android:layout_width="18dp"
-                android:layout_height="18dp"
+                android:layout_width="@dimen/_18sdp"
+                android:layout_height="@dimen/_18sdp"
                 android:background="@drawable/bg_persona_inactive_dot"
                 android:visibility="gone" />
         </FrameLayout>
@@ -167,12 +167,12 @@
         <!-- Delete Action (Only for non-primary personas) -->
         <ImageButton
             android:id="@+id/btnDeletePersona"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_marginStart="6dp"
+            android:layout_width="@dimen/_32sdp"
+            android:layout_height="@dimen/_32sdp"
+            android:layout_marginStart="@dimen/_6sdp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Delete Persona"
-            android:padding="6dp"
+            android:padding="@dimen/_6sdp"
             android:src="@drawable/ic_delete"
             app:tint="@color/colorError"
             android:visibility="gone" />

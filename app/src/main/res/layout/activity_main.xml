@@ -23,7 +23,7 @@
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:paddingEnd="8dp">
+                android:paddingEnd="@dimen/_8sdp">
 
                 <!-- App Logo and Name -->
                 <LinearLayout
@@ -35,10 +35,10 @@
 
                     <ImageView
                         android:id="@+id/appLogo"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="@dimen/_32sdp"
+                        android:layout_height="@dimen/_32sdp"
                         android:src="@drawable/veil_logo_small"
-                        android:layout_marginEnd="10dp" />
+                        android:layout_marginEnd="@dimen/_10sdp" />
 
                     <TextView
                         android:id="@+id/toolbarTitle"
@@ -46,7 +46,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/app_name"
                         android:textColor="@color/textPrimary"
-                        android:textSize="20sp"
+                        android:textSize="@dimen/_20ssp"
                         android:fontFamily="sans-serif-medium"
                         android:letterSpacing="0.02" />
 
@@ -56,16 +56,16 @@
                 <LinearLayout
                     android:id="@+id/appBarCallMicroPill"
                     android:layout_width="wrap_content"
-                    android:layout_height="32dp"
+                    android:layout_height="@dimen/_32sdp"
                     android:layout_toEndOf="@id/layoutBrandHeader"
                     android:layout_toStartOf="@id/layoutActionIcons"
                     android:layout_centerVertical="true"
-                    android:layout_marginStart="8dp"
-                    android:layout_marginEnd="6dp"
+                    android:layout_marginStart="@dimen/_8sdp"
+                    android:layout_marginEnd="@dimen/_6sdp"
                     android:gravity="center_vertical"
                     android:background="@drawable/bg_appbar_call_micropill"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="12dp"
+                    android:paddingStart="@dimen/_10sdp"
+                    android:paddingEnd="@dimen/_12sdp"
                     android:clickable="true"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground"
@@ -73,10 +73,10 @@
 
                     <View
                         android:id="@+id/pillPulseDot"
-                        android:layout_width="8dp"
-                        android:layout_height="8dp"
+                        android:layout_width="@dimen/_8sdp"
+                        android:layout_height="@dimen/_8sdp"
                         android:background="@drawable/bg_green_pulse_dot"
-                        android:layout_marginEnd="6dp" />
+                        android:layout_marginEnd="@dimen/_6sdp" />
 
                     <TextView
                         android:id="@+id/tvCallPillText"
@@ -84,7 +84,7 @@
                         android:layout_height="wrap_content"
                         android:text="Ongoing (00:00)"
                         android:textColor="@color/colorPrimary"
-                        android:textSize="12.5sp"
+                        android:textSize="@dimen/_13ssp"
                         android:fontFamily="sans-serif-medium"
                         android:singleLine="true"
                         android:ellipsize="end" />
@@ -102,34 +102,34 @@
                     <!-- Search Icon -->
                     <ImageView
                         android:id="@+id/searchButton"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/_40sdp"
+                        android:layout_height="@dimen/_40sdp"
                         android:src="@drawable/ic_search"
                         app:tint="@color/textPrimary"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:padding="8dp"
-                        android:layout_marginEnd="4dp" />
+                        android:padding="@dimen/_8sdp"
+                        android:layout_marginEnd="@dimen/_4sdp" />
 
                     <!-- Primary Action (New Chat/Post/Call) -->
                     <ImageView
                         android:id="@+id/newChatButton"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/_40sdp"
+                        android:layout_height="@dimen/_40sdp"
                         android:src="@drawable/ic_add"
                         app:tint="@color/textPrimary"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:padding="8dp"
-                        android:layout_marginEnd="4dp" />
+                        android:padding="@dimen/_8sdp"
+                        android:layout_marginEnd="@dimen/_4sdp" />
 
                     <!-- More / Overflow Menu -->
                     <ImageView
                         android:id="@+id/moreButton"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/_40sdp"
+                        android:layout_height="@dimen/_40sdp"
                         android:src="@drawable/ic_more_vert"
                         app:tint="@color/textPrimary"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:padding="8dp" />
+                        android:padding="@dimen/_8sdp" />
 
                 </LinearLayout>
 
@@ -140,7 +140,7 @@
         <!-- Subtle Hairline Divider -->
         <View
             android:layout_width="match_parent"
-            android:layout_height="1dp"
+            android:layout_height="@dimen/_1sdp"
             android:background="@color/colorOutline" />
 
     </com.google.android.material.appbar.AppBarLayout>
@@ -164,23 +164,23 @@
         <!-- Subtle Hairline Top Border -->
         <View
             android:layout_width="match_parent"
-            android:layout_height="1dp"
+            android:layout_height="@dimen/_1sdp"
             android:background="@color/colorOutline" />
 
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigation"
             style="@style/Widget.Design.BottomNavigationView"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="@dimen/_56sdp"
             android:background="@color/colorSurface"
             app:menu="@menu/bottom_navigation_menu"
             app:itemIconTint="@drawable/bottom_nav_icon_colors"
             app:itemTextColor="@drawable/bottom_nav_text_colors"
             app:labelVisibilityMode="labeled"
             app:elevation="0dp"
-            app:itemIconSize="22dp"
-            app:itemPaddingTop="4dp"
-            app:itemPaddingBottom="4dp"
+            app:itemIconSize="@dimen/_22sdp"
+            app:itemPaddingTop="@dimen/_4sdp"
+            app:itemPaddingBottom="@dimen/_4sdp"
             app:itemActiveIndicatorStyle="@null"
             app:paddingBottomSystemWindowInsets="false"
             app:paddingLeftSystemWindowInsets="false"
@@ -194,16 +194,16 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_marginEnd="26dp"
-        android:layout_marginBottom="140dp"
+        android:layout_marginEnd="@dimen/_26sdp"
+        android:layout_marginBottom="@dimen/_140sdp"
         android:src="@drawable/ic_edit"
         android:contentDescription="Text Status"
         android:visibility="gone"
-        app:fabCustomSize="44dp"
-        app:maxImageSize="20dp"
+        app:fabCustomSize="@dimen/_44sdp"
+        app:maxImageSize="@dimen/_20sdp"
         app:backgroundTint="@color/colorSurfaceVariant"
         app:tint="@color/colorTextPrimary"
-        app:elevation="4dp"
+        app:elevation="@dimen/_4sdp"
         app:borderWidth="0dp" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -211,12 +211,12 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_marginEnd="20dp"
-        android:layout_marginBottom="72dp"
+        android:layout_marginEnd="@dimen/_20sdp"
+        android:layout_marginBottom="@dimen/_72sdp"
         android:src="@drawable/ic_edit"
         app:backgroundTint="@color/colorPrimary"
         app:tint="@android:color/white"
-        app:elevation="4dp"
+        app:elevation="@dimen/_4sdp"
         app:borderWidth="0dp" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

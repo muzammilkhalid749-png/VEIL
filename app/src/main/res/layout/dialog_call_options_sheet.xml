@@ -5,17 +5,17 @@
     android:layout_height="wrap_content"
     android:background="@drawable/bottom_sheet_background"
     android:orientation="vertical"
-    android:paddingStart="20dp"
-    android:paddingTop="12dp"
-    android:paddingEnd="20dp"
-    android:paddingBottom="28dp">
+    android:paddingStart="@dimen/_20sdp"
+    android:paddingTop="@dimen/_12sdp"
+    android:paddingEnd="@dimen/_20sdp"
+    android:paddingBottom="@dimen/_28sdp">
 
     <!-- Top Drag Handle -->
     <View
-        android:layout_width="36dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_36sdp"
+        android:layout_height="@dimen/_4sdp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="14dp"
+        android:layout_marginBottom="@dimen/_14sdp"
         android:background="@drawable/bg_persona_drag_handle" />
 
     <!-- Sheet Header -->
@@ -24,7 +24,7 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="@dimen/_16sdp">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -39,27 +39,27 @@
                 android:fontFamily="sans-serif-medium"
                 android:text="Call Options &amp; Security"
                 android:textColor="@color/textPrimary"
-                android:textSize="18sp"
+                android:textSize="@dimen/_18ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvCallOptionsSubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="@dimen/_2sdp"
                 android:text="End-to-End Encrypted P2P WebRTC Mesh"
                 android:textColor="@color/textSecondary"
-                android:textSize="12.5sp" />
+                android:textSize="@dimen/_13ssp" />
         </LinearLayout>
 
         <FrameLayout
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="@dimen/_36sdp"
+            android:layout_height="@dimen/_36sdp"
             android:background="@drawable/bg_filter_chip">
 
             <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
+                android:layout_width="@dimen/_18sdp"
+                android:layout_height="@dimen/_18sdp"
                 android:layout_gravity="center"
                 android:src="@drawable/ic_lock"
                 app:tint="@color/colorPrimary" />
@@ -72,9 +72,9 @@
         android:layout_height="wrap_content"
         android:text="SEND REACTION"
         android:textColor="@color/textSecondary"
-        android:textSize="11sp"
+        android:textSize="@dimen/_11ssp"
         android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="@dimen/_8sdp" />
 
     <LinearLayout
         android:id="@+id/sheetReactionsRow"
@@ -82,72 +82,72 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="@dimen/_16sdp">
 
         <TextView
             android:id="@+id/sheetRxHeart"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="@dimen/_44sdp"
             android:layout_weight="1"
             android:gravity="center"
             android:background="@drawable/bg_filter_chip"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="@dimen/_6sdp"
             android:text="❤️"
-            android:textSize="22sp" />
+            android:textSize="@dimen/_22ssp" />
 
         <TextView
             android:id="@+id/sheetRxFire"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="@dimen/_44sdp"
             android:layout_weight="1"
             android:gravity="center"
             android:background="@drawable/bg_filter_chip"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="@dimen/_6sdp"
             android:text="🔥"
-            android:textSize="22sp" />
+            android:textSize="@dimen/_22ssp" />
 
         <TextView
             android:id="@+id/sheetRxClap"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="@dimen/_44sdp"
             android:layout_weight="1"
             android:gravity="center"
             android:background="@drawable/bg_filter_chip"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="@dimen/_6sdp"
             android:text="👏"
-            android:textSize="22sp" />
+            android:textSize="@dimen/_22ssp" />
 
         <TextView
             android:id="@+id/sheetRxLaugh"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="@dimen/_44sdp"
             android:layout_weight="1"
             android:gravity="center"
             android:background="@drawable/bg_filter_chip"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="@dimen/_6sdp"
             android:text="😂"
-            android:textSize="22sp" />
+            android:textSize="@dimen/_22ssp" />
 
         <TextView
             android:id="@+id/sheetRxParty"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="@dimen/_44sdp"
             android:layout_weight="1"
             android:gravity="center"
             android:background="@drawable/bg_filter_chip"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="@dimen/_6sdp"
             android:text="🎉"
-            android:textSize="22sp" />
+            android:textSize="@dimen/_22ssp" />
 
         <TextView
             android:id="@+id/sheetRxThumbsUp"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="@dimen/_44sdp"
             android:layout_weight="1"
             android:gravity="center"
             android:background="@drawable/bg_filter_chip"
             android:text="👍"
-            android:textSize="22sp" />
+            android:textSize="@dimen/_22ssp" />
     </LinearLayout>
 
     <!-- SECTION 2: Audio Route Picker Card -->
@@ -156,43 +156,43 @@
         android:layout_height="wrap_content"
         android:text="AUDIO OUTPUT"
         android:textColor="@color/textSecondary"
-        android:textSize="11sp"
+        android:textSize="@dimen/_11ssp"
         android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="@dimen/_8sdp" />
 
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:cardBackgroundColor="@color/colorSurfaceVariant"
-        app:cardCornerRadius="16dp"
+        app:cardCornerRadius="@dimen/_16sdp"
         app:cardElevation="0dp"
         app:strokeColor="@color/colorOutline"
-        app:strokeWidth="1dp"
-        android:layout_marginBottom="16dp">
+        app:strokeWidth="@dimen/_1sdp"
+        android:layout_marginBottom="@dimen/_16sdp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="@dimen/_8sdp">
 
             <!-- Earpiece -->
             <LinearLayout
                 android:id="@+id/optRouteEarpiece"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="@dimen/_44sdp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingEnd="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackground">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="📱"
-                    android:textSize="16sp"
-                    android:layout_marginEnd="12dp" />
+                    android:textSize="@dimen/_16ssp"
+                    android:layout_marginEnd="@dimen/_12sdp" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -200,12 +200,12 @@
                     android:layout_weight="1"
                     android:text="Phone Earpiece"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/_14ssp" />
 
                 <ImageView
                     android:id="@+id/ivCheckEarpiece"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="@dimen/_18sdp"
+                    android:layout_height="@dimen/_18sdp"
                     android:src="@drawable/ic_check"
                     app:tint="@color/colorPrimary"
                     android:visibility="gone" />
@@ -215,19 +215,19 @@
             <LinearLayout
                 android:id="@+id/optRouteSpeaker"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="@dimen/_44sdp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingEnd="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackground">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="🔊"
-                    android:textSize="16sp"
-                    android:layout_marginEnd="12dp" />
+                    android:textSize="@dimen/_16ssp"
+                    android:layout_marginEnd="@dimen/_12sdp" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -235,12 +235,12 @@
                     android:layout_weight="1"
                     android:text="Speakerphone"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/_14ssp" />
 
                 <ImageView
                     android:id="@+id/ivCheckSpeaker"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="@dimen/_18sdp"
+                    android:layout_height="@dimen/_18sdp"
                     android:src="@drawable/ic_check"
                     app:tint="@color/colorPrimary"
                     android:visibility="visible" />
@@ -250,19 +250,19 @@
             <LinearLayout
                 android:id="@+id/optRouteBluetooth"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="@dimen/_44sdp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingEnd="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackground">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="🎧"
-                    android:textSize="16sp"
-                    android:layout_marginEnd="12dp" />
+                    android:textSize="@dimen/_16ssp"
+                    android:layout_marginEnd="@dimen/_12sdp" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -270,12 +270,12 @@
                     android:layout_weight="1"
                     android:text="Bluetooth Headset"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/_14ssp" />
 
                 <ImageView
                     android:id="@+id/ivCheckBluetooth"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="@dimen/_18sdp"
+                    android:layout_height="@dimen/_18sdp"
                     android:src="@drawable/ic_check"
                     app:tint="@color/colorPrimary"
                     android:visibility="gone" />
@@ -290,42 +290,42 @@
         android:layout_height="wrap_content"
         android:text="IN-CALL TOOLS &amp; CONTROLS"
         android:textColor="@color/textSecondary"
-        android:textSize="11sp"
+        android:textSize="@dimen/_11ssp"
         android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="@dimen/_8sdp" />
 
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:cardBackgroundColor="@color/colorSurfaceVariant"
-        app:cardCornerRadius="16dp"
+        app:cardCornerRadius="@dimen/_16sdp"
         app:cardElevation="0dp"
         app:strokeColor="@color/colorOutline"
-        app:strokeWidth="1dp">
+        app:strokeWidth="@dimen/_1sdp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="@dimen/_8sdp">
 
             <!-- In-Call Chat -->
             <LinearLayout
                 android:id="@+id/optInCallChat"
                 android:layout_width="match_parent"
-                android:layout_height="46dp"
+                android:layout_height="@dimen/_46sdp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingEnd="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackground">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="💬"
-                    android:textSize="16sp"
-                    android:layout_marginEnd="12dp" />
+                    android:textSize="@dimen/_16ssp"
+                    android:layout_marginEnd="@dimen/_12sdp" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -333,11 +333,11 @@
                     android:layout_weight="1"
                     android:text="Encrypted In-Call Chat"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/_14ssp" />
 
                 <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
+                    android:layout_width="@dimen/_16sdp"
+                    android:layout_height="@dimen/_16sdp"
                     android:src="@drawable/ic_arrow_forward"
                     app:tint="@color/textSecondary" />
             </LinearLayout>
@@ -346,19 +346,19 @@
             <LinearLayout
                 android:id="@+id/optParticipants"
                 android:layout_width="match_parent"
-                android:layout_height="46dp"
+                android:layout_height="@dimen/_46sdp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingEnd="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackground">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="👥"
-                    android:textSize="16sp"
-                    android:layout_marginEnd="12dp" />
+                    android:textSize="@dimen/_16ssp"
+                    android:layout_marginEnd="@dimen/_12sdp" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -366,11 +366,11 @@
                     android:layout_weight="1"
                     android:text="Participants &amp; Mesh Roster"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/_14ssp" />
 
                 <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
+                    android:layout_width="@dimen/_16sdp"
+                    android:layout_height="@dimen/_16sdp"
                     android:src="@drawable/ic_arrow_forward"
                     app:tint="@color/textSecondary" />
             </LinearLayout>
@@ -379,19 +379,19 @@
             <LinearLayout
                 android:id="@+id/optLowDataMode"
                 android:layout_width="match_parent"
-                android:layout_height="46dp"
+                android:layout_height="@dimen/_46sdp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingEnd="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackground">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="📶"
-                    android:textSize="16sp"
-                    android:layout_marginEnd="12dp" />
+                    android:textSize="@dimen/_16ssp"
+                    android:layout_marginEnd="@dimen/_12sdp" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -399,7 +399,7 @@
                     android:layout_weight="1"
                     android:text="Low-Data Mode (Bandwidth Saver)"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/_14ssp" />
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switchLowData"
@@ -411,19 +411,19 @@
             <LinearLayout
                 android:id="@+id/optVerifyE2ee"
                 android:layout_width="match_parent"
-                android:layout_height="46dp"
+                android:layout_height="@dimen/_46sdp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingEnd="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackground">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="🛡️"
-                    android:textSize="16sp"
-                    android:layout_marginEnd="12dp" />
+                    android:textSize="@dimen/_16ssp"
+                    android:layout_marginEnd="@dimen/_12sdp" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -431,11 +431,11 @@
                     android:layout_weight="1"
                     android:text="Verify E2EE Fingerprint (SAS)"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/_14ssp" />
 
                 <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
+                    android:layout_width="@dimen/_16sdp"
+                    android:layout_height="@dimen/_16sdp"
                     android:src="@drawable/ic_arrow_forward"
                     app:tint="@color/textSecondary" />
             </LinearLayout>

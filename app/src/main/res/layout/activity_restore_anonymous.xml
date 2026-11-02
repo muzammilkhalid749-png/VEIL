@@ -9,19 +9,19 @@
     <!-- Top Navigation Bar -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="@dimen/_56sdp"
         android:layout_gravity="top"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="12dp">
+        android:paddingHorizontal="@dimen/_12sdp">
 
         <ImageView
             android:id="@+id/backButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="@dimen/_40sdp"
+            android:layout_height="@dimen/_40sdp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/back"
-            android:padding="8dp"
+            android:padding="@dimen/_8sdp"
             android:src="@drawable/ic_arrow_back"
             app:tint="@color/colorTextPrimary" />
     </LinearLayout>
@@ -39,22 +39,22 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:gravity="center_horizontal"
-            android:maxWidth="440dp"
+            android:maxWidth="@dimen/_440sdp"
             android:orientation="vertical"
-            android:paddingHorizontal="24dp"
-            android:paddingTop="64dp"
-            android:paddingBottom="36dp">
+            android:paddingHorizontal="@dimen/_24sdp"
+            android:paddingTop="@dimen/_64sdp"
+            android:paddingBottom="@dimen/_36sdp">
 
             <!-- Circular Shield Icon Badge -->
             <FrameLayout
-                android:layout_width="68dp"
-                android:layout_height="68dp"
-                android:layout_marginBottom="18dp"
+                android:layout_width="@dimen/_68sdp"
+                android:layout_height="@dimen/_68sdp"
+                android:layout_marginBottom="@dimen/_18sdp"
                 android:background="@drawable/bg_restore_icon_circle">
 
                 <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
+                    android:layout_width="@dimen/_32sdp"
+                    android:layout_height="@dimen/_32sdp"
                     android:layout_gravity="center"
                     android:contentDescription="Restore Account"
                     android:src="@drawable/ic_shield_locked"
@@ -69,35 +69,35 @@
                 android:letterSpacing="0.01"
                 android:text="Restore Account"
                 android:textColor="@color/colorTextPrimary"
-                android:textSize="22sp"
+                android:textSize="@dimen/_22ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="26dp"
+                android:layout_marginTop="@dimen/_8sdp"
+                android:layout_marginBottom="@dimen/_26sdp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
-                android:lineSpacingExtra="2dp"
+                android:lineSpacingExtra="@dimen/_2sdp"
                 android:text="Enter your 12-word recovery phrase to decrypt and recover your sovereign account."
                 android:textColor="@color/colorTextSecondary"
-                android:textSize="13.5sp" />
+                android:textSize="@dimen/_14ssp" />
 
             <!-- Input Card -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
+                android:layout_marginBottom="@dimen/_24sdp"
                 android:background="@drawable/bg_phrase_card"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="@dimen/_16sdp">
 
                 <!-- Card Header: Title & Paste Button -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="@dimen/_12sdp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
@@ -109,25 +109,25 @@
                         android:letterSpacing="0.06"
                         android:text="SECRET RECOVERY PHRASE"
                         android:textColor="@color/colorTextSecondary"
-                        android:textSize="10.5sp"
+                        android:textSize="@dimen/_11ssp"
                         android:textStyle="bold" />
 
                     <!-- Paste Quick Action Pill -->
                     <LinearLayout
                         android:id="@+id/btnPastePhrase"
                         android:layout_width="wrap_content"
-                        android:layout_height="28dp"
+                        android:layout_height="@dimen/_28sdp"
                         android:background="@drawable/bg_paste_pill"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="10dp">
+                        android:paddingHorizontal="@dimen/_10sdp">
 
                         <ImageView
-                            android:layout_width="13dp"
-                            android:layout_height="13dp"
-                            android:layout_marginEnd="5dp"
+                            android:layout_width="@dimen/_13sdp"
+                            android:layout_height="@dimen/_13sdp"
+                            android:layout_marginEnd="@dimen/_5sdp"
                             android:src="@drawable/ic_copy"
                             app:tint="@color/veil_accent" />
 
@@ -137,7 +137,7 @@
                             android:fontFamily="sans-serif-medium"
                             android:text="Paste"
                             android:textColor="@color/veil_accent"
-                            android:textSize="11.5sp"
+                            android:textSize="@dimen/_12ssp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
@@ -152,18 +152,18 @@
                     android:gravity="top|start"
                     android:hint="apple banana cherry dragon..."
                     android:inputType="textMultiLine"
-                    android:lineSpacingExtra="5dp"
+                    android:lineSpacingExtra="@dimen/_5sdp"
                     android:minLines="3"
                     android:padding="0dp"
                     android:textColor="@color/colorTextPrimary"
                     android:textColorHint="@color/colorTextSecondary"
-                    android:textSize="15sp" />
+                    android:textSize="@dimen/_15ssp" />
 
                 <!-- Card Footer: Word Counter & Clear Button -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="@dimen/_12sdp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
@@ -175,15 +175,15 @@
                         android:fontFamily="sans-serif-medium"
                         android:text="0 / 12 words"
                         android:textColor="@color/colorTextSecondary"
-                        android:textSize="11.5sp" />
+                        android:textSize="@dimen/_12ssp" />
 
                     <ImageView
                         android:id="@+id/btnClearPhrase"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
+                        android:layout_width="@dimen/_28sdp"
+                        android:layout_height="@dimen/_28sdp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:contentDescription="Clear phrase"
-                        android:padding="6dp"
+                        android:padding="@dimen/_6sdp"
                         android:src="@drawable/ic_close"
                         android:visibility="gone"
                         app:tint="@color/colorTextSecondary" />
@@ -194,7 +194,7 @@
             <!-- Restore Action Button with Centered In-Button Spinner -->
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp">
+                android:layout_height="@dimen/_52sdp">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/restoreButton"
@@ -205,15 +205,15 @@
                     android:text="Restore Account"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/_15ssp"
                     android:textStyle="bold"
                     app:backgroundTint="@color/veil_accent"
-                    app:cornerRadius="16dp" />
+                    app:cornerRadius="@dimen/_16sdp" />
 
                 <ProgressBar
                     android:id="@+id/progressBar"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="@dimen/_24sdp"
+                    android:layout_height="@dimen/_24sdp"
                     android:layout_gravity="center"
                     android:indeterminate="true"
                     android:indeterminateTint="@android:color/white"
@@ -224,15 +224,15 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="22dp"
+                android:layout_marginTop="@dimen/_22sdp"
                 android:drawableStart="@drawable/ic_shield"
-                android:drawablePadding="6dp"
+                android:drawablePadding="@dimen/_6sdp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
-                android:lineSpacingExtra="2dp"
+                android:lineSpacingExtra="@dimen/_2sdp"
                 android:text="Offline derivation • Private keys never leave your device"
                 android:textColor="@color/colorTextSecondary"
-                android:textSize="11.5sp"
+                android:textSize="@dimen/_12ssp"
                 app:drawableTint="@color/colorTextSecondary" />
 
         </LinearLayout>

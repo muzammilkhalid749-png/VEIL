@@ -17,15 +17,15 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
-        android:padding="24dp">
+        android:padding="@dimen/_24sdp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="32dp"
+            android:layout_marginBottom="@dimen/_32sdp"
             android:text="Scan QR code on your computer screen"
             android:textColor="@android:color/white"
-            android:textSize="16sp"
+            android:textSize="@dimen/_16ssp"
             android:textStyle="bold"
             android:shadowColor="@android:color/black"
             android:shadowRadius="8" />
@@ -33,14 +33,14 @@
         <!-- Viewfinder Box (260dp x 260dp) -->
         <FrameLayout
             android:id="@+id/viewFinderBox"
-            android:layout_width="260dp"
-            android:layout_height="260dp"
+            android:layout_width="@dimen/_260sdp"
+            android:layout_height="@dimen/_260sdp"
             android:background="@drawable/bg_search_input">
 
             <!-- Center pulsing scanning indicator or target corners -->
             <View
                 android:layout_width="match_parent"
-                android:layout_height="2dp"
+                android:layout_height="@dimen/_2sdp"
                 android:layout_gravity="center"
                 android:background="#6366F1" />
         </FrameLayout>
@@ -48,19 +48,19 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="@dimen/_28sdp"
             android:text="Open VEIL Web &gt; Log in by QR Code"
             android:textColor="#A0AEC0"
-            android:textSize="13sp" />
+            android:textSize="@dimen/_13ssp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnCancelScan"
             android:layout_width="wrap_content"
-            android:layout_height="48dp"
-            android:layout_marginTop="32dp"
+            android:layout_height="@dimen/_48sdp"
+            android:layout_marginTop="@dimen/_32sdp"
             android:text="Cancel"
             android:textAllCaps="false"
-            app:cornerRadius="14dp"
+            app:cornerRadius="@dimen/_14sdp"
             android:backgroundTint="#2D3748"
             android:textColor="@android:color/white" />
     </LinearLayout>

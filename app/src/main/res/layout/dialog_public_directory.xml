@@ -5,25 +5,25 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="20dp"
-    android:paddingEnd="20dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="24dp">
+    android:paddingStart="@dimen/_20sdp"
+    android:paddingEnd="@dimen/_20sdp"
+    android:paddingTop="@dimen/_12sdp"
+    android:paddingBottom="@dimen/_24sdp">
 
     <!-- Handle Bar -->
     <View
-        android:layout_width="36dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_36sdp"
+        android:layout_height="@dimen/_4sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="@dimen/_16sdp" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="12dp">
+        android:layout_marginBottom="@dimen/_12sdp">
 
         <TextView
             android:layout_width="0dp"
@@ -31,13 +31,13 @@
             android:layout_weight="1"
             android:text="Public Groups &amp; Channels"
             android:textColor="@color/textPrimary"
-            android:textSize="19sp"
+            android:textSize="@dimen/_19ssp"
             android:fontFamily="sans-serif-medium" />
 
         <ProgressBar
             android:id="@+id/pbDirectoryLoading"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="@dimen/_24sdp"
+            android:layout_height="@dimen/_24sdp"
             android:visibility="gone" />
     </LinearLayout>
 
@@ -46,23 +46,23 @@
         android:layout_height="wrap_content"
         android:text="Explore public channels and community groups:"
         android:textColor="@color/textSecondary"
-        android:textSize="13sp"
-        android:layout_marginBottom="12dp" />
+        android:textSize="@dimen/_13ssp"
+        android:layout_marginBottom="@dimen/_12sdp" />
 
     <!-- Search Input -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="42dp"
+        android:layout_height="@dimen/_42sdp"
         android:background="@drawable/bg_chat_input"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:layout_marginBottom="12dp">
+        android:paddingStart="@dimen/_12sdp"
+        android:paddingEnd="@dimen/_12sdp"
+        android:layout_marginBottom="@dimen/_12sdp">
 
         <ImageView
-            android:layout_width="18dp"
-            android:layout_height="18dp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_search"
             app:tint="@color/textSecondary" />
 
@@ -70,12 +70,12 @@
             android:id="@+id/etSearchDirectory"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="@dimen/_8sdp"
             android:background="@null"
             android:hint="Search by channel name or @handle..."
             android:textColor="@color/textPrimary"
             android:textColorHint="@color/textSecondary"
-            android:textSize="13.5sp"
+            android:textSize="@dimen/_14ssp"
             android:singleLine="true" />
     </LinearLayout>
 
@@ -84,7 +84,7 @@
         android:id="@+id/chipGroupDirectoryType"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
+        android:layout_marginBottom="@dimen/_8sdp"
         app:singleSelection="true"
         app:selectionRequired="true">
 
@@ -114,15 +114,15 @@
     <!-- RecyclerView -->
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="400dp">
+        android:layout_height="@dimen/_400sdp">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvDirectory"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
-            android:paddingTop="4dp"
-            android:paddingBottom="16dp" />
+            android:paddingTop="@dimen/_4sdp"
+            android:paddingBottom="@dimen/_16sdp" />
 
         <LinearLayout
             android:id="@+id/emptyDirectoryState"
@@ -137,7 +137,7 @@
                 android:layout_height="wrap_content"
                 android:text="No public channels found"
                 android:textColor="@color/textSecondary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/_14ssp" />
         </LinearLayout>
     </FrameLayout>
 

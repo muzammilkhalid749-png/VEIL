@@ -4,10 +4,10 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:gravity="start"
-    android:paddingStart="16dp"
-    android:paddingEnd="64dp"
-    android:paddingTop="4dp"
-    android:paddingBottom="4dp"
+    android:paddingStart="@dimen/_16sdp"
+    android:paddingEnd="@dimen/_64sdp"
+    android:paddingTop="@dimen/_4sdp"
+    android:paddingBottom="@dimen/_4sdp"
     android:clipChildren="false"
     android:clipToPadding="false">
 
@@ -15,10 +15,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_message_received"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp"
+        android:paddingStart="@dimen/_16sdp"
+        android:paddingEnd="@dimen/_16sdp"
+        android:paddingTop="@dimen/_12sdp"
+        android:paddingBottom="@dimen/_12sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:clipChildren="false"
@@ -26,24 +26,24 @@
 
         <View
             android:id="@+id/dot1"
-            android:layout_width="6dp"
-            android:layout_height="6dp"
+            android:layout_width="@dimen/_6sdp"
+            android:layout_height="@dimen/_6sdp"
             android:background="@drawable/circle_background"
             android:backgroundTint="@color/message_text_secondary" />
 
         <View
             android:id="@+id/dot2"
-            android:layout_width="6dp"
-            android:layout_height="6dp"
-            android:layout_marginStart="4dp"
+            android:layout_width="@dimen/_6sdp"
+            android:layout_height="@dimen/_6sdp"
+            android:layout_marginStart="@dimen/_4sdp"
             android:background="@drawable/circle_background"
             android:backgroundTint="@color/message_text_secondary" />
 
         <View
             android:id="@+id/dot3"
-            android:layout_width="6dp"
-            android:layout_height="6dp"
-            android:layout_marginStart="4dp"
+            android:layout_width="@dimen/_6sdp"
+            android:layout_height="@dimen/_6sdp"
+            android:layout_marginStart="@dimen/_4sdp"
             android:background="@drawable/circle_background"
             android:backgroundTint="@color/message_text_secondary" />
 

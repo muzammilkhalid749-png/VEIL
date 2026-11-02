@@ -16,24 +16,24 @@
         android:clipChildren="false"
         android:clipToPadding="false"
         android:gravity="center"
-        android:maxWidth="440dp"
+        android:maxWidth="@dimen/_440sdp"
         android:orientation="vertical"
-        android:paddingHorizontal="28dp"
-        android:paddingVertical="12dp">
+        android:paddingHorizontal="@dimen/_28sdp"
+        android:paddingVertical="@dimen/_12sdp">
 
         <!-- Halo + Floating Micro-Pills Container -->
         <FrameLayout
-            android:layout_width="290dp"
-            android:layout_height="290dp"
-            android:layout_marginBottom="28dp"
+            android:layout_width="@dimen/_290sdp"
+            android:layout_height="@dimen/_290sdp"
+            android:layout_marginBottom="@dimen/_28sdp"
             android:clipChildren="false"
             android:clipToPadding="false">
 
             <!-- Concentric Halo & Main Vector Artwork -->
             <ImageView
                 android:id="@+id/onboardingImage"
-                android:layout_width="270dp"
-                android:layout_height="270dp"
+                android:layout_width="@dimen/_270sdp"
+                android:layout_height="@dimen/_270sdp"
                 android:layout_gravity="center"
                 android:contentDescription="Onboarding Illustration"
                 android:scaleType="fitCenter" />
@@ -44,13 +44,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="top|end"
-                android:layout_marginTop="56dp"
-                android:layout_marginEnd="8dp"
+                android:layout_marginTop="@dimen/_56sdp"
+                android:layout_marginEnd="@dimen/_8sdp"
                 app:cardBackgroundColor="@android:color/white"
-                app:cardCornerRadius="18dp"
-                app:cardElevation="6dp"
+                app:cardCornerRadius="@dimen/_18sdp"
+                app:cardElevation="@dimen/_6sdp"
                 app:strokeColor="#EEF2FA"
-                app:strokeWidth="1dp">
+                app:strokeWidth="@dimen/_1sdp">
 
                 <TextView
                     android:id="@+id/pillTopRightText"
@@ -58,11 +58,11 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="sans-serif-medium"
                     android:letterSpacing="0.01"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="6dp"
+                    android:paddingHorizontal="@dimen/_14sdp"
+                    android:paddingVertical="@dimen/_6sdp"
                     android:text="Encrypted"
                     android:textColor="#1F2433"
-                    android:textSize="12sp" />
+                    android:textSize="@dimen/_12ssp" />
             </com.google.android.material.card.MaterialCardView>
 
             <!-- Bottom-Left Floating Micro-Pill (Local Key on Slide 1) -->
@@ -71,13 +71,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|start"
-                android:layout_marginStart="6dp"
-                android:layout_marginBottom="78dp"
+                android:layout_marginStart="@dimen/_6sdp"
+                android:layout_marginBottom="@dimen/_78sdp"
                 app:cardBackgroundColor="@android:color/white"
-                app:cardCornerRadius="18dp"
-                app:cardElevation="6dp"
+                app:cardCornerRadius="@dimen/_18sdp"
+                app:cardElevation="@dimen/_6sdp"
                 app:strokeColor="#EEF2FA"
-                app:strokeWidth="1dp">
+                app:strokeWidth="@dimen/_1sdp">
 
                 <TextView
                     android:id="@+id/pillBottomLeftText"
@@ -85,11 +85,11 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="sans-serif-medium"
                     android:letterSpacing="0.01"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="6dp"
+                    android:paddingHorizontal="@dimen/_14sdp"
+                    android:paddingVertical="@dimen/_6sdp"
                     android:text="Local Key"
                     android:textColor="#1F2433"
-                    android:textSize="12sp" />
+                    android:textSize="@dimen/_12ssp" />
             </com.google.android.material.card.MaterialCardView>
 
         </FrameLayout>
@@ -99,14 +99,14 @@
             android:id="@+id/onboardingTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="14dp"
+            android:layout_marginBottom="@dimen/_14sdp"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
             android:letterSpacing="-0.01"
-            android:lineSpacingExtra="3dp"
+            android:lineSpacingExtra="@dimen/_3sdp"
             android:text="Private &amp; Secure\nMessaging"
             android:textColor="#161925"
-            android:textSize="26sp"
+            android:textSize="@dimen/_26ssp"
             android:textStyle="bold" />
 
         <!-- Description -->
@@ -116,11 +116,11 @@
             android:layout_height="wrap_content"
             android:fontFamily="sans-serif"
             android:gravity="center"
-            android:lineSpacingExtra="5dp"
-            android:paddingHorizontal="16dp"
+            android:lineSpacingExtra="@dimen/_5sdp"
+            android:paddingHorizontal="@dimen/_16sdp"
             android:text="All messages are fully encrypted on-device. Only you and your recipient hold the keys."
             android:textColor="#5A6175"
-            android:textSize="15sp" />
+            android:textSize="@dimen/_15ssp" />
 
     </LinearLayout>
 

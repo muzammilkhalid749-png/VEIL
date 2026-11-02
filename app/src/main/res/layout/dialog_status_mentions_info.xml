@@ -5,29 +5,29 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="24dp"
-    android:paddingEnd="24dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="24dp"
+    android:paddingStart="@dimen/_24sdp"
+    android:paddingEnd="@dimen/_24sdp"
+    android:paddingTop="@dimen/_12sdp"
+    android:paddingBottom="@dimen/_24sdp"
     android:gravity="center_horizontal">
 
     <!-- Drag Handle -->
     <View
-        android:layout_width="38dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_38sdp"
+        android:layout_height="@dimen/_4sdp"
         android:background="@drawable/bg_persona_drag_handle"
-        android:layout_marginBottom="20dp" />
+        android:layout_marginBottom="@dimen/_20sdp" />
 
     <!-- Center Hero Badge: Modern Tinted Container -->
     <FrameLayout
-        android:layout_width="64dp"
-        android:layout_height="64dp"
+        android:layout_width="@dimen/_64sdp"
+        android:layout_height="@dimen/_64sdp"
         android:background="@drawable/bg_filter_chip"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="@dimen/_16sdp">
 
         <ImageView
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="@dimen/_32sdp"
+            android:layout_height="@dimen/_32sdp"
             android:layout_gravity="center"
             android:src="@drawable/ic_mention"
             app:tint="@color/colorPrimary" />
@@ -39,37 +39,37 @@
         android:layout_height="wrap_content"
         android:text="Status Mentions"
         android:textColor="@color/textPrimary"
-        android:textSize="20sp"
+        android:textSize="@dimen/_20ssp"
         android:fontFamily="sans-serif-medium"
         android:gravity="center"
-        android:layout_marginBottom="6dp" />
+        android:layout_marginBottom="@dimen/_6sdp" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="When you mention people or groups in your status"
         android:textColor="@color/textSecondary"
-        android:textSize="13sp"
+        android:textSize="@dimen/_13ssp"
         android:gravity="center"
-        android:layout_marginBottom="20dp" />
+        android:layout_marginBottom="@dimen/_20sdp" />
 
     <!-- Modern Feature Card Container -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="16dp"
+        app:cardCornerRadius="@dimen/_16sdp"
         app:cardElevation="0dp"
-        app:strokeWidth="1dp"
+        app:strokeWidth="@dimen/_1sdp"
         app:strokeColor="@color/dividerColor"
         app:cardBackgroundColor="@color/colorSurfaceContainerLow"
-        android:layout_marginBottom="24dp">
+        android:layout_marginBottom="@dimen/_24sdp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="12dp">
+            android:paddingHorizontal="@dimen/_16sdp"
+            android:paddingVertical="@dimen/_12sdp">
 
             <!-- Feature 1: Private Notification -->
             <LinearLayout
@@ -77,16 +77,16 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingVertical="8dp">
+                android:paddingVertical="@dimen/_8sdp">
 
                 <FrameLayout
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
+                    android:layout_width="@dimen/_34sdp"
+                    android:layout_height="@dimen/_34sdp"
                     android:background="@drawable/bg_filter_chip">
 
                     <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
+                        android:layout_width="@dimen/_18sdp"
+                        android:layout_height="@dimen/_18sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_chat"
                         app:tint="@color/colorPrimary" />
@@ -96,7 +96,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="@dimen/_12sdp"
                     android:orientation="vertical">
 
                     <TextView
@@ -104,22 +104,22 @@
                         android:layout_height="wrap_content"
                         android:text="Private Notification"
                         android:textColor="@color/textPrimary"
-                        android:textSize="14sp"
+                        android:textSize="@dimen/_14ssp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="1dp"
+                        android:layout_marginTop="@dimen/_1sdp"
                         android:text="Tagged peers receive a direct message notify"
                         android:textColor="@color/textSecondary"
-                        android:textSize="12sp" />
+                        android:textSize="@dimen/_12ssp" />
                 </LinearLayout>
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:background="@color/dividerColor" />
 
             <!-- Feature 2: Ephemeral Viewing -->
@@ -128,16 +128,16 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingVertical="8dp">
+                android:paddingVertical="@dimen/_8sdp">
 
                 <FrameLayout
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
+                    android:layout_width="@dimen/_34sdp"
+                    android:layout_height="@dimen/_34sdp"
                     android:background="@drawable/bg_filter_chip">
 
                     <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
+                        android:layout_width="@dimen/_18sdp"
+                        android:layout_height="@dimen/_18sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_status_ring"
                         app:tint="@color/colorPrimary" />
@@ -147,7 +147,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="@dimen/_12sdp"
                     android:orientation="vertical">
 
                     <TextView
@@ -155,22 +155,22 @@
                         android:layout_height="wrap_content"
                         android:text="Direct Viewing"
                         android:textColor="@color/textPrimary"
-                        android:textSize="14sp"
+                        android:textSize="@dimen/_14ssp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="1dp"
+                        android:layout_marginTop="@dimen/_1sdp"
                         android:text="They can view your status directly from the notification"
                         android:textColor="@color/textSecondary"
-                        android:textSize="12sp" />
+                        android:textSize="@dimen/_12ssp" />
                 </LinearLayout>
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:background="@color/dividerColor" />
 
             <!-- Feature 3: Reshare Option -->
@@ -179,16 +179,16 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingVertical="8dp">
+                android:paddingVertical="@dimen/_8sdp">
 
                 <FrameLayout
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
+                    android:layout_width="@dimen/_34sdp"
+                    android:layout_height="@dimen/_34sdp"
                     android:background="@drawable/bg_filter_chip">
 
                     <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
+                        android:layout_width="@dimen/_18sdp"
+                        android:layout_height="@dimen/_18sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_share"
                         app:tint="@color/colorPrimary" />
@@ -198,7 +198,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="@dimen/_12sdp"
                     android:orientation="vertical">
 
                     <TextView
@@ -206,16 +206,16 @@
                         android:layout_height="wrap_content"
                         android:text="Reshare Permission"
                         android:textColor="@color/textPrimary"
-                        android:textSize="14sp"
+                        android:textSize="@dimen/_14ssp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="1dp"
+                        android:layout_marginTop="@dimen/_1sdp"
                         android:text="They can choose to reshare your update with their audience"
                         android:textColor="@color/textSecondary"
-                        android:textSize="12sp" />
+                        android:textSize="@dimen/_12ssp" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
@@ -225,13 +225,13 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnMentionsInfoOk"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="@dimen/_48sdp"
         android:text="OK, Got it"
         android:textColor="@color/colorOnPrimary"
-        android:textSize="14.5sp"
+        android:textSize="@dimen/_15ssp"
         android:fontFamily="sans-serif-medium"
         app:backgroundTint="@color/colorPrimary"
-        app:cornerRadius="14dp"
+        app:cornerRadius="@dimen/_14sdp"
         app:elevation="0dp" />
 
     <!-- Learn More Link -->
@@ -239,11 +239,11 @@
         android:id="@+id/btnMentionsLearnMore"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="@dimen/_12sdp"
         android:text="Learn more"
         android:textColor="@color/colorPrimary"
-        android:textSize="13.5sp"
+        android:textSize="@dimen/_14ssp"
         android:fontFamily="sans-serif-medium"
-        android:padding="6dp" />
+        android:padding="@dimen/_6sdp" />
 
 </LinearLayout>

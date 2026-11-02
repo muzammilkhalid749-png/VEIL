@@ -6,19 +6,19 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="24dp"
-    android:paddingEnd="24dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="28dp">
+    android:paddingStart="@dimen/_24sdp"
+    android:paddingEnd="@dimen/_24sdp"
+    android:paddingTop="@dimen/_12sdp"
+    android:paddingBottom="@dimen/_28sdp">
 
     <!-- Handle Bar -->
     <View
         android:id="@+id/detailsHandleBar"
-        android:layout_width="36dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_36sdp"
+        android:layout_height="@dimen/_4sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="@dimen/_16sdp" />
 
     <TextView
         android:id="@+id/tvDetailsTitle"
@@ -26,9 +26,9 @@
         android:layout_height="wrap_content"
         android:text="Message Info"
         android:textColor="@color/textPrimary"
-        android:textSize="20sp"
+        android:textSize="@dimen/_20ssp"
         android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="4dp" />
+        android:layout_marginBottom="@dimen/_4sdp" />
 
     <TextView
         android:id="@+id/tvDetailsSubtitle"
@@ -36,26 +36,26 @@
         android:layout_height="wrap_content"
         android:text="End-to-End Encrypted"
         android:textColor="@color/textSecondary"
-        android:textSize="12.5sp"
-        android:layout_marginBottom="18dp" />
+        android:textSize="@dimen/_13ssp"
+        android:layout_marginBottom="@dimen/_18sdp" />
 
     <!-- Details Card -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/detailsCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="14dp"
+        app:cardCornerRadius="@dimen/_14sdp"
         app:cardElevation="0dp"
-        app:strokeWidth="1dp"
+        app:strokeWidth="@dimen/_1sdp"
         app:strokeColor="@color/colorOutline"
         app:cardBackgroundColor="@color/colorSurfaceVariant"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="@dimen/_16sdp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="@dimen/_16sdp">
 
             <!-- Sent Row -->
             <LinearLayout
@@ -63,7 +63,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="12dp">
+                android:layout_marginBottom="@dimen/_12sdp">
 
                 <TextView
                     android:id="@+id/tvSentLabel"
@@ -72,14 +72,14 @@
                     android:layout_weight="1"
                     android:text="Sent"
                     android:textColor="@color/textSecondary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/_14ssp" />
 
                 <TextView
                     android:id="@+id/tvDetailsSent"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14sp"
+                    android:textSize="@dimen/_14ssp"
                     android:textStyle="bold" />
             </LinearLayout>
 
@@ -89,7 +89,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="12dp">
+                android:layout_marginBottom="@dimen/_12sdp">
 
                 <TextView
                     android:id="@+id/tvDeliveredLabel"
@@ -98,14 +98,14 @@
                     android:layout_weight="1"
                     android:text="Delivered"
                     android:textColor="@color/textSecondary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/_14ssp" />
 
                 <TextView
                     android:id="@+id/tvDetailsDelivered"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14sp"
+                    android:textSize="@dimen/_14ssp"
                     android:textStyle="bold" />
             </LinearLayout>
 
@@ -115,7 +115,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="12dp">
+                android:layout_marginBottom="@dimen/_12sdp">
 
                 <TextView
                     android:id="@+id/tvReadLabel"
@@ -124,23 +124,23 @@
                     android:layout_weight="1"
                     android:text="Read"
                     android:textColor="@color/textSecondary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/_14ssp" />
 
                 <TextView
                     android:id="@+id/tvDetailsRead"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="#22C55E"
-                    android:textSize="14sp"
+                    android:textSize="@dimen/_14ssp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <View
                 android:id="@+id/detailsDivider"
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:background="@color/dividerColor"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="@dimen/_12sdp" />
 
             <!-- Message ID / Hash Row -->
             <LinearLayout
@@ -154,15 +154,15 @@
                     android:layout_height="wrap_content"
                     android:text="Message ID"
                     android:textColor="@color/textSecondary"
-                    android:textSize="12sp"
-                    android:layout_marginBottom="4dp" />
+                    android:textSize="@dimen/_12ssp"
+                    android:layout_marginBottom="@dimen/_4sdp" />
 
                 <TextView
                     android:id="@+id/tvDetailsMessageId"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/textPrimary"
-                    android:textSize="12sp"
+                    android:textSize="@dimen/_12ssp"
                     android:fontFamily="monospace" />
             </LinearLayout>
         </LinearLayout>
@@ -172,8 +172,8 @@
         android:id="@+id/btnCloseDetails"
         style="@style/Widget.Material3.Button.TonalButton"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="@dimen/_48sdp"
         android:text="Close"
-        app:cornerRadius="12dp" />
+        app:cornerRadius="@dimen/_12sdp" />
 
 </LinearLayout>

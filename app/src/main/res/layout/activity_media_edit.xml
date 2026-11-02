@@ -36,14 +36,14 @@
         <!-- Standard Mid Play/Pause Button on Video Player -->
         <ImageView
             android:id="@+id/btnMidPlayPause"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
+            android:layout_width="@dimen/_60sdp"
+            android:layout_height="@dimen/_60sdp"
             android:layout_gravity="center"
             android:background="@drawable/bg_circle_translucent"
-            android:padding="16dp"
+            android:padding="@dimen/_16sdp"
             android:src="@drawable/ic_play_arrow"
             app:tint="@android:color/white"
-            android:elevation="8dp" />
+            android:elevation="@dimen/_8sdp" />
     </FrameLayout>
 
     <!-- Unified Studio Top Header Bar (Close Button + Batch Pill + Scrollable Tool & Chip Bar) -->
@@ -53,9 +53,9 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp"
-        android:paddingHorizontal="12dp"
+        android:paddingTop="@dimen/_10sdp"
+        android:paddingBottom="@dimen/_10sdp"
+        android:paddingHorizontal="@dimen/_12sdp"
         android:background="#B30B1017"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -63,9 +63,9 @@
 
         <ImageView
             android:id="@+id/btnClose"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:padding="9dp"
+            android:layout_width="@dimen/_40sdp"
+            android:layout_height="@dimen/_40sdp"
+            android:padding="@dimen/_9sdp"
             android:src="@drawable/ic_close"
             android:background="@drawable/bg_circle_translucent"
             app:tint="@android:color/white" />
@@ -75,13 +75,13 @@
             android:id="@+id/tvEditBatchCounter"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="@dimen/_8sdp"
             android:background="@drawable/bg_filter_chip"
-            android:paddingHorizontal="11dp"
-            android:paddingVertical="5dp"
+            android:paddingHorizontal="@dimen/_11sdp"
+            android:paddingVertical="@dimen/_5sdp"
             android:text="1 / 1"
             android:textColor="@android:color/white"
-            android:textSize="12.5sp"
+            android:textSize="@dimen/_13ssp"
             android:textStyle="bold"
             android:visibility="gone" />
 
@@ -90,7 +90,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="@dimen/_8sdp"
             android:scrollbars="none"
             android:fillViewport="true"
             android:clipToPadding="false">
@@ -105,10 +105,10 @@
 
                 <ImageView
                     android:id="@+id/btnDeleteCurrentMedia"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginEnd="8dp"
-                    android:padding="8dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
+                    android:layout_marginEnd="@dimen/_8sdp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_delete"
                     android:background="@drawable/bg_circle_translucent"
                     app:tint="@android:color/white"
@@ -117,50 +117,50 @@
 
                 <ImageView
                     android:id="@+id/btnUndo"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginEnd="8dp"
-                    android:padding="8dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
+                    android:layout_marginEnd="@dimen/_8sdp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_undo"
                     android:background="@drawable/bg_circle_translucent"
                     app:tint="@android:color/white" />
 
                 <ImageView
                     android:id="@+id/btnCrop"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginEnd="8dp"
-                    android:padding="8dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
+                    android:layout_marginEnd="@dimen/_8sdp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_crop"
                     android:background="@drawable/bg_circle_translucent"
                     app:tint="@android:color/white" />
 
                 <ImageView
                     android:id="@+id/btnEmoji"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginEnd="8dp"
-                    android:padding="8dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
+                    android:layout_marginEnd="@dimen/_8sdp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_emoji"
                     android:background="@drawable/bg_circle_translucent"
                     app:tint="@android:color/white" />
 
                 <ImageView
                     android:id="@+id/btnText"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginEnd="8dp"
-                    android:padding="8dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
+                    android:layout_marginEnd="@dimen/_8sdp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_text"
                     android:background="@drawable/bg_circle_translucent"
                     app:tint="@android:color/white" />
 
                 <ImageView
                     android:id="@+id/btnDraw"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginEnd="8dp"
-                    android:padding="8dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
+                    android:layout_marginEnd="@dimen/_8sdp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_draw"
                     android:background="@drawable/bg_circle_translucent"
                     app:tint="@android:color/white" />
@@ -168,9 +168,9 @@
                 <!-- Toolbar GIF Mode Toggle Icon (Select/Unselect) -->
                 <ImageView
                     android:id="@+id/btnToolbarGifMode"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:padding="7dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
+                    android:padding="@dimen/_7sdp"
                     android:src="@drawable/ic_gif_mode"
                     android:background="@drawable/bg_circle_translucent"
                     app:tint="@android:color/white"
@@ -185,9 +185,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="14dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="8dp"
+        android:paddingHorizontal="@dimen/_14sdp"
+        android:paddingTop="@dimen/_6sdp"
+        android:paddingBottom="@dimen/_8sdp"
         android:background="#D90B1017"
         android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/topHeaderBar"
@@ -200,7 +200,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="6dp"
+            android:layout_marginBottom="@dimen/_6sdp"
             android:visibility="gone">
 
             <TextView
@@ -209,15 +209,15 @@
                 android:layout_height="wrap_content"
                 android:text="⏸ Pause"
                 android:textColor="@android:color/white"
-                android:textSize="11.5sp"
+                android:textSize="@dimen/_12ssp"
                 android:textStyle="bold"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
+                android:paddingHorizontal="@dimen/_10sdp"
+                android:paddingVertical="@dimen/_4sdp"
                 android:background="@drawable/bg_filter_chip" />
 
             <Space
                 android:layout_width="0dp"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:layout_weight="1" />
 
             <TextView
@@ -226,10 +226,10 @@
                 android:layout_height="wrap_content"
                 android:text="🎬 Video Mode"
                 android:textColor="@android:color/white"
-                android:textSize="11.5sp"
+                android:textSize="@dimen/_12ssp"
                 android:textStyle="bold"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
+                android:paddingHorizontal="@dimen/_10sdp"
+                android:paddingVertical="@dimen/_4sdp"
                 android:background="@drawable/bg_filter_chip" />
         </LinearLayout>
 
@@ -237,7 +237,7 @@
         <com.m3.veil.ui.views.VeilVideoTrimmerFilmstripView
             android:id="@+id/videoFilmstripTrimmer"
             android:layout_width="match_parent"
-            android:layout_height="50dp" />
+            android:layout_height="@dimen/_50sdp" />
 
         <!-- Info / Timestamps Row below Filmstrip -->
         <LinearLayout
@@ -245,7 +245,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginTop="5dp">
+            android:layout_marginTop="@dimen/_5sdp">
 
             <TextView
                 android:id="@+id/tvTrimStart"
@@ -253,7 +253,7 @@
                 android:layout_height="wrap_content"
                 android:text="00:00"
                 android:textColor="@android:color/white"
-                android:textSize="12sp"
+                android:textSize="@dimen/_12ssp"
                 android:fontFeatureSettings="tnum" />
 
             <TextView
@@ -264,7 +264,7 @@
                 android:gravity="center"
                 android:text="Trim Video"
                 android:textColor="#CCFFFFFF"
-                android:textSize="12sp"
+                android:textSize="@dimen/_12ssp"
                 android:fontFamily="sans-serif-medium" />
 
             <TextView
@@ -273,7 +273,7 @@
                 android:layout_height="wrap_content"
                 android:text="00:00"
                 android:textColor="@android:color/white"
-                android:textSize="12sp"
+                android:textSize="@dimen/_12ssp"
                 android:fontFeatureSettings="tnum" />
         </LinearLayout>
     </LinearLayout>
@@ -285,8 +285,8 @@
         android:layout_height="wrap_content"
         android:scrollbars="none"
         android:clipToPadding="false"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="6dp"
+        android:paddingHorizontal="@dimen/_16sdp"
+        android:paddingVertical="@dimen/_6sdp"
         android:background="#CC0B1017"
         android:visibility="gone"
         app:layout_constraintBottom_toTopOf="@id/bottomBar">
@@ -294,7 +294,7 @@
         <LinearLayout
             android:id="@+id/editBatchThumbnailStrip"
             android:layout_width="wrap_content"
-            android:layout_height="60dp"
+            android:layout_height="@dimen/_60sdp"
             android:gravity="center_vertical"
             android:orientation="horizontal" />
     </HorizontalScrollView>
@@ -306,26 +306,26 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:background="#D90B1017"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="14dp"
+        android:paddingHorizontal="@dimen/_12sdp"
+        android:paddingTop="@dimen/_10sdp"
+        android:paddingBottom="@dimen/_14sdp"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <!-- Row 1: Dark Rounded Caption Pill ([🖼+] Add a caption... [@] [①]) -->
         <LinearLayout
             android:id="@+id/captionPillWrap"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="@dimen/_48sdp"
             android:background="@drawable/bg_media_glass_chip"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="14dp"
-            android:paddingEnd="10dp">
+            android:paddingStart="@dimen/_14sdp"
+            android:paddingEnd="@dimen/_10sdp">
 
             <ImageView
                 android:id="@+id/btnAddMoreMedia"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="@dimen/_24sdp"
+                android:layout_height="@dimen/_24sdp"
                 android:src="@drawable/ic_image"
                 app:tint="#CFD8DC" />
 
@@ -334,42 +334,42 @@
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="match_parent"
-                android:layout_marginStart="10dp"
+                android:layout_marginStart="@dimen/_10sdp"
                 android:background="@null"
                 android:hint="Add a caption..."
                 android:singleLine="true"
                 android:textColorHint="#99FFFFFF"
                 android:textColor="@android:color/white"
-                android:textSize="15.5sp" />
+                android:textSize="@dimen/_16ssp" />
 
             <TextView
                 android:id="@+id/btnMentionTag"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="@dimen/_32sdp"
+                android:layout_height="@dimen/_32sdp"
                 android:gravity="center"
                 android:text="@"
                 android:textColor="#CFD8DC"
-                android:textSize="18sp"
+                android:textSize="@dimen/_18ssp"
                 android:textStyle="bold" />
 
             <FrameLayout
                 android:id="@+id/btnViewOnce"
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:layout_marginStart="4dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
+                android:layout_marginStart="@dimen/_4sdp"
                 android:clickable="true"
                 android:focusable="true">
 
                 <TextView
                     android:id="@+id/tvViewOnceBadge"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="@dimen/_24sdp"
+                    android:layout_height="@dimen/_24sdp"
                     android:layout_gravity="center"
                     android:background="@drawable/bg_view_once_ring"
                     android:gravity="center"
                     android:text="1"
                     android:textColor="#00A884"
-                    android:textSize="12sp"
+                    android:textSize="@dimen/_12ssp"
                     android:textStyle="bold" />
             </FrameLayout>
         </LinearLayout>
@@ -378,24 +378,24 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="@dimen/_10sdp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <LinearLayout
                 android:id="@+id/recipientStatusPill"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_height="@dimen/_36sdp"
                 android:background="@drawable/bg_media_glass_chip"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="14dp">
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingEnd="@dimen/_14sdp">
 
                 <ImageView
                     android:id="@+id/ivRecipientStatusIcon"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="@dimen/_18sdp"
+                    android:layout_height="@dimen/_18sdp"
                     android:src="@drawable/ic_status_ring"
                     app:tint="#CFD8DC" />
 
@@ -403,22 +403,22 @@
                     android:id="@+id/tvRecipientStatusLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="@dimen/_8sdp"
                     android:text="Status (Contacts)"
                     android:textColor="@android:color/white"
-                    android:textSize="13.5sp"
+                    android:textSize="@dimen/_14ssp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <View
                 android:layout_width="0dp"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:layout_weight="1" />
 
             <FrameLayout
                 android:id="@+id/sendButtonContainer"
-                android:layout_width="48dp"
-                android:layout_height="48dp">
+                android:layout_width="@dimen/_48sdp"
+                android:layout_height="@dimen/_48sdp">
 
                 <com.google.android.material.floatingactionbutton.FloatingActionButton
                     android:id="@+id/btnSend"
@@ -428,18 +428,18 @@
                     android:src="@drawable/ic_send"
                     app:backgroundTint="#25D366"
                     app:tint="#0B141A"
-                    app:fabCustomSize="48dp"
-                    app:maxImageSize="22dp"
-                    app:elevation="4dp" />
+                    app:fabCustomSize="@dimen/_48sdp"
+                    app:maxImageSize="@dimen/_22sdp"
+                    app:elevation="@dimen/_4sdp" />
 
                 <ProgressBar
                     android:id="@+id/sendProgressSpinner"
                     style="?android:attr/progressBarStyleSmall"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="@dimen/_24sdp"
+                    android:layout_height="@dimen/_24sdp"
                     android:layout_gravity="center"
                     android:indeterminateTint="#0B141A"
-                    android:elevation="8dp"
+                    android:elevation="@dimen/_8sdp"
                     android:visibility="gone" />
             </FrameLayout>
         </LinearLayout>
@@ -452,10 +452,10 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center"
-        android:paddingHorizontal="26dp"
-        android:paddingVertical="20dp"
+        android:paddingHorizontal="@dimen/_26sdp"
+        android:paddingVertical="@dimen/_20sdp"
         android:background="@drawable/bg_done_button"
-        android:elevation="14dp"
+        android:elevation="@dimen/_14sdp"
         android:visibility="gone"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -464,10 +464,10 @@
 
         <ProgressBar
             android:id="@+id/mediaProcessingSpinner"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="@dimen/_38sdp"
+            android:layout_height="@dimen/_38sdp"
             android:indeterminateTint="#25D366"
-            android:layout_marginBottom="10dp" />
+            android:layout_marginBottom="@dimen/_10sdp" />
 
         <TextView
             android:id="@+id/tvMediaProcessingStatus"
@@ -475,7 +475,7 @@
             android:layout_height="wrap_content"
             android:text="Processing media..."
             android:textColor="@android:color/white"
-            android:textSize="13.5sp"
+            android:textSize="@dimen/_14ssp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -486,9 +486,9 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingHorizontal="14dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp"
+        android:paddingHorizontal="@dimen/_14sdp"
+        android:paddingTop="@dimen/_10sdp"
+        android:paddingBottom="@dimen/_10sdp"
         android:background="#D90B1017"
         android:visibility="gone"
         app:layout_constraintTop_toTopOf="parent"
@@ -498,18 +498,18 @@
         <TextView
             android:id="@+id/btnDone"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="@dimen/_36sdp"
             android:text="Done"
             android:textColor="@android:color/white"
-            android:textSize="14sp"
+            android:textSize="@dimen/_14ssp"
             android:textStyle="bold"
             android:gravity="center"
-            android:paddingHorizontal="16dp"
+            android:paddingHorizontal="@dimen/_16sdp"
             android:background="@drawable/bg_done_button" />
 
         <Space
             android:layout_width="0dp"
-            android:layout_height="1dp"
+            android:layout_height="@dimen/_1sdp"
             android:layout_weight="1" />
 
         <LinearLayout
@@ -521,14 +521,14 @@
 
         <Space
             android:layout_width="0dp"
-            android:layout_height="1dp"
+            android:layout_height="@dimen/_1sdp"
             android:layout_weight="1" />
 
         <ImageView
             android:id="@+id/btnDrawUndo"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:padding="8dp"
+            android:layout_width="@dimen/_38sdp"
+            android:layout_height="@dimen/_38sdp"
+            android:padding="@dimen/_8sdp"
             android:src="@drawable/ic_undo"
             android:background="@drawable/bg_circle_translucent"
             app:tint="@android:color/white" />
@@ -536,11 +536,11 @@
 
     <com.m3.veil.ui.chat.ColorPickerView
         android:id="@+id/colorPickerView"
-        android:layout_width="24dp"
-        android:layout_height="250dp"
-        android:layout_marginEnd="16dp"
+        android:layout_width="@dimen/_24sdp"
+        android:layout_height="@dimen/_250sdp"
+        android:layout_marginEnd="@dimen/_16sdp"
         android:visibility="gone"
-        android:elevation="10dp"
+        android:elevation="@dimen/_10sdp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
@@ -551,8 +551,8 @@
         android:layout_height="wrap_content"
         android:background="@drawable/bg_done_button"
         android:visibility="gone"
-        android:paddingVertical="8dp"
-        android:layout_marginBottom="32dp"
+        android:paddingVertical="@dimen/_8sdp"
+        android:layout_marginBottom="@dimen/_32sdp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -561,16 +561,16 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:paddingHorizontal="16dp">
+            android:paddingHorizontal="@dimen/_16sdp">
             <!-- Fonts will go here -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Aa"
-                android:textSize="18sp"
+                android:textSize="@dimen/_18ssp"
                 android:textColor="@android:color/white"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="8dp" />
+                android:paddingHorizontal="@dimen/_12sdp"
+                android:paddingVertical="@dimen/_8sdp" />
         </LinearLayout>
     </HorizontalScrollView>
 

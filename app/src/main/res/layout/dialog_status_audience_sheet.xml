@@ -5,18 +5,18 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="20dp"
-    android:paddingEnd="20dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="24dp">
+    android:paddingStart="@dimen/_20sdp"
+    android:paddingEnd="@dimen/_20sdp"
+    android:paddingTop="@dimen/_12sdp"
+    android:paddingBottom="@dimen/_24sdp">
 
     <!-- Drag Handle -->
     <View
-        android:layout_width="38dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_38sdp"
+        android:layout_height="@dimen/_4sdp"
         android:layout_gravity="center_horizontal"
         android:background="@drawable/bg_persona_drag_handle"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="@dimen/_16sdp" />
 
     <!-- Sheet Header -->
     <LinearLayout
@@ -24,13 +24,13 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="@dimen/_16sdp">
 
         <FrameLayout
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="@dimen/_38sdp"
+            android:layout_height="@dimen/_38sdp"
             android:background="@drawable/bg_filter_chip"
-            android:padding="8dp">
+            android:padding="@dimen/_8sdp">
 
             <ImageView
                 android:layout_width="match_parent"
@@ -43,7 +43,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="@dimen/_12sdp"
             android:orientation="vertical">
 
             <TextView
@@ -51,16 +51,16 @@
                 android:layout_height="wrap_content"
                 android:text="Status Privacy"
                 android:textColor="@color/textPrimary"
-                android:textSize="18sp"
+                android:textSize="@dimen/_18ssp"
                 android:fontFamily="sans-serif-medium" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="@dimen/_2sdp"
                 android:text="Choose who can see your ephemeral status"
                 android:textColor="@color/textSecondary"
-                android:textSize="12.5sp" />
+                android:textSize="@dimen/_13ssp" />
         </LinearLayout>
     </LinearLayout>
 
@@ -68,9 +68,9 @@
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="16dp"
+        app:cardCornerRadius="@dimen/_16sdp"
         app:cardElevation="0dp"
-        app:strokeWidth="1dp"
+        app:strokeWidth="@dimen/_1sdp"
         app:strokeColor="@color/dividerColor"
         app:cardBackgroundColor="@color/colorSurfaceContainerLow">
 
@@ -79,8 +79,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="4dp">
+            android:paddingHorizontal="@dimen/_14sdp"
+            android:paddingVertical="@dimen/_4sdp">
 
             <!-- Option 1: My contacts -->
             <LinearLayout
@@ -89,19 +89,19 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingVertical="12dp"
+                android:paddingVertical="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true">
 
                 <FrameLayout
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="@dimen/_36sdp"
+                    android:layout_height="@dimen/_36sdp"
                     android:background="@drawable/bg_filter_chip">
 
                     <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
+                        android:layout_width="@dimen/_20sdp"
+                        android:layout_height="@dimen/_20sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_account"
                         app:tint="@color/colorPrimary" />
@@ -111,7 +111,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="@dimen/_12sdp"
                     android:orientation="vertical">
 
                     <TextView
@@ -119,16 +119,16 @@
                         android:layout_height="wrap_content"
                         android:text="My Contacts"
                         android:textColor="@color/textPrimary"
-                        android:textSize="14.5sp"
+                        android:textSize="@dimen/_15ssp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="1dp"
+                        android:layout_marginTop="@dimen/_1sdp"
                         android:text="All connected peers in your contact list"
                         android:textColor="@color/textSecondary"
-                        android:textSize="12sp" />
+                        android:textSize="@dimen/_12ssp" />
                 </LinearLayout>
 
                 <RadioButton
@@ -142,7 +142,7 @@
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:background="@color/dividerColor" />
 
             <!-- Option 2: My contacts except... -->
@@ -152,19 +152,19 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingVertical="12dp"
+                android:paddingVertical="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true">
 
                 <FrameLayout
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="@dimen/_36sdp"
+                    android:layout_height="@dimen/_36sdp"
                     android:background="@drawable/bg_filter_chip">
 
                     <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
+                        android:layout_width="@dimen/_20sdp"
+                        android:layout_height="@dimen/_20sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_person_remove"
                         app:tint="@color/colorPrimary" />
@@ -174,7 +174,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="@dimen/_12sdp"
                     android:orientation="vertical">
 
                     <TextView
@@ -182,17 +182,17 @@
                         android:layout_height="wrap_content"
                         android:text="My contacts except..."
                         android:textColor="@color/textPrimary"
-                        android:textSize="14.5sp"
+                        android:textSize="@dimen/_15ssp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:id="@+id/tvExcludedSubtext"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="1dp"
+                        android:layout_marginTop="@dimen/_1sdp"
                         android:text="0 excluded • Tap to edit"
                         android:textColor="@color/colorPrimary"
-                        android:textSize="12sp"
+                        android:textSize="@dimen/_12ssp"
                         android:fontFamily="sans-serif-medium" />
                 </LinearLayout>
 
@@ -207,7 +207,7 @@
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:background="@color/dividerColor" />
 
             <!-- Option 3: Only share with... -->
@@ -217,19 +217,19 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingVertical="12dp"
+                android:paddingVertical="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true">
 
                 <FrameLayout
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="@dimen/_36sdp"
+                    android:layout_height="@dimen/_36sdp"
                     android:background="@drawable/bg_filter_chip">
 
                     <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
+                        android:layout_width="@dimen/_20sdp"
+                        android:layout_height="@dimen/_20sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_person_check"
                         app:tint="@color/colorPrimary" />
@@ -239,7 +239,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="@dimen/_12sdp"
                     android:orientation="vertical">
 
                     <TextView
@@ -247,17 +247,17 @@
                         android:layout_height="wrap_content"
                         android:text="Only share with..."
                         android:textColor="@color/textPrimary"
-                        android:textSize="14.5sp"
+                        android:textSize="@dimen/_15ssp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:id="@+id/tvIncludedSubtext"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="1dp"
+                        android:layout_marginTop="@dimen/_1sdp"
                         android:text="0 included • Tap to select"
                         android:textColor="@color/colorPrimary"
-                        android:textSize="12sp"
+                        android:textSize="@dimen/_12ssp"
                         android:fontFamily="sans-serif-medium" />
                 </LinearLayout>
 
@@ -272,7 +272,7 @@
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:background="@color/dividerColor" />
 
             <!-- Option 4: Close friends -->
@@ -282,19 +282,19 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingVertical="12dp"
+                android:paddingVertical="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true">
 
                 <FrameLayout
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="@dimen/_36sdp"
+                    android:layout_height="@dimen/_36sdp"
                     android:background="@drawable/bg_filter_chip">
 
                     <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
+                        android:layout_width="@dimen/_20sdp"
+                        android:layout_height="@dimen/_20sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_heart"
                         app:tint="@color/colorPrimary" />
@@ -304,7 +304,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="@dimen/_12sdp"
                     android:orientation="vertical">
 
                     <TextView
@@ -312,17 +312,17 @@
                         android:layout_height="wrap_content"
                         android:text="Close friends"
                         android:textColor="@color/textPrimary"
-                        android:textSize="14.5sp"
+                        android:textSize="@dimen/_15ssp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:id="@+id/tvCloseFriendsSubtext"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="1dp"
+                        android:layout_marginTop="@dimen/_1sdp"
                         android:text="Trusted circle • Tap to edit"
                         android:textColor="@color/colorPrimary"
-                        android:textSize="12sp"
+                        android:textSize="@dimen/_12ssp"
                         android:fontFamily="sans-serif-medium" />
                 </LinearLayout>
 
@@ -341,10 +341,10 @@
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        app:cardCornerRadius="16dp"
+        android:layout_marginTop="@dimen/_12sdp"
+        app:cardCornerRadius="@dimen/_16sdp"
         app:cardElevation="0dp"
-        app:strokeWidth="1dp"
+        app:strokeWidth="@dimen/_1sdp"
         app:strokeColor="@color/dividerColor"
         app:cardBackgroundColor="@color/colorSurfaceContainerLow">
 
@@ -354,20 +354,20 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="12dp"
+            android:paddingHorizontal="@dimen/_14sdp"
+            android:paddingVertical="@dimen/_12sdp"
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true">
 
             <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="@dimen/_36sdp"
+                android:layout_height="@dimen/_36sdp"
                 android:background="@drawable/bg_filter_chip">
 
                 <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
+                    android:layout_width="@dimen/_20sdp"
+                    android:layout_height="@dimen/_20sdp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_visibility"
                     app:tint="@color/colorPrimary" />
@@ -377,8 +377,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="12dp"
-                android:layout_marginEnd="8dp"
+                android:layout_marginStart="@dimen/_12sdp"
+                android:layout_marginEnd="@dimen/_8sdp"
                 android:orientation="vertical">
 
                 <TextView
@@ -386,16 +386,16 @@
                     android:layout_height="wrap_content"
                     android:text="Stealth Status View"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14.5sp"
+                    android:textSize="@dimen/_15ssp"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
+                    android:layout_marginTop="@dimen/_1sdp"
                     android:text="View others' status updates without sending a read receipt"
                     android:textColor="@color/textSecondary"
-                    android:textSize="12sp" />
+                    android:textSize="@dimen/_12ssp" />
             </LinearLayout>
 
             <com.google.android.material.switchmaterial.SwitchMaterial
@@ -409,24 +409,24 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginTop="@dimen/_16sdp"
+        android:layout_marginBottom="@dimen/_16sdp"
         android:text="Changes to your privacy settings won't affect status updates you've already sent."
         android:textColor="@color/textSecondary"
-        android:textSize="12sp"
+        android:textSize="@dimen/_12ssp"
         android:gravity="center_horizontal" />
 
     <!-- Minimal Modern Action Button -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnAudienceDone"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="@dimen/_48sdp"
         android:text="Done"
         android:textColor="@color/colorOnPrimary"
-        android:textSize="14.5sp"
+        android:textSize="@dimen/_15ssp"
         android:fontFamily="sans-serif-medium"
         app:backgroundTint="@color/colorPrimary"
-        app:cornerRadius="14dp"
+        app:cornerRadius="@dimen/_14sdp"
         app:elevation="0dp" />
 
 </LinearLayout>

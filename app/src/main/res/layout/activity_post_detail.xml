@@ -10,27 +10,27 @@
     <!-- Top Reddit-Style Community & Thread Bar -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="@dimen/_56sdp"
         android:background="@color/colorSurface"
-        android:elevation="4dp"
+        android:elevation="@dimen/_4sdp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="12dp">
+        android:paddingHorizontal="@dimen/_12sdp">
 
         <ImageView
             android:id="@+id/btnBackPostDetail"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="@dimen/_40sdp"
+            android:layout_height="@dimen/_40sdp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Back"
-            android:padding="8dp"
+            android:padding="@dimen/_8sdp"
             android:src="@drawable/ic_arrow_back"
             app:tint="@color/colorTextPrimary" />
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="@dimen/_8sdp"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -40,7 +40,7 @@
                 android:layout_height="wrap_content"
                 android:text="v/veilboard"
                 android:textColor="@color/colorPrimary"
-                android:textSize="14sp"
+                android:textSize="@dimen/_14ssp"
                 android:textStyle="bold" />
 
             <TextView
@@ -49,26 +49,26 @@
                 android:layout_height="wrap_content"
                 android:text="Community Discussion Thread"
                 android:textColor="@color/colorTextSecondary"
-                android:textSize="11sp" />
+                android:textSize="@dimen/_11ssp" />
         </LinearLayout>
 
         <ImageView
             android:id="@+id/btnBookmarkPost"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="@dimen/_40sdp"
+            android:layout_height="@dimen/_40sdp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Bookmark"
-            android:padding="9dp"
+            android:padding="@dimen/_9sdp"
             android:src="@drawable/ic_saved"
             app:tint="@color/colorTextPrimary" />
 
         <ImageView
             android:id="@+id/btnMorePostDetail"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="@dimen/_40sdp"
+            android:layout_height="@dimen/_40sdp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="More"
-            android:padding="9dp"
+            android:padding="@dimen/_9sdp"
             android:src="@drawable/ic_more_vert"
             app:tint="@color/colorTextPrimary" />
     </LinearLayout>
@@ -85,26 +85,26 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="24dp">
+            android:paddingBottom="@dimen/_24sdp">
 
             <!-- Main Post Card Container -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardPostHero"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="10dp"
-                android:layout_marginTop="10dp"
+                android:layout_marginHorizontal="@dimen/_10sdp"
+                android:layout_marginTop="@dimen/_10sdp"
                 app:cardBackgroundColor="@color/colorSurface"
-                app:cardCornerRadius="16dp"
+                app:cardCornerRadius="@dimen/_16sdp"
                 app:cardElevation="0dp"
                 app:strokeColor="@color/colorOutline"
-                app:strokeWidth="1dp">
+                app:strokeWidth="@dimen/_1sdp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="@dimen/_16sdp">
 
                     <!-- Author Row -->
                     <LinearLayout
@@ -116,14 +116,14 @@
 
                         <de.hdodenhof.circleimageview.CircleImageView
                             android:id="@+id/ivPostDetailAvatar"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
+                            android:layout_width="@dimen/_40sdp"
+                            android:layout_height="@dimen/_40sdp"
                             android:src="@drawable/ic_profile_placeholder" />
 
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="10dp"
+                            android:layout_marginStart="@dimen/_10sdp"
                             android:layout_weight="1"
                             android:orientation="vertical">
 
@@ -139,20 +139,20 @@
                                     android:layout_height="wrap_content"
                                     android:text="@anonymous"
                                     android:textColor="@color/colorTextPrimary"
-                                    android:textSize="14.5sp"
+                                    android:textSize="@dimen/_15ssp"
                                     android:textStyle="bold" />
 
                                 <TextView
                                     android:id="@+id/tvOpBadge"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
+                                    android:layout_marginStart="@dimen/_6sdp"
                                     android:background="@drawable/bg_filter_chip"
-                                    android:paddingHorizontal="6dp"
-                                    android:paddingVertical="2dp"
+                                    android:paddingHorizontal="@dimen/_6sdp"
+                                    android:paddingVertical="@dimen/_2sdp"
                                     android:text="OP"
                                     android:textColor="@color/colorPrimary"
-                                    android:textSize="10sp"
+                                    android:textSize="@dimen/_10ssp"
                                     android:textStyle="bold" />
                             </LinearLayout>
 
@@ -162,22 +162,22 @@
                                 android:layout_height="wrap_content"
                                 android:text="Just now • CONFESSION"
                                 android:textColor="@color/colorTextSecondary"
-                                android:textSize="12sp" />
+                                android:textSize="@dimen/_12ssp" />
                         </LinearLayout>
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnDmAuthor"
                             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                             android:layout_width="wrap_content"
-                            android:layout_height="34dp"
+                            android:layout_height="@dimen/_34sdp"
                             android:insetTop="0dp"
                             android:insetBottom="0dp"
-                            android:paddingHorizontal="10dp"
+                            android:paddingHorizontal="@dimen/_10sdp"
                             android:text="💬 DM OP"
                             android:textAllCaps="false"
                             android:textColor="@color/colorPrimary"
-                            android:textSize="11.5sp"
-                            app:cornerRadius="10dp"
+                            android:textSize="@dimen/_12ssp"
+                            app:cornerRadius="@dimen/_10sdp"
                             app:strokeColor="@color/colorPrimary" />
                     </LinearLayout>
 
@@ -186,17 +186,17 @@
                         android:id="@+id/tvPostDetailContent"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
-                        android:lineSpacingExtra="4dp"
+                        android:layout_marginTop="@dimen/_14sdp"
+                        android:lineSpacingExtra="@dimen/_4sdp"
                         android:textColor="@color/colorTextPrimary"
-                        android:textSize="16sp" />
+                        android:textSize="@dimen/_16ssp" />
 
                     <!-- Dynamic Attachments (Mosaic, Voice Waveform, Polls, Collab Chains) -->
                     <LinearLayout
                         android:id="@+id/layoutPostDetailAttachments"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="@dimen/_12sdp"
                         android:orientation="vertical" />
 
                     <!-- Awards Summary Strip -->
@@ -204,7 +204,7 @@
                         android:id="@+id/layoutAwardsStrip"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="@dimen/_8sdp"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
                         android:visibility="gone" />
@@ -213,38 +213,38 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
+                        android:layout_marginTop="@dimen/_14sdp"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
 
                         <!-- Upvote / Score / Downvote Pill -->
                         <LinearLayout
                             android:layout_width="wrap_content"
-                            android:layout_height="36dp"
+                            android:layout_height="@dimen/_36sdp"
                             android:background="@drawable/bg_filter_chip"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="10dp">
+                            android:paddingHorizontal="@dimen/_10sdp">
 
                             <TextView
                                 android:id="@+id/btnUpvotePost"
                                 android:layout_width="wrap_content"
                                 android:layout_height="match_parent"
                                 android:gravity="center"
-                                android:paddingHorizontal="6dp"
+                                android:paddingHorizontal="@dimen/_6sdp"
                                 android:text="▲"
                                 android:textColor="@color/colorTextPrimary"
-                                android:textSize="14sp"
+                                android:textSize="@dimen/_14ssp"
                                 android:textStyle="bold" />
 
                             <TextView
                                 android:id="@+id/tvVoteScore"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:paddingHorizontal="6dp"
+                                android:paddingHorizontal="@dimen/_6sdp"
                                 android:text="0"
                                 android:textColor="@color/colorTextPrimary"
-                                android:textSize="13.5sp"
+                                android:textSize="@dimen/_14ssp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -252,10 +252,10 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="match_parent"
                                 android:gravity="center"
-                                android:paddingHorizontal="6dp"
+                                android:paddingHorizontal="@dimen/_6sdp"
                                 android:text="▼"
                                 android:textColor="@color/colorTextSecondary"
-                                android:textSize="14sp"
+                                android:textSize="@dimen/_14ssp"
                                 android:textStyle="bold" />
                         </LinearLayout>
 
@@ -263,12 +263,12 @@
                         <LinearLayout
                             android:id="@+id/pillCommentsCount"
                             android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:layout_marginStart="8dp"
+                            android:layout_height="@dimen/_36sdp"
+                            android:layout_marginStart="@dimen/_8sdp"
                             android:background="@drawable/bg_filter_chip"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="12dp">
+                            android:paddingHorizontal="@dimen/_12sdp">
 
                             <TextView
                                 android:id="@+id/tvCommentsPillText"
@@ -276,7 +276,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="💬 0"
                                 android:textColor="@color/colorTextPrimary"
-                                android:textSize="13sp"
+                                android:textSize="@dimen/_13ssp"
                                 android:textStyle="bold" />
                         </LinearLayout>
 
@@ -284,19 +284,19 @@
                         <LinearLayout
                             android:id="@+id/btnAwardPost"
                             android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:layout_marginStart="8dp"
+                            android:layout_height="@dimen/_36sdp"
+                            android:layout_marginStart="@dimen/_8sdp"
                             android:background="@drawable/bg_filter_chip"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="12dp">
+                            android:paddingHorizontal="@dimen/_12sdp">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="🏆 Award"
                                 android:textColor="@color/colorPrimary"
-                                android:textSize="13sp"
+                                android:textSize="@dimen/_13ssp"
                                 android:textStyle="bold" />
                         </LinearLayout>
 
@@ -304,19 +304,19 @@
                         <LinearLayout
                             android:id="@+id/btnSharePostDetail"
                             android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:layout_marginStart="8dp"
+                            android:layout_height="@dimen/_36sdp"
+                            android:layout_marginStart="@dimen/_8sdp"
                             android:background="@drawable/bg_filter_chip"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="12dp">
+                            android:paddingHorizontal="@dimen/_12sdp">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="🔄 Share"
                                 android:textColor="@color/colorTextPrimary"
-                                android:textSize="13sp"
+                                android:textSize="@dimen/_13ssp"
                                 android:textStyle="bold" />
                         </LinearLayout>
                     </LinearLayout>
@@ -327,9 +327,9 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="14dp"
-                android:layout_marginBottom="6dp"
+                android:layout_marginHorizontal="@dimen/_12sdp"
+                android:layout_marginTop="@dimen/_14sdp"
+                android:layout_marginBottom="@dimen/_6sdp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -338,13 +338,13 @@
                     android:layout_height="wrap_content"
                     android:text="Sort by:"
                     android:textColor="@color/colorTextSecondary"
-                    android:textSize="12.5sp"
+                    android:textSize="@dimen/_13ssp"
                     android:textStyle="bold" />
 
                 <HorizontalScrollView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="@dimen/_8sdp"
                     android:layout_weight="1"
                     android:scrollbars="none">
 
@@ -358,39 +358,39 @@
                             android:id="@+id/chipSortBest"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="6dp"
+                            android:layout_marginEnd="@dimen/_6sdp"
                             android:background="@drawable/bg_filter_chip_selected"
-                            android:paddingHorizontal="10dp"
-                            android:paddingVertical="5dp"
+                            android:paddingHorizontal="@dimen/_10sdp"
+                            android:paddingVertical="@dimen/_5sdp"
                             android:text="🔥 Best"
                             android:textColor="@android:color/white"
-                            android:textSize="12sp"
+                            android:textSize="@dimen/_12ssp"
                             android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/chipSortNew"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="6dp"
+                            android:layout_marginEnd="@dimen/_6sdp"
                             android:background="@drawable/bg_filter_chip"
-                            android:paddingHorizontal="10dp"
-                            android:paddingVertical="5dp"
+                            android:paddingHorizontal="@dimen/_10sdp"
+                            android:paddingVertical="@dimen/_5sdp"
                             android:text="⚡ New"
                             android:textColor="@color/colorTextPrimary"
-                            android:textSize="12sp"
+                            android:textSize="@dimen/_12ssp"
                             android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/chipSortTop"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="6dp"
+                            android:layout_marginEnd="@dimen/_6sdp"
                             android:background="@drawable/bg_filter_chip"
-                            android:paddingHorizontal="10dp"
-                            android:paddingVertical="5dp"
+                            android:paddingHorizontal="@dimen/_10sdp"
+                            android:paddingVertical="@dimen/_5sdp"
                             android:text="🏆 Top"
                             android:textColor="@color/colorTextPrimary"
-                            android:textSize="12sp"
+                            android:textSize="@dimen/_12ssp"
                             android:textStyle="bold" />
 
                         <TextView
@@ -398,11 +398,11 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:background="@drawable/bg_filter_chip"
-                            android:paddingHorizontal="10dp"
-                            android:paddingVertical="5dp"
+                            android:paddingHorizontal="@dimen/_10sdp"
+                            android:paddingVertical="@dimen/_5sdp"
                             android:text="⚔️ Controversial"
                             android:textColor="@color/colorTextPrimary"
-                            android:textSize="12sp"
+                            android:textSize="@dimen/_12ssp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </HorizontalScrollView>
@@ -413,7 +413,7 @@
                 android:id="@+id/layoutThreadedCommentsContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="10dp"
+                android:layout_marginHorizontal="@dimen/_10sdp"
                 android:orientation="vertical" />
 
             <TextView
@@ -421,10 +421,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:padding="32dp"
+                android:padding="@dimen/_32sdp"
                 android:text="No comments yet. Start the anonymous discussion below!"
                 android:textColor="@color/colorTextSecondary"
-                android:textSize="14sp"
+                android:textSize="@dimen/_14ssp"
                 android:visibility="gone" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
@@ -437,8 +437,8 @@
         android:background="@color/colorSurfaceVariant"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="14dp"
-        android:paddingVertical="6dp"
+        android:paddingHorizontal="@dimen/_14sdp"
+        android:paddingVertical="@dimen/_6sdp"
         android:visibility="gone">
 
         <TextView
@@ -448,17 +448,17 @@
             android:layout_weight="1"
             android:text="Replying to @anonymous"
             android:textColor="@color/colorPrimary"
-            android:textSize="12sp"
+            android:textSize="@dimen/_12ssp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/btnCancelReplyTarget"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:padding="4dp"
+            android:padding="@dimen/_4sdp"
             android:text="✕ Cancel"
             android:textColor="@color/colorTextSecondary"
-            android:textSize="12sp"
+            android:textSize="@dimen/_12ssp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -467,19 +467,19 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/colorSurface"
-        android:elevation="8dp"
+        android:elevation="@dimen/_8sdp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="8dp">
+        android:paddingHorizontal="@dimen/_12sdp"
+        android:paddingVertical="@dimen/_8sdp">
 
         <ImageView
             android:id="@+id/btnVoiceComment"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="@dimen/_38sdp"
+            android:layout_height="@dimen/_38sdp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Voice Reply"
-            android:padding="7dp"
+            android:padding="@dimen/_7sdp"
             android:src="@drawable/ic_mic"
             app:tint="@color/colorPrimary" />
 
@@ -487,27 +487,27 @@
             android:id="@+id/etThreadCommentInput"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="8dp"
+            android:layout_marginHorizontal="@dimen/_8sdp"
             android:layout_weight="1"
             android:background="@drawable/bg_search_input"
             android:hint="Add an anonymous comment..."
             android:inputType="textCapSentences|textMultiLine"
             android:maxLines="4"
-            android:minHeight="40dp"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="8dp"
+            android:minHeight="@dimen/_40sdp"
+            android:paddingHorizontal="@dimen/_14sdp"
+            android:paddingVertical="@dimen/_8sdp"
             android:textColor="@color/colorTextPrimary"
             android:textColorHint="@color/colorTextSecondary"
-            android:textSize="14sp" />
+            android:textSize="@dimen/_14ssp" />
 
         <ImageView
             android:id="@+id/btnSendThreadComment"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="@dimen/_40sdp"
+            android:layout_height="@dimen/_40sdp"
             android:background="@drawable/bg_circle_icon"
             android:backgroundTint="@color/colorPrimary"
             android:contentDescription="Send Comment"
-            android:padding="9dp"
+            android:padding="@dimen/_9sdp"
             android:src="@drawable/ic_send"
             app:tint="@android:color/white" />
     </LinearLayout>

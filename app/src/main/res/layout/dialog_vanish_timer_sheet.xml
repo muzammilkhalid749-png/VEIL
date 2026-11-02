@@ -5,40 +5,40 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="24dp"
-    android:paddingEnd="24dp"
-    android:paddingTop="14dp"
-    android:paddingBottom="28dp">
+    android:paddingStart="@dimen/_24sdp"
+    android:paddingEnd="@dimen/_24sdp"
+    android:paddingTop="@dimen/_14sdp"
+    android:paddingBottom="@dimen/_28sdp">
 
     <!-- Handle Bar -->
     <View
-        android:layout_width="36dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_36sdp"
+        android:layout_height="@dimen/_4sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="@dimen/_16sdp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Disappearing Messages Timer"
         android:textColor="@color/textPrimary"
-        android:textSize="20sp"
+        android:textSize="@dimen/_20ssp"
         android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="4dp" />
+        android:layout_marginBottom="@dimen/_4sdp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Set how long messages stay before disappearing:"
         android:textColor="@color/textSecondary"
-        android:textSize="13sp"
-        android:layout_marginBottom="16dp" />
+        android:textSize="@dimen/_13ssp"
+        android:layout_marginBottom="@dimen/_16sdp" />
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:maxHeight="360dp">
+        android:maxHeight="@dimen/_360sdp">
 
         <LinearLayout
             android:id="@+id/vanishOptionsContainer"

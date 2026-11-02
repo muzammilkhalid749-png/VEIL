@@ -21,7 +21,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:elevation="4dp"
+        android:elevation="@dimen/_4sdp"
         android:background="@color/veil_primary">
 
         <!-- Custom Toolbar -->
@@ -33,16 +33,16 @@
             android:background="@color/veil_primary"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
-            android:paddingBottom="8dp"
-            android:paddingTop="8dp">
+            android:paddingStart="@dimen/_4sdp"
+            android:paddingEnd="@dimen/_4sdp"
+            android:paddingBottom="@dimen/_8sdp"
+            android:paddingTop="@dimen/_8sdp">
 
             <ImageView
                 android:id="@+id/backButton"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:padding="10dp"
+                android:layout_width="@dimen/_44sdp"
+                android:layout_height="@dimen/_44sdp"
+                android:padding="@dimen/_10sdp"
                 android:src="@drawable/ic_arrow_back"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless" />
@@ -57,20 +57,20 @@
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
-                android:paddingStart="2dp"
-                android:paddingEnd="6dp">
+                android:paddingStart="@dimen/_2sdp"
+                android:paddingEnd="@dimen/_6sdp">
 
                 <de.hdodenhof.circleimageview.CircleImageView
                     android:id="@+id/recipientAvatar"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="@dimen/_40sdp"
+                    android:layout_height="@dimen/_40sdp"
                     android:src="@drawable/ic_person" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:layout_marginStart="10dp">
+                    android:layout_marginStart="@dimen/_10sdp">
 
                     <TextView
                         android:id="@+id/recipientName"
@@ -78,7 +78,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/recipient_name"
                         android:textColor="@color/text_primary"
-                        android:textSize="17sp"
+                        android:textSize="@dimen/_17ssp"
                         android:textStyle="bold"
                         android:ellipsize="end"
                         android:singleLine="true" />
@@ -92,19 +92,19 @@
 
                         <View
                             android:id="@+id/ivStatusDot"
-                            android:layout_width="7dp"
-                            android:layout_height="7dp"
+                            android:layout_width="@dimen/_7sdp"
+                            android:layout_height="@dimen/_7sdp"
                             android:background="@drawable/bg_online_dot"
-                            android:layout_marginEnd="5dp"
+                            android:layout_marginEnd="@dimen/_5sdp"
                             android:visibility="gone" />
 
                         <ImageView
                             android:id="@+id/ivLockIcon"
-                            android:layout_width="12dp"
-                            android:layout_height="12dp"
+                            android:layout_width="@dimen/_12sdp"
+                            android:layout_height="@dimen/_12sdp"
                             android:src="@drawable/ic_lock"
                             app:tint="@color/veil_accent"
-                            android:layout_marginEnd="4dp" />
+                            android:layout_marginEnd="@dimen/_4sdp" />
 
                         <TextView
                             android:id="@+id/onlineStatus"
@@ -112,7 +112,7 @@
                             android:layout_height="wrap_content"
                             android:text="Tap here for info"
                             android:textColor="@color/veil_accent"
-                            android:textSize="11sp"
+                            android:textSize="@dimen/_11ssp"
                             android:ellipsize="end"
                             android:singleLine="true" />
                     </LinearLayout>
@@ -122,23 +122,23 @@
                         android:id="@+id/chatCallSubtitlePill"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
+                        android:layout_marginTop="@dimen/_2sdp"
                         android:background="@drawable/bg_chat_call_pill"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingStart="7dp"
-                        android:paddingEnd="8dp"
-                        android:paddingTop="2dp"
-                        android:paddingBottom="2dp"
+                        android:paddingStart="@dimen/_7sdp"
+                        android:paddingEnd="@dimen/_8sdp"
+                        android:paddingTop="@dimen/_2sdp"
+                        android:paddingBottom="@dimen/_2sdp"
                         android:visibility="gone"
                         android:clickable="true"
                         android:focusable="true">
 
                         <View
                             android:id="@+id/chatCallPillPulseDot"
-                            android:layout_width="6dp"
-                            android:layout_height="6dp"
-                            android:layout_marginEnd="5dp"
+                            android:layout_width="@dimen/_6sdp"
+                            android:layout_height="@dimen/_6sdp"
+                            android:layout_marginEnd="@dimen/_5sdp"
                             android:background="@drawable/bg_green_pulse_dot" />
 
                         <TextView
@@ -147,7 +147,7 @@
                             android:layout_height="wrap_content"
                             android:text="Calling 00:08"
                             android:textColor="@color/colorPrimary"
-                            android:textSize="11.5sp"
+                            android:textSize="@dimen/_12ssp"
                             android:textStyle="bold"
                             android:includeFontPadding="false" />
                     </LinearLayout>
@@ -166,11 +166,11 @@
                 <!-- Mute Toggle Circular Button -->
                 <ImageView
                     android:id="@+id/btnChatCallMute"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="8dp"
+                    android:layout_width="@dimen/_36sdp"
+                    android:layout_height="@dimen/_36sdp"
+                    android:layout_marginEnd="@dimen/_8sdp"
                     android:background="@drawable/bg_chat_call_btn_neutral"
-                    android:padding="8dp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_mic"
                     app:tint="@color/textPrimary"
                     android:tint="@color/textPrimary"
@@ -181,11 +181,11 @@
                 <!-- End Call Circular Button -->
                 <ImageView
                     android:id="@+id/btnChatCallEnd"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="4dp"
+                    android:layout_width="@dimen/_36sdp"
+                    android:layout_height="@dimen/_36sdp"
+                    android:layout_marginEnd="@dimen/_4sdp"
                     android:background="@drawable/bg_chat_call_btn_end"
-                    android:padding="8dp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_call_end"
                     app:tint="@android:color/white"
                     android:tint="@android:color/white"
@@ -197,9 +197,9 @@
 
             <ImageView
                 android:id="@+id/btnChatSearch"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:padding="9dp"
+                android:layout_width="@dimen/_40sdp"
+                android:layout_height="@dimen/_40sdp"
+                android:padding="@dimen/_9sdp"
                 android:src="@drawable/ic_search"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -209,9 +209,9 @@
 
             <ImageView
                 android:id="@+id/btnAudioCall"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:padding="9dp"
+                android:layout_width="@dimen/_40sdp"
+                android:layout_height="@dimen/_40sdp"
+                android:padding="@dimen/_9sdp"
                 android:src="@drawable/ic_call"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -220,9 +220,9 @@
 
             <ImageView
                 android:id="@+id/btnVideoCall"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:padding="9dp"
+                android:layout_width="@dimen/_40sdp"
+                android:layout_height="@dimen/_40sdp"
+                android:padding="@dimen/_9sdp"
                 android:src="@drawable/ic_video"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -231,9 +231,9 @@
 
             <ImageView
                 android:id="@+id/moreButton"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:padding="10dp"
+                android:layout_width="@dimen/_42sdp"
+                android:layout_height="@dimen/_42sdp"
+                android:padding="@dimen/_10sdp"
                 android:src="@drawable/ic_more_vert"
                 app:tint="@color/text_primary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -331,7 +331,7 @@
             <!-- Flexible Space to push action icons to the right -->
             <View
                 android:layout_width="0dp"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:layout_weight="1" />
 
             <ImageView
@@ -425,17 +425,17 @@
         <LinearLayout
             android:id="@+id/chatSearchBar"
             android:layout_width="match_parent"
-            android:layout_height="44dp"
+            android:layout_height="@dimen/_44sdp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="@color/colorSurfaceVariant"
-            android:paddingStart="14dp"
-            android:paddingEnd="10dp"
+            android:paddingStart="@dimen/_14sdp"
+            android:paddingEnd="@dimen/_10sdp"
             android:visibility="gone">
 
             <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
+                android:layout_width="@dimen/_18sdp"
+                android:layout_height="@dimen/_18sdp"
                 android:src="@drawable/ic_search"
                 app:tint="@color/textSecondary" />
 
@@ -444,29 +444,29 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:layout_marginStart="10dp"
+                android:layout_marginStart="@dimen/_10sdp"
                 android:background="@null"
                 android:hint="Search messages in this chat..."
                 android:textColor="@color/textPrimary"
                 android:textColorHint="@color/textSecondary"
-                android:textSize="14sp"
+                android:textSize="@dimen/_14ssp"
                 android:singleLine="true" />
 
             <TextView
                 android:id="@+id/tvChatSearchCount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
+                android:layout_marginEnd="@dimen/_6sdp"
                 android:textColor="@color/colorPrimary"
-                android:textSize="12sp"
+                android:textSize="@dimen/_12ssp"
                 android:textStyle="bold"
                 android:text="" />
 
             <ImageView
                 android:id="@+id/btnChatSearchUp"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:padding="5dp"
+                android:layout_width="@dimen/_30sdp"
+                android:layout_height="@dimen/_30sdp"
+                android:padding="@dimen/_5sdp"
                 android:src="@drawable/ic_expand_less"
                 app:tint="@color/textPrimary"
                 android:contentDescription="Previous match"
@@ -475,10 +475,10 @@
 
             <ImageView
                 android:id="@+id/btnChatSearchDown"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:padding="5dp"
-                android:layout_marginEnd="2dp"
+                android:layout_width="@dimen/_30sdp"
+                android:layout_height="@dimen/_30sdp"
+                android:padding="@dimen/_5sdp"
+                android:layout_marginEnd="@dimen/_2sdp"
                 android:src="@drawable/ic_arrow_down"
                 app:tint="@color/textPrimary"
                 android:contentDescription="Next match"
@@ -487,9 +487,9 @@
 
             <ImageView
                 android:id="@+id/btnCloseChatSearch"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:padding="5dp"
+                android:layout_width="@dimen/_28sdp"
+                android:layout_height="@dimen/_28sdp"
+                android:padding="@dimen/_5sdp"
                 android:src="@drawable/ic_close"
                 app:tint="@color/textSecondary"
                 android:background="?attr/selectableItemBackgroundBorderless" />
@@ -503,42 +503,42 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="@drawable/bg_swatch_amber"
-            android:paddingStart="14dp"
-            android:paddingEnd="12dp"
-            android:paddingTop="7dp"
-            android:paddingBottom="7dp"
+            android:paddingStart="@dimen/_14sdp"
+            android:paddingEnd="@dimen/_12sdp"
+            android:paddingTop="@dimen/_7sdp"
+            android:paddingBottom="@dimen/_7sdp"
             android:visibility="gone">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="⏳"
-                android:textSize="16sp" />
+                android:textSize="@dimen/_16ssp" />
 
             <TextView
                 android:id="@+id/tvSpeedTimerText"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="@dimen/_8sdp"
                 android:text="Speed Match: 03:00"
                 android:textColor="@color/textPrimary"
-                android:textSize="13sp"
+                android:textSize="@dimen/_13ssp"
                 android:textStyle="bold" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnMutualReveal"
                 style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                 android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:layout_height="@dimen/_32sdp"
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingEnd="@dimen/_12sdp"
                 android:paddingTop="0dp"
                 android:paddingBottom="0dp"
                 android:text="🎭 Reveal Profile"
                 android:textAllCaps="false"
-                android:textSize="12sp"
-                app:cornerRadius="16dp" />
+                android:textSize="@dimen/_12ssp"
+                app:cornerRadius="@dimen/_16sdp" />
 
         </LinearLayout>
 
@@ -550,15 +550,15 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="@color/colorSurfaceVariant"
-            android:paddingStart="14dp"
-            android:paddingEnd="10dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
+            android:paddingStart="@dimen/_14sdp"
+            android:paddingEnd="@dimen/_10sdp"
+            android:paddingTop="@dimen/_8sdp"
+            android:paddingBottom="@dimen/_8sdp"
             android:visibility="gone">
 
             <ImageView
-                android:layout_width="16dp"
-                android:layout_height="16dp"
+                android:layout_width="@dimen/_16sdp"
+                android:layout_height="@dimen/_16sdp"
                 android:src="@drawable/ic_chat_pin"
                 app:tint="@color/colorPrimary" />
 
@@ -566,7 +566,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="10dp"
+                android:layout_marginStart="@dimen/_10sdp"
                 android:orientation="vertical">
 
                 <TextView
@@ -575,7 +575,7 @@
                     android:layout_height="wrap_content"
                     android:text="Pinned Message"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="11sp"
+                    android:textSize="@dimen/_11ssp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -584,16 +584,16 @@
                     android:layout_height="wrap_content"
                     android:text="Pinned message preview"
                     android:textColor="@color/textPrimary"
-                    android:textSize="13sp"
+                    android:textSize="@dimen/_13ssp"
                     android:maxLines="1"
                     android:ellipsize="end" />
             </LinearLayout>
 
             <ImageView
                 android:id="@+id/btnUnpinBanner"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:padding="6dp"
+                android:layout_width="@dimen/_28sdp"
+                android:layout_height="@dimen/_28sdp"
+                android:padding="@dimen/_6sdp"
                 android:src="@drawable/ic_close"
                 app:tint="@color/textSecondary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -602,7 +602,7 @@
 
         <View
             android:layout_width="match_parent"
-            android:layout_height="1dp"
+            android:layout_height="@dimen/_1sdp"
             android:background="@color/colorOutline" />
     </LinearLayout>
 
@@ -613,7 +613,7 @@
         android:layout_height="match_parent"
         android:layout_above="@+id/bottomContainer"
         android:layout_below="@+id/topHeaderContainer"
-        android:padding="8dp"
+        android:padding="@dimen/_8sdp"
         android:clipToPadding="false"
         android:background="@android:color/transparent" />
 
@@ -626,11 +626,11 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="#DD0F172A"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp"
-        android:elevation="6dp"
+        android:paddingStart="@dimen/_14sdp"
+        android:paddingEnd="@dimen/_14sdp"
+        android:paddingTop="@dimen/_8sdp"
+        android:paddingBottom="@dimen/_8sdp"
+        android:elevation="@dimen/_6sdp"
         android:visibility="gone">
 
         <TextView
@@ -640,35 +640,35 @@
             android:layout_weight="1"
             android:text="⏳ Replaying Chat: 0/0"
             android:textColor="#00F0FF"
-            android:textSize="13sp"
+            android:textSize="@dimen/_13ssp"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/btnReplayPlayPause"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
+            android:layout_height="@dimen/_34sdp"
             android:text="⏸ Pause"
-            android:textSize="11sp"
+            android:textSize="@dimen/_11ssp"
             android:backgroundTint="#334155"
             android:textColor="@android:color/white"
-            android:layout_marginEnd="6dp" />
+            android:layout_marginEnd="@dimen/_6sdp" />
 
         <Button
             android:id="@+id/btnReplaySpeed"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
+            android:layout_height="@dimen/_34sdp"
             android:text="1x"
-            android:textSize="11sp"
+            android:textSize="@dimen/_11ssp"
             android:backgroundTint="#334155"
             android:textColor="@android:color/white"
-            android:layout_marginEnd="6dp" />
+            android:layout_marginEnd="@dimen/_6sdp" />
 
         <Button
             android:id="@+id/btnReplayExit"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
+            android:layout_height="@dimen/_34sdp"
             android:text="✕ Exit"
-            android:textSize="11sp"
+            android:textSize="@dimen/_11ssp"
             android:backgroundTint="#E11D48"
             android:textColor="@android:color/white" />
     </LinearLayout>
@@ -680,35 +680,35 @@
         android:layout_height="wrap_content"
         android:layout_above="@+id/layoutScrollToBottom"
         android:layout_alignParentEnd="true"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginEnd="@dimen/_16sdp"
+        android:layout_marginBottom="@dimen/_8sdp"
         android:visibility="gone">
 
         <LinearLayout
             android:id="@+id/btnJumpToMention"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="@dimen/_36sdp"
             android:orientation="horizontal"
             android:gravity="center"
             android:background="@drawable/bg_mention_jump_pill"
-            android:paddingHorizontal="11dp"
-            android:elevation="6dp">
+            android:paddingHorizontal="@dimen/_11sdp"
+            android:elevation="@dimen/_6sdp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@"
                 android:textColor="#FFFFFF"
-                android:textSize="16sp"
+                android:textSize="@dimen/_16ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvJumpMentionCount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="@dimen/_4sdp"
                 android:textColor="#FFFFFF"
-                android:textSize="12sp"
+                android:textSize="@dimen/_12ssp"
                 android:textStyle="bold"
                 android:visibility="gone" />
         </LinearLayout>
@@ -721,36 +721,36 @@
         android:layout_height="wrap_content"
         android:layout_above="@+id/bottomContainer"
         android:layout_alignParentEnd="true"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginEnd="@dimen/_16sdp"
+        android:layout_marginBottom="@dimen/_16sdp"
         android:visibility="gone">
 
         <ImageButton
             android:id="@+id/btnScrollToBottom"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:layout_marginTop="6dp"
-            android:layout_marginEnd="4dp"
+            android:layout_width="@dimen/_42sdp"
+            android:layout_height="@dimen/_42sdp"
+            android:layout_marginTop="@dimen/_6sdp"
+            android:layout_marginEnd="@dimen/_4sdp"
             android:background="@drawable/bg_scroll_to_bottom"
             android:src="@drawable/ic_arrow_down"
             app:tint="@color/textSecondary"
-            android:elevation="4dp"
+            android:elevation="@dimen/_4sdp"
             android:contentDescription="Scroll to bottom" />
 
         <TextView
             android:id="@+id/tvScrollUnreadBadge"
             android:layout_width="wrap_content"
-            android:layout_height="20dp"
-            android:minWidth="20dp"
+            android:layout_height="@dimen/_20sdp"
+            android:minWidth="@dimen/_20sdp"
             android:layout_gravity="top|end"
             android:gravity="center"
-            android:paddingStart="5dp"
-            android:paddingEnd="5dp"
+            android:paddingStart="@dimen/_5sdp"
+            android:paddingEnd="@dimen/_5sdp"
             android:background="@drawable/bg_unread_badge"
             android:textColor="@android:color/white"
-            android:textSize="11sp"
+            android:textSize="@dimen/_11ssp"
             android:textStyle="bold"
-            android:elevation="6dp"
+            android:elevation="@dimen/_6sdp"
             android:visibility="gone"
             android:text="1" />
 
@@ -771,10 +771,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:scrollbars="none"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:paddingTop="6dp"
-            android:paddingBottom="2dp"
+            android:paddingStart="@dimen/_10sdp"
+            android:paddingEnd="@dimen/_10sdp"
+            android:paddingTop="@dimen/_6sdp"
+            android:paddingBottom="@dimen/_2sdp"
             android:clipToPadding="false"
             android:background="@android:color/transparent">
 
@@ -786,70 +786,70 @@
                 <TextView
                     android:id="@+id/chipQuickBlink"
                     android:layout_width="wrap_content"
-                    android:layout_height="28dp"
+                    android:layout_height="@dimen/_28sdp"
                     android:gravity="center"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp"
-                    android:layout_marginEnd="6dp"
+                    android:paddingStart="@dimen/_10sdp"
+                    android:paddingEnd="@dimen/_10sdp"
+                    android:layout_marginEnd="@dimen/_6sdp"
                     android:background="@drawable/bg_filter_chip"
                     android:text="⚡ Blink: OFF"
                     android:textColor="@color/textSecondary"
-                    android:textSize="11sp"
+                    android:textSize="@dimen/_11ssp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipQuickPoll"
                     android:layout_width="wrap_content"
-                    android:layout_height="28dp"
+                    android:layout_height="@dimen/_28sdp"
                     android:gravity="center"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp"
-                    android:layout_marginEnd="6dp"
+                    android:paddingStart="@dimen/_10sdp"
+                    android:paddingEnd="@dimen/_10sdp"
+                    android:layout_marginEnd="@dimen/_6sdp"
                     android:background="@drawable/bg_filter_chip"
                     android:text="📊 Poll"
                     android:textColor="@color/textSecondary"
-                    android:textSize="11sp"
+                    android:textSize="@dimen/_11ssp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipQuickDoodle"
                     android:layout_width="wrap_content"
-                    android:layout_height="28dp"
+                    android:layout_height="@dimen/_28sdp"
                     android:gravity="center"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp"
-                    android:layout_marginEnd="6dp"
+                    android:paddingStart="@dimen/_10sdp"
+                    android:paddingEnd="@dimen/_10sdp"
+                    android:layout_marginEnd="@dimen/_6sdp"
                     android:background="@drawable/bg_filter_chip"
                     android:text="🎨 Doodle"
                     android:textColor="@color/textSecondary"
-                    android:textSize="11sp"
+                    android:textSize="@dimen/_11ssp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipQuickVoiceMask"
                     android:layout_width="wrap_content"
-                    android:layout_height="28dp"
+                    android:layout_height="@dimen/_28sdp"
                     android:gravity="center"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp"
-                    android:layout_marginEnd="6dp"
+                    android:paddingStart="@dimen/_10sdp"
+                    android:paddingEnd="@dimen/_10sdp"
+                    android:layout_marginEnd="@dimen/_6sdp"
                     android:background="@drawable/bg_filter_chip"
                     android:text="🎙️ Voice: Normal"
                     android:textColor="@color/textSecondary"
-                    android:textSize="11sp"
+                    android:textSize="@dimen/_11ssp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/chipQuickSmartReply"
                     android:layout_width="wrap_content"
-                    android:layout_height="28dp"
+                    android:layout_height="@dimen/_28sdp"
                     android:gravity="center"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp"
+                    android:paddingStart="@dimen/_10sdp"
+                    android:paddingEnd="@dimen/_10sdp"
                     android:background="@drawable/bg_filter_chip"
                     android:text="✨ Smart Reply"
                     android:textColor="@color/textSecondary"
-                    android:textSize="11sp"
+                    android:textSize="@dimen/_11ssp"
                     android:textStyle="bold"
                     android:visibility="gone" />
 
@@ -863,10 +863,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:scrollbars="none"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
+            android:paddingStart="@dimen/_10sdp"
+            android:paddingEnd="@dimen/_10sdp"
+            android:paddingTop="@dimen/_3sdp"
+            android:paddingBottom="@dimen/_3sdp"
             android:clipToPadding="false"
             android:visibility="gone">
 
@@ -884,12 +884,12 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_media_glass_chip"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_marginBottom="8dp"
-            android:padding="14dp"
+            android:layout_marginStart="@dimen/_12sdp"
+            android:layout_marginEnd="@dimen/_12sdp"
+            android:layout_marginBottom="@dimen/_8sdp"
+            android:padding="@dimen/_14sdp"
             android:visibility="gone"
-            android:elevation="6dp">
+            android:elevation="@dimen/_6sdp">
 
             <TextView
                 android:id="@+id/tvMessageRequestPrompt"
@@ -897,34 +897,34 @@
                 android:layout_height="wrap_content"
                 android:text="📥 Message Request: This user wants to send you a message. They won't know you've viewed it until you accept."
                 android:textColor="@color/textPrimary"
-                android:textSize="13.5sp"
-                android:lineSpacingExtra="2dp" />
+                android:textSize="@dimen/_14ssp"
+                android:lineSpacingExtra="@dimen/_2sdp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="end|center_vertical"
-                android:layout_marginTop="10dp">
+                android:layout_marginTop="@dimen/_10sdp">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnDeclineMessageRequest"
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="@dimen/_36sdp"
                     android:text="Decline"
                     android:textColor="@color/colorError"
-                    android:textSize="12.5sp"
-                    android:layout_marginEnd="8dp" />
+                    android:textSize="@dimen/_13ssp"
+                    android:layout_marginEnd="@dimen/_8sdp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnAcceptMessageRequest"
                     style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="@dimen/_36sdp"
                     android:text="Accept"
-                    android:textSize="12.5sp"
-                    app:cornerRadius="18dp" />
+                    android:textSize="@dimen/_13ssp"
+                    app:cornerRadius="@dimen/_18sdp" />
             </LinearLayout>
         </LinearLayout>
 
@@ -933,18 +933,18 @@
             android:id="@+id/mentionSuggestionsContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="10dp"
-            android:layout_marginBottom="4dp"
+            android:layout_marginStart="@dimen/_10sdp"
+            android:layout_marginEnd="@dimen/_10sdp"
+            android:layout_marginBottom="@dimen/_4sdp"
             android:visibility="gone"
-            android:elevation="8dp">
+            android:elevation="@dimen/_8sdp">
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="6dp"
-                app:strokeWidth="1dp"
+                app:cardCornerRadius="@dimen/_16sdp"
+                app:cardElevation="@dimen/_6sdp"
+                app:strokeWidth="@dimen/_1sdp"
                 app:strokeColor="@color/colorOutline"
                 app:cardBackgroundColor="@color/colorSurfaceVariant">
 
@@ -952,9 +952,9 @@
                     android:id="@+id/mentionSuggestionsRecyclerView"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:maxHeight="180dp"
+                    android:maxHeight="@dimen/_180sdp"
                     android:clipToPadding="false"
-                    android:paddingVertical="4dp"
+                    android:paddingVertical="@dimen/_4sdp"
                     android:overScrollMode="never" />
             </com.google.android.material.card.MaterialCardView>
         </FrameLayout>
@@ -966,20 +966,20 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:background="@drawable/bg_reply_preview"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="2dp"
-            android:padding="10dp"
+            android:layout_marginStart="@dimen/_12sdp"
+            android:layout_marginEnd="@dimen/_12sdp"
+            android:layout_marginTop="@dimen/_6sdp"
+            android:layout_marginBottom="@dimen/_2sdp"
+            android:padding="@dimen/_10sdp"
             android:gravity="center_vertical"
             android:visibility="gone"
-            android:elevation="2dp">
+            android:elevation="@dimen/_2sdp">
 
             <View
-                android:layout_width="4dp"
+                android:layout_width="@dimen/_4sdp"
                 android:layout_height="match_parent"
                 android:background="@color/veil_accent"
-                android:layout_marginEnd="12dp" />
+                android:layout_marginEnd="@dimen/_12sdp" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -993,7 +993,7 @@
                     android:layout_height="wrap_content"
                     android:text="User Name"
                     android:textColor="@color/veil_accent"
-                    android:textSize="13sp"
+                    android:textSize="@dimen/_13ssp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -1002,21 +1002,21 @@
                     android:layout_height="wrap_content"
                     android:text="Reply text preview..."
                     android:textColor="@color/text_secondary"
-                    android:textSize="14sp"
+                    android:textSize="@dimen/_14ssp"
                     android:maxLines="2"
                     android:ellipsize="end"
-                    android:layout_marginTop="2dp" />
+                    android:layout_marginTop="@dimen/_2sdp" />
             </LinearLayout>
 
             <ImageView
                 android:id="@+id/closeReplyButton"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:padding="6dp"
+                android:layout_width="@dimen/_28sdp"
+                android:layout_height="@dimen/_28sdp"
+                android:padding="@dimen/_6sdp"
                 android:src="@android:drawable/ic_menu_close_clear_cancel"
                 app:tint="@color/text_secondary"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:layout_marginStart="8dp" />
+                android:layout_marginStart="@dimen/_8sdp" />
         </LinearLayout>
 
         <!-- Input & Recording Area (WhatsApp-Authentic Structure: Pill on Left + Action FAB on Right) -->
@@ -1031,10 +1031,10 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="bottom"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="8dp">
+                android:paddingStart="@dimen/_8sdp"
+                android:paddingEnd="@dimen/_8sdp"
+                android:paddingTop="@dimen/_6sdp"
+                android:paddingBottom="@dimen/_8sdp">
 
                 <FrameLayout
                     android:layout_width="0dp"
@@ -1046,18 +1046,18 @@
                         android:id="@+id/inputContainer"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:minHeight="48dp"
+                        android:minHeight="@dimen/_48sdp"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
                         android:background="@drawable/bg_chat_input"
-                        android:paddingStart="4dp"
-                        android:paddingEnd="4dp">
+                        android:paddingStart="@dimen/_4sdp"
+                        android:paddingEnd="@dimen/_4sdp">
 
                         <ImageView
                             android:id="@+id/emojiButton"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:padding="9dp"
+                            android:layout_width="@dimen/_40sdp"
+                            android:layout_height="@dimen/_40sdp"
+                            android:padding="@dimen/_9sdp"
                             android:src="@drawable/ic_emoji"
                             app:tint="@color/text_secondary"
                             android:background="?attr/selectableItemBackgroundBorderless"
@@ -1074,20 +1074,20 @@
                             android:hint="@string/type_message"
                             android:textColor="@color/text_primary"
                             android:textColorHint="@color/text_secondary"
-                            android:paddingTop="10dp"
-                            android:paddingBottom="10dp"
-                            android:paddingStart="6dp"
-                            android:paddingEnd="6dp"
+                            android:paddingTop="@dimen/_10sdp"
+                            android:paddingBottom="@dimen/_10sdp"
+                            android:paddingStart="@dimen/_6sdp"
+                            android:paddingEnd="@dimen/_6sdp"
                             android:maxLines="5"
-                            android:textSize="16sp"
+                            android:textSize="@dimen/_16ssp"
                             android:inputType="textMultiLine|textCapSentences"
                             android:autofillHints="message" />
 
                         <ImageView
                             android:id="@+id/attachmentButton"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:padding="9dp"
+                            android:layout_width="@dimen/_40sdp"
+                            android:layout_height="@dimen/_40sdp"
+                            android:padding="@dimen/_9sdp"
                             android:src="@drawable/ic_add"
                             app:tint="@color/text_secondary"
                             android:background="?attr/selectableItemBackgroundBorderless"
@@ -1097,9 +1097,9 @@
 
                         <ImageView
                             android:id="@+id/cameraButton"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:padding="9dp"
+                            android:layout_width="@dimen/_40sdp"
+                            android:layout_height="@dimen/_40sdp"
+                            android:padding="@dimen/_9sdp"
                             android:src="@drawable/ic_camera"
                             app:tint="@color/text_secondary"
                             android:background="?attr/selectableItemBackgroundBorderless"
@@ -1112,27 +1112,27 @@
                     <LinearLayout
                         android:id="@+id/recordingContainer"
                         android:layout_width="match_parent"
-                        android:layout_height="48dp"
+                        android:layout_height="@dimen/_48sdp"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
                         android:background="@drawable/bg_chat_input"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="14dp"
+                        android:paddingStart="@dimen/_14sdp"
+                        android:paddingEnd="@dimen/_14sdp"
                         android:visibility="gone">
 
                         <ImageView
                             android:id="@+id/recordBlinkDot"
-                            android:layout_width="10dp"
-                            android:layout_height="10dp"
+                            android:layout_width="@dimen/_10sdp"
+                            android:layout_height="@dimen/_10sdp"
                             android:src="@drawable/circle_red" />
 
                         <TextView
                             android:id="@+id/recordTimerText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="10dp"
+                            android:layout_marginStart="@dimen/_10sdp"
                             android:text="0:00"
-                            android:textSize="16sp"
+                            android:textSize="@dimen/_16ssp"
                             android:textStyle="bold"
                             android:fontFeatureSettings="tnum"
                             android:textColor="@color/text_primary" />
@@ -1147,7 +1147,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="◀ Slide to cancel"
-                            android:textSize="14sp"
+                            android:textSize="@dimen/_14ssp"
                             android:textColor="@color/text_secondary" />
 
                         <Space
@@ -1160,14 +1160,14 @@
                 <!-- Independent WhatsApp-Style Send / Mic FAB (Never hidden when inputContainer hides!) -->
                 <com.google.android.material.floatingactionbutton.FloatingActionButton
                     android:id="@+id/sendButton"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="6dp"
+                    android:layout_width="@dimen/_48sdp"
+                    android:layout_height="@dimen/_48sdp"
+                    android:layout_marginStart="@dimen/_6sdp"
                     android:src="@drawable/ic_mic"
-                    app:fabCustomSize="48dp"
+                    app:fabCustomSize="@dimen/_48sdp"
                     app:backgroundTint="@color/colorPrimary"
                     app:tint="@android:color/white"
-                    app:elevation="2dp"
+                    app:elevation="@dimen/_2sdp"
                     android:contentDescription="@string/send_message" />
             </LinearLayout>
 
@@ -1177,7 +1177,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="12dp"
+                android:padding="@dimen/_12sdp"
                 android:visibility="gone"
                 android:background="@color/colorSurface">
 
@@ -1186,20 +1186,20 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingBottom="10dp">
+                    android:paddingBottom="@dimen/_10sdp">
 
                     <ImageView
-                        android:layout_width="10dp"
-                        android:layout_height="10dp"
+                        android:layout_width="@dimen/_10sdp"
+                        android:layout_height="@dimen/_10sdp"
                         android:src="@drawable/circle_red"
-                        android:layout_marginEnd="8dp" />
+                        android:layout_marginEnd="@dimen/_8sdp" />
 
                     <TextView
                         android:id="@+id/lockedRecordTimerText"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0:00"
-                        android:textSize="17sp"
+                        android:textSize="@dimen/_17ssp"
                         android:textStyle="bold"
                         android:fontFeatureSettings="tnum"
                         android:textColor="@color/text_primary" />
@@ -1208,36 +1208,36 @@
                     <com.m3.veil.ui.views.WaveformView
                         android:id="@+id/lockedWaveformView"
                         android:layout_width="0dp"
-                        android:layout_height="32dp"
+                        android:layout_height="@dimen/_32sdp"
                         android:layout_weight="1"
-                        android:layout_marginStart="12dp"
-                        android:layout_marginEnd="10dp" />
+                        android:layout_marginStart="@dimen/_12sdp"
+                        android:layout_marginEnd="@dimen/_10sdp" />
 
                     <!-- Voice Mask Filter Toggle inside Recorder -->
                     <TextView
                         android:id="@+id/btnLockedVoiceFilter"
                         android:layout_width="wrap_content"
-                        android:layout_height="28dp"
+                        android:layout_height="@dimen/_28sdp"
                         android:gravity="center"
-                        android:paddingStart="8dp"
-                        android:paddingEnd="8dp"
-                        android:layout_marginEnd="6dp"
+                        android:paddingStart="@dimen/_8sdp"
+                        android:paddingEnd="@dimen/_8sdp"
+                        android:layout_marginEnd="@dimen/_6sdp"
                         android:background="@drawable/bg_filter_chip"
                         android:text="🎙️ Normal"
                         android:textColor="@color/colorPrimary"
-                        android:textSize="11sp"
+                        android:textSize="@dimen/_11ssp"
                         android:textStyle="bold" />
 
                     <!-- WhatsApp View-Once Voice Note Toggle -->
                     <TextView
                         android:id="@+id/btnLockedViewOnceVoice"
-                        android:layout_width="32dp"
-                        android:layout_height="28dp"
+                        android:layout_width="@dimen/_32sdp"
+                        android:layout_height="@dimen/_28sdp"
                         android:gravity="center"
                         android:background="@drawable/bg_filter_chip"
                         android:text="1x"
                         android:textColor="@color/textSecondary"
-                        android:textSize="11sp"
+                        android:textSize="@dimen/_11ssp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
@@ -1249,9 +1249,9 @@
 
                     <ImageView
                         android:id="@+id/deleteRecordingButton"
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:padding="10dp"
+                        android:layout_width="@dimen/_44sdp"
+                        android:layout_height="@dimen/_44sdp"
+                        android:padding="@dimen/_10sdp"
                         android:src="@drawable/ic_delete"
                         app:tint="@color/error_red"
                         android:background="?attr/selectableItemBackgroundBorderless"
@@ -1261,20 +1261,20 @@
                     <LinearLayout
                         android:id="@+id/pauseRecordingButton"
                         android:layout_width="0dp"
-                        android:layout_height="42dp"
+                        android:layout_height="@dimen/_42sdp"
                         android:layout_weight="1"
                         android:orientation="horizontal"
                         android:gravity="center"
                         android:background="@drawable/bg_pause_pill"
-                        android:layout_marginStart="16dp"
-                        android:layout_marginEnd="16dp"
+                        android:layout_marginStart="@dimen/_16sdp"
+                        android:layout_marginEnd="@dimen/_16sdp"
                         android:clickable="true"
                         android:focusable="true">
 
                         <ImageView
                             android:id="@+id/pauseRecordingIcon"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="@dimen/_20sdp"
+                            android:layout_height="@dimen/_20sdp"
                             android:src="@drawable/ic_pause"
                             app:tint="@color/text_primary" />
 
@@ -1284,17 +1284,17 @@
                             android:layout_height="wrap_content"
                             android:text="Pause"
                             android:textColor="@color/text_primary"
-                            android:textSize="15sp"
+                            android:textSize="@dimen/_15ssp"
                             android:textStyle="bold"
-                            android:layout_marginStart="8dp" />
+                            android:layout_marginStart="@dimen/_8sdp" />
                     </LinearLayout>
 
                     <com.google.android.material.floatingactionbutton.FloatingActionButton
                         android:id="@+id/lockedSendButton"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
+                        android:layout_width="@dimen/_48sdp"
+                        android:layout_height="@dimen/_48sdp"
                         android:src="@drawable/ic_send"
-                        app:fabCustomSize="48dp"
+                        app:fabCustomSize="@dimen/_48sdp"
                         app:backgroundTint="@color/colorPrimary"
                         app:tint="@android:color/white"
                         app:elevation="0dp"
@@ -1308,16 +1308,16 @@
     <!-- Lock icon for swipe-up to lock (floats above the button) -->
     <ImageView
         android:id="@+id/recordLockIcon"
-        android:layout_width="48dp"
-        android:layout_height="120dp"
+        android:layout_width="@dimen/_48sdp"
+        android:layout_height="@dimen/_120sdp"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="70dp"
+        android:layout_marginEnd="@dimen/_8sdp"
+        android:layout_marginBottom="@dimen/_70sdp"
         android:src="@drawable/ic_lock"
         android:background="@drawable/bg_lock_container"
-        android:paddingTop="12dp"
-        android:paddingBottom="70dp"
+        android:paddingTop="@dimen/_12sdp"
+        android:paddingBottom="@dimen/_70sdp"
         android:visibility="gone"
         app:tint="@color/text_primary" />
 

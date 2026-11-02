@@ -28,24 +28,24 @@
             <LinearLayout
                 android:id="@+id/chatMultiSelectBar"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginStart="12dp"
-                android:layout_marginEnd="12dp"
-                android:layout_marginTop="6dp"
-                android:layout_marginBottom="4dp"
+                android:layout_height="@dimen/_52sdp"
+                android:layout_marginStart="@dimen/_12sdp"
+                android:layout_marginEnd="@dimen/_12sdp"
+                android:layout_marginTop="@dimen/_6sdp"
+                android:layout_marginBottom="@dimen/_4sdp"
                 android:background="@drawable/bg_chat_input"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="6dp"
-                android:paddingEnd="6dp"
+                android:paddingStart="@dimen/_6sdp"
+                android:paddingEnd="@dimen/_6sdp"
                 android:visibility="gone">
 
                 <ImageButton
                     android:id="@+id/btnChatSelectClose"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="8dp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_close"
                     app:tint="@color/textPrimary"
                     android:contentDescription="Cancel selection" />
@@ -55,74 +55,74 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
+                    android:layout_marginStart="@dimen/_6sdp"
                     android:fontFamily="sans-serif-medium"
                     android:singleLine="true"
                     android:ellipsize="end"
                     android:text="1 selected"
                     android:textColor="@color/textPrimary"
-                    android:textSize="16sp"
+                    android:textSize="@dimen/_16ssp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/btnChatSelectAll"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
+                    android:layout_height="@dimen/_34sdp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:gravity="center"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
+                    android:paddingStart="@dimen/_8sdp"
+                    android:paddingEnd="@dimen/_8sdp"
                     android:text="All"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="12.5sp"
+                    android:textSize="@dimen/_13ssp"
                     android:textStyle="bold" />
 
                 <ImageButton
                     android:id="@+id/btnChatSelectPin"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="8dp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_pin"
                     app:tint="@color/textPrimary"
                     android:contentDescription="Pin or Unpin selected" />
 
                 <ImageButton
                     android:id="@+id/btnChatSelectMute"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="8dp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_notifications_off"
                     app:tint="@color/textPrimary"
                     android:contentDescription="Mute or Unmute selected" />
 
                 <ImageButton
                     android:id="@+id/btnChatSelectArchive"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="8dp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_archive"
                     app:tint="@color/textPrimary"
                     android:contentDescription="Archive selected" />
 
                 <ImageButton
                     android:id="@+id/btnChatSelectDelete"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="8dp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_delete"
                     app:tint="@color/statusError"
                     android:contentDescription="Delete selected" />
 
                 <ImageButton
                     android:id="@+id/btnChatSelectMore"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
+                    android:layout_width="@dimen/_38sdp"
+                    android:layout_height="@dimen/_38sdp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="8dp"
+                    android:padding="@dimen/_8sdp"
                     android:src="@drawable/ic_more_vert"
                     app:tint="@color/textPrimary"
                     android:contentDescription="More chat actions" />
@@ -132,20 +132,20 @@
             <LinearLayout
                 android:id="@+id/searchContainer"
                 android:layout_width="match_parent"
-                android:layout_height="42dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginTop="6dp"
-                android:layout_marginBottom="4dp"
+                android:layout_height="@dimen/_42sdp"
+                android:layout_marginStart="@dimen/_16sdp"
+                android:layout_marginEnd="@dimen/_16sdp"
+                android:layout_marginTop="@dimen/_6sdp"
+                android:layout_marginBottom="@dimen/_4sdp"
                 android:background="@drawable/bg_chat_input"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="14dp"
-                android:paddingEnd="10dp">
+                android:paddingStart="@dimen/_14sdp"
+                android:paddingEnd="@dimen/_10sdp">
 
                 <ImageView
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="@dimen/_18sdp"
+                    android:layout_height="@dimen/_18sdp"
                     android:src="@drawable/ic_search"
                     app:tint="@color/textSecondary" />
 
@@ -154,20 +154,20 @@
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:layout_marginStart="10dp"
+                    android:layout_marginStart="@dimen/_10sdp"
                     android:background="@null"
                     android:hint="Search chats or messages..."
                     android:textColor="@color/textPrimary"
                     android:textColorHint="@color/textSecondary"
-                    android:textSize="14sp"
+                    android:textSize="@dimen/_14ssp"
                     android:singleLine="true"
                     android:imeOptions="actionSearch" />
 
                 <ImageView
                     android:id="@+id/btnClearSearch"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:padding="4dp"
+                    android:layout_width="@dimen/_24sdp"
+                    android:layout_height="@dimen/_24sdp"
+                    android:padding="@dimen/_4sdp"
                     android:src="@drawable/ic_close"
                     app:tint="@color/textSecondary"
                     android:visibility="gone" />
@@ -179,10 +179,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:scrollbars="none"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
+                android:paddingStart="@dimen/_16sdp"
+                android:paddingEnd="@dimen/_16sdp"
+                android:paddingTop="@dimen/_6sdp"
+                android:paddingBottom="@dimen/_6sdp"
                 android:clipToPadding="false">
 
                 <LinearLayout
@@ -193,106 +193,106 @@
                     <TextView
                         android:id="@+id/chipFilterAll"
                         android:layout_width="wrap_content"
-                        android:layout_height="32dp"
+                        android:layout_height="@dimen/_32sdp"
                         android:gravity="center"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="14dp"
-                        android:layout_marginEnd="8dp"
+                        android:paddingStart="@dimen/_14sdp"
+                        android:paddingEnd="@dimen/_14sdp"
+                        android:layout_marginEnd="@dimen/_8sdp"
                         android:background="@drawable/bg_filter_chip"
                         android:text="All"
                         android:textColor="@color/colorPrimary"
                         android:textStyle="bold"
-                        android:textSize="13sp" />
+                        android:textSize="@dimen/_13ssp" />
 
                     <TextView
                         android:id="@+id/chipFilterStatus"
                         android:layout_width="wrap_content"
-                        android:layout_height="32dp"
+                        android:layout_height="@dimen/_32sdp"
                         android:gravity="center"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="14dp"
-                        android:layout_marginEnd="8dp"
+                        android:paddingStart="@dimen/_14sdp"
+                        android:paddingEnd="@dimen/_14sdp"
+                        android:layout_marginEnd="@dimen/_8sdp"
                         android:background="@drawable/bg_filter_chip"
                         android:text="🟢 Status"
                         android:textColor="@color/textSecondary"
-                        android:textSize="13sp" />
+                        android:textSize="@dimen/_13ssp" />
 
                     <TextView
                         android:id="@+id/chipFilterUnread"
                         android:layout_width="wrap_content"
-                        android:layout_height="32dp"
+                        android:layout_height="@dimen/_32sdp"
                         android:gravity="center"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="14dp"
-                        android:layout_marginEnd="8dp"
+                        android:paddingStart="@dimen/_14sdp"
+                        android:paddingEnd="@dimen/_14sdp"
+                        android:layout_marginEnd="@dimen/_8sdp"
                         android:background="@drawable/bg_filter_chip"
                         android:text="Unread"
                         android:textColor="@color/textSecondary"
-                        android:textSize="13sp" />
+                        android:textSize="@dimen/_13ssp" />
 
                     <TextView
                         android:id="@+id/chipFilterGroups"
                         android:layout_width="wrap_content"
-                        android:layout_height="32dp"
+                        android:layout_height="@dimen/_32sdp"
                         android:gravity="center"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="14dp"
-                        android:layout_marginEnd="8dp"
+                        android:paddingStart="@dimen/_14sdp"
+                        android:paddingEnd="@dimen/_14sdp"
+                        android:layout_marginEnd="@dimen/_8sdp"
                         android:background="@drawable/bg_filter_chip"
                         android:text="Groups"
                         android:textColor="@color/textSecondary"
-                        android:textSize="13sp" />
+                        android:textSize="@dimen/_13ssp" />
 
                     <TextView
                         android:id="@+id/chipFilterRequests"
                         android:layout_width="wrap_content"
-                        android:layout_height="32dp"
+                        android:layout_height="@dimen/_32sdp"
                         android:gravity="center"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="14dp"
-                        android:layout_marginEnd="8dp"
+                        android:paddingStart="@dimen/_14sdp"
+                        android:paddingEnd="@dimen/_14sdp"
+                        android:layout_marginEnd="@dimen/_8sdp"
                         android:background="@drawable/bg_filter_chip"
                         android:text="📥 Requests"
                         android:textColor="@color/textSecondary"
-                        android:textSize="13sp" />
+                        android:textSize="@dimen/_13ssp" />
 
                     <TextView
                         android:id="@+id/chipFilterVanish"
                         android:layout_width="wrap_content"
-                        android:layout_height="32dp"
+                        android:layout_height="@dimen/_32sdp"
                         android:gravity="center"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="14dp"
-                        android:layout_marginEnd="8dp"
+                        android:paddingStart="@dimen/_14sdp"
+                        android:paddingEnd="@dimen/_14sdp"
+                        android:layout_marginEnd="@dimen/_8sdp"
                         android:background="@drawable/bg_filter_chip"
                         android:text="⏱️ Vanish"
                         android:textColor="@color/textSecondary"
-                        android:textSize="13sp" />
+                        android:textSize="@dimen/_13ssp" />
 
                     <TextView
                         android:id="@+id/chipFilterPinned"
                         android:layout_width="wrap_content"
-                        android:layout_height="32dp"
+                        android:layout_height="@dimen/_32sdp"
                         android:gravity="center"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="14dp"
-                        android:layout_marginEnd="8dp"
+                        android:paddingStart="@dimen/_14sdp"
+                        android:paddingEnd="@dimen/_14sdp"
+                        android:layout_marginEnd="@dimen/_8sdp"
                         android:background="@drawable/bg_filter_chip"
                         android:text="📌 Pinned"
                         android:textColor="@color/textSecondary"
-                        android:textSize="13sp" />
+                        android:textSize="@dimen/_13ssp" />
 
                     <TextView
                         android:id="@+id/chipFilterSecret"
                         android:layout_width="wrap_content"
-                        android:layout_height="32dp"
+                        android:layout_height="@dimen/_32sdp"
                         android:gravity="center"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="14dp"
+                        android:paddingStart="@dimen/_14sdp"
+                        android:paddingEnd="@dimen/_14sdp"
                         android:background="@drawable/bg_filter_chip"
                         android:text="🔒 Secret Vault"
                         android:textColor="@color/textSecondary"
-                        android:textSize="13sp" />
+                        android:textSize="@dimen/_13ssp" />
                 </LinearLayout>
             </HorizontalScrollView>
 
@@ -302,17 +302,17 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingTop="2dp"
-                android:paddingBottom="6dp">
+                android:paddingTop="@dimen/_2sdp"
+                android:paddingBottom="@dimen/_6sdp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:paddingBottom="4dp">
+                    android:paddingStart="@dimen/_16sdp"
+                    android:paddingEnd="@dimen/_16sdp"
+                    android:paddingBottom="@dimen/_4sdp">
 
                     <TextView
                         android:layout_width="0dp"
@@ -321,7 +321,7 @@
                         android:fontFamily="sans-serif-medium"
                         android:text="Status"
                         android:textColor="@color/colorTextPrimary"
-                        android:textSize="18sp"
+                        android:textSize="@dimen/_18ssp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
@@ -330,8 +330,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:scrollbars="none"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
+                    android:paddingStart="@dimen/_16sdp"
+                    android:paddingEnd="@dimen/_16sdp"
                     android:clipToPadding="false">
 
                     <LinearLayout
@@ -343,8 +343,8 @@
 
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="0.8dp"
-                    android:layout_marginTop="8dp"
+                    android:layout_height="@dimen/_1sdp"
+                    android:layout_marginTop="@dimen/_8sdp"
                     android:background="@color/colorOutline" />
             </LinearLayout>
 
@@ -352,17 +352,17 @@
             <LinearLayout
                 android:id="@+id/secretVaultRow"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="@dimen/_48sdp"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp"
+                android:paddingStart="@dimen/_20sdp"
+                android:paddingEnd="@dimen/_20sdp"
                 android:background="?attr/selectableItemBackground"
                 android:visibility="gone">
 
                 <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
+                    android:layout_width="@dimen/_20sdp"
+                    android:layout_height="@dimen/_20sdp"
                     android:src="@drawable/ic_lock"
                     app:tint="@color/colorPrimary" />
 
@@ -370,10 +370,10 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="16dp"
+                    android:layout_marginStart="@dimen/_16sdp"
                     android:text="Locked chats"
                     android:textColor="@color/textPrimary"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/_15ssp"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
@@ -381,7 +381,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="13sp"
+                    android:textSize="@dimen/_13ssp"
                     android:textStyle="bold"
                     android:text="0" />
 
@@ -390,7 +390,7 @@
             <View
                 android:id="@+id/secretVaultDivider"
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:background="@color/colorOutline"
                 android:visibility="gone" />
 
@@ -398,17 +398,17 @@
             <LinearLayout
                 android:id="@+id/archivedRow"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="@dimen/_48sdp"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp"
+                android:paddingStart="@dimen/_20sdp"
+                android:paddingEnd="@dimen/_20sdp"
                 android:background="?attr/selectableItemBackground"
                 android:visibility="gone">
 
                 <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
+                    android:layout_width="@dimen/_20sdp"
+                    android:layout_height="@dimen/_20sdp"
                     android:src="@drawable/ic_archive"
                     app:tint="@color/colorPrimary" />
 
@@ -416,10 +416,10 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="16dp"
+                    android:layout_marginStart="@dimen/_16sdp"
                     android:text="Archived"
                     android:textColor="@color/textPrimary"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/_15ssp"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
@@ -427,7 +427,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="13sp"
+                    android:textSize="@dimen/_13ssp"
                     android:textStyle="bold"
                     android:text="0" />
 
@@ -436,7 +436,7 @@
             <View
                 android:id="@+id/archivedDivider"
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:background="@color/colorOutline"
                 android:visibility="gone" />
 
@@ -450,8 +450,8 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             app:layout_behavior="@string/appbar_scrolling_view_behavior"
-            android:paddingTop="4dp"
-            android:paddingBottom="96dp"
+            android:paddingTop="@dimen/_4sdp"
+            android:paddingBottom="@dimen/_96sdp"
             android:clipToPadding="false"
             android:nestedScrollingEnabled="true"
             android:scrollbars="vertical" />
@@ -463,7 +463,7 @@
             android:layout_height="match_parent"
             app:layout_behavior="@string/appbar_scrolling_view_behavior"
             android:visibility="gone"
-            android:paddingBottom="96dp"
+            android:paddingBottom="@dimen/_96sdp"
             android:clipToPadding="false">
 
             <LinearLayout
@@ -488,14 +488,14 @@
                 android:layout_height="match_parent"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:padding="32dp"
-                android:paddingBottom="100dp">
+                android:padding="@dimen/_32sdp"
+                android:paddingBottom="@dimen/_100sdp">
 
                 <ImageView
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
+                    android:layout_width="@dimen/_72sdp"
+                    android:layout_height="@dimen/_72sdp"
                     android:src="@drawable/ic_chat_empty"
-                    android:layout_marginBottom="20dp"
+                    android:layout_marginBottom="@dimen/_20sdp"
                     app:tint="@color/textSecondary"
                     android:contentDescription="@string/no_conversations" />
 
@@ -505,9 +505,9 @@
                     android:layout_height="wrap_content"
                     android:text="@string/no_conversations"
                     android:textColor="@color/textPrimary"
-                    android:textSize="20sp"
+                    android:textSize="@dimen/_20ssp"
                     android:fontFamily="sans-serif-medium"
-                    android:layout_marginBottom="8dp" />
+                    android:layout_marginBottom="@dimen/_8sdp" />
 
                 <TextView
                     android:id="@+id/tvEmptySubtitle"
@@ -515,21 +515,21 @@
                     android:layout_height="wrap_content"
                     android:text="@string/start_new_conversation_hint"
                     android:textColor="@color/textSecondary"
-                    android:textSize="14sp"
+                    android:textSize="@dimen/_14ssp"
                     android:gravity="center"
-                    android:lineSpacingExtra="2dp" />
+                    android:lineSpacingExtra="@dimen/_2sdp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/startChatButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="48dp"
+                    android:layout_height="@dimen/_48sdp"
                     android:text="@string/start_chat"
                     android:textColor="@android:color/white"
                     app:backgroundTint="@color/colorPrimary"
-                    app:cornerRadius="24dp"
-                    android:layout_marginTop="24dp"
-                    android:paddingStart="28dp"
-                    android:paddingEnd="28dp" />
+                    app:cornerRadius="@dimen/_24sdp"
+                    android:layout_marginTop="@dimen/_24sdp"
+                    android:paddingStart="@dimen/_28sdp"
+                    android:paddingEnd="@dimen/_28sdp" />
 
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>

@@ -10,36 +10,36 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="10dp">
+        android:paddingTop="@dimen/_10sdp">
 
         <!-- Modern Drag Handle -->
         <View
-            android:layout_width="36dp"
-            android:layout_height="4dp"
+            android:layout_width="@dimen/_36sdp"
+            android:layout_height="@dimen/_4sdp"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="@dimen/_8sdp"
             android:background="@drawable/bg_persona_drag_handle" />
 
         <!-- Top Header Row: Close (X) on Left + Centered Title ("Add status" / "Start layout") -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="46dp"
+            android:layout_height="@dimen/_46sdp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp">
+            android:paddingStart="@dimen/_12sdp"
+            android:paddingEnd="@dimen/_12sdp">
 
             <FrameLayout
                 android:id="@+id/btnCloseStatusChoice"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
+                android:layout_width="@dimen/_38sdp"
+                android:layout_height="@dimen/_38sdp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:clickable="true"
                 android:focusable="true">
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="@dimen/_22sdp"
+                    android:layout_height="@dimen/_22sdp"
                     android:layout_gravity="center"
                     android:contentDescription="Close"
                     android:src="@drawable/ic_close"
@@ -55,13 +55,13 @@
                 android:gravity="center"
                 android:text="Add status"
                 android:textColor="@color/colorTextPrimary"
-                android:textSize="20sp"
+                android:textSize="@dimen/_20ssp"
                 android:textStyle="bold" />
 
             <!-- Symmetry Spacer -->
             <View
-                android:layout_width="38dp"
-                android:layout_height="38dp" />
+                android:layout_width="@dimen/_38sdp"
+                android:layout_height="@dimen/_38sdp" />
         </LinearLayout>
 
         <!-- Layout Mode Subtitle ("Choose up to 6 photos for your layout.") -->
@@ -69,12 +69,12 @@
             android:id="@+id/tvLayoutModeSubtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="10dp"
+            android:layout_marginTop="@dimen/_4sdp"
+            android:layout_marginBottom="@dimen/_10sdp"
             android:gravity="center"
             android:text="Choose up to 6 photos for your layout."
             android:textColor="@color/colorTextSecondary"
-            android:textSize="14sp"
+            android:textSize="@dimen/_14ssp"
             android:visibility="gone" />
 
         <!-- 4 Quick Creation Mode Pills Row (Text, Music, Layout, Voice) -->
@@ -82,12 +82,12 @@
             android:id="@+id/layoutQuickStatusModes"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="14dp"
+            android:layout_marginTop="@dimen/_10sdp"
+            android:layout_marginBottom="@dimen/_14sdp"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp">
+            android:paddingStart="@dimen/_12sdp"
+            android:paddingEnd="@dimen/_12sdp">
 
             <!-- 1. Text -->
             <LinearLayout
@@ -102,13 +102,13 @@
                 android:orientation="vertical">
 
                 <FrameLayout
-                    android:layout_width="68dp"
-                    android:layout_height="48dp"
+                    android:layout_width="@dimen/_68sdp"
+                    android:layout_height="@dimen/_48sdp"
                     android:background="@drawable/bg_status_quick_btn">
 
                     <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="@dimen/_22sdp"
+                        android:layout_height="@dimen/_22sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_edit"
                         app:tint="@color/colorTextPrimary" />
@@ -117,11 +117,11 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/_6sdp"
                     android:fontFamily="sans-serif-medium"
                     android:text="Text"
                     android:textColor="@color/colorTextPrimary"
-                    android:textSize="12.5sp" />
+                    android:textSize="@dimen/_13ssp" />
             </LinearLayout>
 
             <!-- 2. Music / Audio Vibe -->
@@ -137,13 +137,13 @@
                 android:orientation="vertical">
 
                 <FrameLayout
-                    android:layout_width="68dp"
-                    android:layout_height="48dp"
+                    android:layout_width="@dimen/_68sdp"
+                    android:layout_height="@dimen/_48sdp"
                     android:background="@drawable/bg_status_quick_btn">
 
                     <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="@dimen/_22sdp"
+                        android:layout_height="@dimen/_22sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_music_note"
                         app:tint="@color/colorTextPrimary" />
@@ -152,11 +152,11 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/_6sdp"
                     android:fontFamily="sans-serif-medium"
                     android:text="Music"
                     android:textColor="@color/colorTextPrimary"
-                    android:textSize="12.5sp" />
+                    android:textSize="@dimen/_13ssp" />
             </LinearLayout>
 
             <!-- 3. Layout (Collage up to 6 photos) -->
@@ -172,13 +172,13 @@
                 android:orientation="vertical">
 
                 <FrameLayout
-                    android:layout_width="68dp"
-                    android:layout_height="48dp"
+                    android:layout_width="@dimen/_68sdp"
+                    android:layout_height="@dimen/_48sdp"
                     android:background="@drawable/bg_status_quick_btn">
 
                     <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="@dimen/_22sdp"
+                        android:layout_height="@dimen/_22sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_status_layout"
                         app:tint="@color/colorTextPrimary" />
@@ -187,11 +187,11 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/_6sdp"
                     android:fontFamily="sans-serif-medium"
                     android:text="Layout"
                     android:textColor="@color/colorTextPrimary"
-                    android:textSize="12.5sp" />
+                    android:textSize="@dimen/_13ssp" />
             </LinearLayout>
 
             <!-- 4. Voice -->
@@ -207,13 +207,13 @@
                 android:orientation="vertical">
 
                 <FrameLayout
-                    android:layout_width="68dp"
-                    android:layout_height="48dp"
+                    android:layout_width="@dimen/_68sdp"
+                    android:layout_height="@dimen/_48sdp"
                     android:background="@drawable/bg_status_quick_btn">
 
                     <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="@dimen/_22sdp"
+                        android:layout_height="@dimen/_22sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_mic"
                         app:tint="@color/colorTextPrimary" />
@@ -222,34 +222,34 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/_6sdp"
                     android:fontFamily="sans-serif-medium"
                     android:text="Voice"
                     android:textColor="@color/colorTextPrimary"
-                    android:textSize="12.5sp" />
+                    android:textSize="@dimen/_13ssp" />
             </LinearLayout>
         </LinearLayout>
 
         <!-- Album Selector Row ("Recents ▼") -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="42dp"
+            android:layout_height="@dimen/_42sdp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp">
+            android:paddingStart="@dimen/_16sdp"
+            android:paddingEnd="@dimen/_16sdp">
 
             <LinearLayout
                 android:id="@+id/layoutStatusAlbumSelector"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_height="@dimen/_36sdp"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="4dp"
-                android:paddingEnd="10dp">
+                android:paddingStart="@dimen/_4sdp"
+                android:paddingEnd="@dimen/_10sdp">
 
                 <TextView
                     android:id="@+id/tvStatusCurrentAlbum"
@@ -258,21 +258,21 @@
                     android:fontFamily="sans-serif-medium"
                     android:text="Recents"
                     android:textColor="@color/colorTextPrimary"
-                    android:textSize="16sp"
+                    android:textSize="@dimen/_16ssp"
                     android:textStyle="bold" />
 
                 <ImageView
                     android:id="@+id/ivStatusAlbumChevron"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:layout_marginStart="6dp"
+                    android:layout_width="@dimen/_18sdp"
+                    android:layout_height="@dimen/_18sdp"
+                    android:layout_marginStart="@dimen/_6sdp"
                     android:src="@drawable/ic_chevron_down"
                     app:tint="@color/colorTextPrimary" />
             </LinearLayout>
 
             <View
                 android:layout_width="0dp"
-                android:layout_height="1dp"
+                android:layout_height="@dimen/_1sdp"
                 android:layout_weight="1" />
 
             <TextView
@@ -280,7 +280,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/colorTextSecondary"
-                android:textSize="12.5sp"
+                android:textSize="@dimen/_13ssp"
                 android:visibility="gone" />
         </LinearLayout>
 
@@ -296,13 +296,13 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:padding="2dp"
-                android:paddingBottom="80dp" />
+                android:padding="@dimen/_2sdp"
+                android:paddingBottom="@dimen/_80sdp" />
 
             <ProgressBar
                 android:id="@+id/statusGalleryProgressBar"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="@dimen/_36sdp"
+                android:layout_height="@dimen/_36sdp"
                 android:layout_gravity="center"
                 android:indeterminateTint="@color/veil_accent"
                 android:visibility="gone" />
@@ -314,18 +314,18 @@
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:padding="32dp"
+                android:padding="@dimen/_32sdp"
                 android:visibility="gone">
 
                 <FrameLayout
-                    android:layout_width="64dp"
-                    android:layout_height="64dp"
+                    android:layout_width="@dimen/_64sdp"
+                    android:layout_height="@dimen/_64sdp"
                     android:background="@drawable/bg_persona_avatar_circle"
                     android:backgroundTint="@color/colorSurfaceVariant">
 
                     <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
+                        android:layout_width="@dimen/_28sdp"
+                        android:layout_height="@dimen/_28sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_camera"
                         app:tint="@color/veil_accent" />
@@ -335,32 +335,32 @@
                     android:id="@+id/tvStatusPermTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="@dimen/_14sdp"
                     android:fontFamily="sans-serif-medium"
                     android:text="Allow Access to Photos &amp; Videos"
                     android:textColor="@color/colorTextPrimary"
-                    android:textSize="16sp"
+                    android:textSize="@dimen/_16ssp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tvStatusPermSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/_6sdp"
                     android:gravity="center"
                     android:text="Select photos and videos from your albums or capture a new moment with the camera."
                     android:textColor="@color/colorTextSecondary"
-                    android:textSize="13sp" />
+                    android:textSize="@dimen/_13ssp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnStatusBrowseSystemFiles"
                     android:layout_width="wrap_content"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="16dp"
+                    android:layout_height="@dimen/_44sdp"
+                    android:layout_marginTop="@dimen/_16sdp"
                     android:text="Browse Photos &amp; Files"
                     android:textColor="@android:color/white"
                     app:backgroundTint="@color/veil_accent"
-                    app:cornerRadius="22dp" />
+                    app:cornerRadius="@dimen/_22sdp" />
             </LinearLayout>
 
             <!-- Scrim when Album Dropdown is open -->
@@ -376,22 +376,22 @@
             <!-- Floating Album Dropdown Menu Card (Screenshots 4.jpg & 5.jpg) -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardStatusAlbumDropdown"
-                android:layout_width="268dp"
+                android:layout_width="@dimen/_268sdp"
                 android:layout_height="wrap_content"
                 android:layout_gravity="top|start"
-                android:layout_marginStart="14dp"
-                android:layout_marginTop="4dp"
+                android:layout_marginStart="@dimen/_14sdp"
+                android:layout_marginTop="@dimen/_4sdp"
                 android:visibility="gone"
                 app:cardBackgroundColor="@color/colorSurface"
-                app:cardCornerRadius="20dp"
-                app:cardElevation="12dp"
+                app:cardCornerRadius="@dimen/_20sdp"
+                app:cardElevation="@dimen/_12sdp"
                 app:strokeColor="@color/colorOutline"
-                app:strokeWidth="1dp">
+                app:strokeWidth="@dimen/_1sdp">
 
                 <androidx.core.widget.NestedScrollView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:maxHeight="360dp"
+                    android:maxHeight="@dimen/_360sdp"
                     android:overScrollMode="never">
 
                     <LinearLayout
@@ -399,30 +399,30 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:paddingTop="8dp"
-                        android:paddingBottom="8dp" />
+                        android:paddingTop="@dimen/_8sdp"
+                        android:paddingBottom="@dimen/_8sdp" />
                 </androidx.core.widget.NestedScrollView>
             </com.google.android.material.card.MaterialCardView>
 
             <!-- Floating Bottom-Right Folder / Multi-Select Button (Screenshots 2.jpg, 3.jpg, 4.jpg, 5.jpg) -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/fabStatusMultiOrFolder"
-                android:layout_width="54dp"
-                android:layout_height="54dp"
+                android:layout_width="@dimen/_54sdp"
+                android:layout_height="@dimen/_54sdp"
                 android:layout_gravity="bottom|end"
-                android:layout_margin="18dp"
+                android:layout_margin="@dimen/_18sdp"
                 android:clickable="true"
                 android:focusable="true"
                 app:cardBackgroundColor="@color/colorSurface"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="8dp"
+                app:cardCornerRadius="@dimen/_16sdp"
+                app:cardElevation="@dimen/_8sdp"
                 app:strokeColor="@color/colorOutline"
-                app:strokeWidth="1dp">
+                app:strokeWidth="@dimen/_1sdp">
 
                 <ImageView
                     android:id="@+id/ivStatusMultiOrFolderIcon"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="@dimen/_24sdp"
+                    android:layout_height="@dimen/_24sdp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_folder_multi"
                     app:tint="@color/colorTextPrimary" />
@@ -433,13 +433,13 @@
         <LinearLayout
             android:id="@+id/layoutStatusBottomSelectionBar"
             android:layout_width="match_parent"
-            android:layout_height="76dp"
+            android:layout_height="@dimen/_76sdp"
             android:background="@color/colorSurface"
-            android:elevation="12dp"
+            android:elevation="@dimen/_12sdp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="16dp"
+            android:paddingStart="@dimen/_12sdp"
+            android:paddingEnd="@dimen/_16sdp"
             android:visibility="gone">
 
             <HorizontalScrollView
@@ -459,15 +459,15 @@
 
             <FrameLayout
                 android:id="@+id/fabStatusConfirmSelection"
-                android:layout_width="52dp"
-                android:layout_height="52dp"
-                android:layout_marginStart="12dp"
+                android:layout_width="@dimen/_52sdp"
+                android:layout_height="@dimen/_52sdp"
+                android:layout_marginStart="@dimen/_12sdp"
                 android:clickable="true"
                 android:focusable="true">
 
                 <ImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="@dimen/_24sdp"
+                    android:layout_height="@dimen/_24sdp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_check"
                     app:tint="@android:color/white" />

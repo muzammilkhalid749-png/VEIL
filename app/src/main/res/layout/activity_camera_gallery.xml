@@ -22,8 +22,8 @@
     <!-- 2. Animated Tap-to-Focus Ring Overlay -->
     <View
         android:id="@+id/viewFocusRing"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
+        android:layout_width="@dimen/_64sdp"
+        android:layout_height="@dimen/_64sdp"
         android:background="@drawable/bg_focus_ring"
         android:visibility="gone" />
 
@@ -43,20 +43,20 @@
 
         <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp">
+            android:layout_height="@dimen/_56sdp"
+            android:paddingStart="@dimen/_16sdp"
+            android:paddingEnd="@dimen/_16sdp">
 
             <ImageView
                 android:id="@+id/btnCloseCamera"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="@dimen/_44sdp"
+                android:layout_height="@dimen/_44sdp"
                 android:layout_alignParentStart="true"
                 android:layout_centerVertical="true"
                 android:background="@drawable/bg_circle_translucent"
                 android:clickable="true"
                 android:focusable="true"
-                android:padding="10dp"
+                android:padding="@dimen/_10sdp"
                 android:src="@drawable/ic_close"
                 android:contentDescription="@string/back"
                 app:tint="@android:color/white" />
@@ -65,18 +65,18 @@
             <LinearLayout
                 android:id="@+id/layoutRecordingTimer"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_height="@dimen/_36sdp"
                 android:layout_centerInParent="true"
                 android:background="@drawable/bg_timer_pill"
                 android:gravity="center_vertical"
-                android:paddingStart="12dp"
-                android:paddingEnd="14dp"
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingEnd="@dimen/_14sdp"
                 android:visibility="gone">
 
                 <ImageView
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:layout_marginEnd="8dp"
+                    android:layout_width="@dimen/_8sdp"
+                    android:layout_height="@dimen/_8sdp"
+                    android:layout_marginEnd="@dimen/_8sdp"
                     android:src="@drawable/circle_red" />
 
                 <TextView
@@ -85,34 +85,34 @@
                     android:layout_height="wrap_content"
                     android:text="00:00"
                     android:textColor="@android:color/white"
-                    android:textSize="14sp"
+                    android:textSize="@dimen/_14ssp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/btnArMaskToggle"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="@dimen/_44sdp"
+                android:layout_height="@dimen/_44sdp"
                 android:layout_toStartOf="@id/btnFlashToggle"
                 android:layout_centerVertical="true"
-                android:layout_marginEnd="12dp"
+                android:layout_marginEnd="@dimen/_12sdp"
                 android:background="@drawable/bg_circle_translucent"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:text="🎭"
-                android:textSize="20sp" />
+                android:textSize="@dimen/_20ssp" />
 
             <ImageView
                 android:id="@+id/btnFlashToggle"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="@dimen/_44sdp"
+                android:layout_height="@dimen/_44sdp"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
                 android:background="@drawable/bg_circle_translucent"
                 android:clickable="true"
                 android:focusable="true"
-                android:padding="10dp"
+                android:padding="@dimen/_10sdp"
                 android:src="@drawable/ic_flash_off"
                 android:contentDescription="Flash Toggle"
                 app:tint="@android:color/white" />
@@ -128,7 +128,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:orientation="vertical"
-        android:paddingBottom="32dp">
+        android:paddingBottom="@dimen/_32sdp">
 
         <!-- Swipe up for gallery indicator -->
         <LinearLayout
@@ -136,30 +136,30 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="@dimen/_12sdp"
             android:background="@drawable/bg_timer_pill"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="14dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="6dp">
+            android:paddingStart="@dimen/_14sdp"
+            android:paddingTop="@dimen/_6sdp"
+            android:paddingEnd="@dimen/_14sdp"
+            android:paddingBottom="@dimen/_6sdp">
 
             <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
+                android:layout_width="@dimen/_18sdp"
+                android:layout_height="@dimen/_18sdp"
                 android:src="@drawable/ic_expand_less"
                 app:tint="@android:color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="@dimen/_4sdp"
                 android:text="Swipe up for gallery"
                 android:textColor="@android:color/white"
-                android:textSize="12sp"
+                android:textSize="@dimen/_12ssp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -167,12 +167,12 @@
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvRecentMediaHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="64dp"
-            android:layout_marginBottom="12dp"
+            android:layout_height="@dimen/_64sdp"
+            android:layout_marginBottom="@dimen/_12sdp"
             android:clipToPadding="false"
             android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp" />
+            android:paddingStart="@dimen/_16sdp"
+            android:paddingEnd="@dimen/_16sdp" />
 
         <!-- Slide Up To Lock Indicator (Hands-free Telegram parity) -->
         <LinearLayout
@@ -180,20 +180,20 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="10dp"
+            android:layout_marginBottom="@dimen/_10sdp"
             android:background="@drawable/bg_timer_pill"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingStart="14dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="6dp"
+            android:paddingStart="@dimen/_14sdp"
+            android:paddingTop="@dimen/_6sdp"
+            android:paddingEnd="@dimen/_14sdp"
+            android:paddingBottom="@dimen/_6sdp"
             android:visibility="gone">
 
             <ImageView
                 android:id="@+id/ivShutterLockIcon"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
+                android:layout_width="@dimen/_16sdp"
+                android:layout_height="@dimen/_16sdp"
                 android:src="@drawable/ic_lock"
                 app:tint="@android:color/white" />
 
@@ -201,10 +201,10 @@
                 android:id="@+id/tvShutterLockText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
+                android:layout_marginStart="@dimen/_6sdp"
                 android:text="Slide up to lock"
                 android:textColor="@android:color/white"
-                android:textSize="12sp"
+                android:textSize="@dimen/_12ssp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -214,65 +214,65 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="14dp"
+            android:layout_marginBottom="@dimen/_14sdp"
             android:background="@drawable/bg_timer_pill"
             android:gravity="center"
             android:orientation="horizontal"
-            android:padding="3dp">
+            android:padding="@dimen/_3sdp">
 
             <TextView
                 android:id="@+id/btnZoom05x"
-                android:layout_width="34dp"
-                android:layout_height="34dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
                 android:background="@drawable/bg_zoom_pill_inactive"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:text="0.5x"
                 android:textColor="@android:color/white"
-                android:textSize="11sp"
+                android:textSize="@dimen/_11ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/btnZoom1x"
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:layout_marginStart="4dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
+                android:layout_marginStart="@dimen/_4sdp"
                 android:background="@drawable/bg_zoom_pill_active"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:text="1x"
                 android:textColor="@android:color/black"
-                android:textSize="12sp"
+                android:textSize="@dimen/_12ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/btnZoom2x"
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:layout_marginStart="4dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
+                android:layout_marginStart="@dimen/_4sdp"
                 android:background="@drawable/bg_zoom_pill_inactive"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:text="2x"
                 android:textColor="@android:color/white"
-                android:textSize="11sp"
+                android:textSize="@dimen/_11ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/btnZoom5x"
-                android:layout_width="34dp"
-                android:layout_height="34dp"
-                android:layout_marginStart="4dp"
+                android:layout_width="@dimen/_34sdp"
+                android:layout_height="@dimen/_34sdp"
+                android:layout_marginStart="@dimen/_4sdp"
                 android:background="@drawable/bg_zoom_pill_inactive"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
                 android:text="5x"
                 android:textColor="@android:color/white"
-                android:textSize="11sp"
+                android:textSize="@dimen/_11ssp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -282,18 +282,18 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="32dp"
-            android:paddingEnd="32dp">
+            android:paddingStart="@dimen/_32sdp"
+            android:paddingEnd="@dimen/_32sdp">
 
             <!-- Open Full Gallery Button -->
             <ImageView
                 android:id="@+id/btnOpenFullGallery"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="@dimen/_48sdp"
+                android:layout_height="@dimen/_48sdp"
                 android:background="@drawable/bg_circle_translucent"
                 android:clickable="true"
                 android:focusable="true"
-                android:padding="12dp"
+                android:padding="@dimen/_12sdp"
                 android:src="@drawable/ic_image"
                 app:tint="@android:color/white" />
 
@@ -305,16 +305,16 @@
             <!-- Large Concentric Dual-Action Shutter Button -->
             <FrameLayout
                 android:id="@+id/shutterButton"
-                android:layout_width="76dp"
-                android:layout_height="76dp"
+                android:layout_width="@dimen/_76sdp"
+                android:layout_height="@dimen/_76sdp"
                 android:background="@drawable/bg_shutter_outer"
                 android:clickable="true"
                 android:focusable="true">
 
                 <View
                     android:id="@+id/shutterInnerCircle"
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
+                    android:layout_width="@dimen/_56sdp"
+                    android:layout_height="@dimen/_56sdp"
                     android:layout_gravity="center"
                     android:background="@drawable/bg_shutter_inner" />
 
@@ -328,12 +328,12 @@
             <!-- Lens Flip Button (Front / Rear) -->
             <ImageView
                 android:id="@+id/btnFlipLens"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="@dimen/_48sdp"
+                android:layout_height="@dimen/_48sdp"
                 android:background="@drawable/bg_circle_translucent"
                 android:clickable="true"
                 android:focusable="true"
-                android:padding="11dp"
+                android:padding="@dimen/_11sdp"
                 android:src="@drawable/ic_flip_camera"
                 app:tint="@android:color/white" />
 
@@ -345,7 +345,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="@dimen/_16sdp"
             android:gravity="center"
             android:orientation="horizontal">
 
@@ -355,29 +355,29 @@
                 android:layout_height="wrap_content"
                 android:clickable="true"
                 android:focusable="true"
-                android:paddingStart="14dp"
-                android:paddingTop="6dp"
-                android:paddingEnd="14dp"
-                android:paddingBottom="6dp"
+                android:paddingStart="@dimen/_14sdp"
+                android:paddingTop="@dimen/_6sdp"
+                android:paddingEnd="@dimen/_14sdp"
+                android:paddingBottom="@dimen/_6sdp"
                 android:text="PHOTO"
                 android:textColor="#FFCC00"
-                android:textSize="13sp"
+                android:textSize="@dimen/_13ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/btnModeVideo"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="@dimen/_12sdp"
                 android:clickable="true"
                 android:focusable="true"
-                android:paddingStart="14dp"
-                android:paddingTop="6dp"
-                android:paddingEnd="14dp"
-                android:paddingBottom="6dp"
+                android:paddingStart="@dimen/_14sdp"
+                android:paddingTop="@dimen/_6sdp"
+                android:paddingEnd="@dimen/_14sdp"
+                android:paddingBottom="@dimen/_6sdp"
                 android:text="VIDEO"
                 android:textColor="#88FFFFFF"
-                android:textSize="13sp"
+                android:textSize="@dimen/_13ssp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -408,20 +408,20 @@
 
             <RelativeLayout
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="16dp">
+                android:layout_height="@dimen/_56sdp"
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingEnd="@dimen/_16sdp">
 
                 <ImageView
                     android:id="@+id/btnBackFromGallery"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
+                    android:layout_width="@dimen/_44sdp"
+                    android:layout_height="@dimen/_44sdp"
                     android:layout_alignParentStart="true"
                     android:layout_centerVertical="true"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
                     android:focusable="true"
-                    android:padding="10dp"
+                    android:padding="@dimen/_10sdp"
                     android:src="@drawable/ic_arrow_back"
                     android:contentDescription="@string/back"
                     app:tint="@android:color/white" />
@@ -430,7 +430,7 @@
                 <LinearLayout
                     android:id="@+id/btnAlbumDropdown"
                     android:layout_width="wrap_content"
-                    android:layout_height="44dp"
+                    android:layout_height="@dimen/_44sdp"
                     android:layout_centerVertical="true"
                     android:layout_toEndOf="@id/btnBackFromGallery"
                     android:background="?attr/selectableItemBackground"
@@ -438,8 +438,8 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="12dp">
+                    android:paddingStart="@dimen/_8sdp"
+                    android:paddingEnd="@dimen/_12sdp">
 
                     <TextView
                         android:id="@+id/tvCurrentAlbumName"
@@ -447,13 +447,13 @@
                         android:layout_height="wrap_content"
                         android:text="All Media"
                         android:textColor="@android:color/white"
-                        android:textSize="18sp"
+                        android:textSize="@dimen/_18ssp"
                         android:textStyle="bold" />
 
                     <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:layout_marginStart="6dp"
+                        android:layout_width="@dimen/_20sdp"
+                        android:layout_height="@dimen/_20sdp"
+                        android:layout_marginStart="@dimen/_6sdp"
                         android:src="@drawable/ic_arrow_down"
                         app:tint="@android:color/white" />
                 </LinearLayout>
@@ -466,7 +466,7 @@
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
                     android:textColor="@color/veil_primary"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/_15ssp"
                     android:textStyle="bold"
                     android:visibility="gone" />
 
@@ -485,7 +485,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:paddingBottom="80dp" />
+                android:paddingBottom="@dimen/_80sdp" />
 
             <ProgressBar
                 android:id="@+id/galleryLoaderProgressBar"
@@ -503,12 +503,12 @@
                 android:layout_gravity="center"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:padding="24dp"
+                android:padding="@dimen/_24sdp"
                 android:visibility="gone">
 
                 <ImageView
-                    android:layout_width="64dp"
-                    android:layout_height="64dp"
+                    android:layout_width="@dimen/_64sdp"
+                    android:layout_height="@dimen/_64sdp"
                     android:src="@drawable/ic_image"
                     app:tint="#66FFFFFF" />
 
@@ -516,10 +516,10 @@
                     android:id="@+id/tvGalleryEmptyMessage"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="@dimen/_12sdp"
                     android:text="No photos or videos found"
                     android:textColor="#99FFFFFF"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/_15ssp"
                     android:fontFamily="sans-serif-medium" />
             </LinearLayout>
 
@@ -529,7 +529,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom"
-                android:padding="20dp"
+                android:padding="@dimen/_20sdp"
                 android:visibility="gone">
 
                 <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton

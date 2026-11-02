@@ -5,59 +5,59 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="24dp"
-    android:paddingEnd="24dp"
-    android:paddingTop="14dp"
-    android:paddingBottom="28dp">
+    android:paddingStart="@dimen/_24sdp"
+    android:paddingEnd="@dimen/_24sdp"
+    android:paddingTop="@dimen/_14sdp"
+    android:paddingBottom="@dimen/_28sdp">
 
     <!-- Handle Bar -->
     <View
-        android:layout_width="36dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_36sdp"
+        android:layout_height="@dimen/_4sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="@dimen/_16sdp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Rank &amp; Rewards"
         android:textColor="@color/textPrimary"
-        android:textSize="19sp"
+        android:textSize="@dimen/_19ssp"
         android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="4dp" />
+        android:layout_marginBottom="@dimen/_4sdp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Earn XP by chatting, unlock badges, and spend VeilCoins:"
         android:textColor="@color/textSecondary"
-        android:textSize="13sp"
-        android:layout_marginBottom="16dp" />
+        android:textSize="@dimen/_13ssp"
+        android:layout_marginBottom="@dimen/_16sdp" />
 
     <!-- Level & XP Card -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="16dp"
+        app:cardCornerRadius="@dimen/_16sdp"
         app:cardElevation="0dp"
-        app:strokeWidth="1.2dp"
+        app:strokeWidth="@dimen/_1sdp"
         app:strokeColor="@color/colorOutline"
         app:cardBackgroundColor="@color/colorSurfaceVariant"
-        android:layout_marginBottom="12dp">
+        android:layout_marginBottom="@dimen/_12sdp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="@dimen/_16sdp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="@dimen/_8sdp">
 
                 <TextView
                     android:id="@+id/tvHubLevelTitle"
@@ -66,7 +66,7 @@
                     android:layout_weight="1"
                     android:text="🎖️ Cypherpunk Level 2"
                     android:textColor="@color/textPrimary"
-                    android:textSize="16sp"
+                    android:textSize="@dimen/_16ssp"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
@@ -74,25 +74,25 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_pill_primary"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="4dp"
+                    android:paddingStart="@dimen/_10sdp"
+                    android:paddingEnd="@dimen/_10sdp"
+                    android:paddingTop="@dimen/_4sdp"
+                    android:paddingBottom="@dimen/_4sdp"
                     android:text="🪙 120 VC"
                     android:textColor="@android:color/white"
                     android:textStyle="bold"
-                    android:textSize="13sp" />
+                    android:textSize="@dimen/_13ssp" />
             </LinearLayout>
 
             <ProgressBar
                 android:id="@+id/pbXpProgress"
                 style="@android:style/Widget.ProgressBar.Horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="8dp"
+                android:layout_height="@dimen/_8sdp"
                 android:max="100"
                 android:progress="65"
                 android:progressTint="@color/colorPrimary"
-                android:layout_marginBottom="6dp" />
+                android:layout_marginBottom="@dimen/_6sdp" />
 
             <TextView
                 android:id="@+id/tvHubStatsLine"
@@ -100,7 +100,7 @@
                 android:layout_height="wrap_content"
                 android:text="🔥 3-Day Streak  •  ⭐ 14 Karma  •  65/100 XP to Level 3"
                 android:textColor="@color/textSecondary"
-                android:textSize="12sp" />
+                android:textSize="@dimen/_12ssp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
@@ -109,41 +109,41 @@
         android:id="@+id/btnClaimBonus"
         style="@style/Widget.Material3.Button.TonalButton"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="@dimen/_48sdp"
         android:text="🎁 Claim Daily Activity Bonus (+50 VC, +25 XP)"
-        android:layout_marginBottom="8dp"
-        app:cornerRadius="12dp" />
+        android:layout_marginBottom="@dimen/_8sdp"
+        app:cornerRadius="@dimen/_12sdp" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnUnlockNeonTheme"
         style="@style/Widget.Material3.Button.TonalButton"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="@dimen/_48sdp"
         android:text="Unlock Cyberpunk Neon Skin (100 VC)"
         app:icon="@drawable/ic_appearance"
         app:iconGravity="textStart"
-        android:layout_marginBottom="8dp"
-        app:cornerRadius="12dp" />
+        android:layout_marginBottom="@dimen/_8sdp"
+        app:cornerRadius="@dimen/_12sdp" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnUnlockUnlimitedPersonas"
         style="@style/Widget.Material3.Button.TonalButton"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="@dimen/_48sdp"
         android:text="Unlock Unlimited Personas Tier (150 VC)"
         app:icon="@drawable/ic_account"
         app:iconGravity="textStart"
-        android:layout_marginBottom="8dp"
-        app:cornerRadius="12dp" />
+        android:layout_marginBottom="@dimen/_8sdp"
+        app:cornerRadius="@dimen/_12sdp" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnOpenWalletSheet"
         style="@style/Widget.Material3.Button"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="@dimen/_48sdp"
         android:text="Open Wallet &amp; Balances"
         app:icon="@drawable/ic_saved"
         app:iconGravity="textStart"
-        app:cornerRadius="12dp" />
+        app:cornerRadius="@dimen/_12sdp" />
 
 </LinearLayout>

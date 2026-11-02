@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/colorSurface"
-        app:elevation="0.5dp">
+        app:elevation="@dimen/_1sdp">
 
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
@@ -22,17 +22,17 @@
                 android:layout_height="wrap_content"
                 android:text="New Channel"
                 android:textColor="@color/textPrimary"
-                android:textSize="19sp"
+                android:textSize="@dimen/_19ssp"
                 android:textStyle="bold" />
 
             <ImageView
                 android:id="@+id/btnDone"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="@dimen/_40sdp"
+                android:layout_height="@dimen/_40sdp"
                 android:layout_gravity="end"
-                android:layout_marginEnd="12dp"
+                android:layout_marginEnd="@dimen/_12sdp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:padding="8dp"
+                android:padding="@dimen/_8sdp"
                 android:src="@drawable/ic_check"
                 app:tint="@color/colorPrimary" />
 
@@ -50,7 +50,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:padding="@dimen/_20sdp">
 
             <!-- Avatar Picker Row -->
             <LinearLayout
@@ -61,24 +61,24 @@
 
                 <FrameLayout
                     android:id="@+id/avatarContainer"
-                    android:layout_width="72dp"
-                    android:layout_height="72dp">
+                    android:layout_width="@dimen/_72sdp"
+                    android:layout_height="@dimen/_72sdp">
 
                     <de.hdodenhof.circleimageview.CircleImageView
                         android:id="@+id/ivChannelAvatar"
-                        android:layout_width="72dp"
-                        android:layout_height="72dp"
+                        android:layout_width="@dimen/_72sdp"
+                        android:layout_height="@dimen/_72sdp"
                         android:src="@drawable/ic_channel"
                         app:civ_border_color="@color/colorOutline"
-                        app:civ_border_width="1.5dp"
+                        app:civ_border_width="@dimen/_2sdp"
                         app:civ_circle_background_color="@color/colorSurfaceVariant" />
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
+                        android:layout_width="@dimen/_26sdp"
+                        android:layout_height="@dimen/_26sdp"
                         android:layout_gravity="bottom|end"
                         android:background="@drawable/badge_background"
-                        android:padding="5dp"
+                        android:padding="@dimen/_5sdp"
                         android:src="@drawable/ic_camera"
                         app:tint="@android:color/white" />
 
@@ -89,13 +89,13 @@
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
+                    android:layout_marginStart="@dimen/_16sdp"
                     android:layout_weight="1"
                     android:hint="Channel Name"
-                    app:boxCornerRadiusBottomEnd="12dp"
-                    app:boxCornerRadiusBottomStart="12dp"
-                    app:boxCornerRadiusTopEnd="12dp"
-                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxCornerRadiusBottomEnd="@dimen/_12sdp"
+                    app:boxCornerRadiusBottomStart="@dimen/_12sdp"
+                    app:boxCornerRadiusTopEnd="@dimen/_12sdp"
+                    app:boxCornerRadiusTopStart="@dimen/_12sdp"
                     app:counterEnabled="true"
                     app:counterMaxLength="64">
 
@@ -117,12 +117,12 @@
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="@dimen/_16sdp"
                 android:hint="Description (optional)"
-                app:boxCornerRadiusBottomEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp"
-                app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusTopStart="12dp"
+                app:boxCornerRadiusBottomEnd="@dimen/_12sdp"
+                app:boxCornerRadiusBottomStart="@dimen/_12sdp"
+                app:boxCornerRadiusTopEnd="@dimen/_12sdp"
+                app:boxCornerRadiusTopStart="@dimen/_12sdp"
                 app:counterEnabled="true"
                 app:counterMaxLength="255">
 
@@ -140,34 +140,34 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="@dimen/_4sdp"
                 android:text="You can provide an optional description for your subscribers."
                 android:textColor="@color/textSecondary"
-                android:textSize="12sp" />
+                android:textSize="@dimen/_12ssp" />
 
             <!-- Channel Type Selector Section -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="@dimen/_24sdp"
                 android:text="Channel Type"
                 android:textColor="@color/colorPrimary"
-                android:textSize="14sp"
+                android:textSize="@dimen/_14ssp"
                 android:textStyle="bold" />
 
             <RadioGroup
                 android:id="@+id/radioGroupChannelType"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp">
+                android:layout_marginTop="@dimen/_8sdp">
 
                 <!-- Public Channel Option -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp">
+                    android:paddingTop="@dimen/_6sdp"
+                    android:paddingBottom="@dimen/_6sdp">
 
                     <RadioButton
                         android:id="@+id/rbPublic"
@@ -176,16 +176,16 @@
                         android:checked="true"
                         android:text="📢 Public Channel"
                         android:textColor="@color/textPrimary"
-                        android:textSize="15sp"
+                        android:textSize="@dimen/_15ssp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="32dp"
+                        android:layout_marginStart="@dimen/_32sdp"
                         android:text="Public channels can be found in search, anyone can join them."
                         android:textColor="@color/textSecondary"
-                        android:textSize="12.5sp" />
+                        android:textSize="@dimen/_13ssp" />
 
                 </LinearLayout>
 
@@ -194,8 +194,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp">
+                    android:paddingTop="@dimen/_6sdp"
+                    android:paddingBottom="@dimen/_6sdp">
 
                     <RadioButton
                         android:id="@+id/rbPrivate"
@@ -203,16 +203,16 @@
                         android:layout_height="wrap_content"
                         android:text="🔒 Private Channel"
                         android:textColor="@color/textPrimary"
-                        android:textSize="15sp"
+                        android:textSize="@dimen/_15ssp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="32dp"
+                        android:layout_marginStart="@dimen/_32sdp"
                         android:text="Private channels can only be joined via an invite link."
                         android:textColor="@color/textSecondary"
-                        android:textSize="12.5sp" />
+                        android:textSize="@dimen/_13ssp" />
 
                 </LinearLayout>
 
@@ -223,7 +223,7 @@
                 android:id="@+id/publicLinkContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="@dimen/_16sdp"
                 android:orientation="vertical"
                 android:visibility="visible">
 
@@ -232,7 +232,7 @@
                     android:layout_height="wrap_content"
                     android:text="Permanent Link"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14sp"
+                    android:textSize="@dimen/_14ssp"
                     android:textStyle="bold" />
 
                 <com.google.android.material.textfield.TextInputLayout
@@ -240,12 +240,12 @@
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/_6sdp"
                     android:hint="Link"
-                    app:boxCornerRadiusBottomEnd="12dp"
-                    app:boxCornerRadiusBottomStart="12dp"
-                    app:boxCornerRadiusTopEnd="12dp"
-                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxCornerRadiusBottomEnd="@dimen/_12sdp"
+                    app:boxCornerRadiusBottomStart="@dimen/_12sdp"
+                    app:boxCornerRadiusTopEnd="@dimen/_12sdp"
+                    app:boxCornerRadiusTopStart="@dimen/_12sdp"
                     app:prefixText="veil.me/">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -262,10 +262,10 @@
                     android:id="@+id/tvHandleStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/_4sdp"
                     android:text="If you set a public link, other people will be able to find and join your channel by this link."
                     android:textColor="@color/textSecondary"
-                    android:textSize="12sp" />
+                    android:textSize="@dimen/_12ssp" />
 
             </LinearLayout>
 
@@ -274,7 +274,7 @@
                 android:id="@+id/privateLinkContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="@dimen/_16sdp"
                 android:orientation="vertical"
                 android:visibility="gone">
 
@@ -283,19 +283,19 @@
                     android:layout_height="wrap_content"
                     android:text="Invite Link"
                     android:textColor="@color/textPrimary"
-                    android:textSize="14sp"
+                    android:textSize="@dimen/_14ssp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tvPrivateInviteLink"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="@dimen/_8sdp"
                     android:background="@drawable/bg_message_received"
-                    android:padding="12dp"
+                    android:padding="@dimen/_12sdp"
                     android:text="veil://channel/join?id=..."
                     android:textColor="@color/colorPrimary"
-                    android:textSize="13sp"
+                    android:textSize="@dimen/_13ssp"
                     android:textStyle="bold" />
 
             </LinearLayout>
@@ -304,13 +304,13 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnCreateChannel"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="28dp"
-                android:layout_marginBottom="24dp"
+                android:layout_height="@dimen/_52sdp"
+                android:layout_marginTop="@dimen/_28sdp"
+                android:layout_marginBottom="@dimen/_24sdp"
                 android:text="Create Channel"
                 android:textAllCaps="false"
-                android:textSize="16sp"
-                app:cornerRadius="14dp" />
+                android:textSize="@dimen/_16ssp"
+                app:cornerRadius="@dimen/_14sdp" />
 
             <ProgressBar
                 android:id="@+id/progressBar"

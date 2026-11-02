@@ -5,15 +5,15 @@
     android:layout_height="wrap_content"
     android:background="@drawable/bg_bottom_sheet_modern"
     android:orientation="vertical"
-    android:paddingBottom="16dp">
+    android:paddingBottom="@dimen/_16sdp">
 
     <!-- Drag Handle -->
     <View
-        android:layout_width="36dp"
-        android:layout_height="4dp"
+        android:layout_width="@dimen/_36sdp"
+        android:layout_height="@dimen/_4sdp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="12dp"
+        android:layout_marginTop="@dimen/_12sdp"
+        android:layout_marginBottom="@dimen/_12sdp"
         android:background="@drawable/bg_persona_drag_handle" />
 
     <!-- Sheet Header -->
@@ -22,9 +22,9 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="12dp">
+        android:paddingStart="@dimen/_20sdp"
+        android:paddingEnd="@dimen/_20sdp"
+        android:paddingBottom="@dimen/_12sdp">
 
         <TextView
             android:id="@+id/commentsTitle"
@@ -33,28 +33,28 @@
             android:layout_weight="1"
             android:text="Comments"
             android:textColor="@color/colorTextPrimary"
-            android:textSize="18sp"
+            android:textSize="@dimen/_18ssp"
             android:textStyle="bold" />
 
         <ImageView
             android:id="@+id/btnCloseComments"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="@dimen/_32sdp"
+            android:layout_height="@dimen/_32sdp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="6dp"
+            android:padding="@dimen/_6sdp"
             android:src="@drawable/ic_close"
             app:tint="@color/colorTextSecondary" />
     </LinearLayout>
 
     <View
         android:layout_width="match_parent"
-        android:layout_height="1dp"
+        android:layout_height="@dimen/_1sdp"
         android:background="@color/colorOutline" />
 
     <!-- List & Empty State Container -->
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="320dp">
+        android:layout_height="@dimen/_320sdp">
 
         <!-- RecyclerView -->
         <androidx.recyclerview.widget.RecyclerView
@@ -62,8 +62,8 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp" />
+            android:paddingTop="@dimen/_8sdp"
+            android:paddingBottom="@dimen/_8sdp" />
 
         <!-- Empty State -->
         <LinearLayout
@@ -72,13 +72,13 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="32dp"
+            android:padding="@dimen/_32sdp"
             android:visibility="gone">
 
             <ImageView
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginBottom="12dp"
+                android:layout_width="@dimen/_48sdp"
+                android:layout_height="@dimen/_48sdp"
+                android:layout_marginBottom="@dimen/_12sdp"
                 android:src="@drawable/ic_comment"
                 app:tint="@color/colorTextSecondary" />
 
@@ -87,16 +87,16 @@
                 android:layout_height="wrap_content"
                 android:text="No comments yet"
                 android:textColor="@color/colorTextPrimary"
-                android:textSize="15sp"
+                android:textSize="@dimen/_15ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="@dimen/_4sdp"
                 android:text="Be the first to share your thoughts anonymously."
                 android:textColor="@color/colorTextSecondary"
-                android:textSize="13sp" />
+                android:textSize="@dimen/_13ssp" />
         </LinearLayout>
 
         <!-- Loading -->
@@ -110,7 +110,7 @@
 
     <View
         android:layout_width="match_parent"
-        android:layout_height="1dp"
+        android:layout_height="@dimen/_1sdp"
         android:background="@color/colorOutline" />
 
     <!-- Comment Input Bar -->
@@ -119,9 +119,9 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingTop="12dp"
-        android:paddingEnd="16dp">
+        android:paddingStart="@dimen/_16sdp"
+        android:paddingTop="@dimen/_12sdp"
+        android:paddingEnd="@dimen/_16sdp">
 
         <EditText
             android:id="@+id/commentInput"
@@ -134,22 +134,22 @@
             android:importantForAutofill="no"
             android:inputType="textCapSentences|textMultiLine"
             android:maxLines="3"
-            android:paddingStart="16dp"
-            android:paddingTop="10dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="10dp"
+            android:paddingStart="@dimen/_16sdp"
+            android:paddingTop="@dimen/_10sdp"
+            android:paddingEnd="@dimen/_16sdp"
+            android:paddingBottom="@dimen/_10sdp"
             android:textColor="@color/colorTextPrimary"
             android:textColorHint="@color/colorTextSecondary"
-            android:textSize="14sp" />
+            android:textSize="@dimen/_14ssp" />
 
         <ImageView
             android:id="@+id/btnSendComment"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="8dp"
+            android:layout_width="@dimen/_40sdp"
+            android:layout_height="@dimen/_40sdp"
+            android:layout_marginStart="@dimen/_8sdp"
             android:background="@drawable/bg_attach_item"
             android:backgroundTint="@color/colorPrimary"
-            android:padding="10dp"
+            android:padding="@dimen/_10sdp"
             android:src="@drawable/ic_send"
             app:tint="@android:color/white" />
     </LinearLayout>
