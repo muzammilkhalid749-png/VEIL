@@ -1073,35 +1073,41 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                     String pName = uDoc.getString("displayName");
                                                     if (pName == null || pName.isEmpty()) pName = uDoc.getString("username");
                                                     String pAvatar = uDoc.getString("avatar");
-                                                    if (pName != null && !pName.isEmpty() && !pName.equals(myPersonaName)) {
-                                                        Chat target = EncryptedChatDatabase.getInstance(ctx).getChat(fChatId);
-                                                        if (target != null) {
-                                                            boolean nameChanged = !pName.equals(target.getName());
-                                                            boolean avatarChanged = (pAvatar != null && !pAvatar.isEmpty() && !pAvatar.equals(target.getAvatar()));
-                                                            if (nameChanged || avatarChanged) {
-                                                                target.setName(pName);
-                                                                if (avatarChanged) target.setAvatar(pAvatar);
-                                                                EncryptedChatDatabase.getInstance(ctx).saveOrUpdateChat(target);
-                                                                final String resolvedPName = pName;
-                                                                final String resolvedPAvatar = pAvatar;
-                                                                if (isAdded() && getActivity() != null) {
-                                                                    requireActivity().runOnUiThread(() -> {
-                                                                        boolean found = false;
-                                                                        for (int i = 0; i < displayedChats.size(); i++) {
-                                                                            Chat dc = displayedChats.get(i);
-                                                                            if (dc != null && fChatId.equals(dc.getId())) {
-                                                                                dc.setName(resolvedPName);
-                                                                                if (resolvedPAvatar != null && !resolvedPAvatar.isEmpty()) dc.setAvatar(resolvedPAvatar);
-                                                                                if (chatsAdapter != null) chatsAdapter.notifyItemChanged(i);
-                                                                                found = true;
-                                                                                break;
-                                                                            }
+                                                    boolean remoteAvatarEmpty = (pAvatar == null || pAvatar.trim().isEmpty());
+                                                    if (remoteAvatarEmpty) {
+                                                        com.m3.veil.utils.VeilAvatarLoader.evictPeerAvatar(ctx, fPeerId);
+                                                    } else {
+                                                        com.m3.veil.utils.VeilAvatarLoader.cachePeerAvatarSource(ctx, fPeerId, pAvatar);
+                                                    }
+                                                    Chat target = EncryptedChatDatabase.getInstance(ctx).getChat(fChatId);
+                                                    if (target != null) {
+                                                        boolean nameChanged = (pName != null && !pName.isEmpty() && !pName.equals(myPersonaName) && !pName.equals(target.getName()));
+                                                        String desiredAvatar = remoteAvatarEmpty ? "" : pAvatar;
+                                                        String currentAvatar = target.getAvatar() != null ? target.getAvatar() : "";
+                                                        boolean avatarChanged = !desiredAvatar.equals(currentAvatar);
+                                                        if (nameChanged || avatarChanged) {
+                                                            if (nameChanged) target.setName(pName);
+                                                            if (avatarChanged) target.setAvatar(desiredAvatar);
+                                                            EncryptedChatDatabase.getInstance(ctx).saveOrUpdateChat(target);
+                                                            final String resolvedPName = target.getName();
+                                                            final String resolvedPAvatar = desiredAvatar;
+                                                            if (isAdded() && getActivity() != null) {
+                                                                requireActivity().runOnUiThread(() -> {
+                                                                    boolean found = false;
+                                                                    for (int i = 0; i < displayedChats.size(); i++) {
+                                                                        Chat dc = displayedChats.get(i);
+                                                                        if (dc != null && fChatId.equals(dc.getId())) {
+                                                                            dc.setName(resolvedPName);
+                                                                            dc.setAvatar(resolvedPAvatar);
+                                                                            if (chatsAdapter != null) chatsAdapter.notifyItemChanged(i);
+                                                                            found = true;
+                                                                            break;
                                                                         }
-                                                                        if (!found && chatsAdapter != null) {
-                                                                            chatsAdapter.notifyDataSetChanged();
-                                                                        }
-                                                                    });
-                                                                }
+                                                                    }
+                                                                    if (!found && chatsAdapter != null) {
+                                                                        chatsAdapter.notifyDataSetChanged();
+                                                                    }
+                                                                });
                                                             }
                                                         }
                                                     }
@@ -1429,34 +1435,61 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
     }
 
     private void openStatusReplyChat(VeilFeatureManager.StatusUpdate status, String replyText) {
-        if (getContext() == null || status == null) return;
+        if (getContext() == null || status == null || status.authorId == null || status.authorId.trim().isEmpty()) return;
+        final String peerId = status.authorId.trim();
+        String myUid = currentUserId;
+        if (myUid == null || myUid.trim().isEmpty()) {
+            myUid = com.m3.veil.manager.PersonaManager.getInstance(requireContext()).getActivePersonaPeerId();
+        }
+        if (myUid == null || myUid.trim().isEmpty()) {
+            myUid = com.m3.veil.manager.AuthManager.getInstance().getCurrentUserId(requireContext());
+        }
+        final String canonicalDirectChatId = (myUid != null && !myUid.isEmpty())
+                ? com.m3.veil.webrtc.WebRtcManager.getChatId(myUid, peerId)
+                : peerId;
+
         Chat target = null;
         for (Chat c : allLocalChats) {
-            if (c.getId().equals(status.authorId)
-                    || (c.getParticipants() != null && c.getParticipants().contains(status.authorId))) {
+            if (c == null || c.getId() == null) continue;
+            String cid = c.getId();
+            if (c.isGroupChat() || c.isChannel()
+                    || cid.startsWith("group_") || cid.startsWith("channel_") || cid.startsWith("lounge_")) {
+                continue;
+            }
+            if (cid.equals(canonicalDirectChatId) || cid.equals(peerId)) {
+                target = c;
+                break;
+            }
+            if (c.getParticipants() != null && c.getParticipants().size() <= 2 && c.getParticipants().contains(peerId)) {
                 target = c;
                 break;
             }
         }
+
+        if (status.id != null && replyText != null && replyText.codePointCount(0, replyText.length()) <= 4) {
+            try {
+                com.m3.veil.manager.StatusController.getInstance(requireContext()).sendStatusReaction(status.id, replyText);
+            } catch (Throwable ignored) {}
+        }
+
         Intent intent = new Intent(getContext(), ChatActivity.class);
         if (target != null) {
-            intent.putExtra("chatId", target.getId());
-            intent.putExtra("recipientName", target.getName());
-            String recipientId = "";
-            if (target.getParticipants() != null) {
-                for (String id : target.getParticipants()) {
-                    if (id != null && !id.equals(currentUserId)) {
-                        recipientId = id;
-                        break;
-                    }
-                }
+            String resolvedChatId = target.getId();
+            if (resolvedChatId == null || resolvedChatId.equals(peerId)) {
+                resolvedChatId = canonicalDirectChatId;
             }
-            intent.putExtra("recipientId", !recipientId.isEmpty() ? recipientId : status.authorId);
+            intent.putExtra("chatId", resolvedChatId);
+            String resolvedName = (target.getName() != null && !target.getName().trim().isEmpty())
+                    ? target.getName()
+                    : status.authorName;
+            intent.putExtra("recipientName", resolvedName);
+            intent.putExtra("recipientId", peerId);
         } else {
-            intent.putExtra("chatId", status.authorId);
+            intent.putExtra("chatId", canonicalDirectChatId);
             intent.putExtra("recipientName", status.authorName);
-            intent.putExtra("recipientId", status.authorId);
+            intent.putExtra("recipientId", peerId);
         }
+        intent.putExtra("isGroup", false);
         intent.putExtra("statusReplyText", replyText);
         String quote = (status.contentText != null && !status.contentText.trim().isEmpty())
                 ? status.contentText.trim() : "📷 Status Photo";
@@ -1757,28 +1790,31 @@ public class HomeFragment extends Fragment implements ChatsAdapter.OnChatClickLi
                                                         String dName = userDoc.getString("displayName");
                                                         if (dName == null || dName.isEmpty()) dName = userDoc.getString("username");
                                                         String uAvatar = userDoc.getString("avatar");
-                                                        if (uAvatar != null && !uAvatar.isEmpty()) {
+                                                        boolean remoteAvatarEmpty = (uAvatar == null || uAvatar.trim().isEmpty());
+                                                        if (remoteAvatarEmpty) {
+                                                            com.m3.veil.utils.VeilAvatarLoader.evictPeerAvatar(appCtx, fPeerId);
+                                                        } else {
                                                             com.m3.veil.utils.VeilAvatarLoader.cachePeerAvatarSource(appCtx, fPeerId, uAvatar);
                                                         }
-                                                        if (dName != null && !dName.isEmpty()) {
-                                                            Chat c = targetDb.getChat(fGId);
-                                                            if (c != null) {
-                                                                boolean cChanged = false;
-                                                                if (!dName.equals(c.getName())) {
-                                                                    c.setName(dName);
-                                                                    cChanged = true;
-                                                                }
-                                                                if (uAvatar != null && !uAvatar.isEmpty() && !uAvatar.equals(c.getAvatar())) {
-                                                                    c.setAvatar(uAvatar);
-                                                                    cChanged = true;
-                                                                }
-                                                                if (cChanged) {
-                                                                    targetDb.saveOrUpdateChat(c);
-                                                                    if (isAdded() && getActivity() != null) {
-                                                                        requireActivity().runOnUiThread(() -> {
-                                                                            if (chatsAdapter != null) chatsAdapter.notifyDataSetChanged();
-                                                                        });
-                                                                    }
+                                                        Chat c = targetDb.getChat(fGId);
+                                                        if (c != null) {
+                                                            boolean cChanged = false;
+                                                            if (dName != null && !dName.isEmpty() && !dName.equals(c.getName())) {
+                                                                c.setName(dName);
+                                                                cChanged = true;
+                                                            }
+                                                            String desiredAv = remoteAvatarEmpty ? "" : uAvatar;
+                                                            String curAv = c.getAvatar() != null ? c.getAvatar() : "";
+                                                            if (!desiredAv.equals(curAv)) {
+                                                                c.setAvatar(desiredAv);
+                                                                cChanged = true;
+                                                            }
+                                                            if (cChanged) {
+                                                                targetDb.saveOrUpdateChat(c);
+                                                                if (isAdded() && getActivity() != null) {
+                                                                    requireActivity().runOnUiThread(() -> {
+                                                                        if (chatsAdapter != null) chatsAdapter.notifyDataSetChanged();
+                                                                    });
                                                                 }
                                                             }
                                                         }

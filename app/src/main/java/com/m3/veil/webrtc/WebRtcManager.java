@@ -1733,6 +1733,46 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
                VeilFeatureManager.getInstance(this.context).removePeerStatus(statusId);
                relayStatusDelete(statusId, authorId, peerId);
             }
+         } else if ("profile_update".equals(type)) {
+            String senderUid = json.optString("senderId", peerId);
+            if (senderUid == null || senderUid.trim().isEmpty()) senderUid = peerId;
+            final String targetPeerId = senderUid.trim();
+            final String newDisplayName = json.optString("displayName", "");
+            final String newUsername = json.optString("username", "");
+            final String newAvatar = json.optString("avatar", "");
+            final boolean avatarRemoved = json.optBoolean("avatarRemoved", false) || newAvatar.trim().isEmpty();
+            if (avatarRemoved) {
+               com.m3.veil.utils.VeilAvatarLoader.evictPeerAvatar(this.context, targetPeerId);
+            } else {
+               com.m3.veil.utils.VeilAvatarLoader.cachePeerAvatarSource(this.context, targetPeerId, newAvatar);
+            }
+            try {
+               EncryptedChatDatabase pDb = EncryptedChatDatabase.getInstance(this.context);
+               for (Chat c : pDb.getAllChats()) {
+                  if (c != null && !c.isGroupChat() && c.getParticipants() != null && c.getParticipants().contains(targetPeerId)) {
+                     boolean changed = false;
+                     if (!newDisplayName.isEmpty() && !newDisplayName.equals(c.getName())) {
+                        c.setName(newDisplayName);
+                        changed = true;
+                     }
+                     String desiredAv = avatarRemoved ? "" : newAvatar;
+                     String curAv = c.getAvatar() != null ? c.getAvatar() : "";
+                     if (!desiredAv.equals(curAv)) {
+                        c.setAvatar(desiredAv);
+                        changed = true;
+                     }
+                     if (changed) {
+                        pDb.saveOrUpdateChat(c);
+                     }
+                  }
+               }
+            } catch (Throwable ignored) {}
+            try {
+               Intent hydrateIntent = new Intent(com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.ACTION_SOVEREIGN_PROFILE_HYDRATED);
+               hydrateIntent.putExtra("uid", targetPeerId);
+               hydrateIntent.putExtra("username", newUsername);
+               this.context.sendBroadcast(hydrateIntent);
+            } catch (Throwable ignored) {}
          } else if (!"peer_leaving".equals(type) && !"disconnect".equals(type)) {
             if ("typing".equals(type)) {
                boolean isTyping = json.optBoolean("isTyping", false);
@@ -4550,6 +4590,51 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             }
         } catch (Throwable ignored) {}
         return false;
+    }
+
+    public void broadcastProfileUpdate(String displayName, String username, String avatarBase64, boolean avatarRemoved) {
+        this.rtcExecutor.execute(() -> {
+            try {
+                if (this.currentUserId == null || this.currentUserId.isEmpty()) return;
+                JSONObject json = new JSONObject();
+                json.put("type", "profile_update");
+                json.put("senderId", this.currentUserId);
+                json.put("displayName", displayName != null ? displayName : "");
+                json.put("username", username != null ? username : "");
+                json.put("avatar", avatarRemoved ? "" : (avatarBase64 != null ? avatarBase64 : ""));
+                json.put("avatarRemoved", avatarRemoved);
+                json.put("timestamp", System.currentTimeMillis());
+
+                java.util.Set<String> peerTargets = new java.util.HashSet<>(getConnectedPeerIds());
+                try {
+                    for (Chat c : EncryptedChatDatabase.getInstance(this.context).getAllChats()) {
+                        if (c == null) continue;
+                        if (!c.isGroupChat()) {
+                            String pid = extractPeerIdFromChatId(c.getId(), this.currentUserId);
+                            if (pid != null && !pid.isEmpty() && !pid.equals(this.currentUserId)) {
+                                peerTargets.add(pid);
+                            }
+                            if (c.getParticipants() != null) {
+                                for (String p : c.getParticipants()) {
+                                    if (p != null && !p.isEmpty() && !p.equals(this.currentUserId)) {
+                                        peerTargets.add(p);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+
+                String payloadStr = json.toString();
+                for (String peerId : peerTargets) {
+                    if (peerId == null || peerId.isEmpty() || peerId.equals(this.currentUserId)) continue;
+                    try {
+                        sendPacket(peerId, new VeilPacket(VeilPacket.LANE_CTRL, VeilPacket.TYPE_CHAT_MESSAGE, payloadStr));
+                        SignalingClient.getInstance().sendP2PSignal(peerId, "p2p_action", json);
+                    } catch (Throwable ignored) {}
+                }
+            } catch (Throwable ignored) {}
+        });
     }
 
 }

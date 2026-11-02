@@ -1,0 +1,136 @@
+---------------------------- PROCESS STARTED (5631) for package com.m3.veil ----------------------------
+2026-11-02 14:03:30.115  2049-2998  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:1
+2026-11-02 14:03:30.139  2049-2191  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:1
+2026-11-02 14:05:16.629  2049-2273  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-11-02 14:05:39.819  2049-2654  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:1
+2026-11-02 14:05:39.856  2049-2191  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-11-02 14:05:39.885  5631-5631  com.m3.veil             com.m3.veil                          I  Late-enabling -Xcheck:jni
+2026-11-02 14:05:39.921  5631-5631  com.m3.veil             com.m3.veil                          I  Using generational CollectorTypeCMC GC.
+2026-11-02 14:05:39.996  5631-5631  re-initialized>         com.m3.veil                          W  type=1400 audit(0.0:173676): avc:  granted  { execute } for  path="/data/data/com.m3.veil/code_cache/startup_agents/a413e612-agent.so" dev="dm-84" ino=74595 scontext=u:r:untrusted_app:s0:c69,c257,c512,c768 tcontext=u:object_r:app_data_file:s0:c69,c257,c512,c768 tclass=file app=com.m3.veil
+2026-11-02 14:05:40.015  5631-5631  com.m3.veil             com.m3.veil                          W  hiddenapi: DexFile /data/data/com.m3.veil/code_cache/.studio/instruments-09818231.jar is in boot class path but is not in a known location
+2026-11-02 14:05:40.228  5631-5631  com.m3.veil             com.m3.veil                          W  Redefining intrinsic method java.lang.Thread java.lang.Thread.currentThread(). This may cause the unexpected use of the original definition of java.lang.Thread java.lang.Thread.currentThread()in methods that have already been compiled.
+2026-11-02 14:05:40.228  5631-5631  com.m3.veil             com.m3.veil                          W  Redefining intrinsic method boolean java.lang.Thread.interrupted(). This may cause the unexpected use of the original definition of boolean java.lang.Thread.interrupted()in methods that have already been compiled.
+2026-11-02 14:05:40.307  5631-5631  com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f71410898) locale list changing from [] to [en-US]
+2026-11-02 14:05:40.309  5631-5631  com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f7140cd38) locale list changing from [] to [en-US]
+2026-11-02 14:05:40.335  5631-5631  LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsion.thub.res
+2026-11-02 14:05:40.336  5631-5631  LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsion.theme.icon
+2026-11-02 14:05:40.336  5631-5631  LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsionui
+2026-11-02 14:05:40.505  5631-5631  VeilPerfController      com.m3.veil                          I  VeilPerformanceController active: class=AVERAGE (CPU=8 cores @2050MHz, RAM=7687MB, RefreshRate=60.0Hz)
+2026-11-02 14:05:40.759  5631-5631  VeilIntegrityGuard      com.m3.veil                          I  Runtime integrity verified. APK Cert SHA-256: D0:F9:6F:C5:10:3D:DB:37:1D:06:C7:55:7A:44:7C:31:83:E4:FF:37:00:A4:D2:5F:68:B8:45:05:13:90:15:B9
+2026-11-02 14:05:40.770  5631-5631  com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->get()Ldalvik/system/CloseGuard; (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-02 14:05:40.770  5631-5631  com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->open(Ljava/lang/String;)V (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-02 14:05:40.770  5631-5631  com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->warnIfOpen()V (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-02 14:05:40.806  5631-5631  PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-11-02 14:05:40.806  5631-5631  PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-11-02 14:05:40.807  5631-5631  M-ProMotion             com.m3.veil                          I  M-ProMotion is disabled
+2026-11-02 14:05:40.814  5631-21649 DisplayManager          com.m3.veil                          I  Choreographer implicitly registered for the refresh rate.
+2026-11-02 14:05:40.815  5631-5631  com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f714094f8) locale list changing from [] to [en-US]
+2026-11-02 14:05:40.823  5631-5631  com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f7140f5d8) locale list changing from [] to [en-US]
+2026-11-02 14:05:40.828  5631-5631  ashmem                  com.m3.veil                          E  Pinning is deprecated since Android Q. Please use trim or other methods.
+2026-11-02 14:05:40.830  5631-21649 mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-11-02 14:05:40.842  5631-21649 mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-11-02 14:05:40.875  5631-5631  com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-02 14:05:41.259  5631-5631  QT                      com.m3.veil                          W  qt_process_init() called
+2026-11-02 14:05:41.259  5631-5631  QT                      com.m3.veil                          E  [QT]file does not exist
+2026-11-02 14:05:41.259  5631-5631  QT                      com.m3.veil                          W  Support!!
+2026-11-02 14:05:41.262  5631-5631  libMEOW_gift            com.m3.veil                          I  open /vendor/etc/vconfig/gift/arc.ini
+2026-11-02 14:05:41.262  5631-5631  QT                      com.m3.veil                          E  [QT]file does not exist
+2026-11-02 14:05:41.264  5631-5631  mali                    com.m3.veil                          I  Successfully parsed 2 environment variable(s) from /vendor/etc/mali_platform.config.
+2026-11-02 14:05:41.267  5631-21676 StatusController        com.m3.veil                          I  Initializing StatusController (100% Pure P2P WebRTC Mesh)...
+2026-11-02 14:05:41.269  5631-5631  org.webrtc.Logging      com.m3.veil                          I  EglBase14Impl: Using OpenGL ES version 2
+2026-11-02 14:05:41.278  5631-21706 org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Loading native library: jingle_peerconnection_so
+2026-11-02 14:05:41.278  5631-21706 org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Loading library: jingle_peerconnection_so
+2026-11-02 14:05:41.286  5631-5631  VeilMessagesCtrl        com.m3.veil                          I  VeilMessagesController initialized successfully.
+2026-11-02 14:05:41.288  5631-21706 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: PeerConnectionFactory was initialized without an injected Loggable. Any existing Loggable will be deleted.
+2026-11-02 14:05:41.293  5631-21635 VeilSchedulerDaemon     com.m3.veil                          I  Starting VeilSchedulerDaemon tick loop...
+2026-11-02 14:05:41.309  5631-21640 PowerHalWrapper         com.m3.veil                          I  PowerHalWrapper.getInstance 
+2026-11-02 14:05:41.310  5631-5631  libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.tgpa_resolution_tuner"
+2026-11-02 14:05:41.318  5631-5631  libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.scaler_version"
+2026-11-02 14:05:41.319  5631-5631  libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.scaler_version"
+2026-11-02 14:05:41.322  5631-5631  os.SingleLiceFactory    com.m3.veil                          W  instance failed. com.transsion.triplefingerscreenshot.TripleFingerScreenshotLiceFactory  from android.view.IViewRootImplLice
+2026-11-02 14:05:41.322  5631-5631  os.SingleLiceFactory    com.m3.veil                          W  instance failed. com.transsion.server.threefingerslideup.ThreeFingerSlideUpServiceLiceFactory  from android.view.IViewRootImplLice
+2026-11-02 14:05:41.344  5631-21724 org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Native library has already been loaded.
+2026-11-02 14:05:41.345  5631-21724 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: PeerConnectionFactory was initialized without an injected Loggable. Any existing Loggable will be deleted.
+2026-11-02 14:05:41.346  5631-21724 org.webrtc.Logging      com.m3.veil                          I  EglBase14Impl: Using OpenGL ES version 2
+2026-11-02 14:05:41.347  5631-21706 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-02 14:05:41.348  5631-21706 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-02 14:05:41.348  5631-21706 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: createAudioDeviceModule
+2026-11-02 14:05:41.348  5631-21706 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW NS will be used.
+2026-11-02 14:05:41.348  5631-21706 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW AEC will be used.
+2026-11-02 14:05:41.348  5631-21706 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: ctor@[name=VeilRtcWorker, id=24295]
+2026-11-02 14:05:41.349  5631-21706 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: ctor@[name=VeilRtcWorker, id=24295]
+2026-11-02 14:05:41.349  5631-21706 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioTrackExternal: ctor@[name=VeilRtcWorker, id=24295]
+2026-11-02 14:05:41.368  5631-21724 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-02 14:05:41.369  5631-21724 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-02 14:05:41.369  5631-21724 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: createAudioDeviceModule
+2026-11-02 14:05:41.369  5631-21724 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW NS will be used.
+2026-11-02 14:05:41.369  5631-5631  com.m3.veil             com.m3.veil                          E  [perfctl] 5631 5631 FPSGO ver:7
+2026-11-02 14:05:41.369  5631-5631  com.m3.veil             com.m3.veil                          E  [perfctl] 1 1 1 0
+2026-11-02 14:05:41.370  5631-21724 org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW AEC will be used.
+2026-11-02 14:05:41.370  5631-21724 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: ctor@[name=pool-5-thread-1, id=24306]
+2026-11-02 14:05:41.370  5631-21724 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: ctor@[name=pool-5-thread-1, id=24306]
+2026-11-02 14:05:41.371  5631-21724 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioTrackExternal: ctor@[name=pool-5-thread-1, id=24306]
+2026-11-02 14:05:41.382  5631-21706 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-02 14:05:41.383  5631-21706 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-02 14:05:41.391  5631-21706 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-02 14:05:41.392  5631-21649 GrallocExtra            com.m3.veil                          I  gralloc_extra_query:is_SW3D 0
+2026-11-02 14:05:41.425  5631-21706 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-02 14:05:41.426  5631-21706 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-02 14:05:41.431  5631-21706 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-02 14:05:41.478  5631-21706 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-02 14:05:41.479  5631-21706 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-02 14:05:41.491  5631-21649 GrallocExtra            com.m3.veil                          I  gralloc_extra_query:is_SW3D 0
+2026-11-02 14:05:41.492  5631-21706 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-02 14:05:41.495  5631-5631  Choreographer           com.m3.veil                          W  Already have a pending vsync event.  There should only be one at a time.
+2026-11-02 14:05:41.591  5631-21678 VeilMeshDaemon          com.m3.veil                          I  Network available -> re-syncing signaling & draining P2P outbox
+2026-11-02 14:05:41.667  5631-21706 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-02 14:05:41.682  5631-21706 VideoCapabilities       com.m3.veil                          W  Unsupported mime image/vnd.android.heic
+2026-11-02 14:05:41.685  5631-5631  ImeTracker              com.m3.veil                          I  com.m3.veil:9b989d69: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+2026-11-02 14:05:41.700  5631-21706 VideoCapabilities       com.m3.veil                          W  Unrecognized profile/level 32768/256 for video/mp4v-es
+2026-11-02 14:05:41.844  5631-21743 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInAEC(true)
+2026-11-02 14:05:41.844  5631-21743 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setAEC(true)
+2026-11-02 14:05:41.845  5631-21743 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInNS(true)
+2026-11-02 14:05:41.864  5631-21743 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setNS(true)
+2026-11-02 14:05:41.872  5631-21742 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onNetworkThreadReady
+2026-11-02 14:05:41.874  5631-21743 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onWorkerThreadReady
+2026-11-02 14:05:41.874  5631-21744 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onSignalingThreadReady
+2026-11-02 14:05:41.875  5631-21746 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInAEC(true)
+2026-11-02 14:05:41.875  5631-21746 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setAEC(true)
+2026-11-02 14:05:41.876  5631-21746 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInNS(true)
+2026-11-02 14:05:41.877  5631-21746 org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setNS(true)
+2026-11-02 14:05:41.879  5631-21745 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onNetworkThreadReady
+2026-11-02 14:05:41.879  5631-21724 CallMediaFactory        com.m3.veil                          I  WebRTC call stack initialised
+2026-11-02 14:05:41.879  5631-21746 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onWorkerThreadReady
+2026-11-02 14:05:41.880  5631-21747 org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onSignalingThreadReady
+2026-11-02 14:05:41.951  5631-21706 TurnCredentialManager   com.m3.veil                          I  Rotated RFC 5389 Ephemeral TURN Credentials: TurnCredentials{user='1793653541:d90275bdd9b4e5b7', ttlRemaining=719m}
+2026-11-02 14:05:41.953  5631-21760 CallEngine              com.m3.veil                          I  CallEngine ready for veil_2f580686a121fb51977179e92c04 (e2ee=true, turn=true)
+2026-11-02 14:05:41.990  5631-21742 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitor: Start monitoring with native observer -5476376670924945136 fieldTrialsString: 
+2026-11-02 14:05:42.014  5631-21678 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: Network handle: 828039417869 becomes available: 192
+2026-11-02 14:05:42.019  5631-21678 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 828039417869 capabilities changed: [ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED LinkUpBandwidth>=12000Kbps LinkDnBandwidth>=60000Kbps TransportInfo: <SSID: <unknown ssid>, BSSID: 02:00:00:00:00:00, MAC: 02:00:00:00:00:00, IP: /192.168.1.6, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 11ac, RSSI: -51, Link speed: 96Mbps, Tx Link speed: 96Mbps, Max Supported Tx Link speed: 96Mbps, Calculated Tx : 0Mbps, Rx Link speed: 78Mbps, Max Supported Rx Link speed: 96Mbps, Calculated Rx : 0Mbps, Frequency: 5825MHz, Net ID: -1, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: -1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>> SignalStrength: -51 UnderlyingNetworks: Null]
+2026-11-02 14:05:42.029  5631-21678 org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 828039417869 link properties changed
+2026-11-02 14:05:42.603  5631-21740 SovereignIdentity       com.m3.veil                          I  Subscribed to ephemeral signals on wss://relay.primal.net for veil_2f580686a121fb51977179e92c04
+2026-11-02 14:05:43.501  5631-21613 com.m3.veil             com.m3.veil                          I  Compiler allocated 6828KB to compile void android.view.ViewRootImpl.performTraversals()
+2026-11-02 14:05:43.804  5631-5631  FinalizerDaemon         com.m3.veil                          W  type=1400 audit(0.0:173677): avc:  denied  { getopt } for  path="/dev/socket/usap_pool_primary" scontext=u:r:untrusted_app:s0:c69,c257,c512,c768 tcontext=u:r:zygote:s0 tclass=unix_stream_socket permissive=0 app=com.m3.veil
+2026-11-02 14:05:43.809  2049-3098  TranCustom...Controller system_server                        E  end setSimplifyAnimByLauncherType mSimplifyAnimOpenPkgName:com.m3.veil simplifyAnimByLauncherType:0
+2026-11-02 14:05:43.837  5631-5631  PowerHalMgrImpl         com.m3.veil                          I  perfLockAcq is supported. 
+2026-11-02 14:05:43.878  5631-5631  com.m3.veil             com.m3.veil                          I  AssetManager2(0xb400006f71432538) locale list changing from [] to [en-US]
+2026-11-02 14:05:44.289  5631-21617 com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 10MB AllocSpace bytes, 18(632KB) LOS objects, 54% free, 9185KB/19MB, paused 1.864ms,3.251ms total 106.836ms
+2026-11-02 14:05:44.699  5631-5631  DisplayEventDispatcher  com.m3.veil                          W  Vsync time out! vsyncScheduleDelay=596ms
+2026-11-02 14:05:44.700  5631-5631  Choreographer           com.m3.veil                          W  Already have a pending vsync event.  There should only be one at a time.
+2026-11-02 14:05:44.700  5631-5631  Choreographer           com.m3.veil                          W  Already have a pending vsync event.  There should only be one at a time.
+2026-11-02 14:05:44.700  5631-5631  Choreographer           com.m3.veil                          I  Skipped 53 frames!  The application may be doing too much work on its main thread.
+2026-11-02 14:05:44.946  5631-5631  ImeTracker              com.m3.veil                          I  com.m3.veil:daff4f6e: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+2026-11-02 14:05:44.949  5631-5631  WindowOnBackDispatcher  com.m3.veil                          W  sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@1b86313
+2026-11-02 14:05:44.975  5631-5631  TranScrollOptimizer     com.m3.veil                          I  Optimizer temporarily enabled
+2026-11-02 14:05:45.339  5631-21617 com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 13MB AllocSpace bytes, 14(380KB) LOS objects, 50% free, 10MB/21MB, paused 2.141ms,7.036ms total 193.375ms
+2026-11-02 14:05:45.729  5631-21707 TurnCredentialManager   com.m3.veil                          I  Completed Multi-Region Edge Relay Probing. Fleet Status:
+2026-11-02 14:05:45.732  5631-21707 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[cloudflare-stun (Cloudflare Anycast STUN): stun.cloudflare.com, rtt=15ms]
+2026-11-02 14:05:45.735  5631-21707 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[google-stun-1 (Google Global STUN 1): stun.l.google.com, rtt=45ms]
+2026-11-02 14:05:45.737  5631-21707 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[anycast-global (Global Anycast Edge): openrelay.metered.ca, rtt=UNREACHABLE]
+2026-11-02 14:05:45.737  5631-21707 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[global-standard (Global Standard Relay): standard.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-02 14:05:45.738  5631-21707 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[us-edge-1 (North America Edge): us.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-02 14:05:45.738  5631-21707 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[eu-edge-1 (Europe Central Edge): eu.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-02 14:05:45.738  5631-21707 TurnCredentialManager   com.m3.veil                          I    -> RelayNode[ap-edge-1 (Asia-Pacific Edge): ap.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-02 14:05:45.765  5631-22640 StatusController        com.m3.veil                          I  Purged remote status segment: 024b5b0c-604f-455d-9c6d-52cc70e675d9
+2026-11-02 14:05:45.909  5631-21617 com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 12MB AllocSpace bytes, 6(268KB) LOS objects, 51% free, 11MB/23MB, paused 2.260ms,4.231ms total 143.430ms
+2026-11-02 14:06:15.360  5631-5631  WindowOnBackDispatcher  com.m3.veil                          W  sendCancelIfRunning: isInProgress=false callback=androidx.activity.OnBackPressedDispatcher$Api34Impl$createOnBackAnimationCallback$1@365dc9e

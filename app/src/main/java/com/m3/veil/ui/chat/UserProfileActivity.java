@@ -278,6 +278,16 @@ public class UserProfileActivity extends AppCompatActivity {
                 chat.setAvatar(activeAvatarSource[0]);
                 EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
             }
+        } else {
+            activeAvatarSource[0] = "";
+            com.m3.veil.utils.VeilAvatarLoader.evictPeerAvatar(this, peerUserId);
+            if (profileAvatarImage != null) {
+                com.m3.veil.utils.VeilAvatarLoader.loadAvatar(profileAvatarImage, null, peerUserName, false);
+            }
+            if (chat != null && chat.getAvatar() != null && !chat.getAvatar().isEmpty()) {
+                chat.setAvatar("");
+                EncryptedChatDatabase.getInstance(this).saveOrUpdateChat(chat);
+            }
         }
     }
 

@@ -255,6 +255,12 @@ public class SignalingClient {
             if (!processedSignalIds.add("mesh_" + docId)) {
                 return;
             }
+            Long sigTs = doc.getLong("timestamp");
+            long now = System.currentTimeMillis();
+            // Reject any stale wake signal older than 2 minutes so previous-day signals never fire notifications on app reopen
+            if (sigTs == null || (now - sigTs) > 120_000L) {
+                return;
+            }
             String from = doc.getString("senderId");
             if (from == null || from.isEmpty()) {
                 from = doc.getString("from");
@@ -273,6 +279,7 @@ public class SignalingClient {
                 notifData.put("messageId", messageId);
                 notifData.put("chatId", chatId != null ? chatId : WebRtcManager.getChatId(this.currentUserId, from));
                 notifData.put("senderId", from);
+                notifData.put("timestamp", String.valueOf(sigTs));
                 String sName = doc.getString("senderName");
                 if (sName != null) notifData.put("senderName", sName);
                 String mType = doc.getString("msgType");
@@ -340,6 +347,7 @@ public class SignalingClient {
 
     private void purgeStaleSignals() {
         if (this.currentUserId == null) return;
+        final long cutoff = System.currentTimeMillis() - SIGNAL_MAX_AGE_MS;
         this.db.collection("users")
                 .document(this.currentUserId)
                 .collection("signals")
@@ -347,7 +355,20 @@ public class SignalingClient {
                 .get()
                 .addOnSuccessListener(sigExecutor, snapshots -> {
                     if (snapshots == null) return;
-                    long cutoff = System.currentTimeMillis() - SIGNAL_MAX_AGE_MS;
+                    for (DocumentSnapshot doc : snapshots.getDocuments()) {
+                        Long ts = doc.getLong("timestamp");
+                        if (ts == null || ts < cutoff) {
+                            doc.getReference().delete();
+                        }
+                    }
+                });
+        this.db.collection("users")
+                .document(this.currentUserId)
+                .collection("mesh_signals")
+                .limit(50)
+                .get()
+                .addOnSuccessListener(sigExecutor, snapshots -> {
+                    if (snapshots == null) return;
                     for (DocumentSnapshot doc : snapshots.getDocuments()) {
                         Long ts = doc.getLong("timestamp");
                         if (ts == null || ts < cutoff) {
@@ -499,6 +520,10 @@ public class SignalingClient {
                 }
                 case "p2p_action":
                 case "p2p_chat": {
+                    long sigTs = data.optLong("timestamp", 0L);
+                    if (sigTs > 0L && (System.currentTimeMillis() - sigTs) > 120_000L) {
+                        break;
+                    }
                     String payloadStr = data.optString("payload", data.toString());
                     if (this.webRtcManager != null && payloadStr != null && !payloadStr.isEmpty()) {
                         this.webRtcManager.processInboundPayload(from, payloadStr);

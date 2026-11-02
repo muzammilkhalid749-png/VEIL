@@ -349,6 +349,15 @@ public class FirebaseFirestore {
             long eventCreatedAtMs = eventObj.optLong("created_at", 0L) * 1000L;
             long wrapperTs = wrapper.optLong("ts", eventCreatedAtMs);
             long effectiveTs = Math.max(wrapperTs, eventCreatedAtMs);
+            long nowMs = System.currentTimeMillis();
+
+            // Never ingest stale ephemeral signals or mesh_signals older than 90 seconds from Nostr relays
+            if ((normPath.contains("/signals/") || normPath.contains("/mesh_signals/"))
+                    && (nowMs - effectiveTs) > 90_000L) {
+                deletedDocs.put(normPath, nowMs);
+                localStore.remove(normPath);
+                return;
+            }
 
             Long prevTs = docTimestamps.get(normPath);
             if (prevTs != null && effectiveTs < prevTs) {
@@ -359,7 +368,7 @@ public class FirebaseFirestore {
                 return;
             }
 
-            long eventSec = eventObj.optLong("created_at", System.currentTimeMillis() / 1000L);
+            long eventSec = eventObj.optLong("created_at", nowMs / 1000L);
             lastCreatedAtSecByPath.compute(normPath, (k, v) -> v == null ? eventSec : Math.max(v, eventSec));
 
             boolean isDeleted = wrapper.optBoolean("deleted", false);
@@ -385,6 +394,18 @@ public class FirebaseFirestore {
                     while (it.hasNext()) {
                         String k = it.next();
                         fieldsMap.put(k, dataObj.opt(k));
+                    }
+                }
+            }
+
+            if (localStore.size() > 600) {
+                Iterator<String> evictIt = localStore.keySet().iterator();
+                int removed = 0;
+                while (evictIt.hasNext() && removed < 150) {
+                    String k = evictIt.next();
+                    if (k.contains("/signals/") || k.contains("/mesh_signals/") || k.contains("/messages/")) {
+                        evictIt.remove();
+                        removed++;
                     }
                 }
             }
@@ -644,8 +665,8 @@ public class FirebaseFirestore {
             notifyDocumentListeners(normPath, new DocumentSnapshot(extractDocId(normPath), normPath, Collections.emptyMap(), false));
             notifyCollectionWakeListeners(extractParentCollection(normPath));
 
-            // Publish replaceable tombstone to Nostr relays for persistent documents (skip ephemeral signals)
-            if (!normPath.contains("/signals/") && !normPath.contains("/mesh_signals/")) {
+            // Publish replaceable tombstone to Nostr relays so deleted mesh_signals and persistent documents are never replayed on restart
+            if (!normPath.contains("/signals/")) {
                 publishNostrDocument(normPath, null, true);
             }
 

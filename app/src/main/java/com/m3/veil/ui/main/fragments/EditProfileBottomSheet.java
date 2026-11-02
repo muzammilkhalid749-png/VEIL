@@ -713,6 +713,7 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
             preferenceManager.remove("photo_url");
             if (uid != null) {
                 sovereignEngine.deleteAvatarFile(uid);
+                VeilAvatarLoader.evictPeerAvatar(requireContext(), uid);
             }
         }
         userPreferences.saveProfileFields(uid, finalUsername, finalDisplayName, finalBio, finalAvatarForPrefs);
@@ -769,6 +770,11 @@ public class EditProfileBottomSheet extends BottomSheetDialogFragment {
                     db.collection("usernames").document(originalUsername.toLowerCase(Locale.ROOT)).delete();
                 } catch (Exception ignored) {}
             }
+
+            try {
+                com.m3.veil.webrtc.WebRtcManager.getInstance(requireContext().getApplicationContext())
+                        .broadcastProfileUpdate(finalDisplayName, finalUsername, finalAvatarB64, avatarRemoved);
+            } catch (Throwable ignored) {}
         }
 
         // 5. Publish SovereignProfileManifest across SQLCipher, Surviving File, Firestore, and Nostr

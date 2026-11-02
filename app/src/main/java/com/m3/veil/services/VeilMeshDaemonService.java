@@ -161,11 +161,21 @@ public class VeilMeshDaemonService extends Service {
         }
     }
 
+    private static final AtomicBoolean sEngineBootInFlight = new AtomicBoolean(false);
+
     private static void ensureInProcessEnginesInitialized(Context ctx) {
         if (ctx == null) return;
         final Context appCtx = ctx.getApplicationContext() != null ? ctx.getApplicationContext() : ctx;
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            new Thread(() -> ensureInProcessEnginesInitializedInternal(appCtx), "VeilEngineBoot").start();
+            if (sEngineBootInFlight.compareAndSet(false, true)) {
+                new Thread(() -> {
+                    try {
+                        ensureInProcessEnginesInitializedInternal(appCtx);
+                    } finally {
+                        sEngineBootInFlight.set(false);
+                    }
+                }, "VeilEngineBoot").start();
+            }
             return;
         }
         ensureInProcessEnginesInitializedInternal(appCtx);
@@ -416,6 +426,16 @@ public class VeilMeshDaemonService extends Service {
             final String myUid = AuthManager.getInstance().getCurrentUserId(ctx);
             if (myUid == null || myUid.isEmpty()) return;
 
+            if (lastSyncedChatTimestampMs.isEmpty()) {
+                try {
+                    for (Chat existingChat : EncryptedChatDatabase.getInstance(ctx).getAllChats()) {
+                        if (existingChat != null && existingChat.getId() != null && existingChat.getLastMessageTime() != null) {
+                            lastSyncedChatTimestampMs.put(existingChat.getId(), existingChat.getLastMessageTime().toDate().getTime());
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
+
             if (backgroundChatsRegistration == null) {
                 backgroundChatsRegistration = FirebaseFirestore.getInstance()
                         .collection("chats")
@@ -463,12 +483,22 @@ public class VeilMeshDaemonService extends Service {
             }
 
             com.google.firebase.Timestamp lastTime = chatDoc.getTimestamp("lastMessageTime");
-            long lastMs = lastTime != null ? lastTime.toDate().getTime() : System.currentTimeMillis();
+            long lastMs = lastTime != null ? lastTime.toDate().getTime() : 0L;
             Long prevSyncedMs = lastSyncedChatTimestampMs.get(chatId);
-            if (prevSyncedMs != null && lastMs <= prevSyncedMs && dcHasNoUnreadIncrease(ctx, chatId, chatDoc)) {
+            final boolean isInitialSync = (prevSyncedMs == null);
+            if (prevSyncedMs != null && lastMs > 0L && lastMs <= prevSyncedMs && dcHasNoUnreadIncrease(ctx, chatId, chatDoc)) {
                 return;
             }
-            lastSyncedChatTimestampMs.put(chatId, lastMs);
+            if (lastMs > 0L) {
+                lastSyncedChatTimestampMs.put(chatId, lastMs);
+            } else {
+                lastSyncedChatTimestampMs.put(chatId, System.currentTimeMillis());
+            }
+
+            // Do not fetch or re-notify previous-day conversations during initial cold-start snapshot sync
+            if (isInitialSync && lastMs > 0L && (System.currentTimeMillis() - lastMs) > 120_000L) {
+                return;
+            }
 
             String collectionName = isGroup ? "groups" : "chats";
             FirebaseFirestore.getInstance()
@@ -538,10 +568,19 @@ public class VeilMeshDaemonService extends Service {
                 if (db.getMessageById(msg.getId()) != null) {
                     continue;
                 }
+                Boolean remoteRead = mDoc.getBoolean("read");
+                Boolean remoteDelivered = mDoc.getBoolean("delivered");
+                boolean alreadyReadOrDelivered = Boolean.TRUE.equals(remoteRead) || Boolean.TRUE.equals(remoteDelivered) || msg.isRead();
+                long msgTs = msg.getTimestamp() != null ? msg.getTimestamp().toDate().getTime() : 0L;
+                boolean isFreshMessage = msgTs > 0L && (System.currentTimeMillis() - msgTs) <= 180_000L;
+
                 if (msg.getText() != null && msg.getText().startsWith("ENC:v")) {
                     msg.setText(com.m3.veil.utils.EncryptionManager.decryptGroupPayload(chatId, msg.getText()));
                 }
                 msg.setDelivered(true);
+                if (Boolean.TRUE.equals(remoteRead)) {
+                    msg.setRead(true);
+                }
                 db.saveMessage(chatId, msg);
 
                 // Ensure chat row exists and has decrypted preview
@@ -555,7 +594,7 @@ public class VeilMeshDaemonService extends Service {
                     List<String> participants = com.m3.veil.utils.VeilFirestoreUtils.getSafeStringList(chatDoc, "participants");
                     localChat = new Chat(chatId, title, preview,
                             msg.getTimestamp() != null ? msg.getTimestamp() : com.google.firebase.Timestamp.now(),
-                            chatDoc.getString("avatarUrl"), 1, isGroup, false,
+                            chatDoc.getString("avatarUrl"), isFreshMessage && !alreadyReadOrDelivered ? 1 : 0, isGroup, false,
                             isGroup ? "group" : "direct",
                             participants);
                     boolean accepted = db.isDirectChatAcceptedByPeer(chatId, myUid, peerId);
@@ -564,29 +603,34 @@ public class VeilMeshDaemonService extends Service {
                     }
                     db.saveOrUpdateChat(localChat);
                 } else {
-                    localChat.setLastMessage(preview);
-                    if (msg.getTimestamp() != null) {
-                        localChat.setLastMessageTime(msg.getTimestamp());
+                    long curChatTs = localChat.getLastMessageTime() != null ? localChat.getLastMessageTime().toDate().getTime() : 0L;
+                    if (msgTs >= curChatTs) {
+                        localChat.setLastMessage(preview);
+                        if (msg.getTimestamp() != null) {
+                            localChat.setLastMessageTime(msg.getTimestamp());
+                        }
                     }
                     String activeFg = com.m3.veil.manager.VeilMessagesController.getInstance(ctx).getActiveChatIdInForeground();
-                    if (!chatId.equals(activeFg)) {
+                    if (!chatId.equals(activeFg) && isFreshMessage && !alreadyReadOrDelivered) {
                         localChat.setUnreadCount(localChat.getUnreadCount() + 1);
                     }
                     db.saveOrUpdateChat(localChat);
                 }
 
                 // Acknowledge delivery back to Firestore so sender sees double-tick immediately even while our screen is locked
-                if (!localChat.isRequest() || db.isDirectChatAcceptedByPeer(chatId, myUid, peerId)) {
+                if ((!localChat.isRequest() || db.isDirectChatAcceptedByPeer(chatId, myUid, peerId)) && !Boolean.TRUE.equals(remoteDelivered)) {
                     mDoc.getReference().update("delivered", true);
                 }
 
-                // Trigger notification & receive sound immediately
-                VeilHybridNotificationManager.getInstance(ctx).onInboundMessageForNotification(
-                        chatId,
-                        peerId != null ? peerId : msg.getSenderId(),
-                        msg,
-                        false
-                );
+                // Trigger notification ONLY for genuinely fresh, unread, undelivered messages
+                if (isFreshMessage && !alreadyReadOrDelivered) {
+                    VeilHybridNotificationManager.getInstance(ctx).onInboundMessageForNotification(
+                            chatId,
+                            peerId != null ? peerId : msg.getSenderId(),
+                            msg,
+                            false
+                    );
+                }
             }
         } catch (Throwable e) {
             Log.w(TAG, "processBackgroundFetchedMessages error: " + e.getMessage());
@@ -770,8 +814,12 @@ public class VeilMeshDaemonService extends Service {
             p.put("blink", message.isBlink());
             p.put("voiceFilter", message.getVoiceFilter());
             p.put("pollJson", message.getPollJson());
-            if (message.getThumbnail() != null) p.put("thumbnail", message.getThumbnail());
-            if (message.getMediaUrl() != null) p.put("mediaUrl", message.getMediaUrl());
+            if (message.getThumbnail() != null && message.getThumbnail().length() <= 131072) {
+                p.put("thumbnail", message.getThumbnail());
+            }
+            if (message.getMediaUrl() != null && message.getMediaUrl().length() <= 262144) {
+                p.put("mediaUrl", message.getMediaUrl());
+            }
             if (message.getLocalFilePath() != null) p.put("localFilePath", message.getLocalFilePath());
             p.put("expiresAt", message.getExpiresAt() != null ? message.getExpiresAt().toDate().getTime() : 0L);
             p.put("vanishTimer", message.getVanishTimer());
@@ -847,6 +895,10 @@ public class VeilMeshDaemonService extends Service {
 
             for (OutboxItem entry : pending) {
                 if (entry == null || entry.recipientId == null || entry.id == null) continue;
+                if (entry.retryCount > 25 || (entry.payload != null && entry.payload.length > 524288)) {
+                    db.removeOutboxItem(entry.id);
+                    continue;
+                }
 
                 if (connectedPeers.contains(entry.recipientId) || rtc.isPeerConnected(entry.recipientId)) {
                     boolean sent = sendFrameOverDataChannel(rtc, entry.recipientId, entry.payload);

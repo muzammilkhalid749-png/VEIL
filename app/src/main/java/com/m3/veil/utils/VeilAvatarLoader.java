@@ -484,13 +484,46 @@ public final class VeilAvatarLoader {
         return null;
     }
 
+    private static final java.util.concurrent.ConcurrentHashMap<String, Long> sPeerFirestoreCheckTimeMs =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static void evictPeerAvatar(@Nullable Context context, @Nullable String peerId) {
+        if (peerId == null || peerId.trim().isEmpty()) return;
+        String cleanPeer = peerId.trim();
+        String basePeer = cleanPeer.contains("_persona_")
+                ? cleanPeer.substring(0, cleanPeer.indexOf("_persona_")) : cleanPeer;
+        sPeerAvatarSourceCache.remove(cleanPeer);
+        sPeerAvatarSourceCache.remove(basePeer);
+        sFetchedFirestorePeers.remove(cleanPeer);
+        sFetchedFirestorePeers.remove(basePeer);
+        if (context != null) {
+            try {
+                Context appCtx = context.getApplicationContext();
+                com.m3.veil.database.EncryptedChatDatabase db = com.m3.veil.database.EncryptedChatDatabase.getInstance(appCtx);
+                db.clearPeerAvatarEverywhere(cleanPeer);
+                if (!basePeer.equals(cleanPeer)) {
+                    db.clearPeerAvatarEverywhere(basePeer);
+                }
+            } catch (Throwable ignored) {}
+        }
+    }
+
     public static void cachePeerAvatarSource(@Nullable Context context, @Nullable String peerId, @Nullable String avatarSource) {
-        cachePeerAvatarSource(peerId, avatarSource);
+        if (peerId == null || peerId.trim().isEmpty()) return;
+        if (isCustomAvatarSource(avatarSource)) {
+            cachePeerAvatarSource(peerId, avatarSource);
+        } else if (avatarSource != null) {
+            evictPeerAvatar(context, peerId);
+        }
     }
 
     public static void cachePeerAvatarSource(@Nullable String peerId, @Nullable String avatarSource) {
-        if (peerId != null && !peerId.trim().isEmpty() && isCustomAvatarSource(avatarSource)) {
-            sPeerAvatarSourceCache.put(peerId.trim(), avatarSource.trim());
+        if (peerId != null && !peerId.trim().isEmpty()) {
+            if (isCustomAvatarSource(avatarSource)) {
+                sPeerAvatarSourceCache.put(peerId.trim(), avatarSource.trim());
+            } else if (avatarSource != null) {
+                sPeerAvatarSourceCache.remove(peerId.trim());
+            }
         }
     }
 
@@ -514,7 +547,7 @@ public final class VeilAvatarLoader {
         if (context == null) return;
 
         String safeName = (displayName != null && !displayName.trim().isEmpty()) ? displayName.trim() : "Veil Contact";
-        String avatarSource = resolvePeerAvatarSource(context, myUserId, peerId);
+        final String avatarSource = resolvePeerAvatarSource(context, myUserId, peerId);
 
         if (isGroup) {
             loadAvatar(imageView, avatarSource, safeName, true);
@@ -523,13 +556,16 @@ public final class VeilAvatarLoader {
 
         loadAvatar(imageView, avatarSource, safeName, false);
 
-        if (!isCustomAvatarSource(avatarSource) && peerId != null && !peerId.trim().isEmpty()
+        if (peerId != null && !peerId.trim().isEmpty()
                 && !peerId.startsWith("group_") && !peerId.startsWith("channel_")) {
             final String cleanPeer = peerId.trim();
             final String lookupDocId = cleanPeer.contains("_persona_")
                     ? cleanPeer.substring(0, cleanPeer.indexOf("_persona_")) : cleanPeer;
             imageView.setTag(cleanPeer);
-            if (sFetchedFirestorePeers.add(cleanPeer)) {
+            long now = System.currentTimeMillis();
+            Long lastCheck = sPeerFirestoreCheckTimeMs.get(cleanPeer);
+            if (lastCheck == null || (now - lastCheck) > 20_000L) {
+                sPeerFirestoreCheckTimeMs.put(cleanPeer, now);
                 final Context appCtx = context.getApplicationContext();
                 try {
                     com.google.firebase.firestore.FirebaseFirestore.getInstance()
@@ -537,7 +573,8 @@ public final class VeilAvatarLoader {
                             .addOnSuccessListener(doc -> {
                                 if (doc != null && doc.exists()) {
                                     com.m3.veil.model.User u = doc.toObject(com.m3.veil.model.User.class);
-                                    String remoteAvatar = u != null ? u.getAvatar() : doc.getString("avatar");
+                                    String rawDocAvatar = doc.getString("avatar");
+                                    String remoteAvatar = (rawDocAvatar != null) ? rawDocAvatar : (u != null ? u.getAvatar() : null);
                                     String remoteName = u != null && u.getDisplayName() != null ? u.getDisplayName() : doc.getString("displayName");
                                     String remoteUser = u != null && u.getUsername() != null ? u.getUsername() : doc.getString("username");
                                     if (isCustomAvatarSource(remoteAvatar)) {
@@ -558,15 +595,23 @@ public final class VeilAvatarLoader {
                                             if (myId != null && !myId.isEmpty()) {
                                                 String dChatId = com.m3.veil.database.EncryptedChatDatabase.generateDirectChatId(myId, cleanPeer);
                                                 com.m3.veil.model.Chat existingChat = db.getChat(dChatId);
-                                                if (existingChat != null) {
+                                                if (existingChat != null && !remoteAvatar.equals(existingChat.getAvatar())) {
                                                     existingChat.setAvatar(remoteAvatar);
                                                     db.saveOrUpdateChat(existingChat);
                                                 }
                                             }
                                         } catch (Throwable ignored) {}
-                                        imageView.post(() -> {
-                                            loadAvatar(imageView, remoteAvatar, safeName, false);
-                                        });
+                                        if (!remoteAvatar.equals(avatarSource)) {
+                                            imageView.post(() -> loadAvatar(imageView, remoteAvatar, safeName, false));
+                                        }
+                                    } else {
+                                        // Remote user has no custom avatar (removed DP or default): evict any stale cached avatar
+                                        boolean hadCustomLocal = isCustomAvatarSource(avatarSource)
+                                                || isCustomAvatarSource(sPeerAvatarSourceCache.get(cleanPeer));
+                                        evictPeerAvatar(appCtx, cleanPeer);
+                                        if (hadCustomLocal) {
+                                            imageView.post(() -> loadAvatar(imageView, null, safeName, false));
+                                        }
                                     }
                                 }
                             });
