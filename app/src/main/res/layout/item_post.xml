@@ -3,11 +3,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="@dimen/_16sdp"
-    android:layout_marginEnd="@dimen/_16sdp"
-    android:layout_marginTop="@dimen/_6sdp"
-    android:layout_marginBottom="@dimen/_6sdp"
-    app:cardCornerRadius="@dimen/_16sdp"
+    android:layout_marginStart="@dimen/_13sdp"
+    android:layout_marginEnd="@dimen/_13sdp"
+    android:layout_marginTop="@dimen/_5sdp"
+    android:layout_marginBottom="@dimen/_5sdp"
+    app:cardCornerRadius="@dimen/_13sdp"
     app:cardElevation="0dp"
     app:strokeWidth="@dimen/_1sdp"
     app:strokeColor="@color/colorOutline"
@@ -17,7 +17,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="@dimen/_16sdp">
+        android:padding="@dimen/_13sdp">
 
         <!-- Header -->
         <LinearLayout
@@ -25,12 +25,12 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="@dimen/_12sdp">
+            android:layout_marginBottom="@dimen/_10sdp">
 
             <de.hdodenhof.circleimageview.CircleImageView
                 android:id="@+id/authorAvatar"
-                android:layout_width="@dimen/_40sdp"
-                android:layout_height="@dimen/_40sdp"
+                android:layout_width="@dimen/_33sdp"
+                android:layout_height="@dimen/_33sdp"
                 android:src="@drawable/ic_person"
                 app:civ_border_width="@dimen/_1sdp"
                 app:civ_border_color="@color/colorOutline" />
@@ -40,7 +40,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical"
-                android:layout_marginStart="@dimen/_12sdp">
+                android:layout_marginStart="@dimen/_10sdp">
 
                 <TextView
                     android:id="@+id/authorUsername"
@@ -48,7 +48,7 @@
                     android:layout_height="wrap_content"
                     android:text="@username"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_15ssp"
+                    android:textSize="@dimen/_13ssp"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
@@ -57,18 +57,18 @@
                     android:layout_height="wrap_content"
                     android:text="2 hours ago"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_12ssp"
+                    android:textSize="@dimen/_10ssp"
                     android:fontFeatureSettings="tnum" />
 
             </LinearLayout>
 
             <ImageView
-                android:layout_width="@dimen/_32sdp"
-                android:layout_height="@dimen/_32sdp"
+                android:layout_width="@dimen/_27sdp"
+                android:layout_height="@dimen/_27sdp"
                 android:src="@drawable/ic_more_vert"
                 app:tint="@color/textSecondary"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:padding="@dimen/_6sdp" />
+                android:padding="@dimen/_5sdp" />
 
         </LinearLayout>
 
@@ -79,16 +79,16 @@
             android:layout_height="wrap_content"
             android:text="This is a sample anonymous post content."
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp"
+            android:textSize="@dimen/_13ssp"
             android:lineSpacingExtra="@dimen/_3sdp"
-            android:layout_marginBottom="@dimen/_16sdp" />
+            android:layout_marginBottom="@dimen/_13sdp" />
 
         <!-- Hairline Divider -->
         <View
             android:layout_width="match_parent"
             android:layout_height="@dimen/_1sdp"
             android:background="@color/colorOutline"
-            android:layout_marginBottom="@dimen/_8sdp" />
+            android:layout_marginBottom="@dimen/_7sdp" />
 
         <!-- Footer / Actions -->
         <LinearLayout
@@ -104,17 +104,17 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingStart="@dimen/_8sdp"
-                android:paddingTop="@dimen/_6sdp"
-                android:paddingEnd="@dimen/_12sdp"
-                android:paddingBottom="@dimen/_6sdp"
+                android:paddingStart="@dimen/_7sdp"
+                android:paddingTop="@dimen/_5sdp"
+                android:paddingEnd="@dimen/_10sdp"
+                android:paddingBottom="@dimen/_5sdp"
                 android:background="?attr/selectableItemBackground"
-                android:layout_marginEnd="@dimen/_16sdp">
+                android:layout_marginEnd="@dimen/_13sdp">
 
                 <ImageView
                     android:id="@+id/likeIcon"
-                    android:layout_width="@dimen/_20sdp"
-                    android:layout_height="@dimen/_20sdp"
+                    android:layout_width="@dimen/_17sdp"
+                    android:layout_height="@dimen/_17sdp"
                     android:src="@drawable/ic_heart_outline"
                     app:tint="@color/textSecondary" />
 
@@ -124,9 +124,9 @@
                     android:layout_height="wrap_content"
                     android:text="0"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_13ssp"
+                    android:textSize="@dimen/_11ssp"
                     android:fontFeatureSettings="tnum"
-                    android:layout_marginStart="@dimen/_6sdp" />
+                    android:layout_marginStart="@dimen/_5sdp" />
             </LinearLayout>
 
             <!-- Comment Button -->
@@ -136,16 +136,16 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingStart="@dimen/_8sdp"
-                android:paddingTop="@dimen/_6sdp"
-                android:paddingEnd="@dimen/_12sdp"
-                android:paddingBottom="@dimen/_6sdp"
+                android:paddingStart="@dimen/_7sdp"
+                android:paddingTop="@dimen/_5sdp"
+                android:paddingEnd="@dimen/_10sdp"
+                android:paddingBottom="@dimen/_5sdp"
                 android:background="?attr/selectableItemBackground"
-                android:layout_marginEnd="@dimen/_16sdp">
+                android:layout_marginEnd="@dimen/_13sdp">
 
                 <ImageView
-                    android:layout_width="@dimen/_20sdp"
-                    android:layout_height="@dimen/_20sdp"
+                    android:layout_width="@dimen/_17sdp"
+                    android:layout_height="@dimen/_17sdp"
                     android:src="@drawable/ic_comment"
                     app:tint="@color/textSecondary" />
 
@@ -155,9 +155,9 @@
                     android:layout_height="wrap_content"
                     android:text="0"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_13ssp"
+                    android:textSize="@dimen/_11ssp"
                     android:fontFeatureSettings="tnum"
-                    android:layout_marginStart="@dimen/_6sdp" />
+                    android:layout_marginStart="@dimen/_5sdp" />
             </LinearLayout>
 
             <!-- Share Button -->
@@ -167,15 +167,15 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingStart="@dimen/_8sdp"
-                android:paddingTop="@dimen/_6sdp"
-                android:paddingEnd="@dimen/_12sdp"
-                android:paddingBottom="@dimen/_6sdp"
+                android:paddingStart="@dimen/_7sdp"
+                android:paddingTop="@dimen/_5sdp"
+                android:paddingEnd="@dimen/_10sdp"
+                android:paddingBottom="@dimen/_5sdp"
                 android:background="?attr/selectableItemBackground">
 
                 <ImageView
-                    android:layout_width="@dimen/_20sdp"
-                    android:layout_height="@dimen/_20sdp"
+                    android:layout_width="@dimen/_17sdp"
+                    android:layout_height="@dimen/_17sdp"
                     android:src="@drawable/ic_share"
                     app:tint="@color/textSecondary" />
 
@@ -184,8 +184,8 @@
                     android:layout_height="wrap_content"
                     android:text="Share"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_13ssp"
-                    android:layout_marginStart="@dimen/_6sdp" />
+                    android:textSize="@dimen/_11ssp"
+                    android:layout_marginStart="@dimen/_5sdp" />
             </LinearLayout>
 
         </LinearLayout>

@@ -5,14 +5,14 @@
     android:layout_height="match_parent"
     android:background="@drawable/bg_bottom_sheet"
     android:orientation="vertical"
-    android:paddingTop="@dimen/_12sdp">
+    android:paddingTop="@dimen/_10sdp">
 
     <!-- Drag Handle -->
     <View
-        android:layout_width="@dimen/_36sdp"
-        android:layout_height="@dimen/_4sdp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_3sdp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_12sdp"
+        android:layout_marginBottom="@dimen/_10sdp"
         android:background="@drawable/bg_persona_drag_handle" />
 
     <!-- Header -->
@@ -21,9 +21,9 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
-        android:paddingBottom="@dimen/_10sdp">
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
+        android:paddingBottom="@dimen/_8sdp">
 
         <TextView
             android:id="@+id/tvCommentsTitle"
@@ -32,15 +32,15 @@
             android:layout_weight="1"
             android:text="Discussion Comments"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_18ssp"
+            android:textSize="@dimen/_15ssp"
             android:textStyle="bold" />
 
         <ImageView
             android:id="@+id/btnCloseComments"
-            android:layout_width="@dimen/_32sdp"
-            android:layout_height="@dimen/_32sdp"
+            android:layout_width="@dimen/_27sdp"
+            android:layout_height="@dimen/_27sdp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="@dimen/_6sdp"
+            android:padding="@dimen/_5sdp"
             android:src="@drawable/ic_close"
             app:tint="@color/textSecondary" />
 
@@ -51,22 +51,22 @@
         android:id="@+id/postPreviewContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/_20sdp"
-        android:layout_marginEnd="@dimen/_20sdp"
-        android:layout_marginBottom="@dimen/_8sdp"
+        android:layout_marginStart="@dimen/_17sdp"
+        android:layout_marginEnd="@dimen/_17sdp"
+        android:layout_marginBottom="@dimen/_7sdp"
         android:background="@drawable/bg_quote_sent"
         android:orientation="horizontal"
-        android:padding="@dimen/_8sdp">
+        android:padding="@dimen/_7sdp">
 
         <View
-            android:layout_width="@dimen/_4sdp"
+            android:layout_width="@dimen/_3sdp"
             android:layout_height="match_parent"
             android:background="@color/colorPrimary" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_8sdp"
+            android:layout_marginStart="@dimen/_7sdp"
             android:orientation="vertical">
 
             <TextView
@@ -75,7 +75,7 @@
                 android:layout_height="wrap_content"
                 android:text="Channel Post"
                 android:textColor="@color/colorPrimary"
-                android:textSize="@dimen/_12ssp"
+                android:textSize="@dimen/_10ssp"
                 android:textStyle="bold" />
 
             <TextView
@@ -86,7 +86,7 @@
                 android:maxLines="2"
                 android:text="Broadcast text preview..."
                 android:textColor="@color/textSecondary"
-                android:textSize="@dimen/_13ssp" />
+                android:textSize="@dimen/_10ssp" />
 
         </LinearLayout>
 
@@ -108,10 +108,10 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
-            android:paddingStart="@dimen/_16sdp"
-            android:paddingEnd="@dimen/_16sdp"
-            android:paddingTop="@dimen/_8sdp"
-            android:paddingBottom="@dimen/_8sdp" />
+            android:paddingStart="@dimen/_13sdp"
+            android:paddingEnd="@dimen/_13sdp"
+            android:paddingTop="@dimen/_7sdp"
+            android:paddingBottom="@dimen/_7sdp" />
 
         <LinearLayout
             android:id="@+id/emptyCommentsState"
@@ -125,24 +125,24 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="💬"
-                android:textSize="@dimen/_36ssp" />
+                android:textSize="@dimen/_30ssp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_8sdp"
+                android:layout_marginTop="@dimen/_7sdp"
                 android:text="No comments yet"
                 android:textColor="@color/textPrimary"
-                android:textSize="@dimen/_15ssp"
+                android:textSize="@dimen/_13ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_4sdp"
+                android:layout_marginTop="@dimen/_3sdp"
                 android:text="Be the first to share your thoughts!"
                 android:textColor="@color/textSecondary"
-                android:textSize="@dimen/_13ssp" />
+                android:textSize="@dimen/_10ssp" />
 
         </LinearLayout>
 
@@ -166,10 +166,10 @@
         android:background="@color/colorSurface"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="@dimen/_12sdp"
-        android:paddingEnd="@dimen/_8sdp"
-        android:paddingTop="@dimen/_8sdp"
-        android:paddingBottom="@dimen/_12sdp">
+        android:paddingStart="@dimen/_10sdp"
+        android:paddingEnd="@dimen/_7sdp"
+        android:paddingTop="@dimen/_7sdp"
+        android:paddingBottom="@dimen/_10sdp">
 
         <EditText
             android:id="@+id/etCommentInput"
@@ -180,21 +180,21 @@
             android:hint="Leave a comment..."
             android:inputType="textCapSentences|textMultiLine"
             android:maxLines="3"
-            android:paddingStart="@dimen/_14sdp"
-            android:paddingEnd="@dimen/_14sdp"
-            android:paddingTop="@dimen/_10sdp"
-            android:paddingBottom="@dimen/_10sdp"
+            android:paddingStart="@dimen/_12sdp"
+            android:paddingEnd="@dimen/_12sdp"
+            android:paddingTop="@dimen/_8sdp"
+            android:paddingBottom="@dimen/_8sdp"
             android:textColor="@color/textPrimary"
             android:textColorHint="@color/textSecondary"
-            android:textSize="@dimen/_14ssp" />
+            android:textSize="@dimen/_12ssp" />
 
         <ImageView
             android:id="@+id/btnSendComment"
-            android:layout_width="@dimen/_44sdp"
-            android:layout_height="@dimen/_44sdp"
-            android:layout_marginStart="@dimen/_8sdp"
+            android:layout_width="@dimen/_37sdp"
+            android:layout_height="@dimen/_37sdp"
+            android:layout_marginStart="@dimen/_7sdp"
             android:background="@drawable/bg_fab_accent"
-            android:padding="@dimen/_11sdp"
+            android:padding="@dimen/_9sdp"
             android:src="@drawable/ic_send"
             app:tint="@android:color/white" />
 

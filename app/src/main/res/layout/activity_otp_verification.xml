@@ -9,14 +9,14 @@
     <!-- Back Button -->
     <ImageView
         android:id="@+id/backButton"
-        android:layout_width="@dimen/_40sdp"
-        android:layout_height="@dimen/_40sdp"
+        android:layout_width="@dimen/_33sdp"
+        android:layout_height="@dimen/_33sdp"
         android:layout_gravity="top|start"
-        android:layout_marginStart="@dimen/_16sdp"
-        android:layout_marginTop="@dimen/_12sdp"
+        android:layout_marginStart="@dimen/_13sdp"
+        android:layout_marginTop="@dimen/_10sdp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/back"
-        android:padding="@dimen/_8sdp"
+        android:padding="@dimen/_7sdp"
         android:src="@drawable/ic_arrow_back"
         app:tint="@color/textPrimary" />
 
@@ -33,17 +33,17 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:gravity="center_horizontal"
-            android:maxWidth="@dimen/_440sdp"
+            android:maxWidth="@dimen/_367sdp"
             android:orientation="vertical"
-            android:paddingHorizontal="@dimen/_24sdp"
-            android:paddingTop="@dimen/_56sdp"
-            android:paddingBottom="@dimen/_32sdp">
+            android:paddingHorizontal="@dimen/_20sdp"
+            android:paddingTop="@dimen/_47sdp"
+            android:paddingBottom="@dimen/_27sdp">
 
             <!-- Lock / Verification Icon -->
             <ImageView
-                android:layout_width="@dimen/_64sdp"
-                android:layout_height="@dimen/_64sdp"
-                android:layout_marginBottom="@dimen/_16sdp"
+                android:layout_width="@dimen/_53sdp"
+                android:layout_height="@dimen/_53sdp"
+                android:layout_marginBottom="@dimen/_13sdp"
                 android:contentDescription="@string/verify_phone_number"
                 android:scaleType="fitCenter"
                 android:src="@drawable/veil_logo" />
@@ -56,48 +56,48 @@
                 android:letterSpacing="0.01"
                 android:text="@string/verify_phone_number"
                 android:textColor="@color/textPrimary"
-                android:textSize="@dimen/_22ssp"
+                android:textSize="@dimen/_18ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/phoneNumberText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_8sdp"
+                android:layout_marginTop="@dimen/_7sdp"
                 android:fontFamily="sans-serif-medium"
                 android:gravity="center"
                 android:text="+1 XXX-XXX-1234"
                 android:textColor="@color/veil_accent"
-                android:textSize="@dimen/_15ssp"
+                android:textSize="@dimen/_13ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_4sdp"
-                android:layout_marginBottom="@dimen/_16sdp"
+                android:layout_marginTop="@dimen/_3sdp"
+                android:layout_marginBottom="@dimen/_13sdp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
                 android:text="@string/enter_otp_hint"
                 android:textColor="@color/textSecondary"
-                android:textSize="@dimen/_14ssp" />
+                android:textSize="@dimen/_12ssp" />
 
             <!-- Sovereign Local OTP Instant Auto-Fill Pill -->
             <TextView
                 android:id="@+id/tvSovereignOtpHelper"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_20sdp"
+                android:layout_marginBottom="@dimen/_17sdp"
                 android:background="@drawable/input_background"
                 android:clickable="true"
                 android:focusable="true"
                 android:fontFamily="monospace"
                 android:gravity="center"
-                android:paddingHorizontal="@dimen/_14sdp"
-                android:paddingVertical="@dimen/_8sdp"
+                android:paddingHorizontal="@dimen/_12sdp"
+                android:paddingVertical="@dimen/_7sdp"
                 android:text="🔐 Sovereign Code: 123456 (Tap to auto-fill)"
                 android:textColor="@color/veil_accent"
-                android:textSize="@dimen/_12ssp"
+                android:textSize="@dimen/_10ssp"
                 android:textStyle="bold" />
 
             <!-- OTP Input Grid -->
@@ -106,7 +106,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:layout_marginBottom="@dimen/_28sdp"
+                android:layout_marginBottom="@dimen/_23sdp"
                 android:clickable="true"
                 android:cursorVisible="true"
                 android:focusable="true"
@@ -114,23 +114,23 @@
                 android:fontFamily="sans-serif-medium"
                 android:inputType="number"
                 android:textColor="@color/textPrimary"
-                android:textSize="@dimen/_20ssp"
+                android:textSize="@dimen/_17ssp"
                 android:textStyle="bold"
                 app:OtpHideLineWhenFilled="true"
                 app:OtpItemCount="6"
-                app:OtpItemHeight="@dimen/_50sdp"
-                app:OtpItemRadius="@dimen/_12sdp"
-                app:OtpItemSpacing="@dimen/_8sdp"
-                app:OtpItemWidth="@dimen/_38sdp"
+                app:OtpItemHeight="@dimen/_42sdp"
+                app:OtpItemRadius="@dimen/_10sdp"
+                app:OtpItemSpacing="@dimen/_7sdp"
+                app:OtpItemWidth="@dimen/_32sdp"
                 app:OtpLineColor="@color/veil_accent"
-                app:OtpLineWidth="@dimen/_2sdp"
+                app:OtpLineWidth="@dimen/_1sdp"
                 app:OtpViewType="rectangle" />
 
             <!-- Countdown Timer & Resend Option -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_28sdp"
+                android:layout_marginBottom="@dimen/_23sdp"
                 android:gravity="center"
                 android:orientation="horizontal">
 
@@ -141,16 +141,16 @@
                     android:fontFamily="sans-serif-medium"
                     android:text="02:00"
                     android:textColor="@color/veil_accent"
-                    android:textSize="@dimen/_14ssp"
+                    android:textSize="@dimen/_12ssp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="@dimen/_10sdp"
+                    android:layout_marginHorizontal="@dimen/_8sdp"
                     android:text="•"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_14ssp" />
+                    android:textSize="@dimen/_12ssp" />
 
                 <TextView
                     android:id="@+id/resendCodeText"
@@ -159,17 +159,17 @@
                     android:background="?attr/selectableItemBackground"
                     android:clickable="false"
                     android:fontFamily="sans-serif-medium"
-                    android:padding="@dimen/_6sdp"
+                    android:padding="@dimen/_5sdp"
                     android:text="@string/resend_code"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_14ssp" />
+                    android:textSize="@dimen/_12ssp" />
 
             </LinearLayout>
 
             <!-- Verify Action Button with Centered In-Button Spinner -->
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/_52sdp">
+                android:layout_height="@dimen/_43sdp">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/verifyButton"
@@ -180,15 +180,15 @@
                     android:text="@string/verify_continue"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
-                    android:textSize="@dimen/_15ssp"
+                    android:textSize="@dimen/_13ssp"
                     android:textStyle="bold"
                     app:backgroundTint="@color/colorPrimary"
-                    app:cornerRadius="@dimen/_14sdp" />
+                    app:cornerRadius="@dimen/_12sdp" />
 
                 <ProgressBar
                     android:id="@+id/progressBar"
-                    android:layout_width="@dimen/_26sdp"
-                    android:layout_height="@dimen/_26sdp"
+                    android:layout_width="@dimen/_22sdp"
+                    android:layout_height="@dimen/_22sdp"
                     android:layout_gravity="center"
                     android:indeterminate="true"
                     android:indeterminateTint="@android:color/white"

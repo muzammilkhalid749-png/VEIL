@@ -5,16 +5,16 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingTop="@dimen/_12sdp"
-    android:paddingBottom="@dimen/_24sdp">
+    android:paddingTop="@dimen/_10sdp"
+    android:paddingBottom="@dimen/_20sdp">
 
     <!-- Handle Bar -->
     <View
-        android:layout_width="@dimen/_36sdp"
-        android:layout_height="@dimen/_4sdp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_3sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_14sdp" />
+        android:layout_marginBottom="@dimen/_12sdp" />
 
     <!-- Emoji Reactions Strip -->
     <LinearLayout
@@ -23,67 +23,67 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:paddingStart="@dimen/_16sdp"
-        android:paddingEnd="@dimen/_16sdp"
-        android:paddingBottom="@dimen/_12sdp">
+        android:paddingStart="@dimen/_13sdp"
+        android:paddingEnd="@dimen/_13sdp"
+        android:paddingBottom="@dimen/_10sdp">
 
         <TextView
             android:id="@+id/reactionThumbsUp"
-            android:layout_width="@dimen/_44sdp"
-            android:layout_height="@dimen/_44sdp"
+            android:layout_width="@dimen/_37sdp"
+            android:layout_height="@dimen/_37sdp"
             android:gravity="center"
             android:text="👍"
-            android:textSize="@dimen/_24ssp"
+            android:textSize="@dimen/_20ssp"
             android:background="?attr/selectableItemBackgroundBorderless" />
 
         <TextView
             android:id="@+id/reactionHeart"
-            android:layout_width="@dimen/_44sdp"
-            android:layout_height="@dimen/_44sdp"
+            android:layout_width="@dimen/_37sdp"
+            android:layout_height="@dimen/_37sdp"
             android:gravity="center"
             android:text="❤️"
-            android:textSize="@dimen/_24ssp"
-            android:layout_marginStart="@dimen/_8sdp"
+            android:textSize="@dimen/_20ssp"
+            android:layout_marginStart="@dimen/_7sdp"
             android:background="?attr/selectableItemBackgroundBorderless" />
 
         <TextView
             android:id="@+id/reactionLaugh"
-            android:layout_width="@dimen/_44sdp"
-            android:layout_height="@dimen/_44sdp"
+            android:layout_width="@dimen/_37sdp"
+            android:layout_height="@dimen/_37sdp"
             android:gravity="center"
             android:text="😂"
-            android:textSize="@dimen/_24ssp"
-            android:layout_marginStart="@dimen/_8sdp"
+            android:textSize="@dimen/_20ssp"
+            android:layout_marginStart="@dimen/_7sdp"
             android:background="?attr/selectableItemBackgroundBorderless" />
 
         <TextView
             android:id="@+id/reactionWow"
-            android:layout_width="@dimen/_44sdp"
-            android:layout_height="@dimen/_44sdp"
+            android:layout_width="@dimen/_37sdp"
+            android:layout_height="@dimen/_37sdp"
             android:gravity="center"
             android:text="😮"
-            android:textSize="@dimen/_24ssp"
-            android:layout_marginStart="@dimen/_8sdp"
+            android:textSize="@dimen/_20ssp"
+            android:layout_marginStart="@dimen/_7sdp"
             android:background="?attr/selectableItemBackgroundBorderless" />
 
         <TextView
             android:id="@+id/reactionSad"
-            android:layout_width="@dimen/_44sdp"
-            android:layout_height="@dimen/_44sdp"
+            android:layout_width="@dimen/_37sdp"
+            android:layout_height="@dimen/_37sdp"
             android:gravity="center"
             android:text="😢"
-            android:textSize="@dimen/_24ssp"
-            android:layout_marginStart="@dimen/_8sdp"
+            android:textSize="@dimen/_20ssp"
+            android:layout_marginStart="@dimen/_7sdp"
             android:background="?attr/selectableItemBackgroundBorderless" />
 
         <TextView
             android:id="@+id/reactionPray"
-            android:layout_width="@dimen/_44sdp"
-            android:layout_height="@dimen/_44sdp"
+            android:layout_width="@dimen/_37sdp"
+            android:layout_height="@dimen/_37sdp"
             android:gravity="center"
             android:text="🙏"
-            android:textSize="@dimen/_24ssp"
-            android:layout_marginStart="@dimen/_8sdp"
+            android:textSize="@dimen/_20ssp"
+            android:layout_marginStart="@dimen/_7sdp"
             android:background="?attr/selectableItemBackgroundBorderless" />
 
     </LinearLayout>
@@ -97,28 +97,28 @@
     <LinearLayout
         android:id="@+id/actionReply"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_52sdp"
+        android:layout_height="@dimen/_43sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_reply"
             app:tint="@color/textPrimary" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Reply"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 
@@ -126,28 +126,28 @@
     <LinearLayout
         android:id="@+id/actionComments"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_52sdp"
+        android:layout_height="@dimen/_43sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_chat"
             app:tint="@color/colorPrimary" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Comments &amp; Discussion"
             android:textColor="@color/colorPrimary"
-            android:textSize="@dimen/_15ssp"
+            android:textSize="@dimen/_13ssp"
             android:textStyle="bold" />
 
     </LinearLayout>
@@ -156,28 +156,28 @@
     <LinearLayout
         android:id="@+id/actionCopy"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_52sdp"
+        android:layout_height="@dimen/_43sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_copy"
             app:tint="@color/textPrimary" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Copy"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 
@@ -185,28 +185,28 @@
     <LinearLayout
         android:id="@+id/actionForward"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_52sdp"
+        android:layout_height="@dimen/_43sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_forward"
             app:tint="@color/textPrimary" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Forward"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 
@@ -214,28 +214,28 @@
     <LinearLayout
         android:id="@+id/actionInfo"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_48sdp"
+        android:layout_height="@dimen/_40sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_info"
             app:tint="@color/textPrimary" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Message info &amp; details"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 
@@ -243,18 +243,18 @@
     <LinearLayout
         android:id="@+id/actionEdit"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_48sdp"
+        android:layout_height="@dimen/_40sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_edit"
             app:tint="@color/textPrimary" />
 
@@ -262,17 +262,17 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Edit message"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
         <TextView
             android:id="@+id/tvEditRemainingBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="@color/textSecondary"
-            android:textSize="@dimen/_12ssp"
+            android:textSize="@dimen/_10ssp"
             android:visibility="gone" />
 
     </LinearLayout>
@@ -281,28 +281,28 @@
     <LinearLayout
         android:id="@+id/actionSelectMessages"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_48sdp"
+        android:layout_height="@dimen/_40sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_check"
             app:tint="@color/textPrimary" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Select messages"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 
@@ -310,28 +310,28 @@
     <LinearLayout
         android:id="@+id/actionPin"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_48sdp"
+        android:layout_height="@dimen/_40sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_chat_pin"
             app:tint="@color/textPrimary" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Pin / Unpin message"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 
@@ -339,11 +339,11 @@
     <LinearLayout
         android:id="@+id/actionFavoriteMedia"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_48sdp"
+        android:layout_height="@dimen/_40sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true"
@@ -351,8 +351,8 @@
 
         <ImageView
             android:id="@+id/ivFavoriteMediaIcon"
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_star"
             app:tint="@color/textPrimary" />
 
@@ -360,10 +360,10 @@
             android:id="@+id/tvFavoriteMediaTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Add to Favorites"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 
@@ -371,19 +371,19 @@
     <LinearLayout
         android:id="@+id/actionBookmark"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_48sdp"
+        android:layout_height="@dimen/_40sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
             android:id="@+id/ivBookmarkIcon"
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_star_outline"
             app:tint="@color/textPrimary" />
 
@@ -391,10 +391,10 @@
             android:id="@+id/tvBookmarkTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Bookmark message"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 
@@ -402,19 +402,19 @@
     <LinearLayout
         android:id="@+id/actionTranslate"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_48sdp"
+        android:layout_height="@dimen/_40sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
             android:id="@+id/ivTranslateIcon"
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_language"
             app:tint="@color/textPrimary" />
 
@@ -422,10 +422,10 @@
             android:id="@+id/tvTranslateTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Translate message"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 
@@ -438,28 +438,28 @@
     <LinearLayout
         android:id="@+id/actionDelete"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_52sdp"
+        android:layout_height="@dimen/_43sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_20sdp"
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_17sdp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
-            android:layout_width="@dimen/_22sdp"
-            android:layout_height="@dimen/_22sdp"
+            android:layout_width="@dimen/_18sdp"
+            android:layout_height="@dimen/_18sdp"
             android:src="@drawable/ic_delete"
             app:tint="@color/colorError" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_18sdp"
+            android:layout_marginStart="@dimen/_15sdp"
             android:text="Delete message"
             android:textColor="@color/colorError"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 

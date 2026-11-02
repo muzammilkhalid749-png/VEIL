@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="@dimen/_64sdp"
-    android:layout_height="@dimen/_64sdp"
-    android:layout_marginEnd="@dimen/_6sdp"
-    app:cardCornerRadius="@dimen/_8sdp"
+    android:layout_width="@dimen/_53sdp"
+    android:layout_height="@dimen/_53sdp"
+    android:layout_marginEnd="@dimen/_5sdp"
+    app:cardCornerRadius="@dimen/_7sdp"
     app:cardElevation="0dp"
     app:strokeWidth="@dimen/_1sdp"
     app:strokeColor="#33FFFFFF"
@@ -23,8 +23,8 @@
         <!-- Video indicator -->
         <ImageView
             android:id="@+id/ivRecentVideoIcon"
-            android:layout_width="@dimen/_16sdp"
-            android:layout_height="@dimen/_16sdp"
+            android:layout_width="@dimen/_13sdp"
+            android:layout_height="@dimen/_13sdp"
             android:layout_gravity="bottom|start"
             android:layout_margin="@dimen/_3sdp"
             android:src="@drawable/ic_play_arrow"

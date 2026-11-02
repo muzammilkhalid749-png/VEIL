@@ -4,10 +4,10 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:gravity="start"
-    android:paddingStart="@dimen/_16sdp"
-    android:paddingEnd="@dimen/_64sdp"
-    android:paddingTop="@dimen/_4sdp"
-    android:paddingBottom="@dimen/_4sdp"
+    android:paddingStart="@dimen/_13sdp"
+    android:paddingEnd="@dimen/_53sdp"
+    android:paddingTop="@dimen/_3sdp"
+    android:paddingBottom="@dimen/_3sdp"
     android:clipChildren="false"
     android:clipToPadding="false">
 
@@ -15,10 +15,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_message_received"
-        android:paddingStart="@dimen/_16sdp"
-        android:paddingEnd="@dimen/_16sdp"
-        android:paddingTop="@dimen/_12sdp"
-        android:paddingBottom="@dimen/_12sdp"
+        android:paddingStart="@dimen/_13sdp"
+        android:paddingEnd="@dimen/_13sdp"
+        android:paddingTop="@dimen/_10sdp"
+        android:paddingBottom="@dimen/_10sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:clipChildren="false"
@@ -26,24 +26,24 @@
 
         <View
             android:id="@+id/dot1"
-            android:layout_width="@dimen/_6sdp"
-            android:layout_height="@dimen/_6sdp"
+            android:layout_width="@dimen/_5sdp"
+            android:layout_height="@dimen/_5sdp"
             android:background="@drawable/circle_background"
             android:backgroundTint="@color/message_text_secondary" />
 
         <View
             android:id="@+id/dot2"
-            android:layout_width="@dimen/_6sdp"
-            android:layout_height="@dimen/_6sdp"
-            android:layout_marginStart="@dimen/_4sdp"
+            android:layout_width="@dimen/_5sdp"
+            android:layout_height="@dimen/_5sdp"
+            android:layout_marginStart="@dimen/_3sdp"
             android:background="@drawable/circle_background"
             android:backgroundTint="@color/message_text_secondary" />
 
         <View
             android:id="@+id/dot3"
-            android:layout_width="@dimen/_6sdp"
-            android:layout_height="@dimen/_6sdp"
-            android:layout_marginStart="@dimen/_4sdp"
+            android:layout_width="@dimen/_5sdp"
+            android:layout_height="@dimen/_5sdp"
+            android:layout_marginStart="@dimen/_3sdp"
             android:background="@drawable/circle_background"
             android:backgroundTint="@color/message_text_secondary" />
 

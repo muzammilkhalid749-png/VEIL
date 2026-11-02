@@ -5,29 +5,29 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="@dimen/_24sdp"
-    android:paddingEnd="@dimen/_24sdp"
-    android:paddingTop="@dimen/_12sdp"
-    android:paddingBottom="@dimen/_24sdp"
+    android:paddingStart="@dimen/_20sdp"
+    android:paddingEnd="@dimen/_20sdp"
+    android:paddingTop="@dimen/_10sdp"
+    android:paddingBottom="@dimen/_20sdp"
     android:gravity="center_horizontal">
 
     <!-- Drag Handle -->
     <View
-        android:layout_width="@dimen/_38sdp"
-        android:layout_height="@dimen/_4sdp"
+        android:layout_width="@dimen/_32sdp"
+        android:layout_height="@dimen/_3sdp"
         android:background="@drawable/bg_persona_drag_handle"
-        android:layout_marginBottom="@dimen/_20sdp" />
+        android:layout_marginBottom="@dimen/_17sdp" />
 
     <!-- Center Hero Badge: Modern Tinted Container -->
     <FrameLayout
-        android:layout_width="@dimen/_64sdp"
-        android:layout_height="@dimen/_64sdp"
+        android:layout_width="@dimen/_53sdp"
+        android:layout_height="@dimen/_53sdp"
         android:background="@drawable/bg_filter_chip"
-        android:layout_marginBottom="@dimen/_16sdp">
+        android:layout_marginBottom="@dimen/_13sdp">
 
         <ImageView
-            android:layout_width="@dimen/_32sdp"
-            android:layout_height="@dimen/_32sdp"
+            android:layout_width="@dimen/_27sdp"
+            android:layout_height="@dimen/_27sdp"
             android:layout_gravity="center"
             android:src="@drawable/ic_mention"
             app:tint="@color/colorPrimary" />
@@ -39,37 +39,37 @@
         android:layout_height="wrap_content"
         android:text="Status Mentions"
         android:textColor="@color/textPrimary"
-        android:textSize="@dimen/_20ssp"
+        android:textSize="@dimen/_17ssp"
         android:fontFamily="sans-serif-medium"
         android:gravity="center"
-        android:layout_marginBottom="@dimen/_6sdp" />
+        android:layout_marginBottom="@dimen/_5sdp" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="When you mention people or groups in your status"
         android:textColor="@color/textSecondary"
-        android:textSize="@dimen/_13ssp"
+        android:textSize="@dimen/_11ssp"
         android:gravity="center"
-        android:layout_marginBottom="@dimen/_20sdp" />
+        android:layout_marginBottom="@dimen/_17sdp" />
 
     <!-- Modern Feature Card Container -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="@dimen/_16sdp"
+        app:cardCornerRadius="@dimen/_13sdp"
         app:cardElevation="0dp"
         app:strokeWidth="@dimen/_1sdp"
         app:strokeColor="@color/dividerColor"
         app:cardBackgroundColor="@color/colorSurfaceContainerLow"
-        android:layout_marginBottom="@dimen/_24sdp">
+        android:layout_marginBottom="@dimen/_20sdp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="@dimen/_16sdp"
-            android:paddingVertical="@dimen/_12sdp">
+            android:paddingHorizontal="@dimen/_13sdp"
+            android:paddingVertical="@dimen/_10sdp">
 
             <!-- Feature 1: Private Notification -->
             <LinearLayout
@@ -77,16 +77,16 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingVertical="@dimen/_8sdp">
+                android:paddingVertical="@dimen/_7sdp">
 
                 <FrameLayout
-                    android:layout_width="@dimen/_34sdp"
-                    android:layout_height="@dimen/_34sdp"
+                    android:layout_width="@dimen/_28sdp"
+                    android:layout_height="@dimen/_28sdp"
                     android:background="@drawable/bg_filter_chip">
 
                     <ImageView
-                        android:layout_width="@dimen/_18sdp"
-                        android:layout_height="@dimen/_18sdp"
+                        android:layout_width="@dimen/_15sdp"
+                        android:layout_height="@dimen/_15sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_chat"
                         app:tint="@color/colorPrimary" />
@@ -96,7 +96,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="@dimen/_12sdp"
+                    android:layout_marginStart="@dimen/_10sdp"
                     android:orientation="vertical">
 
                     <TextView
@@ -104,7 +104,7 @@
                         android:layout_height="wrap_content"
                         android:text="Private Notification"
                         android:textColor="@color/textPrimary"
-                        android:textSize="@dimen/_14ssp"
+                        android:textSize="@dimen/_12ssp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
@@ -113,7 +113,7 @@
                         android:layout_marginTop="@dimen/_1sdp"
                         android:text="Tagged peers receive a direct message notify"
                         android:textColor="@color/textSecondary"
-                        android:textSize="@dimen/_12ssp" />
+                        android:textSize="@dimen/_10ssp" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -128,16 +128,16 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingVertical="@dimen/_8sdp">
+                android:paddingVertical="@dimen/_7sdp">
 
                 <FrameLayout
-                    android:layout_width="@dimen/_34sdp"
-                    android:layout_height="@dimen/_34sdp"
+                    android:layout_width="@dimen/_28sdp"
+                    android:layout_height="@dimen/_28sdp"
                     android:background="@drawable/bg_filter_chip">
 
                     <ImageView
-                        android:layout_width="@dimen/_18sdp"
-                        android:layout_height="@dimen/_18sdp"
+                        android:layout_width="@dimen/_15sdp"
+                        android:layout_height="@dimen/_15sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_status_ring"
                         app:tint="@color/colorPrimary" />
@@ -147,7 +147,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="@dimen/_12sdp"
+                    android:layout_marginStart="@dimen/_10sdp"
                     android:orientation="vertical">
 
                     <TextView
@@ -155,7 +155,7 @@
                         android:layout_height="wrap_content"
                         android:text="Direct Viewing"
                         android:textColor="@color/textPrimary"
-                        android:textSize="@dimen/_14ssp"
+                        android:textSize="@dimen/_12ssp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
@@ -164,7 +164,7 @@
                         android:layout_marginTop="@dimen/_1sdp"
                         android:text="They can view your status directly from the notification"
                         android:textColor="@color/textSecondary"
-                        android:textSize="@dimen/_12ssp" />
+                        android:textSize="@dimen/_10ssp" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -179,16 +179,16 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingVertical="@dimen/_8sdp">
+                android:paddingVertical="@dimen/_7sdp">
 
                 <FrameLayout
-                    android:layout_width="@dimen/_34sdp"
-                    android:layout_height="@dimen/_34sdp"
+                    android:layout_width="@dimen/_28sdp"
+                    android:layout_height="@dimen/_28sdp"
                     android:background="@drawable/bg_filter_chip">
 
                     <ImageView
-                        android:layout_width="@dimen/_18sdp"
-                        android:layout_height="@dimen/_18sdp"
+                        android:layout_width="@dimen/_15sdp"
+                        android:layout_height="@dimen/_15sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_share"
                         app:tint="@color/colorPrimary" />
@@ -198,7 +198,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="@dimen/_12sdp"
+                    android:layout_marginStart="@dimen/_10sdp"
                     android:orientation="vertical">
 
                     <TextView
@@ -206,7 +206,7 @@
                         android:layout_height="wrap_content"
                         android:text="Reshare Permission"
                         android:textColor="@color/textPrimary"
-                        android:textSize="@dimen/_14ssp"
+                        android:textSize="@dimen/_12ssp"
                         android:fontFamily="sans-serif-medium" />
 
                     <TextView
@@ -215,7 +215,7 @@
                         android:layout_marginTop="@dimen/_1sdp"
                         android:text="They can choose to reshare your update with their audience"
                         android:textColor="@color/textSecondary"
-                        android:textSize="@dimen/_12ssp" />
+                        android:textSize="@dimen/_10ssp" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
@@ -225,13 +225,13 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnMentionsInfoOk"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_48sdp"
+        android:layout_height="@dimen/_40sdp"
         android:text="OK, Got it"
         android:textColor="@color/colorOnPrimary"
-        android:textSize="@dimen/_15ssp"
+        android:textSize="@dimen/_12ssp"
         android:fontFamily="sans-serif-medium"
         app:backgroundTint="@color/colorPrimary"
-        app:cornerRadius="@dimen/_14sdp"
+        app:cornerRadius="@dimen/_12sdp"
         app:elevation="0dp" />
 
     <!-- Learn More Link -->
@@ -239,11 +239,11 @@
         android:id="@+id/btnMentionsLearnMore"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/_12sdp"
+        android:layout_marginTop="@dimen/_10sdp"
         android:text="Learn more"
         android:textColor="@color/colorPrimary"
-        android:textSize="@dimen/_14ssp"
+        android:textSize="@dimen/_11ssp"
         android:fontFamily="sans-serif-medium"
-        android:padding="@dimen/_6sdp" />
+        android:padding="@dimen/_5sdp" />
 
 </LinearLayout>

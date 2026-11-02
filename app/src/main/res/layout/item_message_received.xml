@@ -4,10 +4,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingStart="@dimen/_8sdp"
-    android:paddingEnd="@dimen/_8sdp"
-    android:paddingTop="@dimen/_2sdp"
-    android:paddingBottom="@dimen/_2sdp">
+    android:paddingStart="@dimen/_7sdp"
+    android:paddingEnd="@dimen/_7sdp"
+    android:paddingTop="@dimen/_1sdp"
+    android:paddingBottom="@dimen/_1sdp">
 
     <!-- Centered Date Header Pill (WhatsApp Style) -->
     <LinearLayout
@@ -15,8 +15,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:paddingTop="@dimen/_10sdp"
-        android:paddingBottom="@dimen/_6sdp"
+        android:paddingTop="@dimen/_8sdp"
+        android:paddingBottom="@dimen/_5sdp"
         android:visibility="gone">
 
         <TextView
@@ -24,13 +24,13 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_date_header_pill"
-            android:paddingStart="@dimen/_12sdp"
-            android:paddingTop="@dimen/_4sdp"
-            android:paddingEnd="@dimen/_12sdp"
-            android:paddingBottom="@dimen/_4sdp"
+            android:paddingStart="@dimen/_10sdp"
+            android:paddingTop="@dimen/_3sdp"
+            android:paddingEnd="@dimen/_10sdp"
+            android:paddingBottom="@dimen/_3sdp"
             android:text="TODAY"
             android:textColor="@color/message_text_secondary"
-            android:textSize="@dimen/_12ssp"
+            android:textSize="@dimen/_10ssp"
             android:fontFamily="sans-serif-medium"
             android:elevation="@dimen/_1sdp" />
 
@@ -50,10 +50,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingStart="@dimen/_8sdp"
-            android:paddingEnd="@dimen/_8sdp"
-            android:paddingTop="@dimen/_6sdp"
-            android:paddingBottom="@dimen/_6sdp"
+            android:paddingStart="@dimen/_7sdp"
+            android:paddingEnd="@dimen/_7sdp"
+            android:paddingTop="@dimen/_5sdp"
+            android:paddingBottom="@dimen/_5sdp"
             android:elevation="@dimen/_1sdp">
 
         <!-- Group Peer Sender Header Name (Telegram/WhatsApp Style) -->
@@ -62,11 +62,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:paddingStart="@dimen/_2sdp"
-            android:paddingEnd="@dimen/_4sdp"
+            android:paddingEnd="@dimen/_3sdp"
             android:paddingBottom="@dimen/_2sdp"
             android:text="Peer"
             android:textColor="@color/colorPrimary"
-            android:textSize="@dimen/_13ssp"
+            android:textSize="@dimen/_10ssp"
             android:textStyle="bold"
             android:singleLine="true"
             android:ellipsize="end"
@@ -78,7 +78,7 @@
             android:layout_width="match_parent"
             android:layout_height="@dimen/_1sdp"
             android:layout_marginTop="@dimen/_2sdp"
-            android:layout_marginBottom="@dimen/_4sdp"
+            android:layout_marginBottom="@dimen/_3sdp"
             android:background="@color/colorOutline"
             android:alpha="0.3"
             android:visibility="gone" />
@@ -90,11 +90,11 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:background="@drawable/bg_quote_received"
-            android:paddingStart="@dimen/_12sdp"
-            android:paddingEnd="@dimen/_10sdp"
-            android:paddingTop="@dimen/_6sdp"
-            android:paddingBottom="@dimen/_6sdp"
-            android:layout_marginBottom="@dimen/_4sdp"
+            android:paddingStart="@dimen/_10sdp"
+            android:paddingEnd="@dimen/_8sdp"
+            android:paddingTop="@dimen/_5sdp"
+            android:paddingBottom="@dimen/_5sdp"
+            android:layout_marginBottom="@dimen/_3sdp"
             android:visibility="gone">
 
             <!-- Accent Left Vertical Stripe (drawn full-height by replyQuoteContainer background Drawable) -->
@@ -115,7 +115,7 @@
                     android:layout_height="wrap_content"
                     android:text="Sender"
                     android:textColor="@color/message_quote_strip"
-                    android:textSize="@dimen/_13ssp"
+                    android:textSize="@dimen/_10ssp"
                     android:textStyle="bold"
                     android:singleLine="true"
                     android:maxLines="1"
@@ -129,7 +129,7 @@
                     android:layout_marginTop="@dimen/_2sdp"
                     android:text="Quote text"
                     android:textColor="@color/message_text_secondary"
-                    android:textSize="@dimen/_13ssp"
+                    android:textSize="@dimen/_10ssp"
                     android:maxLines="2"
                     android:ellipsize="end"
                     android:includeFontPadding="false" />
@@ -145,8 +145,8 @@
             android:paddingEnd="@dimen/_3sdp"
             android:text="Received message"
             android:textColor="@color/message_text_primary"
-            android:textSize="@dimen/_16ssp"
-            android:lineSpacingExtra="@dimen/_2sdp" />
+            android:textSize="@dimen/_13ssp"
+            android:lineSpacingExtra="@dimen/_1sdp" />
 
         <!-- Rich Link Preview Card (WhatsApp / Telegram style) -->
         <LinearLayout
@@ -154,15 +154,15 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginTop="@dimen/_6sdp"
-            android:layout_marginBottom="@dimen/_4sdp"
+            android:layout_marginTop="@dimen/_5sdp"
+            android:layout_marginBottom="@dimen/_3sdp"
             android:background="@drawable/bg_link_preview_card"
             android:visibility="gone">
 
             <ImageView
                 android:id="@+id/ivLinkThumb"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/_140sdp"
+                android:layout_height="@dimen/_117sdp"
                 android:scaleType="centerCrop"
                 android:visibility="gone" />
 
@@ -170,14 +170,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="@dimen/_8sdp">
+                android:padding="@dimen/_7sdp">
 
                 <TextView
                     android:id="@+id/tvLinkDomain"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/message_text_secondary"
-                    android:textSize="@dimen/_11ssp"
+                    android:textSize="@dimen/_9ssp"
                     android:textAllCaps="true"
                     android:textStyle="bold"
                     android:maxLines="1"
@@ -189,7 +189,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/_2sdp"
                     android:textColor="@color/message_text_primary"
-                    android:textSize="@dimen/_14ssp"
+                    android:textSize="@dimen/_12ssp"
                     android:textStyle="bold"
                     android:maxLines="2"
                     android:ellipsize="end" />
@@ -200,7 +200,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/_2sdp"
                     android:textColor="@color/message_text_secondary"
-                    android:textSize="@dimen/_12ssp"
+                    android:textSize="@dimen/_10ssp"
                     android:maxLines="2"
                     android:ellipsize="end" />
             </LinearLayout>
@@ -216,9 +216,9 @@
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/imageCardView"
-                android:layout_width="@dimen/_254sdp"
-                android:layout_height="@dimen/_214sdp"
-                app:cardCornerRadius="@dimen/_10sdp"
+                android:layout_width="@dimen/_212sdp"
+                android:layout_height="@dimen/_178sdp"
+                app:cardCornerRadius="@dimen/_8sdp"
                 app:cardElevation="0dp"
                 app:strokeWidth="0dp"
                 app:cardBackgroundColor="@android:color/transparent">
@@ -238,7 +238,7 @@
                     <View
                         android:id="@+id/imageScrimView"
                         android:layout_width="match_parent"
-                        android:layout_height="@dimen/_48sdp"
+                        android:layout_height="@dimen/_40sdp"
                         android:layout_gravity="bottom"
                         android:background="@drawable/bg_gradient_bottom_scrim" />
 
@@ -248,15 +248,15 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="top|start"
-                        android:layout_margin="@dimen/_8sdp"
+                        android:layout_margin="@dimen/_7sdp"
                         android:background="@drawable/bg_media_overlay_pill"
-                        android:paddingStart="@dimen/_7sdp"
-                        android:paddingEnd="@dimen/_7sdp"
+                        android:paddingStart="@dimen/_6sdp"
+                        android:paddingEnd="@dimen/_6sdp"
                         android:paddingTop="@dimen/_2sdp"
                         android:paddingBottom="@dimen/_2sdp"
                         android:text="GIF"
                         android:textColor="@android:color/white"
-                        android:textSize="@dimen/_10ssp"
+                        android:textSize="@dimen/_8ssp"
                         android:textStyle="bold"
                         android:letterSpacing="0.06"
                         android:visibility="gone" />
@@ -264,8 +264,8 @@
                     <!-- Centered progress loader -->
                     <ProgressBar
                         android:id="@+id/imageProgressBar"
-                        android:layout_width="@dimen/_28sdp"
-                        android:layout_height="@dimen/_28sdp"
+                        android:layout_width="@dimen/_23sdp"
+                        android:layout_height="@dimen/_23sdp"
                         android:layout_gravity="center"
                         android:indeterminateTint="@android:color/white"
                         android:visibility="gone" />
@@ -283,21 +283,21 @@
                             android:id="@+id/imageDownloadIdleLayout"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:minWidth="@dimen/_56sdp"
-                            android:minHeight="@dimen/_56sdp"
+                            android:minWidth="@dimen/_47sdp"
+                            android:minHeight="@dimen/_47sdp"
                             android:background="@drawable/bg_media_download_circle"
                             android:gravity="center"
                             android:orientation="vertical"
-                            android:paddingStart="@dimen/_8sdp"
-                            android:paddingEnd="@dimen/_8sdp"
-                            android:paddingTop="@dimen/_6sdp"
-                            android:paddingBottom="@dimen/_6sdp"
+                            android:paddingStart="@dimen/_7sdp"
+                            android:paddingEnd="@dimen/_7sdp"
+                            android:paddingTop="@dimen/_5sdp"
+                            android:paddingBottom="@dimen/_5sdp"
                             android:clickable="true"
                             android:focusable="true">
 
                             <ImageView
-                                android:layout_width="@dimen/_22sdp"
-                                android:layout_height="@dimen/_22sdp"
+                                android:layout_width="@dimen/_18sdp"
+                                android:layout_height="@dimen/_18sdp"
                                 android:src="@drawable/ic_download"
                                 app:tint="@android:color/white" />
 
@@ -307,7 +307,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:textColor="@android:color/white"
-                                android:textSize="@dimen/_11ssp"
+                                android:textSize="@dimen/_9ssp"
                                 android:textStyle="bold"
                                 android:text="1.2 MB" />
                         </LinearLayout>
@@ -315,8 +315,8 @@
                         <!-- State 2: DOWNLOADING (Circular progress bar + center Stop/Cancel icon) -->
                         <FrameLayout
                             android:id="@+id/imageDownloadingLayout"
-                            android:layout_width="@dimen/_56sdp"
-                            android:layout_height="@dimen/_56sdp"
+                            android:layout_width="@dimen/_47sdp"
+                            android:layout_height="@dimen/_47sdp"
                             android:background="@drawable/bg_media_download_circle"
                             android:visibility="gone"
                             android:clickable="true"
@@ -324,15 +324,15 @@
 
                             <ProgressBar
                                 android:id="@+id/imageDownloadProgress"
-                                android:layout_width="@dimen/_40sdp"
-                                android:layout_height="@dimen/_40sdp"
+                                android:layout_width="@dimen/_33sdp"
+                                android:layout_height="@dimen/_33sdp"
                                 android:layout_gravity="center"
                                 android:indeterminateTint="@android:color/white" />
 
                             <ImageView
                                 android:id="@+id/imageDownloadCancelBtn"
-                                android:layout_width="@dimen/_16sdp"
-                                android:layout_height="@dimen/_16sdp"
+                                android:layout_width="@dimen/_13sdp"
+                                android:layout_height="@dimen/_13sdp"
                                 android:layout_gravity="center"
                                 android:src="@drawable/ic_close"
                                 app:tint="@android:color/white" />
@@ -343,22 +343,22 @@
                             android:id="@+id/imageDownloadRetryLayout"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:minWidth="@dimen/_56sdp"
-                            android:minHeight="@dimen/_56sdp"
+                            android:minWidth="@dimen/_47sdp"
+                            android:minHeight="@dimen/_47sdp"
                             android:background="@drawable/bg_media_download_circle"
                             android:gravity="center"
                             android:orientation="vertical"
-                            android:paddingStart="@dimen/_8sdp"
-                            android:paddingEnd="@dimen/_8sdp"
-                            android:paddingTop="@dimen/_6sdp"
-                            android:paddingBottom="@dimen/_6sdp"
+                            android:paddingStart="@dimen/_7sdp"
+                            android:paddingEnd="@dimen/_7sdp"
+                            android:paddingTop="@dimen/_5sdp"
+                            android:paddingBottom="@dimen/_5sdp"
                             android:visibility="gone"
                             android:clickable="true"
                             android:focusable="true">
 
                             <ImageView
-                                android:layout_width="@dimen/_22sdp"
-                                android:layout_height="@dimen/_22sdp"
+                                android:layout_width="@dimen/_18sdp"
+                                android:layout_height="@dimen/_18sdp"
                                 android:src="@drawable/ic_undo"
                                 app:tint="@android:color/white" />
 
@@ -367,7 +367,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:textColor="@android:color/white"
-                                android:textSize="@dimen/_10ssp"
+                                android:textSize="@dimen/_8ssp"
                                 android:textStyle="bold"
                                 android:text="Retry" />
                         </LinearLayout>
@@ -379,15 +379,15 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="bottom|end"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:background="@drawable/bg_media_overlay_pill"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
 
                         <ImageView
                             android:id="@+id/ivImagePinnedBadge"
-                            android:layout_width="@dimen/_11sdp"
-                            android:layout_height="@dimen/_11sdp"
+                            android:layout_width="@dimen/_9sdp"
+                            android:layout_height="@dimen/_9sdp"
                             android:layout_marginEnd="@dimen/_3sdp"
                             android:src="@drawable/ic_chat_pin"
                             app:tint="@android:color/white"
@@ -399,7 +399,7 @@
                             android:layout_height="wrap_content"
                             android:text="10:00"
                             android:textColor="@android:color/white"
-                            android:textSize="@dimen/_11ssp" />
+                            android:textSize="@dimen/_9ssp" />
                     </LinearLayout>
                 </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -407,13 +407,13 @@
             <!-- Optional Image Caption -->
             <com.m3.veil.ui.views.VeilAdvancedTextView
                 android:id="@+id/imageCaptionText"
-                android:layout_width="@dimen/_254sdp"
+                android:layout_width="@dimen/_212sdp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_5sdp"
+                android:layout_marginTop="@dimen/_4sdp"
                 android:paddingStart="@dimen/_3sdp"
                 android:paddingEnd="@dimen/_3sdp"
                 android:textColor="@color/message_text_primary"
-                android:textSize="@dimen/_15ssp"
+                android:textSize="@dimen/_12ssp"
                 android:visibility="gone" />
         </LinearLayout>
 
@@ -427,9 +427,9 @@
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/videoCardView"
-                android:layout_width="@dimen/_254sdp"
-                android:layout_height="@dimen/_214sdp"
-                app:cardCornerRadius="@dimen/_10sdp"
+                android:layout_width="@dimen/_212sdp"
+                android:layout_height="@dimen/_178sdp"
+                app:cardCornerRadius="@dimen/_8sdp"
                 app:cardElevation="0dp"
                 app:strokeWidth="0dp"
                 app:cardBackgroundColor="@android:color/transparent">
@@ -448,22 +448,22 @@
                     <!-- Bottom gradient scrim -->
                     <View
                         android:layout_width="match_parent"
-                        android:layout_height="@dimen/_48sdp"
+                        android:layout_height="@dimen/_40sdp"
                         android:layout_gravity="bottom"
                         android:background="@drawable/bg_gradient_bottom_scrim" />
 
                     <!-- Centered Glass Play Button -->
                     <FrameLayout
                         android:id="@+id/videoPlayButtonContainer"
-                        android:layout_width="@dimen/_48sdp"
-                        android:layout_height="@dimen/_48sdp"
+                        android:layout_width="@dimen/_40sdp"
+                        android:layout_height="@dimen/_40sdp"
                         android:layout_gravity="center"
                         android:background="@drawable/bg_video_play_glass">
 
                         <ImageView
                             android:id="@+id/videoPlayIcon"
-                            android:layout_width="@dimen/_24sdp"
-                            android:layout_height="@dimen/_24sdp"
+                            android:layout_width="@dimen/_20sdp"
+                            android:layout_height="@dimen/_20sdp"
                             android:layout_gravity="center"
                             android:layout_marginStart="@dimen/_2sdp"
                             android:src="@drawable/ic_play_arrow"
@@ -471,8 +471,8 @@
 
                         <ProgressBar
                             android:id="@+id/videoProgressBar"
-                            android:layout_width="@dimen/_26sdp"
-                            android:layout_height="@dimen/_26sdp"
+                            android:layout_width="@dimen/_22sdp"
+                            android:layout_height="@dimen/_22sdp"
                             android:layout_gravity="center"
                             android:indeterminateTint="@android:color/white"
                             android:visibility="gone" />
@@ -491,21 +491,21 @@
                             android:id="@+id/videoDownloadIdleLayout"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:minWidth="@dimen/_56sdp"
-                            android:minHeight="@dimen/_56sdp"
+                            android:minWidth="@dimen/_47sdp"
+                            android:minHeight="@dimen/_47sdp"
                             android:background="@drawable/bg_media_download_circle"
                             android:gravity="center"
                             android:orientation="vertical"
-                            android:paddingStart="@dimen/_8sdp"
-                            android:paddingEnd="@dimen/_8sdp"
-                            android:paddingTop="@dimen/_6sdp"
-                            android:paddingBottom="@dimen/_6sdp"
+                            android:paddingStart="@dimen/_7sdp"
+                            android:paddingEnd="@dimen/_7sdp"
+                            android:paddingTop="@dimen/_5sdp"
+                            android:paddingBottom="@dimen/_5sdp"
                             android:clickable="true"
                             android:focusable="true">
 
                             <ImageView
-                                android:layout_width="@dimen/_22sdp"
-                                android:layout_height="@dimen/_22sdp"
+                                android:layout_width="@dimen/_18sdp"
+                                android:layout_height="@dimen/_18sdp"
                                 android:src="@drawable/ic_download"
                                 app:tint="@android:color/white" />
 
@@ -515,7 +515,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:textColor="@android:color/white"
-                                android:textSize="@dimen/_11ssp"
+                                android:textSize="@dimen/_9ssp"
                                 android:textStyle="bold"
                                 android:text="3.2 MB" />
                         </LinearLayout>
@@ -523,8 +523,8 @@
                         <!-- State 2: DOWNLOADING (Circular progress bar + center Stop/Cancel icon) -->
                         <FrameLayout
                             android:id="@+id/videoDownloadingLayout"
-                            android:layout_width="@dimen/_56sdp"
-                            android:layout_height="@dimen/_56sdp"
+                            android:layout_width="@dimen/_47sdp"
+                            android:layout_height="@dimen/_47sdp"
                             android:background="@drawable/bg_media_download_circle"
                             android:visibility="gone"
                             android:clickable="true"
@@ -532,15 +532,15 @@
 
                             <ProgressBar
                                 android:id="@+id/videoDownloadProgress"
-                                android:layout_width="@dimen/_40sdp"
-                                android:layout_height="@dimen/_40sdp"
+                                android:layout_width="@dimen/_33sdp"
+                                android:layout_height="@dimen/_33sdp"
                                 android:layout_gravity="center"
                                 android:indeterminateTint="@android:color/white" />
 
                             <ImageView
                                 android:id="@+id/videoDownloadCancelBtn"
-                                android:layout_width="@dimen/_16sdp"
-                                android:layout_height="@dimen/_16sdp"
+                                android:layout_width="@dimen/_13sdp"
+                                android:layout_height="@dimen/_13sdp"
                                 android:layout_gravity="center"
                                 android:src="@drawable/ic_close"
                                 app:tint="@android:color/white" />
@@ -551,22 +551,22 @@
                             android:id="@+id/videoDownloadRetryLayout"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:minWidth="@dimen/_56sdp"
-                            android:minHeight="@dimen/_56sdp"
+                            android:minWidth="@dimen/_47sdp"
+                            android:minHeight="@dimen/_47sdp"
                             android:background="@drawable/bg_media_download_circle"
                             android:gravity="center"
                             android:orientation="vertical"
-                            android:paddingStart="@dimen/_8sdp"
-                            android:paddingEnd="@dimen/_8sdp"
-                            android:paddingTop="@dimen/_6sdp"
-                            android:paddingBottom="@dimen/_6sdp"
+                            android:paddingStart="@dimen/_7sdp"
+                            android:paddingEnd="@dimen/_7sdp"
+                            android:paddingTop="@dimen/_5sdp"
+                            android:paddingBottom="@dimen/_5sdp"
                             android:visibility="gone"
                             android:clickable="true"
                             android:focusable="true">
 
                             <ImageView
-                                android:layout_width="@dimen/_22sdp"
-                                android:layout_height="@dimen/_22sdp"
+                                android:layout_width="@dimen/_18sdp"
+                                android:layout_height="@dimen/_18sdp"
                                 android:src="@drawable/ic_undo"
                                 app:tint="@android:color/white" />
 
@@ -575,7 +575,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:textColor="@android:color/white"
-                                android:textSize="@dimen/_10ssp"
+                                android:textSize="@dimen/_8ssp"
                                 android:textStyle="bold"
                                 android:text="Retry" />
                         </LinearLayout>
@@ -587,14 +587,14 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="bottom|start"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:background="@drawable/bg_media_overlay_pill"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
 
                         <ImageView
-                            android:layout_width="@dimen/_11sdp"
-                            android:layout_height="@dimen/_11sdp"
+                            android:layout_width="@dimen/_9sdp"
+                            android:layout_height="@dimen/_9sdp"
                             android:layout_marginEnd="@dimen/_3sdp"
                             android:src="@drawable/ic_videocam"
                             app:tint="@android:color/white" />
@@ -605,7 +605,7 @@
                             android:layout_height="wrap_content"
                             android:text="0:30"
                             android:textColor="@android:color/white"
-                            android:textSize="@dimen/_11ssp" />
+                            android:textSize="@dimen/_9ssp" />
                     </LinearLayout>
 
                     <!-- Overlaid Timestamp (Bottom Right) -->
@@ -614,15 +614,15 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="bottom|end"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:background="@drawable/bg_media_overlay_pill"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
 
                         <ImageView
                             android:id="@+id/ivVideoPinnedBadge"
-                            android:layout_width="@dimen/_11sdp"
-                            android:layout_height="@dimen/_11sdp"
+                            android:layout_width="@dimen/_9sdp"
+                            android:layout_height="@dimen/_9sdp"
                             android:layout_marginEnd="@dimen/_3sdp"
                             android:src="@drawable/ic_chat_pin"
                             app:tint="@android:color/white"
@@ -634,7 +634,7 @@
                             android:layout_height="wrap_content"
                             android:text="10:00"
                             android:textColor="@android:color/white"
-                            android:textSize="@dimen/_11ssp" />
+                            android:textSize="@dimen/_9ssp" />
                     </LinearLayout>
                 </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -642,20 +642,20 @@
             <!-- Optional Video Caption -->
             <com.m3.veil.ui.views.VeilAdvancedTextView
                 android:id="@+id/videoCaptionText"
-                android:layout_width="@dimen/_254sdp"
+                android:layout_width="@dimen/_212sdp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_5sdp"
+                android:layout_marginTop="@dimen/_4sdp"
                 android:paddingStart="@dimen/_3sdp"
                 android:paddingEnd="@dimen/_3sdp"
                 android:textColor="@color/message_text_primary"
-                android:textSize="@dimen/_15ssp"
+                android:textSize="@dimen/_12ssp"
                 android:visibility="gone" />
         </LinearLayout>
 
         <!-- Voice Note Container (WhatsApp Exact Architecture for Received) -->
         <LinearLayout
             android:id="@+id/voiceMessageContainer"
-            android:layout_width="@dimen/_256sdp"
+            android:layout_width="@dimen/_213sdp"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingTop="@dimen/_2sdp"
@@ -671,25 +671,25 @@
                 <!-- WhatsApp Voice Note Mic Avatar Badge -->
                 <FrameLayout
                     android:id="@+id/voiceMicBadge"
-                    android:layout_width="@dimen/_42sdp"
-                    android:layout_height="@dimen/_42sdp">
+                    android:layout_width="@dimen/_35sdp"
+                    android:layout_height="@dimen/_35sdp">
 
                     <de.hdodenhof.circleimageview.CircleImageView
-                        android:layout_width="@dimen/_38sdp"
-                        android:layout_height="@dimen/_38sdp"
+                        android:layout_width="@dimen/_32sdp"
+                        android:layout_height="@dimen/_32sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_person" />
 
                     <!-- Small Corner Mic Badge -->
                     <FrameLayout
-                        android:layout_width="@dimen/_16sdp"
-                        android:layout_height="@dimen/_16sdp"
+                        android:layout_width="@dimen/_13sdp"
+                        android:layout_height="@dimen/_13sdp"
                         android:layout_gravity="bottom|end"
                         android:background="@drawable/bg_poll_checkbox_checked">
 
                         <ImageView
-                            android:layout_width="@dimen/_10sdp"
-                            android:layout_height="@dimen/_10sdp"
+                            android:layout_width="@dimen/_8sdp"
+                            android:layout_height="@dimen/_8sdp"
                             android:layout_gravity="center"
                             android:src="@drawable/ic_mic"
                             app:tint="@android:color/white" />
@@ -698,23 +698,23 @@
 
                 <!-- 38dp Circular Action Button -->
                 <FrameLayout
-                    android:layout_width="@dimen/_38sdp"
-                    android:layout_height="@dimen/_38sdp"
-                    android:layout_marginStart="@dimen/_6sdp"
+                    android:layout_width="@dimen/_32sdp"
+                    android:layout_height="@dimen/_32sdp"
+                    android:layout_marginStart="@dimen/_5sdp"
                     android:background="@drawable/bg_voice_circle_received">
 
                     <ProgressBar
                         android:id="@+id/voiceProgressBar"
-                        android:layout_width="@dimen/_34sdp"
-                        android:layout_height="@dimen/_34sdp"
+                        android:layout_width="@dimen/_28sdp"
+                        android:layout_height="@dimen/_28sdp"
                         android:layout_gravity="center"
                         android:indeterminateTint="@android:color/white"
                         android:visibility="gone" />
 
                     <ImageView
                         android:id="@+id/voiceActionButton"
-                        android:layout_width="@dimen/_20sdp"
-                        android:layout_height="@dimen/_20sdp"
+                        android:layout_width="@dimen/_17sdp"
+                        android:layout_height="@dimen/_17sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_play_arrow"
                         app:tint="@android:color/white" />
@@ -724,10 +724,10 @@
                 <com.m3.veil.ui.views.VoiceWaveformView
                     android:id="@+id/voiceWaveformView"
                     android:layout_width="0dp"
-                    android:layout_height="@dimen/_32sdp"
+                    android:layout_height="@dimen/_27sdp"
                     android:layout_weight="1"
-                    android:layout_marginStart="@dimen/_8sdp"
-                    android:layout_marginEnd="@dimen/_6sdp" />
+                    android:layout_marginStart="@dimen/_7sdp"
+                    android:layout_marginEnd="@dimen/_5sdp" />
 
                 <!-- Legacy Fallbacks (Invisible) -->
                 <View
@@ -747,8 +747,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/_1sdp"
-                android:paddingStart="@dimen/_90sdp"
-                android:paddingEnd="@dimen/_6sdp"
+                android:paddingStart="@dimen/_75sdp"
+                android:paddingEnd="@dimen/_5sdp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -758,7 +758,7 @@
                     android:layout_height="wrap_content"
                     android:text="0:00"
                     android:textColor="@color/message_text_secondary"
-                    android:textSize="@dimen/_11ssp" />
+                    android:textSize="@dimen/_9ssp" />
 
                 <Space
                     android:layout_width="0dp"
@@ -771,13 +771,13 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_voice_speed_pill_received"
-                    android:paddingStart="@dimen/_7sdp"
-                    android:paddingEnd="@dimen/_7sdp"
-                    android:paddingTop="@dimen/_2sdp"
-                    android:paddingBottom="@dimen/_2sdp"
+                    android:paddingStart="@dimen/_6sdp"
+                    android:paddingEnd="@dimen/_6sdp"
+                    android:paddingTop="@dimen/_1sdp"
+                    android:paddingBottom="@dimen/_1sdp"
                     android:text="1x"
                     android:textColor="@color/message_text_primary"
-                    android:textSize="@dimen/_11ssp"
+                    android:textSize="@dimen/_9ssp"
                     android:textStyle="bold"
                     android:clickable="true"
                     android:focusable="true" />
@@ -787,7 +787,7 @@
         <!-- Document Message Container (WhatsApp Exact Document Row: _name_removed__res_0x7f0e05ab.xml) -->
         <LinearLayout
             android:id="@+id/documentMessageContainer"
-            android:layout_width="@dimen/_256sdp"
+            android:layout_width="@dimen/_213sdp"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:visibility="gone">
@@ -797,22 +797,22 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:padding="@dimen/_9sdp"
+                android:padding="@dimen/_7sdp"
                 android:background="@drawable/bg_doc_inner_card">
 
                 <!-- Document Color-Coded Icon Badge -->
                 <FrameLayout
                     android:id="@+id/documentIconContainer"
-                    android:layout_width="@dimen/_38sdp"
-                    android:layout_height="@dimen/_42sdp"
+                    android:layout_width="@dimen/_32sdp"
+                    android:layout_height="@dimen/_35sdp"
                     android:background="@drawable/bg_doc_badge">
 
                     <ImageView
                         android:id="@+id/documentIcon"
-                        android:layout_width="@dimen/_22sdp"
-                        android:layout_height="@dimen/_22sdp"
+                        android:layout_width="@dimen/_18sdp"
+                        android:layout_height="@dimen/_18sdp"
                         android:layout_gravity="top|center_horizontal"
-                        android:layout_marginTop="@dimen/_4sdp"
+                        android:layout_marginTop="@dimen/_3sdp"
                         android:src="@drawable/ic_document"
                         app:tint="@android:color/white" />
 
@@ -824,7 +824,7 @@
                         android:layout_marginBottom="@dimen/_3sdp"
                         android:text="PDF"
                         android:textColor="@android:color/white"
-                        android:textSize="@dimen/_8ssp"
+                        android:textSize="@dimen/_6ssp"
                         android:textStyle="bold"
                         android:visibility="visible" />
                 </FrameLayout>
@@ -835,8 +835,8 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:orientation="vertical"
-                    android:layout_marginStart="@dimen/_10sdp"
-                    android:layout_marginEnd="@dimen/_6sdp">
+                    android:layout_marginStart="@dimen/_8sdp"
+                    android:layout_marginEnd="@dimen/_5sdp">
 
                     <TextView
                         android:id="@+id/documentFileName"
@@ -844,28 +844,28 @@
                         android:layout_height="wrap_content"
                         android:text="Document.pdf"
                         android:textColor="@color/message_text_primary"
-                        android:textSize="@dimen/_15ssp"
+                        android:textSize="@dimen/_12ssp"
                         android:maxLines="2"
                         android:ellipsize="middle" />
                 </LinearLayout>
 
                 <!-- Circular Action / Download / Cancel / Retry Button -->
                 <FrameLayout
-                    android:layout_width="@dimen/_32sdp"
-                    android:layout_height="@dimen/_32sdp">
+                    android:layout_width="@dimen/_27sdp"
+                    android:layout_height="@dimen/_27sdp">
 
                     <ProgressBar
                         android:id="@+id/documentProgressBar"
-                        android:layout_width="@dimen/_30sdp"
-                        android:layout_height="@dimen/_30sdp"
+                        android:layout_width="@dimen/_25sdp"
+                        android:layout_height="@dimen/_25sdp"
                         android:layout_gravity="center"
                         android:indeterminateTint="@color/message_action_button"
                         android:visibility="gone" />
 
                     <ImageView
                         android:id="@+id/documentActionIcon"
-                        android:layout_width="@dimen/_18sdp"
-                        android:layout_height="@dimen/_18sdp"
+                        android:layout_width="@dimen/_15sdp"
+                        android:layout_height="@dimen/_15sdp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_download"
                         app:tint="@color/message_text_secondary" />
@@ -877,17 +877,17 @@
                 android:id="@+id/documentFileSize"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_4sdp"
-                android:layout_marginStart="@dimen/_4sdp"
+                android:layout_marginTop="@dimen/_3sdp"
+                android:layout_marginStart="@dimen/_3sdp"
                 android:text="PDF • 1.2 MB"
                 android:textColor="@color/message_text_secondary"
-                android:textSize="@dimen/_12ssp" />
+                android:textSize="@dimen/_10ssp" />
         </LinearLayout>
 
         <!-- Location Message Container (WhatsApp Exact Map Frame: _name_removed__res_0x7f0e0607.xml) -->
         <LinearLayout
             android:id="@+id/locationMessageContainer"
-            android:layout_width="@dimen/_256sdp"
+            android:layout_width="@dimen/_213sdp"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:visibility="gone">
@@ -895,8 +895,8 @@
             <!-- Map Thumbnail Preview Frame -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/_136sdp"
-                app:cardCornerRadius="@dimen/_8sdp"
+                android:layout_height="@dimen/_113sdp"
+                app:cardCornerRadius="@dimen/_7sdp"
                 app:cardElevation="0dp"
                 app:strokeWidth="0dp">
 
@@ -910,9 +910,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingStart="@dimen/_4sdp"
-                android:paddingEnd="@dimen/_4sdp"
-                android:paddingTop="@dimen/_6sdp"
+                android:paddingStart="@dimen/_3sdp"
+                android:paddingEnd="@dimen/_3sdp"
+                android:paddingTop="@dimen/_5sdp"
                 android:paddingBottom="@dimen/_2sdp">
 
                 <TextView
@@ -921,7 +921,7 @@
                     android:layout_height="wrap_content"
                     android:text="Current Location"
                     android:textColor="@color/message_text_primary"
-                    android:textSize="@dimen/_15ssp"
+                    android:textSize="@dimen/_12ssp"
                     android:fontFamily="sans-serif-medium"
                     android:maxLines="1"
                     android:ellipsize="end" />
@@ -933,7 +933,7 @@
                     android:layout_marginTop="@dimen/_1sdp"
                     android:text="Accurate to 10 m • Tap to open map"
                     android:textColor="@color/message_text_secondary"
-                    android:textSize="@dimen/_12ssp"
+                    android:textSize="@dimen/_10ssp"
                     android:maxLines="2"
                     android:ellipsize="end" />
             </LinearLayout>
@@ -942,7 +942,7 @@
         <!-- Contact Message Container (WhatsApp Exact Contact Card: _name_removed__res_0x7f0e0591.xml) -->
         <LinearLayout
             android:id="@+id/contactMessageContainer"
-            android:layout_width="@dimen/_256sdp"
+            android:layout_width="@dimen/_213sdp"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:visibility="gone">
@@ -952,15 +952,15 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingStart="@dimen/_6sdp"
-                android:paddingEnd="@dimen/_6sdp"
-                android:paddingTop="@dimen/_6sdp"
-                android:paddingBottom="@dimen/_6sdp">
+                android:paddingStart="@dimen/_5sdp"
+                android:paddingEnd="@dimen/_5sdp"
+                android:paddingTop="@dimen/_5sdp"
+                android:paddingBottom="@dimen/_5sdp">
 
                 <de.hdodenhof.circleimageview.CircleImageView
                     android:id="@+id/contactAvatar"
-                    android:layout_width="@dimen/_44sdp"
-                    android:layout_height="@dimen/_44sdp"
+                    android:layout_width="@dimen/_37sdp"
+                    android:layout_height="@dimen/_37sdp"
                     android:src="@drawable/ic_person" />
 
                 <LinearLayout
@@ -968,7 +968,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:orientation="vertical"
-                    android:layout_marginStart="@dimen/_12sdp">
+                    android:layout_marginStart="@dimen/_10sdp">
 
                     <TextView
                         android:id="@+id/contactName"
@@ -976,7 +976,7 @@
                         android:layout_height="wrap_content"
                         android:text="Contact Name"
                         android:textColor="@color/message_text_primary"
-                        android:textSize="@dimen/_16ssp"
+                        android:textSize="@dimen/_13ssp"
                         android:fontFamily="sans-serif-medium"
                         android:maxLines="1"
                         android:ellipsize="end" />
@@ -988,7 +988,7 @@
                         android:layout_marginTop="@dimen/_1sdp"
                         android:text="+1 234 567 890"
                         android:textColor="@color/message_text_secondary"
-                        android:textSize="@dimen/_12ssp"
+                        android:textSize="@dimen/_10ssp"
                         android:maxLines="1"
                         android:ellipsize="end" />
                 </LinearLayout>
@@ -997,12 +997,12 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/_1sdp"
-                android:layout_marginTop="@dimen/_4sdp"
+                android:layout_marginTop="@dimen/_3sdp"
                 android:background="@color/message_divider" />
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/_38sdp"
+                android:layout_height="@dimen/_32sdp"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
@@ -1015,12 +1015,12 @@
                     android:gravity="center"
                     android:background="?attr/selectableItemBackground"
                     android:textColor="@color/message_action_button"
-                    android:textSize="@dimen/_14ssp"
+                    android:textSize="@dimen/_11ssp"
                     android:fontFamily="sans-serif-medium" />
 
                 <View
                     android:layout_width="@dimen/_1sdp"
-                    android:layout_height="@dimen/_22sdp"
+                    android:layout_height="@dimen/_18sdp"
                     android:background="@color/message_divider" />
 
                 <TextView
@@ -1032,7 +1032,7 @@
                     android:gravity="center"
                     android:background="?attr/selectableItemBackground"
                     android:textColor="@color/message_action_button"
-                    android:textSize="@dimen/_14ssp"
+                    android:textSize="@dimen/_11ssp"
                     android:fontFamily="sans-serif-medium" />
 
                 <!-- Legacy invisible reference -->
@@ -1047,12 +1047,12 @@
         <!-- WhatsApp Exact Poll Bubble (_name_removed__res_0x7f0e0649.xml) -->
         <LinearLayout
             android:id="@+id/pollMessageContainer"
-            android:layout_width="@dimen/_264sdp"
+            android:layout_width="@dimen/_220sdp"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingStart="@dimen/_4sdp"
-            android:paddingEnd="@dimen/_4sdp"
-            android:paddingTop="@dimen/_4sdp"
+            android:paddingStart="@dimen/_3sdp"
+            android:paddingEnd="@dimen/_3sdp"
+            android:paddingTop="@dimen/_3sdp"
             android:visibility="gone">
 
             <!-- poll_name (Question) -->
@@ -1062,7 +1062,7 @@
                 android:layout_height="wrap_content"
                 android:text="Poll Question"
                 android:textColor="@color/message_text_primary"
-                android:textSize="@dimen/_16ssp"
+                android:textSize="@dimen/_13ssp"
                 android:fontFamily="sans-serif-medium"
                 android:textStyle="bold" />
 
@@ -1070,14 +1070,14 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_4sdp"
+                android:layout_marginTop="@dimen/_3sdp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <ImageView
                     android:id="@+id/pollTypeIcon"
-                    android:layout_width="@dimen/_14sdp"
-                    android:layout_height="@dimen/_14sdp"
+                    android:layout_width="@dimen/_12sdp"
+                    android:layout_height="@dimen/_12sdp"
                     android:src="@drawable/ic_check"
                     app:tint="@color/message_text_secondary" />
 
@@ -1085,10 +1085,10 @@
                     android:id="@+id/pollSubtitleText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/_5sdp"
+                    android:layout_marginStart="@dimen/_4sdp"
                     android:text="Select one"
                     android:textColor="@color/message_text_secondary"
-                    android:textSize="@dimen/_13ssp" />
+                    android:textSize="@dimen/_10ssp" />
             </LinearLayout>
 
             <!-- poll_options -->
@@ -1096,26 +1096,26 @@
                 android:id="@+id/pollOptionsLinearLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_6sdp"
+                android:layout_marginTop="@dimen/_5sdp"
                 android:orientation="vertical" />
 
             <!-- view_details_divider -->
             <View
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/_1sdp"
-                android:layout_marginTop="@dimen/_6sdp"
+                android:layout_marginTop="@dimen/_5sdp"
                 android:background="@color/message_divider" />
 
             <!-- view_details ("View votes") -->
             <TextView
                 android:id="@+id/pollTotalVotesText"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/_38sdp"
+                android:layout_height="@dimen/_32sdp"
                 android:gravity="center"
                 android:background="?attr/selectableItemBackground"
                 android:text="View votes"
                 android:textColor="@color/message_action_button"
-                android:textSize="@dimen/_14ssp"
+                android:textSize="@dimen/_12ssp"
                 android:fontFamily="sans-serif-medium" />
         </LinearLayout>
 
@@ -1124,34 +1124,34 @@
             android:id="@+id/blinkMessageContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:minWidth="@dimen/_195sdp"
+            android:minWidth="@dimen/_162sdp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="@dimen/_4sdp"
-            android:paddingEnd="@dimen/_8sdp"
-            android:paddingTop="@dimen/_6sdp"
-            android:paddingBottom="@dimen/_4sdp"
+            android:paddingStart="@dimen/_3sdp"
+            android:paddingEnd="@dimen/_7sdp"
+            android:paddingTop="@dimen/_5sdp"
+            android:paddingBottom="@dimen/_3sdp"
             android:visibility="gone">
 
             <FrameLayout
-                android:layout_width="@dimen/_28sdp"
-                android:layout_height="@dimen/_28sdp">
+                android:layout_width="@dimen/_23sdp"
+                android:layout_height="@dimen/_23sdp">
 
                 <TextView
                     android:id="@+id/blinkBadgeIcon"
-                    android:layout_width="@dimen/_28sdp"
-                    android:layout_height="@dimen/_28sdp"
+                    android:layout_width="@dimen/_23sdp"
+                    android:layout_height="@dimen/_23sdp"
                     android:gravity="center"
                     android:background="@drawable/bg_view_once_ring"
                     android:text="1"
                     android:textColor="#00A884"
-                    android:textSize="@dimen/_12ssp"
+                    android:textSize="@dimen/_10ssp"
                     android:textStyle="bold" />
 
                 <ProgressBar
                     android:id="@+id/blinkProgressBar"
-                    android:layout_width="@dimen/_24sdp"
-                    android:layout_height="@dimen/_24sdp"
+                    android:layout_width="@dimen/_20sdp"
+                    android:layout_height="@dimen/_20sdp"
                     android:layout_gravity="center"
                     android:indeterminateTint="@color/colorPrimary"
                     android:visibility="gone" />
@@ -1160,7 +1160,7 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/_10sdp"
+                android:layout_marginStart="@dimen/_8sdp"
                 android:orientation="vertical">
 
                 <TextView
@@ -1169,7 +1169,7 @@
                     android:layout_height="wrap_content"
                     android:text="Photo"
                     android:textColor="@color/message_text_primary"
-                    android:textSize="@dimen/_15ssp" />
+                    android:textSize="@dimen/_13ssp" />
 
                 <TextView
                     android:id="@+id/blinkSubtitleText"
@@ -1177,7 +1177,7 @@
                     android:layout_height="wrap_content"
                     android:text="View once"
                     android:textColor="@color/message_text_secondary"
-                    android:textSize="@dimen/_12ssp"
+                    android:textSize="@dimen/_10ssp"
                     android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
@@ -1187,26 +1187,26 @@
             android:id="@+id/callMessageContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:minWidth="@dimen/_195sdp"
+            android:minWidth="@dimen/_162sdp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="@dimen/_4sdp"
-            android:paddingEnd="@dimen/_10sdp"
-            android:paddingTop="@dimen/_6sdp"
-            android:paddingBottom="@dimen/_6sdp"
+            android:paddingStart="@dimen/_3sdp"
+            android:paddingEnd="@dimen/_8sdp"
+            android:paddingTop="@dimen/_5sdp"
+            android:paddingBottom="@dimen/_5sdp"
             android:visibility="gone">
 
             <FrameLayout
                 android:id="@+id/callIconContainer"
-                android:layout_width="@dimen/_38sdp"
-                android:layout_height="@dimen/_38sdp"
+                android:layout_width="@dimen/_32sdp"
+                android:layout_height="@dimen/_32sdp"
                 android:background="@drawable/bg_call_icon_circle"
                 android:layout_gravity="center_vertical">
 
                 <ImageView
                     android:id="@+id/callIcon"
-                    android:layout_width="@dimen/_20sdp"
-                    android:layout_height="@dimen/_20sdp"
+                    android:layout_width="@dimen/_17sdp"
+                    android:layout_height="@dimen/_17sdp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_call_incoming"
                     app:tint="@color/statusError" />
@@ -1215,7 +1215,7 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/_10sdp"
+                android:layout_marginStart="@dimen/_8sdp"
                 android:orientation="vertical">
 
                 <TextView
@@ -1224,7 +1224,7 @@
                     android:layout_height="wrap_content"
                     android:text="Missed voice call"
                     android:textColor="@color/message_text_primary"
-                    android:textSize="@dimen/_15ssp"
+                    android:textSize="@dimen/_12ssp"
                     android:fontFamily="sans-serif-medium"
                     android:textStyle="bold" />
 
@@ -1235,7 +1235,7 @@
                     android:layout_marginTop="@dimen/_1sdp"
                     android:text="Tap to call back"
                     android:textColor="@color/message_text_secondary"
-                    android:textSize="@dimen/_12ssp" />
+                    android:textSize="@dimen/_10ssp" />
             </LinearLayout>
         </LinearLayout>
 
@@ -1247,14 +1247,14 @@
             android:orientation="horizontal"
             android:layout_gravity="end"
             android:layout_marginTop="@dimen/_1sdp"
-            android:layout_marginStart="@dimen/_8sdp"
+            android:layout_marginStart="@dimen/_7sdp"
             android:gravity="center_vertical">
 
             <ImageView
                 android:id="@+id/ivPinnedBadge"
-                android:layout_width="@dimen/_12sdp"
-                android:layout_height="@dimen/_12sdp"
-                android:layout_marginEnd="@dimen/_4sdp"
+                android:layout_width="@dimen/_10sdp"
+                android:layout_height="@dimen/_10sdp"
+                android:layout_marginEnd="@dimen/_3sdp"
                 android:src="@drawable/ic_chat_pin"
                 app:tint="@color/message_text_secondary"
                 android:contentDescription="Pinned"
@@ -1264,30 +1264,30 @@
                 android:id="@+id/tvStarredBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/_4sdp"
+                android:layout_marginEnd="@dimen/_3sdp"
                 android:text="★"
                 android:textColor="@color/message_text_secondary"
-                android:textSize="@dimen/_11ssp"
+                android:textSize="@dimen/_9ssp"
                 android:visibility="gone" />
 
             <TextView
                 android:id="@+id/tvVanishBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/_4sdp"
+                android:layout_marginEnd="@dimen/_3sdp"
                 android:text="⏱️"
                 android:textColor="@color/message_text_secondary"
-                android:textSize="@dimen/_10ssp"
+                android:textSize="@dimen/_8ssp"
                 android:visibility="gone" />
 
             <TextView
                 android:id="@+id/tvEditedBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/_4sdp"
+                android:layout_marginEnd="@dimen/_3sdp"
                 android:text="Edited"
                 android:textColor="@color/message_text_secondary"
-                android:textSize="@dimen/_11ssp"
+                android:textSize="@dimen/_9ssp"
                 android:visibility="gone" />
 
             <TextView
@@ -1296,18 +1296,18 @@
                 android:layout_height="wrap_content"
                 android:text="10:00"
                 android:textColor="@color/message_text_secondary"
-                android:textSize="@dimen/_11ssp" />
+                android:textSize="@dimen/_9ssp" />
         </LinearLayout>
 
     </com.m3.veil.ui.views.ChatMessageCell>
 
         <ImageView
             android:id="@+id/btnQuickForwardMedia"
-            android:layout_width="@dimen/_31sdp"
-            android:layout_height="@dimen/_31sdp"
-            android:layout_marginStart="@dimen/_8sdp"
-            android:layout_marginEnd="@dimen/_12sdp"
-            android:padding="@dimen/_7sdp"
+            android:layout_width="@dimen/_26sdp"
+            android:layout_height="@dimen/_26sdp"
+            android:layout_marginStart="@dimen/_7sdp"
+            android:layout_marginEnd="@dimen/_10sdp"
+            android:padding="@dimen/_5sdp"
             android:src="@drawable/ic_whatsapp_forward_double"
             android:contentDescription="Forward media"
             android:visibility="gone" />
@@ -1320,15 +1320,15 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="start"
-        android:layout_marginTop="@dimen/_minus6sdp"
-        android:layout_marginStart="@dimen/_10sdp"
+        android:layout_marginTop="@dimen/_minus5sdp"
+        android:layout_marginStart="@dimen/_8sdp"
         android:background="@drawable/bg_reaction"
-        android:paddingStart="@dimen/_6sdp"
-        android:paddingEnd="@dimen/_6sdp"
+        android:paddingStart="@dimen/_5sdp"
+        android:paddingEnd="@dimen/_5sdp"
         android:paddingTop="@dimen/_2sdp"
         android:paddingBottom="@dimen/_2sdp"
         android:textColor="@color/text_primary"
-        android:textSize="@dimen/_12ssp"
+        android:textSize="@dimen/_10ssp"
         android:visibility="gone"
         android:elevation="@dimen/_2sdp" />
 

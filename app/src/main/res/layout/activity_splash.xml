@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/splash_background"
-    android:padding="@dimen/_40sdp">
+    android:padding="@dimen/_33sdp">
 
     <!-- Main Container -->
     <LinearLayout
@@ -17,17 +17,17 @@
         <!-- Logo Container -->
 
         <RelativeLayout
-            android:layout_width="@dimen/_250sdp"
-            android:layout_height="@dimen/_250sdp"
-            android:layout_marginBottom="@dimen/_28sdp"
+            android:layout_width="@dimen/_208sdp"
+            android:layout_height="@dimen/_208sdp"
+            android:layout_marginBottom="@dimen/_23sdp"
             android:clipChildren="false"
             android:clipToPadding="false">
 
             <!-- Frameless Ambient Radiant Halo (Behind Emblem) -->
             <ImageView
                 android:id="@+id/shield_glow"
-                android:layout_width="@dimen/_250sdp"
-                android:layout_height="@dimen/_250sdp"
+                android:layout_width="@dimen/_208sdp"
+                android:layout_height="@dimen/_208sdp"
                 android:layout_centerInParent="true"
                 android:src="@drawable/shield_glow"
                 android:scaleType="fitCenter" />
@@ -35,8 +35,8 @@
             <!-- Frameless Cloaked Whisper Animated Emblem -->
             <ImageView
                 android:id="@+id/splash_logo"
-                android:layout_width="@dimen/_200sdp"
-                android:layout_height="@dimen/_200sdp"
+                android:layout_width="@dimen/_167sdp"
+                android:layout_height="@dimen/_167sdp"
                 android:layout_centerInParent="true"
                 android:scaleType="fitCenter" />
 
@@ -56,7 +56,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/app_name"
                 android:textColor="@color/text_primary"
-                android:textSize="@dimen/_42ssp"
+                android:textSize="@dimen/_35ssp"
                 android:textStyle="bold"
                 android:letterSpacing="0.05"
                 android:fontFamily="sans-serif-medium" />
@@ -67,8 +67,8 @@
                 android:layout_height="wrap_content"
                 android:text="@string/tagline"
                 android:textColor="@color/text_secondary"
-                android:textSize="@dimen/_14ssp"
-                android:layout_marginTop="@dimen/_8sdp"
+                android:textSize="@dimen/_12ssp"
+                android:layout_marginTop="@dimen/_7sdp"
                 android:letterSpacing="0.02"
                 android:fontFamily="sans-serif" />
 
@@ -77,22 +77,22 @@
                 android:id="@+id/layout_connection_status"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_22sdp"
+                android:layout_marginTop="@dimen/_18sdp"
                 android:background="@drawable/bg_splash_connection_pill"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="@dimen/_14sdp"
-                android:paddingTop="@dimen/_6sdp"
-                android:paddingEnd="@dimen/_16sdp"
-                android:paddingBottom="@dimen/_6sdp"
+                android:paddingStart="@dimen/_12sdp"
+                android:paddingTop="@dimen/_5sdp"
+                android:paddingEnd="@dimen/_13sdp"
+                android:paddingBottom="@dimen/_5sdp"
                 android:alpha="0">
 
                 <!-- Micro Breathing Status Dot -->
                 <View
                     android:id="@+id/view_status_dot"
-                    android:layout_width="@dimen/_7sdp"
-                    android:layout_height="@dimen/_7sdp"
-                    android:layout_marginEnd="@dimen/_9sdp"
+                    android:layout_width="@dimen/_6sdp"
+                    android:layout_height="@dimen/_6sdp"
+                    android:layout_marginEnd="@dimen/_7sdp"
                     android:background="@drawable/bg_splash_status_dot" />
 
                 <!-- Minimal Modern Status Label -->
@@ -104,7 +104,7 @@
                     android:letterSpacing="0.02"
                     android:text="Connecting to secure mesh…"
                     android:textColor="@color/colorTextSecondary"
-                    android:textSize="@dimen/_12ssp" />
+                    android:textSize="@dimen/_10ssp" />
             </LinearLayout>
 
         </LinearLayout>

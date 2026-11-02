@@ -9,14 +9,14 @@
     <!-- Top Navigation Bar -->
     <ImageView
         android:id="@+id/backButton"
-        android:layout_width="@dimen/_40sdp"
-        android:layout_height="@dimen/_40sdp"
+        android:layout_width="@dimen/_33sdp"
+        android:layout_height="@dimen/_33sdp"
         android:layout_gravity="top|start"
-        android:layout_marginStart="@dimen/_16sdp"
-        android:layout_marginTop="@dimen/_12sdp"
+        android:layout_marginStart="@dimen/_13sdp"
+        android:layout_marginTop="@dimen/_10sdp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/back"
-        android:padding="@dimen/_8sdp"
+        android:padding="@dimen/_7sdp"
         android:src="@drawable/ic_arrow_back"
         app:tint="@color/textPrimary" />
 
@@ -33,17 +33,17 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:gravity="center_horizontal"
-            android:maxWidth="@dimen/_440sdp"
+            android:maxWidth="@dimen/_367sdp"
             android:orientation="vertical"
-            android:paddingHorizontal="@dimen/_24sdp"
-            android:paddingTop="@dimen/_56sdp"
-            android:paddingBottom="@dimen/_24sdp">
+            android:paddingHorizontal="@dimen/_20sdp"
+            android:paddingTop="@dimen/_47sdp"
+            android:paddingBottom="@dimen/_20sdp">
 
             <!-- Profile / Avatar Icon -->
             <ImageView
-                android:layout_width="@dimen/_64sdp"
-                android:layout_height="@dimen/_64sdp"
-                android:layout_marginBottom="@dimen/_16sdp"
+                android:layout_width="@dimen/_53sdp"
+                android:layout_height="@dimen/_53sdp"
+                android:layout_marginBottom="@dimen/_13sdp"
                 android:contentDescription="@string/complete_profile"
                 android:scaleType="fitCenter"
                 android:src="@drawable/veil_logo" />
@@ -56,19 +56,19 @@
                 android:letterSpacing="0.01"
                 android:text="@string/complete_profile"
                 android:textColor="@color/textPrimary"
-                android:textSize="@dimen/_22ssp"
+                android:textSize="@dimen/_18ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_6sdp"
-                android:layout_marginBottom="@dimen/_28sdp"
+                android:layout_marginTop="@dimen/_5sdp"
+                android:layout_marginBottom="@dimen/_23sdp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
                 android:text="@string/choose_username_hint"
                 android:textColor="@color/textSecondary"
-                android:textSize="@dimen/_14ssp" />
+                android:textSize="@dimen/_12ssp" />
 
             <!-- Username Input Field -->
             <com.google.android.material.textfield.TextInputLayout
@@ -76,7 +76,7 @@
                 style="@style/VeilInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_6sdp"
+                android:layout_marginBottom="@dimen/_5sdp"
                 android:hint="@string/username">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -88,7 +88,7 @@
                     android:inputType="text"
                     android:maxLines="1"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_15ssp" />
+                    android:textSize="@dimen/_13ssp" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -97,12 +97,12 @@
                 android:id="@+id/usernameAvailabilityText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_16sdp"
+                android:layout_marginBottom="@dimen/_13sdp"
                 android:fontFamily="sans-serif"
-                android:paddingStart="@dimen/_4sdp"
+                android:paddingStart="@dimen/_3sdp"
                 android:text="@string/enter_desired_username"
                 android:textColor="@color/textSecondary"
-                android:textSize="@dimen/_12ssp" />
+                android:textSize="@dimen/_10ssp" />
 
             <!-- Display Name (Optional) -->
             <com.google.android.material.textfield.TextInputLayout
@@ -110,7 +110,7 @@
                 style="@style/VeilInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_20sdp"
+                android:layout_marginBottom="@dimen/_17sdp"
                 android:hint="@string/display_name_optional">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -122,7 +122,7 @@
                     android:inputType="textPersonName"
                     android:maxLines="1"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_15ssp" />
+                    android:textSize="@dimen/_13ssp" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -130,19 +130,19 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_24sdp"
+                android:layout_marginBottom="@dimen/_20sdp"
                 android:background="@drawable/input_background"
                 android:orientation="vertical"
-                android:padding="@dimen/_16sdp">
+                android:padding="@dimen/_13sdp">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="@dimen/_6sdp"
+                    android:layout_marginBottom="@dimen/_5sdp"
                     android:fontFamily="sans-serif-medium"
                     android:text="@string/username_guidelines"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_13ssp"
+                    android:textSize="@dimen/_11ssp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -152,7 +152,7 @@
                     android:lineSpacingExtra="@dimen/_3sdp"
                     android:text="@string/username_rules"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_12ssp" />
+                    android:textSize="@dimen/_10ssp" />
 
             </LinearLayout>
 
@@ -161,23 +161,23 @@
                 android:id="@+id/continueButton"
                 style="@style/Widget.Material3.Button.UnelevatedButton"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/_52sdp"
+                android:layout_height="@dimen/_43sdp"
                 android:enabled="false"
                 android:letterSpacing="0.01"
                 android:text="@string/continue_to_veil"
                 android:textAllCaps="false"
                 android:textColor="@android:color/white"
-                android:textSize="@dimen/_15ssp"
+                android:textSize="@dimen/_13ssp"
                 android:textStyle="bold"
                 app:backgroundTint="@color/colorPrimary"
-                app:cornerRadius="@dimen/_14sdp" />
+                app:cornerRadius="@dimen/_12sdp" />
 
             <!-- Progress Spinner -->
             <ProgressBar
                 android:id="@+id/progressBar"
-                android:layout_width="@dimen/_32sdp"
-                android:layout_height="@dimen/_32sdp"
-                android:layout_marginTop="@dimen/_16sdp"
+                android:layout_width="@dimen/_27sdp"
+                android:layout_height="@dimen/_27sdp"
+                android:layout_marginTop="@dimen/_13sdp"
                 android:visibility="gone" />
 
             <!-- Random Profile Generator Link -->
@@ -185,15 +185,15 @@
                 android:id="@+id/skipForNowText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_12sdp"
+                android:layout_marginTop="@dimen/_10sdp"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
                 android:fontFamily="sans-serif-medium"
-                android:padding="@dimen/_8sdp"
+                android:padding="@dimen/_7sdp"
                 android:text="@string/generate_random_profile"
                 android:textColor="@color/veil_accent"
-                android:textSize="@dimen/_13ssp"
+                android:textSize="@dimen/_11ssp"
                 android:textStyle="bold" />
 
         </LinearLayout>

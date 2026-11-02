@@ -5,15 +5,15 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingTop="@dimen/_12sdp">
+    android:paddingTop="@dimen/_10sdp">
 
     <!-- Minimal Drag Handle -->
     <View
-        android:layout_width="@dimen/_36sdp"
-        android:layout_height="@dimen/_4sdp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_3sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_16sdp" />
+        android:layout_marginBottom="@dimen/_13sdp" />
 
     <!-- Header -->
     <LinearLayout
@@ -21,9 +21,9 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_20sdp"
-        android:paddingEnd="@dimen/_16sdp"
-        android:paddingBottom="@dimen/_12sdp">
+        android:paddingStart="@dimen/_17sdp"
+        android:paddingEnd="@dimen/_13sdp"
+        android:paddingBottom="@dimen/_10sdp">
 
         <TextView
             android:layout_width="0dp"
@@ -31,15 +31,15 @@
             android:layout_weight="1"
             android:text="Select Country"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_19ssp"
+            android:textSize="@dimen/_16ssp"
             android:fontFamily="sans-serif-medium" />
 
         <ImageView
             android:id="@+id/closeButton"
-            android:layout_width="@dimen/_36sdp"
-            android:layout_height="@dimen/_36sdp"
+            android:layout_width="@dimen/_30sdp"
+            android:layout_height="@dimen/_30sdp"
             android:src="@drawable/ic_close"
-            android:padding="@dimen/_8sdp"
+            android:padding="@dimen/_7sdp"
             android:background="?attr/selectableItemBackgroundBorderless"
             app:tint="@color/textSecondary" />
     </LinearLayout>
@@ -52,22 +52,22 @@
     <!-- Modern Search Box -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_46sdp"
+        android:layout_height="@dimen/_38sdp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="@drawable/bg_search_input"
-        android:paddingStart="@dimen/_14sdp"
-        android:paddingEnd="@dimen/_14sdp"
-        android:layout_marginStart="@dimen/_20sdp"
-        android:layout_marginEnd="@dimen/_20sdp"
-        android:layout_marginTop="@dimen/_14sdp"
-        android:layout_marginBottom="@dimen/_10sdp">
+        android:paddingStart="@dimen/_12sdp"
+        android:paddingEnd="@dimen/_12sdp"
+        android:layout_marginStart="@dimen/_17sdp"
+        android:layout_marginEnd="@dimen/_17sdp"
+        android:layout_marginTop="@dimen/_12sdp"
+        android:layout_marginBottom="@dimen/_8sdp">
 
         <ImageView
-            android:layout_width="@dimen/_18sdp"
-            android:layout_height="@dimen/_18sdp"
+            android:layout_width="@dimen/_15sdp"
+            android:layout_height="@dimen/_15sdp"
             android:src="@drawable/ic_search"
-            android:layout_marginEnd="@dimen/_10sdp"
+            android:layout_marginEnd="@dimen/_8sdp"
             app:tint="@color/textTertiary" />
 
         <EditText
@@ -78,7 +78,7 @@
             android:hint="Search country..."
             android:textColor="@color/textPrimary"
             android:textColorHint="@color/textSecondary"
-            android:textSize="@dimen/_14ssp"
+            android:textSize="@dimen/_12ssp"
             android:maxLines="1"
             android:background="@null"
             android:padding="0dp" />
@@ -90,8 +90,8 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:paddingStart="@dimen/_4sdp"
-        android:paddingEnd="@dimen/_4sdp"
+        android:paddingStart="@dimen/_3sdp"
+        android:paddingEnd="@dimen/_3sdp"
         android:clipToPadding="false" />
 
 </LinearLayout>

@@ -17,14 +17,14 @@
             android:layout_height="?attr/actionBarSize"
             android:background="@color/colorSurface"
             android:gravity="center_vertical"
-            android:paddingStart="@dimen/_8sdp"
-            android:paddingEnd="@dimen/_16sdp">
+            android:paddingStart="@dimen/_7sdp"
+            android:paddingEnd="@dimen/_13sdp">
 
             <ImageView
                 android:id="@+id/backButton"
-                android:layout_width="@dimen/_40sdp"
-                android:layout_height="@dimen/_40sdp"
-                android:padding="@dimen/_8sdp"
+                android:layout_width="@dimen/_33sdp"
+                android:layout_height="@dimen/_33sdp"
+                android:padding="@dimen/_7sdp"
                 android:src="@drawable/ic_arrow_back"
                 app:tint="@color/textPrimary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -35,9 +35,9 @@
                 android:layout_height="wrap_content"
                 android:text="@string/start_chat"
                 android:textColor="@color/textPrimary"
-                android:textSize="@dimen/_18ssp"
+                android:textSize="@dimen/_15ssp"
                 android:fontFamily="sans-serif-medium"
-                android:layout_marginStart="@dimen/_8sdp" />
+                android:layout_marginStart="@dimen/_7sdp" />
 
         </LinearLayout>
 
@@ -51,9 +51,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="@dimen/_16sdp"
-            android:paddingTop="@dimen/_14sdp"
-            android:paddingBottom="@dimen/_10sdp">
+            android:paddingHorizontal="@dimen/_13sdp"
+            android:paddingTop="@dimen/_12sdp"
+            android:paddingBottom="@dimen/_8sdp">
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/searchInputLayout"
@@ -72,7 +72,7 @@
                     android:inputType="text"
                     android:maxLines="1"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_16ssp" />
+                    android:textSize="@dimen/_13ssp" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -80,24 +80,24 @@
                 android:id="@+id/tvNewChatDirectoryStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_6sdp"
+                android:layout_marginTop="@dimen/_5sdp"
                 android:fontFamily="monospace"
                 android:text="Search users by @username or connect directly"
                 android:textColor="@color/veil_accent"
-                android:textSize="@dimen/_12ssp" />
+                android:textSize="@dimen/_10ssp" />
 
             <LinearLayout
                 android:id="@+id/btnQuickConnectHandle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_8sdp"
+                android:layout_marginTop="@dimen/_7sdp"
                 android:background="@drawable/input_background"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="@dimen/_12sdp"
-                android:paddingVertical="@dimen/_10sdp"
+                android:paddingHorizontal="@dimen/_10sdp"
+                android:paddingVertical="@dimen/_8sdp"
                 android:visibility="gone">
 
                 <TextView
@@ -108,14 +108,14 @@
                     android:fontFamily="sans-serif-medium"
                     android:text="⚡ Connect directly with @handle"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_14ssp" />
+                    android:textSize="@dimen/_11ssp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="START CHAT →"
                     android:textColor="@color/veil_accent"
-                    android:textSize="@dimen/_12ssp"
+                    android:textSize="@dimen/_10ssp"
                     android:fontFamily="sans-serif-medium" />
             </LinearLayout>
 
@@ -125,24 +125,24 @@
         <LinearLayout
             android:id="@+id/btnNewGroup"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/_56sdp"
+            android:layout_height="@dimen/_47sdp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="@dimen/_16sdp"
-            android:paddingEnd="@dimen/_16sdp"
+            android:paddingStart="@dimen/_13sdp"
+            android:paddingEnd="@dimen/_13sdp"
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true">
 
             <FrameLayout
-                android:layout_width="@dimen/_42sdp"
-                android:layout_height="@dimen/_42sdp"
+                android:layout_width="@dimen/_35sdp"
+                android:layout_height="@dimen/_35sdp"
                 android:background="@drawable/bg_attach_item"
                 android:backgroundTint="@color/colorPrimary">
 
                 <ImageView
-                    android:layout_width="@dimen/_22sdp"
-                    android:layout_height="@dimen/_22sdp"
+                    android:layout_width="@dimen/_18sdp"
+                    android:layout_height="@dimen/_18sdp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_group"
                     app:tint="@android:color/white" />
@@ -151,10 +151,10 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/_16sdp"
+                android:layout_marginStart="@dimen/_13sdp"
                 android:text="New Group"
                 android:textColor="@color/textPrimary"
-                android:textSize="@dimen/_16ssp"
+                android:textSize="@dimen/_13ssp"
                 android:fontFamily="sans-serif-medium" />
 
         </LinearLayout>
@@ -168,24 +168,24 @@
         <LinearLayout
             android:id="@+id/btnNewChannel"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/_56sdp"
+            android:layout_height="@dimen/_47sdp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="@dimen/_16sdp"
-            android:paddingEnd="@dimen/_16sdp"
+            android:paddingStart="@dimen/_13sdp"
+            android:paddingEnd="@dimen/_13sdp"
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true">
 
             <FrameLayout
-                android:layout_width="@dimen/_42sdp"
-                android:layout_height="@dimen/_42sdp"
+                android:layout_width="@dimen/_35sdp"
+                android:layout_height="@dimen/_35sdp"
                 android:background="@drawable/bg_attach_item"
                 android:backgroundTint="#8B5CF6">
 
                 <ImageView
-                    android:layout_width="@dimen/_22sdp"
-                    android:layout_height="@dimen/_22sdp"
+                    android:layout_width="@dimen/_18sdp"
+                    android:layout_height="@dimen/_18sdp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_group"
                     app:tint="@android:color/white" />
@@ -195,7 +195,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="@dimen/_16sdp"
+                android:layout_marginStart="@dimen/_13sdp"
                 android:orientation="vertical">
 
                 <TextView
@@ -203,7 +203,7 @@
                     android:layout_height="wrap_content"
                     android:text="New Broadcast Channel"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_16ssp"
+                    android:textSize="@dimen/_13ssp"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
@@ -211,7 +211,7 @@
                     android:layout_height="wrap_content"
                     android:text="One-to-many announcements &amp; subscriber feed"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_12ssp" />
+                    android:textSize="@dimen/_10ssp" />
             </LinearLayout>
 
         </LinearLayout>
@@ -225,24 +225,24 @@
         <LinearLayout
             android:id="@+id/btnDiscoveryHub"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/_56sdp"
+            android:layout_height="@dimen/_47sdp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="@dimen/_16sdp"
-            android:paddingEnd="@dimen/_16sdp"
+            android:paddingStart="@dimen/_13sdp"
+            android:paddingEnd="@dimen/_13sdp"
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true">
 
             <FrameLayout
-                android:layout_width="@dimen/_42sdp"
-                android:layout_height="@dimen/_42sdp"
+                android:layout_width="@dimen/_35sdp"
+                android:layout_height="@dimen/_35sdp"
                 android:background="@drawable/bg_attach_item"
                 android:backgroundTint="@color/colorSecondary">
 
                 <ImageView
-                    android:layout_width="@dimen/_22sdp"
-                    android:layout_height="@dimen/_22sdp"
+                    android:layout_width="@dimen/_18sdp"
+                    android:layout_height="@dimen/_18sdp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_discover"
                     app:tint="@android:color/white" />
@@ -252,7 +252,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="@dimen/_16sdp"
+                android:layout_marginStart="@dimen/_13sdp"
                 android:orientation="vertical">
 
                 <TextView
@@ -260,7 +260,7 @@
                     android:layout_height="wrap_content"
                     android:text="Discovery Hub &amp; Matchmaking"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_16ssp"
+                    android:textSize="@dimen/_13ssp"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
@@ -268,7 +268,7 @@
                     android:layout_height="wrap_content"
                     android:text="Roulette · Mood match · Whisper · Channels"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_12ssp" />
+                    android:textSize="@dimen/_10ssp" />
             </LinearLayout>
 
         </LinearLayout>
@@ -287,7 +287,7 @@
                 android:id="@+id/usersRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="@dimen/_8sdp"
+                android:padding="@dimen/_7sdp"
                 android:clipToPadding="false" />
 
             <!-- Empty State -->
@@ -298,13 +298,13 @@
                 android:orientation="vertical"
                 android:gravity="center"
                 android:visibility="gone"
-                android:padding="@dimen/_40sdp">
+                android:padding="@dimen/_33sdp">
 
                 <ImageView
-                    android:layout_width="@dimen/_64sdp"
-                    android:layout_height="@dimen/_64sdp"
+                    android:layout_width="@dimen/_53sdp"
+                    android:layout_height="@dimen/_53sdp"
                     android:src="@drawable/ic_person"
-                    android:layout_marginBottom="@dimen/_16sdp"
+                    android:layout_marginBottom="@dimen/_13sdp"
                     app:tint="@color/text_secondary"
                     android:contentDescription="@string/username" />
 
@@ -313,7 +313,7 @@
                     android:layout_height="wrap_content"
                     android:text="Find people to chat with"
                     android:textColor="@color/text_secondary"
-                    android:textSize="@dimen/_14ssp"
+                    android:textSize="@dimen/_12ssp"
                     android:gravity="center" />
 
             </LinearLayout>

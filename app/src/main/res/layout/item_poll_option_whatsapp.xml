@@ -5,10 +5,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingStart="@dimen/_4sdp"
-    android:paddingEnd="@dimen/_4sdp"
-    android:paddingTop="@dimen/_7sdp"
-    android:paddingBottom="@dimen/_7sdp"
+    android:paddingStart="@dimen/_3sdp"
+    android:paddingEnd="@dimen/_3sdp"
+    android:paddingTop="@dimen/_6sdp"
+    android:paddingBottom="@dimen/_6sdp"
     android:background="?attr/selectableItemBackground"
     android:clickable="true"
     android:focusable="true">
@@ -22,14 +22,14 @@
         <!-- WhatsApp Circular Poll Option Checkbox (20dp) -->
         <FrameLayout
             android:id="@+id/poll_option_vote_checkbox"
-            android:layout_width="@dimen/_20sdp"
-            android:layout_height="@dimen/_20sdp"
+            android:layout_width="@dimen/_17sdp"
+            android:layout_height="@dimen/_17sdp"
             android:background="@drawable/bg_poll_checkbox_unchecked">
 
             <ImageView
                 android:id="@+id/poll_option_check_icon"
-                android:layout_width="@dimen/_13sdp"
-                android:layout_height="@dimen/_13sdp"
+                android:layout_width="@dimen/_11sdp"
+                android:layout_height="@dimen/_11sdp"
                 android:layout_gravity="center"
                 android:src="@drawable/ic_check"
                 app:tint="@android:color/white"
@@ -42,11 +42,11 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="@dimen/_12sdp"
-            android:layout_marginEnd="@dimen/_8sdp"
+            android:layout_marginStart="@dimen/_10sdp"
+            android:layout_marginEnd="@dimen/_7sdp"
             android:text="Option"
             android:textColor="@color/message_text_primary"
-            android:textSize="@dimen/_15ssp"
+            android:textSize="@dimen/_12ssp"
             android:maxLines="3"
             android:ellipsize="end" />
 
@@ -60,28 +60,28 @@
 
             <TextView
                 android:id="@+id/poll_voter_avatar_1"
-                android:layout_width="@dimen/_18sdp"
-                android:layout_height="@dimen/_18sdp"
-                android:layout_marginEnd="@dimen/_4sdp"
+                android:layout_width="@dimen/_15sdp"
+                android:layout_height="@dimen/_15sdp"
+                android:layout_marginEnd="@dimen/_3sdp"
                 android:background="@drawable/bg_poll_checkbox_checked"
                 android:gravity="center"
                 android:text="Y"
                 android:textColor="@android:color/white"
-                android:textSize="@dimen/_9ssp"
+                android:textSize="@dimen/_7ssp"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
             <TextView
                 android:id="@+id/poll_voter_avatar_2"
-                android:layout_width="@dimen/_18sdp"
-                android:layout_height="@dimen/_18sdp"
-                android:layout_marginStart="@dimen/_minus8sdp"
-                android:layout_marginEnd="@dimen/_4sdp"
+                android:layout_width="@dimen/_15sdp"
+                android:layout_height="@dimen/_15sdp"
+                android:layout_marginStart="@dimen/_minus7sdp"
+                android:layout_marginEnd="@dimen/_3sdp"
                 android:background="@drawable/bg_voice_circle_received"
                 android:gravity="center"
                 android:text="P"
                 android:textColor="@android:color/white"
-                android:textSize="@dimen/_9ssp"
+                android:textSize="@dimen/_7ssp"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
@@ -91,7 +91,7 @@
                 android:layout_height="wrap_content"
                 android:text="0"
                 android:textColor="@color/message_text_secondary"
-                android:textSize="@dimen/_13ssp" />
+                android:textSize="@dimen/_10ssp" />
         </LinearLayout>
     </LinearLayout>
 
@@ -100,9 +100,9 @@
         android:id="@+id/poll_vote_ratio"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_7sdp"
-        android:layout_marginStart="@dimen/_32sdp"
-        android:layout_marginTop="@dimen/_6sdp"
+        android:layout_height="@dimen/_6sdp"
+        android:layout_marginStart="@dimen/_27sdp"
+        android:layout_marginTop="@dimen/_5sdp"
         android:max="100"
         android:progress="0"
         android:progressDrawable="@drawable/progress_poll_whatsapp" />

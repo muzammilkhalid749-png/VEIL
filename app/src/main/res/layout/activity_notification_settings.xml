@@ -12,14 +12,14 @@
         android:layout_height="?attr/actionBarSize"
         android:background="@color/colorSurface"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_8sdp"
-        android:paddingEnd="@dimen/_16sdp">
+        android:paddingStart="@dimen/_7sdp"
+        android:paddingEnd="@dimen/_13sdp">
 
         <ImageView
             android:id="@+id/btnBack"
-            android:layout_width="@dimen/_40sdp"
-            android:layout_height="@dimen/_40sdp"
-            android:padding="@dimen/_8sdp"
+            android:layout_width="@dimen/_33sdp"
+            android:layout_height="@dimen/_33sdp"
+            android:padding="@dimen/_7sdp"
             android:src="@drawable/ic_arrow_back"
             app:tint="@color/textPrimary"
             android:background="?attr/selectableItemBackgroundBorderless"
@@ -28,10 +28,10 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_8sdp"
+            android:layout_marginStart="@dimen/_7sdp"
             android:text="Notifications and Sounds"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_18ssp"
+            android:textSize="@dimen/_15ssp"
             android:fontFamily="sans-serif-medium" />
     </LinearLayout>
 
@@ -52,10 +52,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingStart="@dimen/_16sdp"
-            android:paddingEnd="@dimen/_16sdp"
-            android:paddingTop="@dimen/_16sdp"
-            android:paddingBottom="@dimen/_36sdp">
+            android:paddingStart="@dimen/_13sdp"
+            android:paddingEnd="@dimen/_13sdp"
+            android:paddingTop="@dimen/_13sdp"
+            android:paddingBottom="@dimen/_30sdp">
 
             <!-- Section 1: Private Chats -->
             <TextView
@@ -63,17 +63,17 @@
                 android:layout_height="wrap_content"
                 android:text="PRIVATE CHATS"
                 android:textColor="@color/colorPrimary"
-                android:textSize="@dimen/_12ssp"
+                android:textSize="@dimen/_10ssp"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.06"
-                android:layout_marginStart="@dimen/_4sdp"
-                android:layout_marginBottom="@dimen/_8sdp" />
+                android:layout_marginStart="@dimen/_3sdp"
+                android:layout_marginBottom="@dimen/_7sdp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_20sdp"
-                app:cardCornerRadius="@dimen/_16sdp"
+                android:layout_marginBottom="@dimen/_17sdp"
+                app:cardCornerRadius="@dimen/_13sdp"
                 app:cardElevation="0dp"
                 app:strokeWidth="@dimen/_1sdp"
                 app:strokeColor="@color/colorOutline"
@@ -89,7 +89,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -102,7 +102,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Show Notifications"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -111,7 +111,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Receive alerts for 1-on-1 chats"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -123,8 +123,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <LinearLayout
@@ -132,7 +132,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -145,7 +145,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Message Preview"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -154,7 +154,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Show message sender and content in push alert"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -166,8 +166,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <LinearLayout
@@ -175,7 +175,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -188,7 +188,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Vibrate"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -197,7 +197,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Haptic vibration for incoming messages"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -214,17 +214,17 @@
                 android:layout_height="wrap_content"
                 android:text="GROUPS &amp; CHANNELS"
                 android:textColor="@color/colorPrimary"
-                android:textSize="@dimen/_12ssp"
+                android:textSize="@dimen/_10ssp"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.06"
-                android:layout_marginStart="@dimen/_4sdp"
-                android:layout_marginBottom="@dimen/_8sdp" />
+                android:layout_marginStart="@dimen/_3sdp"
+                android:layout_marginBottom="@dimen/_7sdp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_20sdp"
-                app:cardCornerRadius="@dimen/_16sdp"
+                android:layout_marginBottom="@dimen/_17sdp"
+                app:cardCornerRadius="@dimen/_13sdp"
                 app:cardElevation="0dp"
                 app:strokeWidth="@dimen/_1sdp"
                 app:strokeColor="@color/colorOutline"
@@ -240,7 +240,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -253,7 +253,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Group Notifications"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -262,7 +262,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Alerts for all group discussions"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -274,8 +274,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <LinearLayout
@@ -283,7 +283,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -296,7 +296,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Broadcast Channel Alerts"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -305,7 +305,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Notifications when channels publish announcements"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -317,8 +317,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <LinearLayout
@@ -326,7 +326,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -339,7 +339,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Only When Mentioned (@Me)"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -348,7 +348,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Mutes regular group traffic and alerts only when your @handle is tagged"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -365,17 +365,17 @@
                 android:layout_height="wrap_content"
                 android:text="VOICE &amp; VIDEO CALLS"
                 android:textColor="@color/colorPrimary"
-                android:textSize="@dimen/_12ssp"
+                android:textSize="@dimen/_10ssp"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.06"
-                android:layout_marginStart="@dimen/_4sdp"
-                android:layout_marginBottom="@dimen/_8sdp" />
+                android:layout_marginStart="@dimen/_3sdp"
+                android:layout_marginBottom="@dimen/_7sdp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_20sdp"
-                app:cardCornerRadius="@dimen/_16sdp"
+                android:layout_marginBottom="@dimen/_17sdp"
+                app:cardCornerRadius="@dimen/_13sdp"
                 app:cardElevation="0dp"
                 app:strokeWidth="@dimen/_1sdp"
                 app:strokeColor="@color/colorOutline"
@@ -391,7 +391,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -404,7 +404,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Incoming Call Ringtone"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -413,7 +413,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Plays ringtone for incoming calls"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -425,8 +425,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <LinearLayout
@@ -434,7 +434,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -447,7 +447,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Vibrate on Calls"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -456,7 +456,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Continuous vibration for incoming calls"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -473,17 +473,17 @@
                 android:layout_height="wrap_content"
                 android:text="IN-APP NOTIFICATIONS"
                 android:textColor="@color/colorPrimary"
-                android:textSize="@dimen/_12ssp"
+                android:textSize="@dimen/_10ssp"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.06"
-                android:layout_marginStart="@dimen/_4sdp"
-                android:layout_marginBottom="@dimen/_8sdp" />
+                android:layout_marginStart="@dimen/_3sdp"
+                android:layout_marginBottom="@dimen/_7sdp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_24sdp"
-                app:cardCornerRadius="@dimen/_16sdp"
+                android:layout_marginBottom="@dimen/_20sdp"
+                app:cardCornerRadius="@dimen/_13sdp"
                 app:cardElevation="0dp"
                 app:strokeWidth="@dimen/_1sdp"
                 app:strokeColor="@color/colorOutline"
@@ -499,7 +499,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -512,7 +512,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="In-App Sounds"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -521,7 +521,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Play subtle audio ticks when messages arrive while app is open"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -533,8 +533,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <LinearLayout
@@ -542,7 +542,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -555,7 +555,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="In-App Vibrate"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -564,7 +564,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Short tactile vibration when message arrives in active view"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -576,8 +576,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <LinearLayout
@@ -585,7 +585,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -598,7 +598,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="In-App Preview Banners"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -607,7 +607,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Drop-down banner for other chats while inside a conversation"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -622,11 +622,11 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/_4sdp"
-                android:layout_marginBottom="@dimen/_8sdp"
+                android:layout_marginStart="@dimen/_3sdp"
+                android:layout_marginBottom="@dimen/_7sdp"
                 android:text="BACKGROUND DELIVERY"
                 android:textColor="@color/colorPrimary"
-                android:textSize="@dimen/_12ssp"
+                android:textSize="@dimen/_10ssp"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.05" />
 
@@ -634,8 +634,8 @@
                 android:id="@+id/cardBatteryOptimization"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_20sdp"
-                app:cardCornerRadius="@dimen/_16sdp"
+                android:layout_marginBottom="@dimen/_17sdp"
+                app:cardCornerRadius="@dimen/_13sdp"
                 app:cardElevation="0dp"
                 app:cardBackgroundColor="@color/colorSurfaceContainerLow"
                 app:strokeWidth="@dimen/_1sdp"
@@ -649,8 +649,8 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingHorizontal="@dimen/_16sdp"
-                    android:paddingVertical="@dimen/_14sdp">
+                    android:paddingHorizontal="@dimen/_13sdp"
+                    android:paddingVertical="@dimen/_12sdp">
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -663,7 +663,7 @@
                             android:layout_height="wrap_content"
                             android:text="Battery Optimization"
                             android:textColor="@color/textPrimary"
-                            android:textSize="@dimen/_15ssp"
+                            android:textSize="@dimen/_13ssp"
                             android:fontFamily="sans-serif-medium" />
 
                         <TextView
@@ -673,12 +673,12 @@
                             android:layout_marginTop="@dimen/_2sdp"
                             android:text="Unrestricted (Calls and messages delivered instantly)"
                             android:textColor="@color/textSecondary"
-                            android:textSize="@dimen/_13ssp" />
+                            android:textSize="@dimen/_10ssp" />
                     </LinearLayout>
 
                     <ImageView
-                        android:layout_width="@dimen/_20sdp"
-                        android:layout_height="@dimen/_20sdp"
+                        android:layout_width="@dimen/_17sdp"
+                        android:layout_height="@dimen/_17sdp"
                         android:src="@drawable/ic_chevron_right"
                         app:tint="@color/textSecondary" />
                 </LinearLayout>
@@ -689,13 +689,13 @@
                 android:id="@+id/btnResetAllNotifications"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/_48sdp"
-                android:layout_marginTop="@dimen/_8sdp"
-                android:layout_marginBottom="@dimen/_16sdp"
+                android:layout_height="@dimen/_40sdp"
+                android:layout_marginTop="@dimen/_7sdp"
+                android:layout_marginBottom="@dimen/_13sdp"
                 android:text="Reset All Notification Settings"
                 android:textColor="@color/colorError"
                 app:strokeColor="@color/colorError"
-                app:cornerRadius="@dimen/_14sdp"
+                app:cornerRadius="@dimen/_12sdp"
                 android:fontFamily="sans-serif-medium"
                 android:textAllCaps="false" />
 

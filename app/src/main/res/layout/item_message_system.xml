@@ -5,8 +5,8 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:gravity="center_horizontal"
-    android:paddingStart="@dimen/_16sdp"
-    android:paddingEnd="@dimen/_16sdp"
+    android:paddingStart="@dimen/_13sdp"
+    android:paddingEnd="@dimen/_13sdp"
     android:paddingTop="@dimen/_3sdp"
     android:paddingBottom="@dimen/_3sdp">
 
@@ -16,8 +16,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:paddingTop="@dimen/_10sdp"
-        android:paddingBottom="@dimen/_6sdp"
+        android:paddingTop="@dimen/_8sdp"
+        android:paddingBottom="@dimen/_5sdp"
         android:visibility="gone">
 
         <TextView
@@ -25,12 +25,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_date_header_pill"
-            android:paddingStart="@dimen/_12sdp"
-            android:paddingTop="@dimen/_4sdp"
-            android:paddingEnd="@dimen/_12sdp"
-            android:paddingBottom="@dimen/_4sdp"
+            android:paddingStart="@dimen/_10sdp"
+            android:paddingTop="@dimen/_3sdp"
+            android:paddingEnd="@dimen/_10sdp"
+            android:paddingBottom="@dimen/_3sdp"
             android:textColor="@color/message_text_secondary"
-            android:textSize="@dimen/_12ssp" />
+            android:textSize="@dimen/_10ssp" />
     </LinearLayout>
 
     <!-- Centered System Notification Capsule -->
@@ -44,18 +44,18 @@
         android:foreground="?attr/selectableItemBackground"
         android:gravity="center"
         android:orientation="horizontal"
-        android:paddingStart="@dimen/_16sdp"
-        android:paddingEnd="@dimen/_16sdp"
-        android:paddingTop="@dimen/_8sdp"
-        android:paddingBottom="@dimen/_8sdp"
-        android:layout_marginTop="@dimen/_4sdp"
-        android:layout_marginBottom="@dimen/_4sdp">
+        android:paddingStart="@dimen/_13sdp"
+        android:paddingEnd="@dimen/_13sdp"
+        android:paddingTop="@dimen/_7sdp"
+        android:paddingBottom="@dimen/_7sdp"
+        android:layout_marginTop="@dimen/_3sdp"
+        android:layout_marginBottom="@dimen/_3sdp">
 
         <ImageView
             android:id="@+id/ivSystemMessageIcon"
-            android:layout_width="@dimen/_14sdp"
-            android:layout_height="@dimen/_14sdp"
-            android:layout_marginEnd="@dimen/_6sdp"
+            android:layout_width="@dimen/_12sdp"
+            android:layout_height="@dimen/_12sdp"
+            android:layout_marginEnd="@dimen/_5sdp"
             android:visibility="gone"
             app:tint="@color/message_text_secondary" />
 
@@ -63,11 +63,11 @@
             android:id="@+id/tvSystemMessageText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:maxWidth="@dimen/_300sdp"
+            android:maxWidth="@dimen/_250sdp"
             android:text="You blocked this person. Tap to unblock."
             android:textAlignment="center"
             android:textColor="@color/colorTextPrimary"
-            android:textSize="@dimen/_13ssp"
+            android:textSize="@dimen/_10ssp"
             android:lineSpacingExtra="@dimen/_2sdp" />
 
     </LinearLayout>

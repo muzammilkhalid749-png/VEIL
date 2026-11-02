@@ -4,32 +4,32 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:paddingStart="@dimen/_16sdp"
-    android:paddingEnd="@dimen/_16sdp"
-    android:paddingTop="@dimen/_12sdp"
-    android:paddingBottom="@dimen/_12sdp"
+    android:paddingStart="@dimen/_13sdp"
+    android:paddingEnd="@dimen/_13sdp"
+    android:paddingTop="@dimen/_10sdp"
+    android:paddingBottom="@dimen/_10sdp"
     android:background="?attr/selectableItemBackground"
     android:gravity="center_vertical"
     android:clickable="true"
     android:focusable="true">
 
     <FrameLayout
-        android:layout_width="@dimen/_46sdp"
-        android:layout_height="@dimen/_46sdp"
-        android:layout_marginEnd="@dimen/_12sdp">
+        android:layout_width="@dimen/_38sdp"
+        android:layout_height="@dimen/_38sdp"
+        android:layout_marginEnd="@dimen/_10sdp">
 
         <de.hdodenhof.circleimageview.CircleImageView
             android:id="@+id/ivNotifAvatar"
-            android:layout_width="@dimen/_46sdp"
-            android:layout_height="@dimen/_46sdp"
+            android:layout_width="@dimen/_38sdp"
+            android:layout_height="@dimen/_38sdp"
             android:src="@drawable/ic_person"
             app:civ_border_width="@dimen/_1sdp"
             app:civ_border_color="@color/colorOutline" />
 
         <ImageView
             android:id="@+id/ivNotifBadge"
-            android:layout_width="@dimen/_18sdp"
-            android:layout_height="@dimen/_18sdp"
+            android:layout_width="@dimen/_15sdp"
+            android:layout_height="@dimen/_15sdp"
             android:layout_gravity="bottom|end"
             android:background="@drawable/badge_background"
             android:padding="@dimen/_2sdp"
@@ -56,7 +56,7 @@
                 android:layout_weight="1"
                 android:text="Sender Name"
                 android:textColor="@color/textPrimary"
-                android:textSize="@dimen/_15ssp"
+                android:textSize="@dimen/_13ssp"
                 android:textStyle="bold"
                 android:singleLine="true"
                 android:ellipsize="end" />
@@ -65,10 +65,10 @@
                 android:id="@+id/tvNotifTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/_8sdp"
+                android:layout_marginStart="@dimen/_7sdp"
                 android:text="12:45 PM"
                 android:textColor="@color/textSecondary"
-                android:textSize="@dimen/_12ssp" />
+                android:textSize="@dimen/_10ssp" />
         </LinearLayout>
 
         <TextView
@@ -78,16 +78,16 @@
             android:layout_marginTop="@dimen/_2sdp"
             android:text="Notification preview text goes here..."
             android:textColor="@color/textSecondary"
-            android:textSize="@dimen/_13ssp"
+            android:textSize="@dimen/_11ssp"
             android:maxLines="2"
             android:ellipsize="end" />
     </LinearLayout>
 
     <View
         android:id="@+id/viewUnreadDot"
-        android:layout_width="@dimen/_8sdp"
-        android:layout_height="@dimen/_8sdp"
-        android:layout_marginStart="@dimen/_8sdp"
+        android:layout_width="@dimen/_7sdp"
+        android:layout_height="@dimen/_7sdp"
+        android:layout_marginStart="@dimen/_7sdp"
         android:background="@drawable/badge_background"
         android:visibility="visible" />
 

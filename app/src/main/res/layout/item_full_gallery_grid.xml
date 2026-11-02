@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="@dimen/_120sdp"
+    android:layout_height="@dimen/_100sdp"
     android:padding="@dimen/_1sdp">
 
     <ImageView
@@ -26,15 +26,15 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|start"
-        android:layout_margin="@dimen/_4sdp"
+        android:layout_margin="@dimen/_3sdp"
         android:background="@drawable/bg_media_overlay_pill"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:visibility="gone">
 
         <ImageView
-            android:layout_width="@dimen/_10sdp"
-            android:layout_height="@dimen/_10sdp"
+            android:layout_width="@dimen/_8sdp"
+            android:layout_height="@dimen/_8sdp"
             android:layout_marginEnd="@dimen/_3sdp"
             android:src="@drawable/ic_play_arrow"
             app:tint="@android:color/white" />
@@ -44,17 +44,17 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="@android:color/white"
-            android:textSize="@dimen/_10ssp"
+            android:textSize="@dimen/_8ssp"
             android:textStyle="bold" />
     </LinearLayout>
 
     <!-- Selection Badge (top-right) with Counter like WhatsApp -->
     <FrameLayout
         android:id="@+id/layoutSelectionBadge"
-        android:layout_width="@dimen/_26sdp"
-        android:layout_height="@dimen/_26sdp"
+        android:layout_width="@dimen/_22sdp"
+        android:layout_height="@dimen/_22sdp"
         android:layout_gravity="top|end"
-        android:layout_margin="@dimen/_4sdp"
+        android:layout_margin="@dimen/_3sdp"
         android:background="@drawable/bg_circle_translucent">
 
         <TextView
@@ -63,7 +63,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:textColor="@android:color/white"
-            android:textSize="@dimen/_12ssp"
+            android:textSize="@dimen/_10ssp"
             android:textStyle="bold"
             android:visibility="gone" />
 

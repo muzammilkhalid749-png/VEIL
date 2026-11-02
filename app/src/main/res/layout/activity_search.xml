@@ -18,16 +18,16 @@
             android:layout_height="?attr/actionBarSize"
             android:background="@color/veil_primary"
             android:gravity="center_vertical"
-            android:paddingStart="@dimen/_8sdp"
-            android:paddingEnd="@dimen/_12sdp">
+            android:paddingStart="@dimen/_7sdp"
+            android:paddingEnd="@dimen/_10sdp">
 
             <ImageView
                 android:id="@+id/backButton"
-                android:layout_width="@dimen/_40sdp"
-                android:layout_height="@dimen/_40sdp"
+                android:layout_width="@dimen/_33sdp"
+                android:layout_height="@dimen/_33sdp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/app_name"
-                android:padding="@dimen/_8sdp"
+                android:padding="@dimen/_7sdp"
                 android:src="@drawable/ic_arrow_back"
                 app:tint="@color/text_primary" />
 
@@ -42,19 +42,19 @@
                 android:imeOptions="actionSearch"
                 android:inputType="text"
                 android:maxLines="1"
-                android:paddingStart="@dimen/_12sdp"
-                android:paddingEnd="@dimen/_8sdp"
+                android:paddingStart="@dimen/_10sdp"
+                android:paddingEnd="@dimen/_7sdp"
                 android:textColor="@color/text_primary"
                 android:textColorHint="@color/text_secondary"
-                android:textSize="@dimen/_16ssp" />
+                android:textSize="@dimen/_13ssp" />
 
             <ImageView
                 android:id="@+id/btnClearSearch"
-                android:layout_width="@dimen/_36sdp"
-                android:layout_height="@dimen/_36sdp"
+                android:layout_width="@dimen/_30sdp"
+                android:layout_height="@dimen/_30sdp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="Clear search"
-                android:padding="@dimen/_8sdp"
+                android:padding="@dimen/_7sdp"
                 android:src="@drawable/ic_close"
                 android:visibility="gone"
                 app:tint="@color/text_secondary" />
@@ -73,8 +73,8 @@
             android:layout_height="wrap_content"
             android:background="@color/veil_primary"
             android:overScrollMode="never"
-            android:paddingHorizontal="@dimen/_12sdp"
-            android:paddingVertical="@dimen/_8sdp"
+            android:paddingHorizontal="@dimen/_10sdp"
+            android:paddingVertical="@dimen/_7sdp"
             android:scrollbars="none">
 
             <LinearLayout
@@ -93,11 +93,11 @@
             android:layout_height="wrap_content"
             android:background="@color/veil_primary_dark"
             android:fontFamily="monospace"
-            android:paddingHorizontal="@dimen/_16sdp"
-            android:paddingVertical="@dimen/_6sdp"
+            android:paddingHorizontal="@dimen/_13sdp"
+            android:paddingVertical="@dimen/_5sdp"
             android:text="Search chats and contacts"
             android:textColor="@color/veil_accent"
-            android:textSize="@dimen/_12ssp"
+            android:textSize="@dimen/_10ssp"
             android:textStyle="bold" />
 
         <View
@@ -115,7 +115,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:padding="@dimen/_8sdp" />
+                android:padding="@dimen/_7sdp" />
 
             <!-- Empty State -->
             <LinearLayout
@@ -124,13 +124,13 @@
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:padding="@dimen/_40sdp"
+                android:padding="@dimen/_33sdp"
                 android:visibility="gone">
 
                 <ImageView
-                    android:layout_width="@dimen/_64sdp"
-                    android:layout_height="@dimen/_64sdp"
-                    android:layout_marginBottom="@dimen/_16sdp"
+                    android:layout_width="@dimen/_53sdp"
+                    android:layout_height="@dimen/_53sdp"
+                    android:layout_marginBottom="@dimen/_13sdp"
                     android:contentDescription="@string/search"
                     android:src="@drawable/ic_search"
                     app:tint="@color/text_secondary" />
@@ -142,7 +142,7 @@
                     android:gravity="center"
                     android:text="@string/search_desc"
                     android:textColor="@color/text_secondary"
-                    android:textSize="@dimen/_14ssp" />
+                    android:textSize="@dimen/_12ssp" />
 
             </LinearLayout>
 
@@ -153,12 +153,12 @@
     <!-- Loading State -->
     <ProgressBar
         android:id="@+id/loadingBar"
-        android:layout_width="@dimen/_28sdp"
-        android:layout_height="@dimen/_28sdp"
+        android:layout_width="@dimen/_23sdp"
+        android:layout_height="@dimen/_23sdp"
         android:layout_alignParentTop="true"
         android:layout_alignParentEnd="true"
-        android:layout_marginTop="@dimen/_14sdp"
-        android:layout_marginEnd="@dimen/_52sdp"
+        android:layout_marginTop="@dimen/_12sdp"
+        android:layout_marginEnd="@dimen/_43sdp"
         android:visibility="gone" />
 
 </RelativeLayout>

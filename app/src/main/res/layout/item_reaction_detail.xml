@@ -4,14 +4,14 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingTop="@dimen/_12sdp"
-    android:paddingBottom="@dimen/_12sdp"
+    android:paddingTop="@dimen/_10sdp"
+    android:paddingBottom="@dimen/_10sdp"
     android:background="?android:attr/selectableItemBackground">
 
     <ImageView
         android:id="@+id/userProfileImage"
-        android:layout_width="@dimen/_40sdp"
-        android:layout_height="@dimen/_40sdp"
+        android:layout_width="@dimen/_33sdp"
+        android:layout_height="@dimen/_33sdp"
         android:src="@drawable/ic_profile_placeholder"
         android:background="@drawable/circle_background"
         android:scaleType="centerCrop" />
@@ -21,7 +21,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:layout_marginStart="@dimen/_16sdp">
+        android:layout_marginStart="@dimen/_13sdp">
 
         <TextView
             android:id="@+id/userNameText"
@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:text="You"
             android:textColor="@color/text_primary"
-            android:textSize="@dimen/_16ssp" />
+            android:textSize="@dimen/_13ssp" />
 
         <TextView
             android:id="@+id/actionSubtext"
@@ -37,7 +37,7 @@
             android:layout_height="wrap_content"
             android:text="Tap to remove"
             android:textColor="@color/text_secondary"
-            android:textSize="@dimen/_12ssp"
+            android:textSize="@dimen/_10ssp"
             android:visibility="gone" />
     </LinearLayout>
 
@@ -46,7 +46,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Reaction"
-        android:textSize="@dimen/_24ssp"
-        android:layout_marginStart="@dimen/_16sdp" />
+        android:textSize="@dimen/_20ssp"
+        android:layout_marginStart="@dimen/_13sdp" />
 
 </LinearLayout>

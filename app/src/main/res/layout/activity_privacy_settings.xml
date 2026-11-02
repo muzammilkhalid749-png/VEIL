@@ -13,14 +13,14 @@
         android:layout_height="?attr/actionBarSize"
         android:background="@color/colorSurface"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_8sdp"
-        android:paddingEnd="@dimen/_16sdp">
+        android:paddingStart="@dimen/_7sdp"
+        android:paddingEnd="@dimen/_13sdp">
 
         <ImageView
             android:id="@+id/btnBack"
-            android:layout_width="@dimen/_40sdp"
-            android:layout_height="@dimen/_40sdp"
-            android:padding="@dimen/_8sdp"
+            android:layout_width="@dimen/_33sdp"
+            android:layout_height="@dimen/_33sdp"
+            android:padding="@dimen/_7sdp"
             android:src="@drawable/ic_arrow_back"
             app:tint="@color/textPrimary"
             android:background="?attr/selectableItemBackgroundBorderless"
@@ -29,10 +29,10 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_8sdp"
+            android:layout_marginStart="@dimen/_7sdp"
             android:text="Privacy &amp; Security"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_18ssp"
+            android:textSize="@dimen/_15ssp"
             android:fontFamily="sans-serif-medium" />
     </LinearLayout>
 
@@ -53,17 +53,17 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingStart="@dimen/_16sdp"
-            android:paddingEnd="@dimen/_16sdp"
-            android:paddingTop="@dimen/_16sdp"
-            android:paddingBottom="@dimen/_36sdp">
+            android:paddingStart="@dimen/_13sdp"
+            android:paddingEnd="@dimen/_13sdp"
+            android:paddingTop="@dimen/_13sdp"
+            android:paddingBottom="@dimen/_30sdp">
 
             <!-- Minimal Privacy Score Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_20sdp"
-                app:cardCornerRadius="@dimen/_16sdp"
+                android:layout_marginBottom="@dimen/_17sdp"
+                app:cardCornerRadius="@dimen/_13sdp"
                 app:cardElevation="0dp"
                 app:strokeWidth="@dimen/_1sdp"
                 app:strokeColor="@color/colorOutline"
@@ -73,7 +73,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="@dimen/_18sdp">
+                    android:padding="@dimen/_15sdp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -92,7 +92,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Privacy &amp; Security Status"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_16ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -102,7 +102,7 @@
                                 android:layout_marginTop="@dimen/_3sdp"
                                 android:text="End-to-end encryption &amp; on-device security active"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_12ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <TextView
@@ -111,18 +111,18 @@
                             android:layout_height="wrap_content"
                             android:text="90/100"
                             android:textColor="@color/colorPrimary"
-                            android:textSize="@dimen/_20ssp"
+                            android:textSize="@dimen/_17ssp"
                             android:fontFamily="sans-serif-medium"
                             android:fontFeatureSettings="tnum"
-                            android:layout_marginStart="@dimen/_12sdp" />
+                            android:layout_marginStart="@dimen/_10sdp" />
                     </LinearLayout>
 
                     <ProgressBar
                         android:id="@+id/pbPrivacyScore"
                         style="@android:style/Widget.ProgressBar.Horizontal"
                         android:layout_width="match_parent"
-                        android:layout_height="@dimen/_6sdp"
-                        android:layout_marginTop="@dimen/_14sdp"
+                        android:layout_height="@dimen/_5sdp"
+                        android:layout_marginTop="@dimen/_12sdp"
                         android:max="100"
                         android:progress="90"
                         android:progressTint="@color/colorPrimary" />
@@ -135,18 +135,18 @@
                 android:layout_height="wrap_content"
                 android:text="AUTHENTICATION &amp; VAULT"
                 android:textColor="@color/colorPrimary"
-                android:textSize="@dimen/_12ssp"
+                android:textSize="@dimen/_10ssp"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.04"
-                android:layout_marginStart="@dimen/_4sdp"
-                android:layout_marginBottom="@dimen/_8sdp" />
+                android:layout_marginStart="@dimen/_3sdp"
+                android:layout_marginBottom="@dimen/_7sdp" />
 
             <!-- Card 1: Auth & Vault Group -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_20sdp"
-                app:cardCornerRadius="@dimen/_16sdp"
+                android:layout_marginBottom="@dimen/_17sdp"
+                app:cardCornerRadius="@dimen/_13sdp"
                 app:cardElevation="0dp"
                 app:strokeWidth="@dimen/_1sdp"
                 app:strokeColor="@color/colorOutline"
@@ -164,7 +164,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp"
+                        android:padding="@dimen/_13sdp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true">
@@ -180,7 +180,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Master App PIN Lock"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -190,12 +190,12 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Not configured"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <ImageView
-                            android:layout_width="@dimen/_18sdp"
-                            android:layout_height="@dimen/_18sdp"
+                            android:layout_width="@dimen/_15sdp"
+                            android:layout_height="@dimen/_15sdp"
                             android:src="@drawable/ic_arrow_forward"
                             app:tint="@color/textTertiary" />
                     </LinearLayout>
@@ -203,8 +203,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <!-- Secret Vault Password -->
@@ -214,7 +214,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp"
+                        android:padding="@dimen/_13sdp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true">
@@ -230,7 +230,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Secret Vault Password"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -240,12 +240,12 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Protects hidden conversations"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <ImageView
-                            android:layout_width="@dimen/_18sdp"
-                            android:layout_height="@dimen/_18sdp"
+                            android:layout_width="@dimen/_15sdp"
+                            android:layout_height="@dimen/_15sdp"
                             android:src="@drawable/ic_arrow_forward"
                             app:tint="@color/textTertiary" />
                     </LinearLayout>
@@ -253,8 +253,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <!-- Decoy PIN -->
@@ -264,7 +264,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp"
+                        android:padding="@dimen/_13sdp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true">
@@ -280,7 +280,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Decoy Account PIN"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -290,12 +290,12 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Opens an empty decoy account if unlocked under pressure"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <ImageView
-                            android:layout_width="@dimen/_18sdp"
-                            android:layout_height="@dimen/_18sdp"
+                            android:layout_width="@dimen/_15sdp"
+                            android:layout_height="@dimen/_15sdp"
                             android:src="@drawable/ic_arrow_forward"
                             app:tint="@color/textTertiary" />
                     </LinearLayout>
@@ -303,8 +303,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <!-- Panic Safe Word -->
@@ -314,7 +314,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp"
+                        android:padding="@dimen/_13sdp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true">
@@ -330,7 +330,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Emergency Panic Word"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -340,12 +340,12 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Sending secret word in chat erases all local data"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <ImageView
-                            android:layout_width="@dimen/_18sdp"
-                            android:layout_height="@dimen/_18sdp"
+                            android:layout_width="@dimen/_15sdp"
+                            android:layout_height="@dimen/_15sdp"
                             android:src="@drawable/ic_arrow_forward"
                             app:tint="@color/textTertiary" />
                     </LinearLayout>
@@ -358,18 +358,18 @@
                 android:layout_height="wrap_content"
                 android:text="CHAT &amp; PRESENCE PRIVACY"
                 android:textColor="@color/colorPrimary"
-                android:textSize="@dimen/_12ssp"
+                android:textSize="@dimen/_10ssp"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.04"
-                android:layout_marginStart="@dimen/_4sdp"
-                android:layout_marginBottom="@dimen/_8sdp" />
+                android:layout_marginStart="@dimen/_3sdp"
+                android:layout_marginBottom="@dimen/_7sdp" />
 
             <!-- Card 2: Presence & Privacy Controls -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_20sdp"
-                app:cardCornerRadius="@dimen/_16sdp"
+                android:layout_marginBottom="@dimen/_17sdp"
+                app:cardCornerRadius="@dimen/_13sdp"
                 app:cardElevation="0dp"
                 app:strokeWidth="@dimen/_1sdp"
                 app:strokeColor="@color/colorOutline"
@@ -386,7 +386,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -399,7 +399,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Screen Security"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -408,7 +408,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Block screenshots and hide app in recent apps"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -420,8 +420,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <!-- Stealth Typing -->
@@ -430,7 +430,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -443,7 +443,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Typing Indicator"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -452,7 +452,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Don't show when you are typing a message"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -464,8 +464,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <!-- Fake Offline -->
@@ -474,7 +474,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -487,7 +487,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Appear Offline"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -496,7 +496,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Hide your online status from everyone"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -508,8 +508,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <!-- Blocked Contacts -->
@@ -519,7 +519,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp"
+                        android:padding="@dimen/_13sdp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true">
@@ -535,7 +535,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Blocked Contacts"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -545,12 +545,12 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="0 contacts"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <ImageView
-                            android:layout_width="@dimen/_18sdp"
-                            android:layout_height="@dimen/_18sdp"
+                            android:layout_width="@dimen/_15sdp"
+                            android:layout_height="@dimen/_15sdp"
                             android:src="@drawable/ic_arrow_forward"
                             app:tint="@color/textTertiary" />
                     </LinearLayout>
@@ -563,18 +563,18 @@
                 android:layout_height="wrap_content"
                 android:text="COMMUNICATION &amp; MENTIONS"
                 android:textColor="@color/colorPrimary"
-                android:textSize="@dimen/_12ssp"
+                android:textSize="@dimen/_10ssp"
                 android:fontFamily="sans-serif-medium"
                 android:letterSpacing="0.04"
-                android:layout_marginStart="@dimen/_4sdp"
-                android:layout_marginBottom="@dimen/_8sdp" />
+                android:layout_marginStart="@dimen/_3sdp"
+                android:layout_marginBottom="@dimen/_7sdp" />
 
             <!-- Card 3: Communication Privacy -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_24sdp"
-                app:cardCornerRadius="@dimen/_16sdp"
+                android:layout_marginBottom="@dimen/_20sdp"
+                app:cardCornerRadius="@dimen/_13sdp"
                 app:cardElevation="0dp"
                 app:strokeWidth="@dimen/_1sdp"
                 app:strokeColor="@color/colorOutline"
@@ -592,7 +592,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp"
+                        android:padding="@dimen/_13sdp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true">
@@ -608,7 +608,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Who Can Message You"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -618,12 +618,12 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Everyone"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <ImageView
-                            android:layout_width="@dimen/_18sdp"
-                            android:layout_height="@dimen/_18sdp"
+                            android:layout_width="@dimen/_15sdp"
+                            android:layout_height="@dimen/_15sdp"
                             android:src="@drawable/ic_arrow_forward"
                             app:tint="@color/textTertiary" />
                     </LinearLayout>
@@ -631,8 +631,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <!-- Who Can Mention You -->
@@ -642,7 +642,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp"
+                        android:padding="@dimen/_13sdp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true">
@@ -658,7 +658,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Who Can Mention You"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -668,12 +668,12 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Everyone"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <ImageView
-                            android:layout_width="@dimen/_18sdp"
-                            android:layout_height="@dimen/_18sdp"
+                            android:layout_width="@dimen/_15sdp"
+                            android:layout_height="@dimen/_15sdp"
                             android:src="@drawable/ic_arrow_forward"
                             app:tint="@color/textTertiary" />
                     </LinearLayout>
@@ -681,8 +681,8 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/_1sdp"
-                        android:layout_marginStart="@dimen/_16sdp"
-                        android:layout_marginEnd="@dimen/_16sdp"
+                        android:layout_marginStart="@dimen/_13sdp"
+                        android:layout_marginEnd="@dimen/_13sdp"
                         android:background="@color/colorOutline" />
 
                     <!-- Show Username in Group Chats Switch -->
@@ -691,7 +691,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:padding="@dimen/_16sdp">
+                        android:padding="@dimen/_13sdp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -704,7 +704,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Show Username in Groups"
                                 android:textColor="@color/textPrimary"
-                                android:textSize="@dimen/_15ssp"
+                                android:textSize="@dimen/_13ssp"
                                 android:fontFamily="sans-serif-medium" />
 
                             <TextView
@@ -713,7 +713,7 @@
                                 android:layout_marginTop="@dimen/_2sdp"
                                 android:text="Display @username on group bubbles and participant list"
                                 android:textColor="@color/textSecondary"
-                                android:textSize="@dimen/_13ssp" />
+                                android:textSize="@dimen/_10ssp" />
                         </LinearLayout>
 
                         <androidx.appcompat.widget.SwitchCompat
@@ -729,15 +729,15 @@
                 android:id="@+id/btnInstantSecureWipe"
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/_48sdp"
+                android:layout_height="@dimen/_40sdp"
                 android:text="Erase All Local Data &amp; Reset App"
                 app:icon="@drawable/ic_delete"
                 app:iconGravity="textStart"
                 app:iconTint="@color/colorError"
-                app:cornerRadius="@dimen/_12sdp"
+                app:cornerRadius="@dimen/_10sdp"
                 android:textColor="@color/colorError"
                 android:fontFamily="sans-serif-medium"
-                android:textSize="@dimen/_14ssp" />
+                android:textSize="@dimen/_12ssp" />
 
         </LinearLayout>
     </ScrollView>

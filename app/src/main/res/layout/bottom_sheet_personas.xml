@@ -5,27 +5,27 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="@dimen/_24sdp"
-    android:paddingEnd="@dimen/_24sdp"
-    android:paddingTop="@dimen/_12sdp"
-    android:paddingBottom="@dimen/_28sdp">
+    android:paddingStart="@dimen/_20sdp"
+    android:paddingEnd="@dimen/_20sdp"
+    android:paddingTop="@dimen/_10sdp"
+    android:paddingBottom="@dimen/_23sdp">
 
     <!-- Modern Drag Handle -->
     <View
-        android:layout_width="@dimen/_36sdp"
-        android:layout_height="@dimen/_4sdp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_3sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_16sdp" />
+        android:layout_marginBottom="@dimen/_13sdp" />
         
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Your Personas"
         android:textColor="@color/textPrimary"
-        android:textSize="@dimen/_20ssp"
+        android:textSize="@dimen/_17ssp"
         android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="@dimen/_4sdp" />
+        android:layout_marginBottom="@dimen/_3sdp" />
 
     <TextView
         android:id="@+id/currentPersonaText"
@@ -33,25 +33,25 @@
         android:layout_height="wrap_content"
         android:text="Current: @username"
         android:textColor="@color/colorPrimary"
-        android:textSize="@dimen/_14ssp"
-        android:layout_marginBottom="@dimen/_16sdp" />
+        android:textSize="@dimen/_12ssp"
+        android:layout_marginBottom="@dimen/_13sdp" />
 
     <View
         android:layout_width="match_parent"
         android:layout_height="@dimen/_1sdp"
         android:background="@color/colorOutline"
-        android:layout_marginBottom="@dimen/_12sdp" />
+        android:layout_marginBottom="@dimen/_10sdp" />
 
     <TextView
         android:id="@+id/actionCreatePersona"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_48sdp"
+        android:layout_height="@dimen/_40sdp"
         android:gravity="center_vertical"
         android:text="Create New Persona"
         android:textColor="@color/colorPrimary"
-        android:textSize="@dimen/_15ssp"
+        android:textSize="@dimen/_13ssp"
         android:fontFamily="sans-serif-medium"
-        android:drawablePadding="@dimen/_16sdp"
+        android:drawablePadding="@dimen/_13sdp"
         app:drawableStartCompat="@drawable/ic_add"
         app:drawableTint="@color/colorPrimary"
         android:background="?attr/selectableItemBackground"

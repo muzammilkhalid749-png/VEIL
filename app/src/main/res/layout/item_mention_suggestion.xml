@@ -6,8 +6,8 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingHorizontal="@dimen/_14sdp"
-    android:paddingVertical="@dimen/_9sdp"
+    android:paddingHorizontal="@dimen/_12sdp"
+    android:paddingVertical="@dimen/_7sdp"
     android:background="?attr/selectableItemBackground"
     android:clickable="true"
     android:focusable="true">
@@ -15,12 +15,12 @@
     <!-- Member Avatar -->
     <ImageView
         android:id="@+id/ivMentionAvatar"
-        android:layout_width="@dimen/_38sdp"
-        android:layout_height="@dimen/_38sdp"
+        android:layout_width="@dimen/_32sdp"
+        android:layout_height="@dimen/_32sdp"
         android:src="@drawable/ic_person"
         android:background="@drawable/bg_circle_icon"
         android:backgroundTint="@color/colorSurfaceVariant"
-        android:padding="@dimen/_6sdp"
+        android:padding="@dimen/_5sdp"
         app:tint="@color/colorPrimary" />
 
     <!-- Name & @Username Container -->
@@ -28,14 +28,14 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_marginStart="@dimen/_12sdp"
+        android:layout_marginStart="@dimen/_10sdp"
         android:orientation="vertical">
 
         <TextView
             android:id="@+id/tvMentionDisplayName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="@dimen/_15ssp"
+            android:textSize="@dimen/_12ssp"
             android:textStyle="bold"
             android:textColor="@color/colorTextPrimary"
             android:maxLines="1"
@@ -46,7 +46,7 @@
             android:id="@+id/tvMentionUsername"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="@dimen/_13ssp"
+            android:textSize="@dimen/_10ssp"
             android:textColor="@color/colorPrimary"
             android:maxLines="1"
             android:ellipsize="end"
@@ -58,10 +58,10 @@
         android:id="@+id/tvMentionBadge"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="@dimen/_11ssp"
+        android:textSize="@dimen/_9ssp"
         android:textStyle="bold"
         android:textColor="@color/veil_accent"
-        android:paddingHorizontal="@dimen/_8sdp"
+        android:paddingHorizontal="@dimen/_7sdp"
         android:paddingVertical="@dimen/_3sdp"
         android:background="@drawable/bg_filter_chip"
         android:visibility="gone"

@@ -16,17 +16,17 @@
         <LinearLayout
             android:id="@+id/mentionsHeaderBar"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/_56sdp"
+            android:layout_height="@dimen/_47sdp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="@dimen/_8sdp"
-            android:paddingEnd="@dimen/_12sdp"
+            android:paddingStart="@dimen/_7sdp"
+            android:paddingEnd="@dimen/_10sdp"
             android:background="@color/colorSurface">
 
             <ImageButton
                 android:id="@+id/btnMentionsBack"
-                android:layout_width="@dimen/_40sdp"
-                android:layout_height="@dimen/_40sdp"
+                android:layout_width="@dimen/_33sdp"
+                android:layout_height="@dimen/_33sdp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_arrow_back"
                 app:tint="@color/textPrimary"
@@ -36,7 +36,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="@dimen/_8sdp"
+                android:layout_marginStart="@dimen/_7sdp"
                 android:orientation="vertical">
 
                 <TextView
@@ -45,7 +45,7 @@
                     android:layout_height="wrap_content"
                     android:text="Add mentions"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_18ssp"
+                    android:textSize="@dimen/_15ssp"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
@@ -54,13 +54,13 @@
                     android:layout_height="wrap_content"
                     android:text="0 contacts"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_13ssp" />
+                    android:textSize="@dimen/_10ssp" />
             </LinearLayout>
 
             <ImageButton
                 android:id="@+id/btnMentionsSearch"
-                android:layout_width="@dimen/_40sdp"
-                android:layout_height="@dimen/_40sdp"
+                android:layout_width="@dimen/_33sdp"
+                android:layout_height="@dimen/_33sdp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_search"
                 app:tint="@color/textPrimary"
@@ -71,11 +71,11 @@
         <LinearLayout
             android:id="@+id/mentionsSearchContainer"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/_46sdp"
+            android:layout_height="@dimen/_38sdp"
             android:visibility="gone"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingHorizontal="@dimen/_16sdp"
+            android:paddingHorizontal="@dimen/_13sdp"
             android:background="@color/colorSurface">
 
             <EditText
@@ -87,17 +87,17 @@
                 android:hint="Search contacts..."
                 android:textColorHint="@color/textSecondary"
                 android:textColor="@color/textPrimary"
-                android:textSize="@dimen/_15ssp"
+                android:textSize="@dimen/_13ssp"
                 android:imeOptions="actionSearch"
                 android:singleLine="true" />
 
             <ImageView
                 android:id="@+id/btnClearMentionsSearch"
-                android:layout_width="@dimen/_28sdp"
-                android:layout_height="@dimen/_28sdp"
+                android:layout_width="@dimen/_23sdp"
+                android:layout_height="@dimen/_23sdp"
                 android:src="@drawable/ic_close"
                 app:tint="@color/textSecondary"
-                android:padding="@dimen/_4sdp" />
+                android:padding="@dimen/_3sdp" />
         </LinearLayout>
     </LinearLayout>
 
@@ -115,8 +115,8 @@
             android:layout_height="wrap_content"
             android:visibility="gone"
             android:scrollbars="none"
-            android:paddingVertical="@dimen/_10sdp"
-            android:paddingHorizontal="@dimen/_12sdp"
+            android:paddingVertical="@dimen/_8sdp"
+            android:paddingHorizontal="@dimen/_10sdp"
             android:background="@color/colorSurface">
 
             <LinearLayout
@@ -144,7 +144,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingBottom="@dimen/_88sdp" />
+                android:paddingBottom="@dimen/_73sdp" />
         </ScrollView>
     </LinearLayout>
 
@@ -155,12 +155,12 @@
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
-        android:layout_margin="@dimen/_20sdp"
+        android:layout_margin="@dimen/_17sdp"
         android:src="@drawable/ic_check"
         app:backgroundTint="@color/colorPrimary"
         app:tint="@color/colorOnPrimary"
-        app:fabCustomSize="@dimen/_56sdp"
-        app:maxImageSize="@dimen/_28sdp"
+        app:fabCustomSize="@dimen/_47sdp"
+        app:maxImageSize="@dimen/_23sdp"
         android:contentDescription="Done" />
 
 </RelativeLayout>

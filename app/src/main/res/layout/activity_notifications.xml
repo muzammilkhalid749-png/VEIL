@@ -12,14 +12,14 @@
         android:layout_height="?attr/actionBarSize"
         android:background="@color/colorSurface"
         android:gravity="center_vertical"
-        android:paddingStart="@dimen/_8sdp"
-        android:paddingEnd="@dimen/_16sdp">
+        android:paddingStart="@dimen/_7sdp"
+        android:paddingEnd="@dimen/_13sdp">
 
         <ImageView
             android:id="@+id/btnBack"
-            android:layout_width="@dimen/_40sdp"
-            android:layout_height="@dimen/_40sdp"
-            android:padding="@dimen/_8sdp"
+            android:layout_width="@dimen/_33sdp"
+            android:layout_height="@dimen/_33sdp"
+            android:padding="@dimen/_7sdp"
             android:src="@drawable/ic_arrow_back"
             app:tint="@color/textPrimary"
             android:background="?attr/selectableItemBackgroundBorderless"
@@ -29,17 +29,17 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="@dimen/_8sdp"
+            android:layout_marginStart="@dimen/_7sdp"
             android:text="Notifications"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_18ssp"
+            android:textSize="@dimen/_15ssp"
             android:fontFamily="sans-serif-medium" />
 
         <ImageView
             android:id="@+id/btnNotificationSettings"
-            android:layout_width="@dimen/_40sdp"
-            android:layout_height="@dimen/_40sdp"
-            android:padding="@dimen/_8sdp"
+            android:layout_width="@dimen/_33sdp"
+            android:layout_height="@dimen/_33sdp"
+            android:padding="@dimen/_7sdp"
             android:src="@drawable/ic_settings"
             app:tint="@color/textPrimary"
             android:background="?attr/selectableItemBackgroundBorderless"
@@ -49,10 +49,10 @@
             android:id="@+id/btnMarkAllRead"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:padding="@dimen/_8sdp"
+            android:padding="@dimen/_7sdp"
             android:text="Mark Read"
             android:textColor="@color/colorPrimary"
-            android:textSize="@dimen/_14ssp"
+            android:textSize="@dimen/_12ssp"
             android:fontFamily="sans-serif-medium"
             android:background="?attr/selectableItemBackground" />
     </LinearLayout>
@@ -66,7 +66,7 @@
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabLayoutNotifications"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_44sdp"
+        android:layout_height="@dimen/_37sdp"
         android:background="@color/colorSurface"
         app:tabIndicatorColor="@color/colorPrimary"
         app:tabIndicatorHeight="@dimen/_3sdp"
@@ -111,8 +111,8 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
-            android:paddingTop="@dimen/_8sdp"
-            android:paddingBottom="@dimen/_24sdp" />
+            android:paddingTop="@dimen/_7sdp"
+            android:paddingBottom="@dimen/_20sdp" />
 
         <LinearLayout
             android:id="@+id/layoutEmptyState"
@@ -120,12 +120,12 @@
             android:layout_height="match_parent"
             android:orientation="vertical"
             android:gravity="center"
-            android:padding="@dimen/_32sdp"
+            android:padding="@dimen/_27sdp"
             android:visibility="gone">
 
             <ImageView
-                android:layout_width="@dimen/_64sdp"
-                android:layout_height="@dimen/_64sdp"
+                android:layout_width="@dimen/_53sdp"
+                android:layout_height="@dimen/_53sdp"
                 android:src="@drawable/ic_notifications"
                 app:tint="@color/textSecondary"
                 android:alpha="0.4" />
@@ -134,20 +134,20 @@
                 android:id="@+id/tvEmptyTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_16sdp"
+                android:layout_marginTop="@dimen/_13sdp"
                 android:text="No Notifications"
                 android:textColor="@color/textPrimary"
-                android:textSize="@dimen/_17ssp"
+                android:textSize="@dimen/_14ssp"
                 android:fontFamily="sans-serif-medium" />
 
             <TextView
                 android:id="@+id/tvEmptySubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_6sdp"
+                android:layout_marginTop="@dimen/_5sdp"
                 android:text="Mentions, replies, missed calls, and notifications will appear here."
                 android:textColor="@color/textSecondary"
-                android:textSize="@dimen/_13ssp"
+                android:textSize="@dimen/_11ssp"
                 android:gravity="center" />
         </LinearLayout>
     </FrameLayout>

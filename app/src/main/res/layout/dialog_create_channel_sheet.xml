@@ -5,46 +5,46 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="@dimen/_24sdp"
-    android:paddingEnd="@dimen/_24sdp"
-    android:paddingTop="@dimen/_12sdp"
-    android:paddingBottom="@dimen/_28sdp">
+    android:paddingStart="@dimen/_20sdp"
+    android:paddingEnd="@dimen/_20sdp"
+    android:paddingTop="@dimen/_10sdp"
+    android:paddingBottom="@dimen/_23sdp">
 
     <!-- Handle Bar -->
     <View
-        android:layout_width="@dimen/_36sdp"
-        android:layout_height="@dimen/_4sdp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_3sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_16sdp" />
+        android:layout_marginBottom="@dimen/_13sdp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Create Broadcast Channel"
         android:textColor="@color/textPrimary"
-        android:textSize="@dimen/_19ssp"
+        android:textSize="@dimen/_16ssp"
         android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="@dimen/_4sdp" />
+        android:layout_marginBottom="@dimen/_3sdp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Create a broadcast channel to share updates with subscribers:"
         android:textColor="@color/textSecondary"
-        android:textSize="@dimen/_13ssp"
-        android:layout_marginBottom="@dimen/_18sdp" />
+        android:textSize="@dimen/_11ssp"
+        android:layout_marginBottom="@dimen/_15sdp" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/tilChannelName"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="@dimen/_20sdp"
-        app:boxCornerRadiusBottomEnd="@dimen/_12sdp"
-        app:boxCornerRadiusBottomStart="@dimen/_12sdp"
-        app:boxCornerRadiusTopEnd="@dimen/_12sdp"
-        app:boxCornerRadiusTopStart="@dimen/_12sdp"
+        android:layout_marginBottom="@dimen/_17sdp"
+        app:boxCornerRadiusBottomEnd="@dimen/_10sdp"
+        app:boxCornerRadiusBottomStart="@dimen/_10sdp"
+        app:boxCornerRadiusTopEnd="@dimen/_10sdp"
+        app:boxCornerRadiusTopStart="@dimen/_10sdp"
         app:boxStrokeColor="@color/colorPrimary">
 
         <com.google.android.material.textfield.TextInputEditText
@@ -59,8 +59,8 @@
         android:id="@+id/btnConfirmCreateChannel"
         style="@style/Widget.Material3.Button"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_50sdp"
+        android:layout_height="@dimen/_42sdp"
         android:text="Create Channel"
-        app:cornerRadius="@dimen/_12sdp" />
+        app:cornerRadius="@dimen/_10sdp" />
 
 </LinearLayout>

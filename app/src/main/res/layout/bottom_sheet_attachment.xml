@@ -5,17 +5,17 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="@dimen/_22sdp"
-    android:paddingTop="@dimen/_12sdp"
-    android:paddingEnd="@dimen/_22sdp"
-    android:paddingBottom="@dimen/_26sdp">
+    android:paddingStart="@dimen/_18sdp"
+    android:paddingTop="@dimen/_10sdp"
+    android:paddingEnd="@dimen/_18sdp"
+    android:paddingBottom="@dimen/_22sdp">
 
     <!-- Minimal Drag Handle -->
     <View
-        android:layout_width="@dimen/_36sdp"
-        android:layout_height="@dimen/_4sdp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_3sdp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_16sdp"
+        android:layout_marginBottom="@dimen/_13sdp"
         android:background="@drawable/bg_persona_drag_handle" />
 
     <TextView
@@ -23,9 +23,9 @@
         android:layout_height="wrap_content"
         android:text="Share Attachment"
         android:textColor="@color/textPrimary"
-        android:textSize="@dimen/_19ssp"
+        android:textSize="@dimen/_16ssp"
         android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="@dimen/_20sdp" />
+        android:layout_marginBottom="@dimen/_17sdp" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -45,12 +45,12 @@
             android:focusable="true">
 
             <ImageView
-                android:layout_width="@dimen/_48sdp"
-                android:layout_height="@dimen/_48sdp"
+                android:layout_width="@dimen/_40sdp"
+                android:layout_height="@dimen/_40sdp"
                 android:src="@drawable/ic_image"
                 android:background="@drawable/bg_circle_icon"
                 android:backgroundTint="#4CAF50"
-                android:padding="@dimen/_12sdp"
+                android:padding="@dimen/_10sdp"
                 app:tint="@android:color/white" />
 
             <TextView
@@ -58,8 +58,8 @@
                 android:layout_height="wrap_content"
                 android:text="Gallery"
                 android:textColor="@color/text_primary"
-                android:textSize="@dimen/_12ssp"
-                android:layout_marginTop="@dimen/_8sdp" />
+                android:textSize="@dimen/_10ssp"
+                android:layout_marginTop="@dimen/_7sdp" />
         </LinearLayout>
 
         <LinearLayout
@@ -74,12 +74,12 @@
             android:focusable="true">
 
             <ImageView
-                android:layout_width="@dimen/_48sdp"
-                android:layout_height="@dimen/_48sdp"
+                android:layout_width="@dimen/_40sdp"
+                android:layout_height="@dimen/_40sdp"
                 android:src="@drawable/ic_camera"
                 android:background="@drawable/bg_circle_icon"
                 android:backgroundTint="#E91E63"
-                android:padding="@dimen/_12sdp"
+                android:padding="@dimen/_10sdp"
                 app:tint="@android:color/white" />
 
             <TextView
@@ -87,8 +87,8 @@
                 android:layout_height="wrap_content"
                 android:text="Camera"
                 android:textColor="@color/text_primary"
-                android:textSize="@dimen/_12ssp"
-                android:layout_marginTop="@dimen/_8sdp" />
+                android:textSize="@dimen/_10ssp"
+                android:layout_marginTop="@dimen/_7sdp" />
         </LinearLayout>
 
         <LinearLayout
@@ -103,12 +103,12 @@
             android:focusable="true">
 
             <ImageView
-                android:layout_width="@dimen/_48sdp"
-                android:layout_height="@dimen/_48sdp"
+                android:layout_width="@dimen/_40sdp"
+                android:layout_height="@dimen/_40sdp"
                 android:src="@drawable/ic_document"
                 android:background="@drawable/bg_circle_icon"
                 android:backgroundTint="#2196F3"
-                android:padding="@dimen/_12sdp"
+                android:padding="@dimen/_10sdp"
                 app:tint="@android:color/white" />
 
             <TextView
@@ -116,8 +116,8 @@
                 android:layout_height="wrap_content"
                 android:text="Document"
                 android:textColor="@color/text_primary"
-                android:textSize="@dimen/_12ssp"
-                android:layout_marginTop="@dimen/_8sdp" />
+                android:textSize="@dimen/_10ssp"
+                android:layout_marginTop="@dimen/_7sdp" />
         </LinearLayout>
 
         <LinearLayout
@@ -132,12 +132,12 @@
             android:focusable="true">
 
             <ImageView
-                android:layout_width="@dimen/_48sdp"
-                android:layout_height="@dimen/_48sdp"
+                android:layout_width="@dimen/_40sdp"
+                android:layout_height="@dimen/_40sdp"
                 android:src="@drawable/ic_location"
                 android:background="@drawable/bg_circle_icon"
                 android:backgroundTint="#FF9800"
-                android:padding="@dimen/_12sdp"
+                android:padding="@dimen/_10sdp"
                 app:tint="@android:color/white" />
 
             <TextView
@@ -145,8 +145,8 @@
                 android:layout_height="wrap_content"
                 android:text="Location"
                 android:textColor="@color/text_primary"
-                android:textSize="@dimen/_12ssp"
-                android:layout_marginTop="@dimen/_8sdp" />
+                android:textSize="@dimen/_10ssp"
+                android:layout_marginTop="@dimen/_7sdp" />
         </LinearLayout>
 
     </LinearLayout>

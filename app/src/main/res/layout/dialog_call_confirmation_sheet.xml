@@ -5,42 +5,42 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="@dimen/_24sdp"
-    android:paddingEnd="@dimen/_24sdp"
-    android:paddingTop="@dimen/_12sdp"
-    android:paddingBottom="@dimen/_28sdp">
+    android:paddingStart="@dimen/_20sdp"
+    android:paddingEnd="@dimen/_20sdp"
+    android:paddingTop="@dimen/_10sdp"
+    android:paddingBottom="@dimen/_23sdp">
 
     <!-- Minimal Drag Handle -->
     <View
-        android:layout_width="@dimen/_36sdp"
-        android:layout_height="@dimen/_4sdp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_3sdp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_16sdp"
+        android:layout_marginBottom="@dimen/_13sdp"
         android:background="@drawable/bg_persona_drag_handle" />
 
     <!-- Avatar Container with Call Badge -->
     <FrameLayout
-        android:layout_width="@dimen/_72sdp"
-        android:layout_height="@dimen/_72sdp"
+        android:layout_width="@dimen/_60sdp"
+        android:layout_height="@dimen/_60sdp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_10sdp">
+        android:layout_marginBottom="@dimen/_8sdp">
 
         <de.hdodenhof.circleimageview.CircleImageView
             android:id="@+id/ivCallConfirmAvatar"
-            android:layout_width="@dimen/_72sdp"
-            android:layout_height="@dimen/_72sdp"
+            android:layout_width="@dimen/_60sdp"
+            android:layout_height="@dimen/_60sdp"
             android:layout_gravity="center"
             android:src="@drawable/ic_person"
-            app:civ_border_width="@dimen/_3sdp"
+            app:civ_border_width="@dimen/_2sdp"
             app:civ_border_color="@color/colorPrimary" />
 
         <ImageView
             android:id="@+id/ivCallConfirmBadge"
-            android:layout_width="@dimen/_24sdp"
-            android:layout_height="@dimen/_24sdp"
+            android:layout_width="@dimen/_20sdp"
+            android:layout_height="@dimen/_20sdp"
             android:layout_gravity="bottom|end"
             android:background="@drawable/bg_chat_call_btn_neutral"
-            android:padding="@dimen/_5sdp"
+            android:padding="@dimen/_4sdp"
             android:src="@drawable/ic_call"
             app:tint="@color/colorPrimary" />
     </FrameLayout>
@@ -54,7 +54,7 @@
         android:fontFamily="sans-serif-medium"
         android:text="Contact Name"
         android:textColor="@color/textPrimary"
-        android:textSize="@dimen/_19ssp"
+        android:textSize="@dimen/_16ssp"
         android:textStyle="bold"
         android:ellipsize="end"
         android:singleLine="true" />
@@ -64,23 +64,23 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="@dimen/_4sdp"
+        android:layout_marginTop="@dimen/_3sdp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <ImageView
-            android:layout_width="@dimen/_12sdp"
-            android:layout_height="@dimen/_12sdp"
+            android:layout_width="@dimen/_10sdp"
+            android:layout_height="@dimen/_10sdp"
             android:src="@drawable/ic_lock"
             app:tint="@color/colorPrimary" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_4sdp"
+            android:layout_marginStart="@dimen/_3sdp"
             android:text="End-to-End Encrypted \u2022 P2P"
             android:textColor="@color/colorPrimary"
-            android:textSize="@dimen/_12ssp"
+            android:textSize="@dimen/_10ssp"
             android:fontFamily="sans-serif-medium" />
     </LinearLayout>
 
@@ -90,8 +90,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="@dimen/_16sdp"
-        android:layout_marginBottom="@dimen/_12sdp"
+        android:layout_marginTop="@dimen/_13sdp"
+        android:layout_marginBottom="@dimen/_10sdp"
         android:background="@drawable/bg_call_confirm_segmented_container"
         android:orientation="horizontal"
         android:padding="@dimen/_3sdp">
@@ -106,15 +106,15 @@
             android:focusable="true"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingStart="@dimen/_16sdp"
-            android:paddingEnd="@dimen/_16sdp"
-            android:paddingTop="@dimen/_7sdp"
-            android:paddingBottom="@dimen/_7sdp">
+            android:paddingStart="@dimen/_13sdp"
+            android:paddingEnd="@dimen/_13sdp"
+            android:paddingTop="@dimen/_6sdp"
+            android:paddingBottom="@dimen/_6sdp">
 
             <ImageView
                 android:id="@+id/ivSegmentAudio"
-                android:layout_width="@dimen/_16sdp"
-                android:layout_height="@dimen/_16sdp"
+                android:layout_width="@dimen/_13sdp"
+                android:layout_height="@dimen/_13sdp"
                 android:src="@drawable/ic_call"
                 app:tint="@android:color/white" />
 
@@ -122,10 +122,10 @@
                 android:id="@+id/tvSegmentAudio"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/_6sdp"
+                android:layout_marginStart="@dimen/_5sdp"
                 android:text="Voice Call"
                 android:textColor="@android:color/white"
-                android:textSize="@dimen/_13ssp"
+                android:textSize="@dimen/_11ssp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -134,21 +134,21 @@
             android:id="@+id/btnSegmentVideo"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/_4sdp"
+            android:layout_marginStart="@dimen/_3sdp"
             android:background="@android:color/transparent"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingStart="@dimen/_16sdp"
-            android:paddingEnd="@dimen/_16sdp"
-            android:paddingTop="@dimen/_7sdp"
-            android:paddingBottom="@dimen/_7sdp">
+            android:paddingStart="@dimen/_13sdp"
+            android:paddingEnd="@dimen/_13sdp"
+            android:paddingTop="@dimen/_6sdp"
+            android:paddingBottom="@dimen/_6sdp">
 
             <ImageView
                 android:id="@+id/ivSegmentVideo"
-                android:layout_width="@dimen/_16sdp"
-                android:layout_height="@dimen/_16sdp"
+                android:layout_width="@dimen/_13sdp"
+                android:layout_height="@dimen/_13sdp"
                 android:src="@drawable/ic_video"
                 app:tint="@color/textSecondary" />
 
@@ -156,10 +156,10 @@
                 android:id="@+id/tvSegmentVideo"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/_6sdp"
+                android:layout_marginStart="@dimen/_5sdp"
                 android:text="Video Call"
                 android:textColor="@color/textSecondary"
-                android:textSize="@dimen/_13ssp"
+                android:textSize="@dimen/_11ssp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -171,10 +171,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_20sdp"
+        android:layout_marginBottom="@dimen/_17sdp"
         android:text="Direct peer-to-peer WebRTC connection. Zero servers in between."
         android:textColor="@color/textSecondary"
-        android:textSize="@dimen/_12ssp"
+        android:textSize="@dimen/_10ssp"
         android:gravity="center" />
 
     <!-- Action Buttons (Cancel / Start Call) -->
@@ -188,7 +188,7 @@
         <TextView
             android:id="@+id/btnCallConfirmCancel"
             android:layout_width="0dp"
-            android:layout_height="@dimen/_48sdp"
+            android:layout_height="@dimen/_40sdp"
             android:layout_weight="1"
             android:background="@drawable/bg_call_confirm_btn_cancel"
             android:clickable="true"
@@ -197,17 +197,17 @@
             android:gravity="center"
             android:text="Cancel"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_14ssp" />
+            android:textSize="@dimen/_12ssp" />
 
         <Space
-            android:layout_width="@dimen/_12sdp"
+            android:layout_width="@dimen/_10sdp"
             android:layout_height="@dimen/_1sdp" />
 
         <!-- Start Call Button -->
         <LinearLayout
             android:id="@+id/btnCallConfirmStart"
             android:layout_width="0dp"
-            android:layout_height="@dimen/_48sdp"
+            android:layout_height="@dimen/_40sdp"
             android:layout_weight="1.4"
             android:background="@drawable/bg_call_confirm_btn_start"
             android:clickable="true"
@@ -217,9 +217,9 @@
 
             <ImageView
                 android:id="@+id/ivCallConfirmActionIcon"
-                android:layout_width="@dimen/_18sdp"
-                android:layout_height="@dimen/_18sdp"
-                android:layout_marginEnd="@dimen/_8sdp"
+                android:layout_width="@dimen/_15sdp"
+                android:layout_height="@dimen/_15sdp"
+                android:layout_marginEnd="@dimen/_7sdp"
                 android:src="@drawable/ic_call"
                 app:tint="@android:color/white" />
 
@@ -229,7 +229,7 @@
                 android:layout_height="wrap_content"
                 android:text="Start Voice Call"
                 android:textColor="@android:color/white"
-                android:textSize="@dimen/_15ssp"
+                android:textSize="@dimen/_12ssp"
                 android:textStyle="bold" />
         </LinearLayout>
 

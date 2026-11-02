@@ -5,27 +5,27 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingStart="@dimen/_24sdp"
-    android:paddingEnd="@dimen/_24sdp"
-    android:paddingTop="@dimen/_16sdp"
-    android:paddingBottom="@dimen/_24sdp">
+    android:paddingStart="@dimen/_20sdp"
+    android:paddingEnd="@dimen/_20sdp"
+    android:paddingTop="@dimen/_13sdp"
+    android:paddingBottom="@dimen/_20sdp">
 
     <!-- Handle Bar -->
     <View
-        android:layout_width="@dimen/_36sdp"
-        android:layout_height="@dimen/_4sdp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_3sdp"
         android:background="@drawable/bg_persona_drag_handle"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_16sdp" />
+        android:layout_marginBottom="@dimen/_13sdp" />
 
     <ImageView
         android:id="@+id/ivPinIcon"
-        android:layout_width="@dimen/_48sdp"
-        android:layout_height="@dimen/_48sdp"
+        android:layout_width="@dimen/_40sdp"
+        android:layout_height="@dimen/_40sdp"
         android:src="@drawable/ic_lock"
         app:tint="@color/colorPrimary"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_12sdp" />
+        android:layout_marginBottom="@dimen/_10sdp" />
 
     <TextView
         android:id="@+id/tvPinDialogTitle"
@@ -33,10 +33,10 @@
         android:layout_height="wrap_content"
         android:text="Security Verification"
         android:textColor="@color/textPrimary"
-        android:textSize="@dimen/_20ssp"
+        android:textSize="@dimen/_17ssp"
         android:fontFamily="sans-serif-medium"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_6sdp" />
+        android:layout_marginBottom="@dimen/_5sdp" />
 
     <TextView
         android:id="@+id/tvPinDialogSubtitle"
@@ -44,21 +44,21 @@
         android:layout_height="wrap_content"
         android:text="Enter your PIN to authenticate:"
         android:textColor="@color/textSecondary"
-        android:textSize="@dimen/_14ssp"
+        android:textSize="@dimen/_12ssp"
         android:gravity="center"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/_20sdp" />
+        android:layout_marginBottom="@dimen/_17sdp" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/pinInputLayout"
         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="@dimen/_24sdp"
-        app:boxCornerRadiusBottomEnd="@dimen/_12sdp"
-        app:boxCornerRadiusBottomStart="@dimen/_12sdp"
-        app:boxCornerRadiusTopEnd="@dimen/_12sdp"
-        app:boxCornerRadiusTopStart="@dimen/_12sdp"
+        android:layout_marginBottom="@dimen/_20sdp"
+        app:boxCornerRadiusBottomEnd="@dimen/_10sdp"
+        app:boxCornerRadiusBottomStart="@dimen/_10sdp"
+        app:boxCornerRadiusTopEnd="@dimen/_10sdp"
+        app:boxCornerRadiusTopStart="@dimen/_10sdp"
         app:boxStrokeColor="@color/colorPrimary"
         app:passwordToggleEnabled="true">
 
@@ -71,7 +71,7 @@
             android:maxLength="8"
             android:letterSpacing="0.2"
             android:gravity="center"
-            android:textSize="@dimen/_18ssp" />
+            android:textSize="@dimen/_15ssp" />
     </com.google.android.material.textfield.TextInputLayout>
 
     <LinearLayout
@@ -84,17 +84,17 @@
             android:id="@+id/btnCancelPin"
             style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
-            android:layout_height="@dimen/_48sdp"
+            android:layout_height="@dimen/_40sdp"
             android:text="Cancel"
-            android:layout_marginEnd="@dimen/_8sdp" />
+            android:layout_marginEnd="@dimen/_7sdp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnConfirmPin"
             style="@style/Widget.Material3.Button"
             android:layout_width="wrap_content"
-            android:layout_height="@dimen/_48sdp"
+            android:layout_height="@dimen/_40sdp"
             android:text="Authenticate"
-            app:cornerRadius="@dimen/_12sdp" />
+            app:cornerRadius="@dimen/_10sdp" />
     </LinearLayout>
 
 </LinearLayout>

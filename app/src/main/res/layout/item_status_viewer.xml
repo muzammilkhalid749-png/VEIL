@@ -4,15 +4,15 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingTop="@dimen/_10sdp"
-    android:paddingBottom="@dimen/_10sdp">
+    android:paddingTop="@dimen/_8sdp"
+    android:paddingBottom="@dimen/_8sdp">
 
     <!-- Avatar container -->
     <FrameLayout
         android:id="@+id/viewerAvatarFrame"
-        android:layout_width="@dimen/_40sdp"
-        android:layout_height="@dimen/_40sdp"
-        android:layout_marginEnd="@dimen/_14sdp">
+        android:layout_width="@dimen/_33sdp"
+        android:layout_height="@dimen/_33sdp"
+        android:layout_marginEnd="@dimen/_12sdp">
 
         <TextView
             android:id="@+id/tvViewerInitial"
@@ -20,7 +20,7 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:textColor="#FFFFFF"
-            android:textSize="@dimen/_16ssp"
+            android:textSize="@dimen/_13ssp"
             android:textStyle="bold" />
     </FrameLayout>
 
@@ -36,7 +36,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp"
+            android:textSize="@dimen/_13ssp"
             android:textStyle="bold" />
 
         <TextView
@@ -44,7 +44,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="@color/textSecondary"
-            android:textSize="@dimen/_12ssp"
+            android:textSize="@dimen/_10ssp"
             android:layout_marginTop="@dimen/_2sdp" />
     </LinearLayout>
 
@@ -53,7 +53,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="👁"
-        android:textSize="@dimen/_14ssp"
+        android:textSize="@dimen/_12ssp"
         android:alpha="0.7" />
 
 </LinearLayout>

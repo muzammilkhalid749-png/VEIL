@@ -5,24 +5,24 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bottom_sheet_background"
-    android:paddingBottom="@dimen/_16sdp"
+    android:paddingBottom="@dimen/_13sdp"
     app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
     <!-- Top Drag Handle -->
     <View
-        android:layout_width="@dimen/_36sdp"
-        android:layout_height="@dimen/_4sdp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_3sdp"
         android:background="@drawable/bg_voice_circle_incoming"
         android:backgroundTint="@color/colorSurfaceContainerHighest"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="@dimen/_10sdp"
-        android:layout_marginBottom="@dimen/_12sdp" />
+        android:layout_marginTop="@dimen/_8sdp"
+        android:layout_marginBottom="@dimen/_10sdp" />
 
     <!-- Tab Bar -->
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabLayout"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_44sdp"
+        android:layout_height="@dimen/_37sdp"
         android:background="@color/colorSurface"
         app:tabIndicatorColor="@color/colorPrimary"
         app:tabIndicatorHeight="@dimen/_3sdp"
@@ -50,6 +50,6 @@
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewPager"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_320sdp" />
+        android:layout_height="@dimen/_267sdp" />
 
 </LinearLayout>

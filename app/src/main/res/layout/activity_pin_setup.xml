@@ -9,14 +9,14 @@
     <!-- Top Navigation Bar -->
     <ImageView
         android:id="@+id/backButton"
-        android:layout_width="@dimen/_44sdp"
-        android:layout_height="@dimen/_44sdp"
+        android:layout_width="@dimen/_37sdp"
+        android:layout_height="@dimen/_37sdp"
         android:layout_gravity="top|start"
-        android:layout_marginStart="@dimen/_16sdp"
-        android:layout_marginTop="@dimen/_12sdp"
+        android:layout_marginStart="@dimen/_13sdp"
+        android:layout_marginTop="@dimen/_10sdp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/back"
-        android:padding="@dimen/_10sdp"
+        android:padding="@dimen/_8sdp"
         android:src="@drawable/ic_arrow_back"
         app:tint="@color/textPrimary" />
 
@@ -33,24 +33,24 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:gravity="center_horizontal"
-            android:maxWidth="@dimen/_440sdp"
+            android:maxWidth="@dimen/_367sdp"
             android:orientation="vertical"
-            android:paddingHorizontal="@dimen/_24sdp"
-            android:paddingTop="@dimen/_56sdp"
-            android:paddingBottom="@dimen/_24sdp">
+            android:paddingHorizontal="@dimen/_20sdp"
+            android:paddingTop="@dimen/_47sdp"
+            android:paddingBottom="@dimen/_20sdp">
 
             <!-- Hero Shield Header Container -->
             <androidx.cardview.widget.CardView
-                android:layout_width="@dimen/_72sdp"
-                android:layout_height="@dimen/_72sdp"
-                android:layout_marginBottom="@dimen/_20sdp"
+                android:layout_width="@dimen/_60sdp"
+                android:layout_height="@dimen/_60sdp"
+                android:layout_marginBottom="@dimen/_17sdp"
                 app:cardBackgroundColor="@color/colorPrimaryContainer"
-                app:cardCornerRadius="@dimen/_36sdp"
+                app:cardCornerRadius="@dimen/_30sdp"
                 app:cardElevation="0dp">
 
                 <ImageView
-                    android:layout_width="@dimen/_36sdp"
-                    android:layout_height="@dimen/_36sdp"
+                    android:layout_width="@dimen/_30sdp"
+                    android:layout_height="@dimen/_30sdp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/setup_secure_pin"
                     android:scaleType="fitCenter"
@@ -67,28 +67,28 @@
                 android:letterSpacing="0.02"
                 android:text="@string/setup_secure_pin"
                 android:textColor="@color/textPrimary"
-                android:textSize="@dimen/_24ssp"
+                android:textSize="@dimen/_20ssp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/subtitleText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_8sdp"
+                android:layout_marginTop="@dimen/_7sdp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
                 android:lineSpacingExtra="@dimen/_3sdp"
                 android:text="@string/pin_hint"
                 android:textColor="@color/textSecondary"
-                android:textSize="@dimen/_14ssp" />
+                android:textSize="@dimen/_12ssp" />
 
             <!-- PIN Progress Dots Container -->
             <LinearLayout
                 android:id="@+id/pinDotsContainer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_28sdp"
-                android:layout_marginBottom="@dimen/_16sdp"
+                android:layout_marginTop="@dimen/_23sdp"
+                android:layout_marginBottom="@dimen/_13sdp"
                 android:gravity="center"
                 android:orientation="horizontal" />
 
@@ -97,11 +97,11 @@
                 android:id="@+id/errorText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/_12sdp"
+                android:layout_marginBottom="@dimen/_10sdp"
                 android:fontFamily="sans-serif-medium"
                 android:gravity="center"
                 android:textColor="@color/statusError"
-                android:textSize="@dimen/_13ssp"
+                android:textSize="@dimen/_11ssp"
                 android:visibility="gone" />
 
             <!-- Responsive Number Pad (Fluid weights with max width for any screen) -->
@@ -109,7 +109,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
-                android:maxWidth="@dimen/_340sdp"
+                android:maxWidth="@dimen/_283sdp"
                 android:orientation="vertical">
 
                 <!-- Row 1: 1, 2, 3 -->
@@ -121,38 +121,38 @@
                     <Button
                         android:id="@+id/button1"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="1"
                         android:textColor="@color/keypad_digit_text"
-                        android:textSize="@dimen/_24ssp" />
+                        android:textSize="@dimen/_20ssp" />
 
                     <Button
                         android:id="@+id/button2"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="2"
                         android:textColor="@color/keypad_digit_text"
-                        android:textSize="@dimen/_24ssp" />
+                        android:textSize="@dimen/_20ssp" />
 
                     <Button
                         android:id="@+id/button3"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="3"
                         android:textColor="@color/keypad_digit_text"
-                        android:textSize="@dimen/_24ssp" />
+                        android:textSize="@dimen/_20ssp" />
                 </LinearLayout>
 
                 <!-- Row 2: 4, 5, 6 -->
@@ -164,38 +164,38 @@
                     <Button
                         android:id="@+id/button4"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="4"
                         android:textColor="@color/keypad_digit_text"
-                        android:textSize="@dimen/_24ssp" />
+                        android:textSize="@dimen/_20ssp" />
 
                     <Button
                         android:id="@+id/button5"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="5"
                         android:textColor="@color/keypad_digit_text"
-                        android:textSize="@dimen/_24ssp" />
+                        android:textSize="@dimen/_20ssp" />
 
                     <Button
                         android:id="@+id/button6"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="6"
                         android:textColor="@color/keypad_digit_text"
-                        android:textSize="@dimen/_24ssp" />
+                        android:textSize="@dimen/_20ssp" />
                 </LinearLayout>
 
                 <!-- Row 3: 7, 8, 9 -->
@@ -207,38 +207,38 @@
                     <Button
                         android:id="@+id/button7"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="7"
                         android:textColor="@color/keypad_digit_text"
-                        android:textSize="@dimen/_24ssp" />
+                        android:textSize="@dimen/_20ssp" />
 
                     <Button
                         android:id="@+id/button8"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="8"
                         android:textColor="@color/keypad_digit_text"
-                        android:textSize="@dimen/_24ssp" />
+                        android:textSize="@dimen/_20ssp" />
 
                     <Button
                         android:id="@+id/button9"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="9"
                         android:textColor="@color/keypad_digit_text"
-                        android:textSize="@dimen/_24ssp" />
+                        android:textSize="@dimen/_20ssp" />
                 </LinearLayout>
 
                 <!-- Row 4: Delete, 0, Clear -->
@@ -250,38 +250,38 @@
                     <Button
                         android:id="@+id/buttonDelete"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif"
                         android:text="⌫"
                         android:textColor="@color/keypad_control_text"
-                        android:textSize="@dimen/_20ssp" />
+                        android:textSize="@dimen/_17ssp" />
 
                     <Button
                         android:id="@+id/button0"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="0"
                         android:textColor="@color/keypad_digit_text"
-                        android:textSize="@dimen/_24ssp" />
+                        android:textSize="@dimen/_20ssp" />
 
                     <Button
                         android:id="@+id/buttonClear"
                         android:layout_width="0dp"
-                        android:layout_height="@dimen/_64sdp"
-                        android:layout_margin="@dimen/_6sdp"
+                        android:layout_height="@dimen/_53sdp"
+                        android:layout_margin="@dimen/_5sdp"
                         android:layout_weight="1"
                         android:background="@drawable/button_number_pad"
                         android:fontFamily="sans-serif-medium"
                         android:text="C"
                         android:textColor="@color/keypad_control_text"
-                        android:textSize="@dimen/_18ssp" />
+                        android:textSize="@dimen/_15ssp" />
                 </LinearLayout>
 
             </LinearLayout>
@@ -291,62 +291,62 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
-                android:layout_marginTop="@dimen/_24sdp"
-                android:maxWidth="@dimen/_340sdp"
+                android:layout_marginTop="@dimen/_20sdp"
+                android:maxWidth="@dimen/_283sdp"
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/skipButton"
                     style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
-                    android:layout_height="@dimen/_52sdp"
-                    android:layout_marginEnd="@dimen/_6sdp"
+                    android:layout_height="@dimen/_43sdp"
+                    android:layout_marginEnd="@dimen/_5sdp"
                     android:layout_weight="1"
                     android:letterSpacing="0.01"
                     android:text="@string/skip_for_now"
                     android:textAllCaps="false"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_14ssp"
-                    app:cornerRadius="@dimen/_16sdp" />
+                    android:textSize="@dimen/_12ssp"
+                    app:cornerRadius="@dimen/_13sdp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/confirmButton"
                     style="@style/Widget.Material3.Button.UnelevatedButton"
                     android:layout_width="0dp"
-                    android:layout_height="@dimen/_52sdp"
-                    android:layout_marginStart="@dimen/_6sdp"
+                    android:layout_height="@dimen/_43sdp"
+                    android:layout_marginStart="@dimen/_5sdp"
                     android:layout_weight="1"
                     android:enabled="false"
                     android:letterSpacing="0.01"
                     android:text="@string/confirm_pin"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
-                    android:textSize="@dimen/_14ssp"
+                    android:textSize="@dimen/_12ssp"
                     android:textStyle="bold"
                     app:backgroundTint="@color/colorPrimary"
-                    app:cornerRadius="@dimen/_16sdp" />
+                    app:cornerRadius="@dimen/_13sdp" />
             </LinearLayout>
 
             <!-- Loading Indicator -->
             <ProgressBar
                 android:id="@+id/progressBar"
-                android:layout_width="@dimen/_32sdp"
-                android:layout_height="@dimen/_32sdp"
-                android:layout_marginTop="@dimen/_16sdp"
+                android:layout_width="@dimen/_27sdp"
+                android:layout_height="@dimen/_27sdp"
+                android:layout_marginTop="@dimen/_13sdp"
                 android:visibility="gone" />
 
             <!-- Security Footer -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_16sdp"
+                android:layout_marginTop="@dimen/_13sdp"
                 android:drawableStart="@drawable/ic_shield"
-                android:drawablePadding="@dimen/_6sdp"
+                android:drawablePadding="@dimen/_5sdp"
                 android:fontFamily="sans-serif"
                 android:gravity="center"
                 android:text="@string/pin_secure_storage"
                 android:textColor="@color/textSecondary"
-                android:textSize="@dimen/_12ssp"
+                android:textSize="@dimen/_10ssp"
                 app:drawableTint="@color/textSecondary" />
 
         </LinearLayout>

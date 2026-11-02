@@ -10,9 +10,9 @@
     <RelativeLayout
         android:id="@+id/topHeaderContainer"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_56sdp"
+        android:layout_height="@dimen/_47sdp"
         android:layout_alignParentTop="true"
-        android:paddingHorizontal="@dimen/_24sdp">
+        android:paddingHorizontal="@dimen/_20sdp">
 
         <TextView
             android:id="@+id/stepCounterText"
@@ -23,7 +23,7 @@
             android:letterSpacing="0.06"
             android:text="01"
             android:textColor="#8C93A4"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
 
         <TextView
             android:id="@+id/skipText"
@@ -35,10 +35,10 @@
             android:clickable="true"
             android:focusable="true"
             android:fontFamily="sans-serif"
-            android:padding="@dimen/_8sdp"
+            android:padding="@dimen/_7sdp"
             android:text="@string/skip"
             android:textColor="#596072"
-            android:textSize="@dimen/_15ssp" />
+            android:textSize="@dimen/_13ssp" />
     </RelativeLayout>
 
     <!-- ViewPager2 Constrained Between Top Header and Bottom Controls -->
@@ -58,11 +58,11 @@
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
         android:gravity="center_horizontal"
-        android:maxWidth="@dimen/_440sdp"
+        android:maxWidth="@dimen/_367sdp"
         android:orientation="vertical"
-        android:paddingHorizontal="@dimen/_28sdp"
-        android:paddingTop="@dimen/_8sdp"
-        android:paddingBottom="@dimen/_32sdp">
+        android:paddingHorizontal="@dimen/_23sdp"
+        android:paddingTop="@dimen/_7sdp"
+        android:paddingBottom="@dimen/_27sdp">
 
         <!-- Dots Indicator -->
         <LinearLayout
@@ -70,7 +70,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:layout_marginBottom="@dimen/_28sdp"
+            android:layout_marginBottom="@dimen/_23sdp"
             android:gravity="center_vertical"
             android:orientation="horizontal" />
 
@@ -78,7 +78,7 @@
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/nextButton"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/_54sdp"
+            android:layout_height="@dimen/_45sdp"
             android:background="@drawable/bg_btn_next_subtle"
             android:fontFamily="sans-serif-medium"
             android:letterSpacing="0.01"
@@ -86,7 +86,7 @@
             android:text="@string/next"
             android:textAllCaps="false"
             android:textColor="#8C93A4"
-            android:textSize="@dimen/_16ssp" />
+            android:textSize="@dimen/_13ssp" />
 
     </LinearLayout>
 

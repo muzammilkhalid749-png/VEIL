@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="@dimen/_115sdp"
+    android:layout_height="@dimen/_96sdp"
     android:padding="@dimen/_2sdp">
 
     <!-- Normal Media Item Container -->
@@ -10,7 +10,7 @@
         android:id="@+id/cardMediaContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:cardCornerRadius="@dimen/_12sdp"
+        app:cardCornerRadius="@dimen/_10sdp"
         app:cardElevation="0dp"
         app:strokeWidth="0dp"
         app:cardBackgroundColor="@color/colorSurfaceVariant">
@@ -39,19 +39,19 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|start"
-                android:layout_margin="@dimen/_6sdp"
+                android:layout_margin="@dimen/_5sdp"
                 android:background="@drawable/bg_media_overlay_pill"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="@dimen/_6sdp"
+                android:paddingStart="@dimen/_5sdp"
                 android:paddingTop="@dimen/_2sdp"
-                android:paddingEnd="@dimen/_6sdp"
+                android:paddingEnd="@dimen/_5sdp"
                 android:paddingBottom="@dimen/_2sdp"
                 android:visibility="gone">
 
                 <ImageView
-                    android:layout_width="@dimen/_10sdp"
-                    android:layout_height="@dimen/_10sdp"
+                    android:layout_width="@dimen/_8sdp"
+                    android:layout_height="@dimen/_8sdp"
                     android:layout_marginEnd="@dimen/_3sdp"
                     android:src="@drawable/ic_play_arrow"
                     app:tint="@android:color/white" />
@@ -62,23 +62,23 @@
                     android:layout_height="wrap_content"
                     android:text="0:30"
                     android:textColor="@android:color/white"
-                    android:textSize="@dimen/_10ssp"
+                    android:textSize="@dimen/_8ssp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Selection Checkbox / Badge (Top Right) -->
             <FrameLayout
                 android:id="@+id/selectionBadge"
-                android:layout_width="@dimen/_24sdp"
-                android:layout_height="@dimen/_24sdp"
+                android:layout_width="@dimen/_20sdp"
+                android:layout_height="@dimen/_20sdp"
                 android:layout_gravity="top|end"
-                android:layout_margin="@dimen/_6sdp"
+                android:layout_margin="@dimen/_5sdp"
                 android:background="@drawable/bg_circle_translucent">
 
                 <ImageView
                     android:id="@+id/ivCheckmark"
-                    android:layout_width="@dimen/_14sdp"
-                    android:layout_height="@dimen/_14sdp"
+                    android:layout_width="@dimen/_12sdp"
+                    android:layout_height="@dimen/_12sdp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_check"
                     app:tint="@android:color/white"
@@ -92,7 +92,7 @@
         android:id="@+id/cardCameraTile"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:cardCornerRadius="@dimen/_12sdp"
+        app:cardCornerRadius="@dimen/_10sdp"
         app:cardElevation="0dp"
         app:strokeWidth="@dimen/_1sdp"
         app:strokeColor="@color/colorOutline"
@@ -108,14 +108,14 @@
             android:orientation="vertical">
 
             <FrameLayout
-                android:layout_width="@dimen/_44sdp"
-                android:layout_height="@dimen/_44sdp"
+                android:layout_width="@dimen/_37sdp"
+                android:layout_height="@dimen/_37sdp"
                 android:background="@drawable/bg_persona_avatar_circle"
                 android:backgroundTint="@color/colorSurfaceContainerHigh">
 
                 <ImageView
-                    android:layout_width="@dimen/_22sdp"
-                    android:layout_height="@dimen/_22sdp"
+                    android:layout_width="@dimen/_18sdp"
+                    android:layout_height="@dimen/_18sdp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_camera"
                     app:tint="@color/colorPrimary" />
@@ -124,11 +124,11 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/_8sdp"
+                android:layout_marginTop="@dimen/_7sdp"
                 android:fontFamily="sans-serif-medium"
                 android:text="Camera"
                 android:textColor="@color/textPrimary"
-                android:textSize="@dimen/_12ssp" />
+                android:textSize="@dimen/_10ssp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 

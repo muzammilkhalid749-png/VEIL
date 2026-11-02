@@ -17,14 +17,14 @@
             android:layout_height="?attr/actionBarSize"
             android:background="@color/colorSurface"
             android:gravity="center_vertical"
-            android:paddingStart="@dimen/_8sdp"
-            android:paddingEnd="@dimen/_16sdp">
+            android:paddingStart="@dimen/_7sdp"
+            android:paddingEnd="@dimen/_13sdp">
 
             <ImageView
                 android:id="@+id/btnBack"
-                android:layout_width="@dimen/_40sdp"
-                android:layout_height="@dimen/_40sdp"
-                android:padding="@dimen/_8sdp"
+                android:layout_width="@dimen/_33sdp"
+                android:layout_height="@dimen/_33sdp"
+                android:padding="@dimen/_7sdp"
                 android:src="@drawable/ic_arrow_back"
                 app:tint="@color/textPrimary"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -35,14 +35,14 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical"
-                android:layout_marginStart="@dimen/_8sdp">
+                android:layout_marginStart="@dimen/_7sdp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="New Group"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_18ssp"
+                    android:textSize="@dimen/_15ssp"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
@@ -51,7 +51,7 @@
                     android:layout_height="wrap_content"
                     android:text="Add participants"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_12ssp" />
+                    android:textSize="@dimen/_10ssp" />
 
             </LinearLayout>
 
@@ -68,20 +68,20 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:padding="@dimen/_16sdp"
+            android:padding="@dimen/_13sdp"
             android:background="@color/colorSurface">
 
             <FrameLayout
                 android:id="@+id/groupAvatarContainer"
-                android:layout_width="@dimen/_54sdp"
-                android:layout_height="@dimen/_54sdp"
+                android:layout_width="@dimen/_45sdp"
+                android:layout_height="@dimen/_45sdp"
                 android:background="@drawable/bg_attach_item"
                 android:backgroundTint="@color/colorSurfaceVariant">
 
                 <ImageView
                     android:id="@+id/ivGroupAvatar"
-                    android:layout_width="@dimen/_28sdp"
-                    android:layout_height="@dimen/_28sdp"
+                    android:layout_width="@dimen/_23sdp"
+                    android:layout_height="@dimen/_23sdp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_group"
                     app:tint="@color/colorPrimary" />
@@ -93,7 +93,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="@dimen/_14sdp"
+                android:layout_marginStart="@dimen/_12sdp"
                 android:hint="Group subject..."
                 style="@style/VeilInputLayout">
 
@@ -102,7 +102,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_16ssp"
+                    android:textSize="@dimen/_13ssp"
                     android:maxLines="1"
                     android:inputType="textCapSentences"
                     android:imeOptions="actionDone" />
@@ -120,7 +120,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="@dimen/_12sdp">
+            android:padding="@dimen/_10sdp">
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
@@ -133,7 +133,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textColor="@color/textPrimary"
-                    android:textSize="@dimen/_14ssp"
+                    android:textSize="@dimen/_12ssp"
                     android:maxLines="1"
                     android:inputType="text" />
 
@@ -151,7 +151,7 @@
                 android:id="@+id/usersRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:paddingBottom="@dimen/_88sdp"
+                android:paddingBottom="@dimen/_73sdp"
                 android:clipToPadding="false" />
 
             <!-- Empty State -->
@@ -162,21 +162,21 @@
                 android:orientation="vertical"
                 android:gravity="center"
                 android:visibility="gone"
-                android:padding="@dimen/_32sdp">
+                android:padding="@dimen/_27sdp">
 
                 <ImageView
-                    android:layout_width="@dimen/_56sdp"
-                    android:layout_height="@dimen/_56sdp"
+                    android:layout_width="@dimen/_47sdp"
+                    android:layout_height="@dimen/_47sdp"
                     android:src="@drawable/ic_person"
                     app:tint="@color/textSecondary"
-                    android:layout_marginBottom="@dimen/_12sdp" />
+                    android:layout_marginBottom="@dimen/_10sdp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="No contacts found"
                     android:textColor="@color/textSecondary"
-                    android:textSize="@dimen/_14ssp" />
+                    android:textSize="@dimen/_12ssp" />
 
             </LinearLayout>
 
@@ -198,11 +198,11 @@
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
-        android:layout_marginEnd="@dimen/_20sdp"
-        android:layout_marginBottom="@dimen/_24sdp"
+        android:layout_marginEnd="@dimen/_17sdp"
+        android:layout_marginBottom="@dimen/_20sdp"
         android:src="@drawable/ic_check"
         app:backgroundTint="@color/colorPrimary"
         app:tint="@android:color/white"
-        app:elevation="@dimen/_6sdp" />
+        app:elevation="@dimen/_5sdp" />
 
 </RelativeLayout>

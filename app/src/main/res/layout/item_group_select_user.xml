@@ -2,17 +2,17 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="@dimen/_68sdp"
+    android:layout_height="@dimen/_57sdp"
     android:orientation="horizontal"
-    android:paddingStart="@dimen/_16sdp"
-    android:paddingEnd="@dimen/_16sdp"
+    android:paddingStart="@dimen/_13sdp"
+    android:paddingEnd="@dimen/_13sdp"
     android:gravity="center_vertical"
     android:background="?attr/selectableItemBackground">
 
     <de.hdodenhof.circleimageview.CircleImageView
         android:id="@+id/avatar"
-        android:layout_width="@dimen/_44sdp"
-        android:layout_height="@dimen/_44sdp"
+        android:layout_width="@dimen/_37sdp"
+        android:layout_height="@dimen/_37sdp"
         android:src="@drawable/ic_person"
         app:civ_border_color="@color/colorOutline"
         app:civ_border_width="@dimen/_1sdp" />
@@ -22,7 +22,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:layout_marginStart="@dimen/_14sdp">
+        android:layout_marginStart="@dimen/_12sdp">
 
         <TextView
             android:id="@+id/name"
@@ -30,7 +30,7 @@
             android:layout_height="wrap_content"
             android:text="User Name"
             android:textColor="@color/textPrimary"
-            android:textSize="@dimen/_15ssp"
+            android:textSize="@dimen/_13ssp"
             android:textStyle="bold" />
 
         <TextView
@@ -39,15 +39,15 @@
             android:layout_height="wrap_content"
             android:text="@username"
             android:textColor="@color/colorPrimary"
-            android:textSize="@dimen/_13ssp"
+            android:textSize="@dimen/_11ssp"
             android:layout_marginTop="@dimen/_2sdp" />
 
     </LinearLayout>
 
     <ImageView
         android:id="@+id/ivCheckbox"
-        android:layout_width="@dimen/_24sdp"
-        android:layout_height="@dimen/_24sdp"
+        android:layout_width="@dimen/_20sdp"
+        android:layout_height="@dimen/_20sdp"
         android:src="@drawable/ic_check_circle"
         app:tint="@color/textSecondary" />
 
