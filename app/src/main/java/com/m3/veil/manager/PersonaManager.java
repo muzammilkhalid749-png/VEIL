@@ -95,6 +95,14 @@ public class PersonaManager {
             EncryptedChatDatabase masterDb = EncryptedChatDatabase.getMasterDatabase(appContext);
             UserPreferences userPrefs = new UserPreferences(appContext);
             String baseUid = userPrefs.getUserId();
+            if (TextUtils.isEmpty(baseUid) || "sovereign_node".equals(baseUid)) {
+                try {
+                    String authUid = AuthManager.getInstance().getCurrentUserId(appContext);
+                    if (!TextUtils.isEmpty(authUid)) {
+                        baseUid = authUid;
+                    }
+                } catch (Throwable ignored) {}
+            }
             if (TextUtils.isEmpty(baseUid)) {
                 baseUid = "sovereign_node";
             }
@@ -370,7 +378,9 @@ public class PersonaManager {
      */
     public String getActivePersonaPeerId() {
         String cachedPeerId = inMemoryActivePeerId;
-        if (cachedPeerId != null && !cachedPeerId.isEmpty()) return cachedPeerId;
+        if (cachedPeerId != null && !cachedPeerId.isEmpty() && !"sovereign_node".equals(cachedPeerId)) {
+            return cachedPeerId;
+        }
         Persona active = getActivePersona();
         String peerId = getPersonaPeerId(active);
         inMemoryActivePeerId = peerId;
@@ -383,17 +393,26 @@ public class PersonaManager {
     public String getPersonaPeerId(Persona persona) {
         UserPreferences userPrefs = new UserPreferences(appContext);
         String baseUid = userPrefs.getUserId();
-        if (TextUtils.isEmpty(baseUid)) {
+        if (TextUtils.isEmpty(baseUid) || "sovereign_node".equals(baseUid)) {
             try {
-                if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                String authUid = AuthManager.getInstance().getCurrentUserId(appContext);
+                if (!TextUtils.isEmpty(authUid)) {
+                    baseUid = authUid;
+                } else if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
                     baseUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid();
                 }
             } catch (Throwable ignored) {}
         }
         if (persona == null || PRIMARY_PERSONA_ID.equals(persona.getId())) {
-            return !TextUtils.isEmpty(baseUid) ? baseUid : (persona != null && !TextUtils.isEmpty(persona.getKeyPairId()) ? persona.getKeyPairId() : "sovereign_node");
+            if (!TextUtils.isEmpty(baseUid) && !"sovereign_node".equals(baseUid)) {
+                return baseUid;
+            }
+            if (persona != null && !TextUtils.isEmpty(persona.getKeyPairId()) && !"sovereign_node".equals(persona.getKeyPairId())) {
+                return persona.getKeyPairId();
+            }
+            return !TextUtils.isEmpty(baseUid) ? baseUid : "sovereign_node";
         }
-        if (!TextUtils.isEmpty(persona.getKeyPairId()) && !persona.getKeyPairId().equals(baseUid)) {
+        if (!TextUtils.isEmpty(persona.getKeyPairId()) && !persona.getKeyPairId().equals(baseUid) && !persona.getKeyPairId().startsWith("sovereign_node_")) {
             return persona.getKeyPairId();
         }
         return (!TextUtils.isEmpty(baseUid) ? baseUid : "sovereign_node") + "_" + persona.getId();
@@ -408,6 +427,11 @@ public class PersonaManager {
         List<Persona> list = getPersonas();
         UserPreferences userPrefs = new UserPreferences(appContext);
         String baseUid = userPrefs.getUserId();
+        if (TextUtils.isEmpty(baseUid) || "sovereign_node".equals(baseUid)) {
+            try {
+                baseUid = AuthManager.getInstance().getCurrentUserId(appContext);
+            } catch (Throwable ignored) {}
+        }
         String firebaseUid = null;
         try {
             if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {

@@ -114,6 +114,7 @@ public class FirebaseFirestore {
     private final ConcurrentHashMap<String, Long> deletedDocs = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> lastCreatedAtSecByPath = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> lastColHttpPollMs = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> lastDocHttpPollMs = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CopyOnWriteArrayList<EventListener<DocumentSnapshot>>> docListeners = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CopyOnWriteArrayList<Runnable>> collectionWakeListeners = new ConcurrentHashMap<>();
 
@@ -544,7 +545,13 @@ public class FirebaseFirestore {
         final TaskCompletionSource<DocumentSnapshot> tcs = new TaskCompletionSource<>();
 
         ioExecutor.execute(() -> {
-            if (isFirestoreRestAvailable()) {
+            long nowMs = System.currentTimeMillis();
+            Map<String, Object> existingLocal = localStore.get(normPath);
+            Long lastDocPoll = lastDocHttpPollMs.get(normPath);
+            boolean skipDocHttp = (existingLocal != null && !existingLocal.isEmpty()
+                    && lastDocPoll != null && (nowMs - lastDocPoll) < 10_000L);
+            if (!skipDocHttp && isFirestoreRestAvailable()) {
+                lastDocHttpPollMs.put(normPath, nowMs);
                 try {
                     String url = BASE_URL + "/" + normPath;
                     Request req = new Request.Builder().url(url).get().build();
@@ -703,17 +710,25 @@ public class FirebaseFirestore {
 
             long nowMs = System.currentTimeMillis();
             Long lastPoll = lastColHttpPollMs.get(normCollection);
-            boolean skipRemoteHttp = (lastPoll != null && (nowMs - lastPoll) < 2500L && !localStore.isEmpty());
+            boolean hasCollectionDocsLocally = false;
+            for (String pKey : localStore.keySet()) {
+                if (!deletedDocs.containsKey(pKey) && extractParentCollection(pKey).equals(normCollection)) {
+                    hasCollectionDocsLocally = true;
+                    break;
+                }
+            }
+            boolean skipRemoteHttp = (lastPoll != null && (nowMs - lastPoll) < 3_000L && hasCollectionDocsLocally);
             boolean restSucceeded = false;
             if (!skipRemoteHttp && isFirestoreRestAvailable()) {
-                lastColHttpPollMs.put(normCollection, nowMs);
                 try {
-                    int pageSize = (limitCount > 0 && limitCount < 80) ? (int) limitCount : 80;
+                    boolean hasFilterOrSort = (filters != null && !filters.isEmpty()) || (orderByField != null && !orderByField.isEmpty());
+                    int pageSize = hasFilterOrSort ? 150 : ((limitCount > 0 && limitCount < 150) ? (int) limitCount : 150);
                     String url = BASE_URL + "/" + normCollection + "?pageSize=" + pageSize;
                     Request req = new Request.Builder().url(url).get().build();
                     try (Response resp = httpClient.newCall(req).execute()) {
                         if (resp.isSuccessful() && resp.body() != null) {
                             restSucceeded = true;
+                            lastColHttpPollMs.put(normCollection, System.currentTimeMillis());
                             JSONObject root = new JSONObject(resp.body().string());
                             JSONArray docsArr = root.optJSONArray("documents");
                             if (docsArr != null) {
@@ -850,7 +865,7 @@ public class FirebaseFirestore {
                     }
                 });
             });
-        }, 0, 5000, TimeUnit.MILLISECONDS);
+        }, 2000, 15000, TimeUnit.MILLISECONDS);
 
         return () -> {
             future.cancel(false);
@@ -939,7 +954,7 @@ public class FirebaseFirestore {
         ScheduledFuture<?> future = pollExecutor.scheduleWithFixedDelay(() -> {
             queryCollectionAsync(normCollection, filters, orderByField, orderDirection, limitCount)
                     .addOnSuccessListener(querySnap -> evaluateAndEmit.run());
-        }, 0, 4000, TimeUnit.MILLISECONDS);
+        }, 0, 8000, TimeUnit.MILLISECONDS);
 
         return () -> {
             future.cancel(false);

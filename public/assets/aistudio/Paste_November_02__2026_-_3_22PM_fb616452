@@ -1,0 +1,585 @@
+--------- beginning of system
+2026-11-02 15:20:12.271 31289-31289 AppResolutionTuner      com.m3.veil                          D  loadTunerAppList + 
+2026-11-02 15:20:12.272 31289-31289 AppResolutionTuner      com.m3.veil                          W  Target file doesn't exist: /data/retuner/sf_resolution_tuner_app_list.xml
+2026-11-02 15:20:12.299 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.tencent.ig', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.300 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.tencent.tmgp.pubgmhd', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.301 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.pubg.krmobile', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.302 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='vn.vng.pubgmobile', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.305 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.rekoo.pubgm', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.306 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.tencent.tmgp.sgame', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.308 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.dts.freefireth', scale='1.2', filteredWindows= []', scalingFlow= wms'}
+2026-11-02 15:20:12.309 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.dts.freefiremax', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.311 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.mobile.legends', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.313 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.tencent.tmgp.cod', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.314 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.activision.callofduty.shooter', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.315 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.garena.game.codm', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.316 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.vng.codmvn', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.316 31289-31289 AppResolutionTuner      com.m3.veil                          D  loadTunerAppList - 
+2026-11-02 15:20:12.316 31289-31289 AppResolutionTuner      com.m3.veil                          D  loadTunerAppList + 
+2026-11-02 15:20:12.317 31289-31289 AppResolutionTuner      com.m3.veil                          W  Target file doesn't exist: /data/retuner/sf_resolution_tuner_app_list.xml
+2026-11-02 15:20:12.359 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.tencent.ig', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.364 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.tencent.tmgp.pubgmhd', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.369 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.pubg.krmobile', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.369 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='vn.vng.pubgmobile', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.370 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.rekoo.pubgm', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.371 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.tencent.tmgp.sgame', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.373 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.dts.freefireth', scale='1.2', filteredWindows= []', scalingFlow= wms'}
+2026-11-02 15:20:12.375 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.dts.freefiremax', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.375 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.mobile.legends', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.377 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.tencent.tmgp.cod', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.379 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.activision.callofduty.shooter', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.380 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.garena.game.codm', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.381 31289-31289 AppResolutionTuner      com.m3.veil                          D  dom2xml: App{packageName='com.vng.codmvn', scale='1.0', filteredWindows= []', scalingFlow= surfaceview'}
+2026-11-02 15:20:12.382 31289-31289 AppResolutionTuner      com.m3.veil                          D  loadTunerAppList - 
+2026-11-02 15:20:12.389 31289-31289 TranClassInfo           com.m3.veil                          D  instance successfully. com.transsion.hubcore.view.TranSurfaceImpl@2322f76 from com.transsion.hubcore.view.ITranSurface
+2026-11-02 15:20:12.780 31289-31289 TranActivi...pturboImpl com.m3.veil                          D  onResumeHork
+2026-11-02 15:20:18.998 31289-31289 TranActivi...pturboImpl com.m3.veil                          D  onResumeHork
+2026-11-02 15:20:35.293 31289-31289 TranActivi...pturboImpl com.m3.veil                          D  attach
+2026-11-02 15:20:35.557 31289-31289 TranActivi...pturboImpl com.m3.veil                          D  onResumeHork
+--------- beginning of main
+2026-11-02 15:20:37.973 31289-31321 TrafficStats            com.m3.veil                          D  tagSocket(323) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:37.978 31289-31319 TrafficStats            com.m3.veil                          D  tagSocket(215) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:38.725 31289-31289 MediaPlayer             com.m3.veil                          V  resetDrmState:  mDrmInfo=null mDrmProvisioningThread=null mPrepareDrmInProgress=false mActiveDrmScheme=false
+2026-11-02 15:20:38.725 31289-31289 MediaPlayer             com.m3.veil                          V  cleanDrmObj: mDrmObj=null mDrmSessionId=null
+2026-11-02 15:20:38.766 31289-31289 CallEngine              com.m3.veil                          D  recorded ended call ba9c92c5-0a19-41f0-ad49-458980e61550 (from local)
+2026-11-02 15:20:38.766 31289-31289 CallStateMachine        com.m3.veil                          I  CallStateMachine transition: INCOMING_RINGING -> ENDED (callId=ba9c92c5-0a19-41f0-ad49-458980e61550)
+2026-11-02 15:20:38.848 31289-31289 org.webrtc.Logging      com.m3.veil                          I  EglRenderer: remoteVideoViewReleasing.
+2026-11-02 15:20:38.848 31289-31289 org.webrtc.Logging      com.m3.veil                          I  EglRenderer: remoteVideoViewAlready released
+2026-11-02 15:20:38.848 31289-31289 org.webrtc.Logging      com.m3.veil                          I  EglRenderer: localVideoViewReleasing.
+2026-11-02 15:20:38.849 31289-31289 org.webrtc.Logging      com.m3.veil                          I  EglRenderer: localVideoViewAlready released
+2026-11-02 15:20:38.857 31289-31289 CallStateMachine        com.m3.veil                          I  CallStateMachine transition: ENDED -> IDLE (callId=null)
+2026-11-02 15:20:38.859 31289-31289 MediaPlayer             com.m3.veil                          W  mediaplayer went away with unhandled events
+2026-11-02 15:20:38.864 31289-31289 MediaPlayer             com.m3.veil                          W  mediaplayer went away with unhandled events
+2026-11-02 15:20:38.911 31289-31289 VeilConnectionService   com.m3.veil                          I  PhoneAccount registered successfully
+2026-11-02 15:20:39.115 31289-31296 com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 5216KB AllocSpace bytes, 0(0B) LOS objects, 24% free, 15MB/20MB, paused 945us,5.579ms total 36.158ms
+2026-11-02 15:20:39.120 31289-31289 FcmCallPusher           com.m3.veil                          D  Direct FCM v1 skipped (no service-account.json); attempting legacy fallback push.
+2026-11-02 15:20:39.262 31289-31323 mali_gralloc            com.m3.veil                          I  unregister: id=0x2a400023fec, base=0x0, importpid=31289
+2026-11-02 15:20:39.263 31289-31323 mali_gralloc            com.m3.veil                          I  unregister: id=0x2a400023fef, base=0x0, importpid=31289
+2026-11-02 15:20:39.265 31289-1325  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a400023fed, base=0x0, importpid=31289
+2026-11-02 15:20:39.269 31289-31289 VRI[CallActivity]       com.m3.veil                          D  performTraversals relayoutWindow: maybeSyncSeqId=-1 ,mSyncSeqId=0 ,relayoutResult=2
+2026-11-02 15:20:39.270 31289-31289 mali_gralloc            com.m3.veil                          I  unregister: id=0x2a400023fee, base=0x0, importpid=31289
+2026-11-02 15:20:39.275 31289-31289 PresenceManager         com.m3.veil                          D  App entered background -> status: offline for veil_096df98db26ed89e48dc66eb91be (keeping P2P DataChannels alive for background transfers)
+2026-11-02 15:20:39.278 31289-31289 ActivityThread          com.m3.veil                          D  mToDestroying.remove:ActivityRecord{8a00278 token=android.os.BinderProxy@8b5e6b2 {com.m3.veil/com.m3.veil.ui.chat.CallActivity}}
+2026-11-02 15:20:39.286 31289-31289 org.webrtc.Logging      com.m3.veil                          I  EglRenderer: remoteVideoViewReleasing.
+2026-11-02 15:20:39.286 31289-31289 org.webrtc.Logging      com.m3.veil                          I  EglRenderer: remoteVideoViewAlready released
+2026-11-02 15:20:39.287 31289-31289 org.webrtc.Logging      com.m3.veil                          I  EglRenderer: localVideoViewReleasing.
+2026-11-02 15:20:39.287 31289-31289 org.webrtc.Logging      com.m3.veil                          I  EglRenderer: localVideoViewAlready released
+2026-11-02 15:20:39.754 31289-31289 CallEngine              com.m3.veil                          I  ignoring invite for already-ended call ba9c92c5-0a19-41f0-ad49-458980e61550
+2026-11-02 15:20:40.652 31289-31296 com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 4816KB AllocSpace bytes, 0(0B) LOS objects, 22% free, 15MB/20MB, paused 829us,6.027ms total 42.212ms
+2026-11-02 15:20:41.076 31289-31319 TrafficStats            com.m3.veil                          D  tagSocket(136) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:41.079 31289-31321 TrafficStats            com.m3.veil                          D  tagSocket(195) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:44.125 31289-31296 com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 4904KB AllocSpace bytes, 0(0B) LOS objects, 23% free, 15MB/20MB, paused 1.001ms,5.263ms total 34.162ms
+2026-11-02 15:20:44.196 31289-31321 TrafficStats            com.m3.veil                          D  tagSocket(136) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:44.200 31289-31319 TrafficStats            com.m3.veil                          D  tagSocket(181) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:46.822 31289-31296 com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 4716KB AllocSpace bytes, 0(0B) LOS objects, 23% free, 15MB/20MB, paused 1.275ms,5.602ms total 35.969ms
+2026-11-02 15:20:47.116 31289-1301  TrafficStats            com.m3.veil                          D  tagSocket(195) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:47.117 31289-1300  TrafficStats            com.m3.veil                          D  tagSocket(199) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:50.424 31289-1300  TrafficStats            com.m3.veil                          D  tagSocket(136) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:50.431 31289-1301  TrafficStats            com.m3.veil                          D  tagSocket(181) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:53.449 31289-1301  TrafficStats            com.m3.veil                          D  tagSocket(136) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:53.450 31289-1300  TrafficStats            com.m3.veil                          D  tagSocket(181) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:53.750 31289-31296 com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 4688KB AllocSpace bytes, 0(0B) LOS objects, 22% free, 15MB/20MB, paused 1.421ms,5.142ms total 36.698ms
+2026-11-02 15:20:56.697 31289-1301  TrafficStats            com.m3.veil                          D  tagSocket(136) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:56.699 31289-1300  TrafficStats            com.m3.veil                          D  tagSocket(181) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:58.864 31289-31296 com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 4460KB AllocSpace bytes, 0(0B) LOS objects, 21% free, 15MB/20MB, paused 1.242ms,5.109ms total 36.581ms
+2026-11-02 15:20:59.832 31289-1300  TrafficStats            com.m3.veil                          D  tagSocket(136) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:20:59.833 31289-1301  TrafficStats            com.m3.veil                          D  tagSocket(195) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:03.000 31289-1301  TrafficStats            com.m3.veil                          D  tagSocket(136) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:03.008 31289-1300  TrafficStats            com.m3.veil                          D  tagSocket(181) with statsTag=0xffffffff, statsUid=-1
+---------------------------- PROCESS STARTED (2621) for package com.m3.veil ----------------------------
+2026-11-02 15:21:36.899  2621-2621  Compatibil...geReporter com.m3.veil                          D  Compat change id reported: 171979766; UID 10129; state: ENABLED
+2026-11-02 15:21:36.903  2621-2621  TranClassInfo           com.m3.veil                          D  instance successfully. com.transsion.hubcore.graphics.TranGraphicImpl@b70769b from com.transsion.hubcore.graphics.ITranGraphic
+2026-11-02 15:21:36.904  2621-2621  os.SingleLiceFactory    com.m3.veil                          D  instance successfully. com.transsion.typeface.v1.TypefaceLice@482b9b6 from android.graphics.IGraphicLice
+2026-11-02 15:21:36.904  2621-2621  os.LiceInfo             com.m3.veil                          D  instance successfully. com.transsion.graphics.GraphicLice@9e7ea38 from android.graphics.IGraphicLice
+2026-11-02 15:21:37.752  2621-2621  nativeloader            com.m3.veil                          D  Configuring clns-4 for other apk /data/app/~~_UtBXzLCVHa9qOlLU6FC7g==/com.m3.veil-TlM6bCyZMsD1Ap-584-sSA==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~_UtBXzLCVHa9qOlLU6FC7g==/com.m3.veil-TlM6bCyZMsD1Ap-584-sSA==/lib/arm64:/data/app/~~_UtBXzLCVHa9qOlLU6FC7g==/com.m3.veil-TlM6bCyZMsD1Ap-584-sSA==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.m3.veil
+2026-11-02 15:21:37.753  2621-2621  CheckTime               com.m3.veil                          W  App running slow: Executing application classloader create took 835ms
+2026-11-02 15:21:37.766  2621-2621  nativeloader            com.m3.veil                          D  Load libframework-connectivity-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity.jar: ok
+2026-11-02 15:21:37.786  2621-2621  GraphicsEnvironment     com.m3.veil                          V  ANGLE Developer option for 'com.m3.veil' set to: 'default'
+2026-11-02 15:21:37.787  2621-2621  GraphicsEnvironment     com.m3.veil                          V  ANGLE GameManagerService for com.m3.veil: false
+2026-11-02 15:21:37.787  2621-2621  GraphicsEnvironment     com.m3.veil                          V  Neither updatable production driver nor prerelease driver is supported.
+2026-11-02 15:21:37.792  2621-2621  LoadedApk               com.m3.veil                          I  No resource references to update in package com.transsion.theme.icon
+2026-11-02 15:21:37.793  2621-2621  NetworkSecurityConfig   com.m3.veil                          D  No Network Security Config specified, using platform default
+2026-11-02 15:21:37.794  2621-2621  NetworkSecurityConfig   com.m3.veil                          D  No Network Security Config specified, using platform default
+2026-11-02 15:21:38.107  2621-2621  VeilPerfController      com.m3.veil                          I  VeilPerformanceController active: class=LOW (CPU=8 cores @1612MHz, RAM=3771MB, RefreshRate=60.0Hz)
+2026-11-02 15:21:38.272  2621-2621  VeilIntegrityGuard      com.m3.veil                          I  Runtime integrity verified. APK Cert SHA-256: D0:F9:6F:C5:10:3D:DB:37:1D:06:C7:55:7A:44:7C:31:83:E4:FF:37:00:A4:D2:5F:68:B8:45:05:13:90:15:B9
+2026-11-02 15:21:38.296  2621-2621  com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->get()Ldalvik/system/CloseGuard; (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-02 15:21:38.296  2621-2621  com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->open(Ljava/lang/String;)V (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-02 15:21:38.296  2621-2621  com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Ldalvik/system/CloseGuard;->warnIfOpen()V (runtime_flags=CorePlatformApi, domain=core-platform, api=unsupported,core-platform-api) from Lokhttp3/internal/platform/AndroidPlatform$CloseGuard; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-02 15:21:38.320  2621-2621  CheckTime               com.m3.veil                          W  App running slow: Executing handleBindApplication : callApplicationOnCreate took 492ms
+2026-11-02 15:21:38.329  2621-2646  TrafficStats            com.m3.veil                          D  tagSocket(105) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:38.329  2621-2647  TrafficStats            com.m3.veil                          D  tagSocket(99) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:38.329  2621-2648  TrafficStats            com.m3.veil                          D  tagSocket(100) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:38.329  2621-2645  TrafficStats            com.m3.veil                          D  tagSocket(98) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:38.357  2621-2621  ActivityThread          com.m3.veil                          D  ++ activityComponent:com.m3.veil/com.m3.veil.ui.splash.SplashActivity counts:1 ALEAK_CLEAR_SUPPORT:true
+2026-11-02 15:21:38.370  2621-2621  AppCompatDelegate       com.m3.veil                          D  Checking for metadata for AppLocalesMetadataHolderService : Service not found
+2026-11-02 15:21:38.379  2621-2621  TranClassInfo           com.m3.veil                          D  instance successfully. com.transsion.hubcore.app.TranActivityImpl@72836cc from com.transsion.hubcore.app.ITranActivity
+2026-11-02 15:21:38.379  2621-2621  TranActivi...pturboImpl com.m3.veil                          D  attach
+2026-11-02 15:21:38.400  2621-2645  FeatureFlagsImplExport  com.m3.veil                          W  java.lang.NoClassDefFoundError: Class not found using the boot class loader; no stack trace available
+2026-11-02 15:21:38.426  2621-2621  TranClassInfo           com.m3.veil                          D  instance successfully. com.transsion.hubcore.view.TranViewImpl@3f1cd93 from com.transsion.hubcore.view.ITranView
+2026-11-02 15:21:38.434  2621-2621  os.SingleLice           com.m3.veil                          D  instance successfully. com.transsion.dragdrop.v1.DragDropLice@d4981d0 from com.transsion.dragdrop.DragDropLiceFactory
+2026-11-02 15:21:38.434  2621-2621  os.SingleLiceFactory    com.m3.veil                          D  instance successfully. com.transsion.dragdrop.v1.DragDropLice@d4981d0 from android.view.IViewLice
+2026-11-02 15:21:38.434  2621-2621  os.LiceInfo             com.m3.veil                          D  instance successfully. com.transsion.view.ViewLice@4b9d5c9 from android.view.IViewLice
+2026-11-02 15:21:38.441  2621-2621  TranClassInfo           com.m3.veil                          D  instance successfully. com.transsion.hubcore.internal.TranInternalViewImpl@a8ceafc from com.transsion.hubcore.internal.ITranInternalView
+2026-11-02 15:21:38.442  2621-2621  os.SingleLiceFactory    com.m3.veil                          D  using com.android.internal.IInternalViewLice$DefaultImpl@8810585 instead of com.transsion.freeform.FreeformLiceFactory  from com.android.internal.IInternalViewLice
+2026-11-02 15:21:38.443  2621-2621  os.SingleLice           com.m3.veil                          D  instance successfully. com.transsion.whitenavigation.v1.WhiteNavigationLice@87c0fda from com.transsion.whitenavigation.WhiteNavigationLiceFactory
+2026-11-02 15:21:38.443  2621-2621  os.SingleLiceFactory    com.m3.veil                          D  instance successfully. com.transsion.whitenavigation.v1.WhiteNavigationLice@87c0fda from com.android.internal.IInternalViewLice
+2026-11-02 15:21:38.443  2621-2621  os.SingleLiceFactory    com.m3.veil                          D  using com.android.internal.IInternalViewLice$DefaultImpl@8810585 instead of com.transsion.screenshothelper.ScreenShotHelperImplLiceFactory  from com.android.internal.IInternalViewLice
+2026-11-02 15:21:38.443  2621-2621  os.LiceInfo             com.m3.veil                          D  instance successfully. com.transsion.internal.InternalViewLice@6435c0b from com.android.internal.IInternalViewLice
+2026-11-02 15:21:38.499  2621-2621  com.m3.veil             com.m3.veil                          I  hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app, TargetSdkVersion=36) using reflection: allowed
+2026-11-02 15:21:38.532  2621-2621  Compatibil...geReporter com.m3.veil                          D  Compat change id reported: 210923482; UID 10129; state: ENABLED
+2026-11-02 15:21:38.615  2621-2633  ActivityThreadLice      com.m3.veil                          D  received OSMessage 110001
+2026-11-02 15:21:38.616  2621-2633  ActivityThreadLice      com.m3.veil                          D  send OSMessage 110001 to [-1]
+2026-11-02 15:21:38.617  2621-2633  OSServiceManager        com.m3.veil                          D  update local os service os.activity from null to android.os.BinderProxy@be24fb6
+2026-11-02 15:21:38.652  2621-2649  nativeloader            com.m3.veil                          D  Load /data/app/~~_UtBXzLCVHa9qOlLU6FC7g==/com.m3.veil-TlM6bCyZMsD1Ap-584-sSA==/base.apk!/lib/arm64-v8a/libsqlcipher.so using class loader ns clns-4 (caller=/data/app/~~_UtBXzLCVHa9qOlLU6FC7g==/com.m3.veil-TlM6bCyZMsD1Ap-584-sSA==/base.apk!classes17.dex): ok
+2026-11-02 15:21:38.657  2621-2621  PresenceManager         com.m3.veil                          D  App entered foreground -> status: online for veil_096df98db26ed89e48dc66eb91be
+2026-11-02 15:21:39.444  2621-2667  StatusController        com.m3.veil                          I  Initializing StatusController (100% Pure P2P WebRTC Mesh)...
+2026-11-02 15:21:39.466  2621-2677  StatusController        com.m3.veil                          D  Loaded 0 active status segments from encrypted database
+2026-11-02 15:21:39.471  2621-2621  org.webrtc.Logging      com.m3.veil                          I  EglBase14Impl: Using OpenGL ES version 2
+2026-11-02 15:21:39.481  2621-2695  org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Loading native library: jingle_peerconnection_so
+2026-11-02 15:21:39.482  2621-2695  org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Loading library: jingle_peerconnection_so
+2026-11-02 15:21:39.494  2621-2621  VeilMessagesCtrl        com.m3.veil                          I  VeilMessagesController initialized successfully.
+2026-11-02 15:21:39.501  2621-2649  VeilSchedulerDaemon     com.m3.veil                          I  Starting VeilSchedulerDaemon tick loop...
+2026-11-02 15:21:39.503  2621-2649  Compatibil...geReporter com.m3.veil                          D  Compat change id reported: 160794467; UID 10129; state: ENABLED
+2026-11-02 15:21:39.504  2621-2692  TrafficStats            com.m3.veil                          D  tagSocket(128) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:39.505  2621-2695  nativeloader            com.m3.veil                          D  Load /data/app/~~_UtBXzLCVHa9qOlLU6FC7g==/com.m3.veil-TlM6bCyZMsD1Ap-584-sSA==/base.apk!/lib/arm64-v8a/libjingle_peerconnection_so.so using class loader ns clns-4 (caller=/data/app/~~_UtBXzLCVHa9qOlLU6FC7g==/com.m3.veil-TlM6bCyZMsD1Ap-584-sSA==/base.apk!classes17.dex): ok
+2026-11-02 15:21:39.506  2621-2696  TrafficStats            com.m3.veil                          D  tagSocket(129) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:39.507  2621-2695  org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: PeerConnectionFactory was initialized without an injected Loggable. Any existing Loggable will be deleted.
+2026-11-02 15:21:39.513  2621-2621  TranActivi...pturboImpl com.m3.veil                          D  onResumeHork
+2026-11-02 15:21:39.529  2621-2710  TrafficStats            com.m3.veil                          D  tagSocket(132) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:39.533  2621-2712  TrafficStats            com.m3.veil                          D  tagSocket(133) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:39.539  2621-2621  SurfaceFactory          com.m3.veil                          I  [static] sSurfaceFactory = com.transsion.rt.SurfaceFactoryImpl@36f2d82
+2026-11-02 15:21:39.539  2621-2716  TrafficStats            com.m3.veil                          D  tagSocket(135) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:39.540  2621-2621  libc                    com.m3.veil                          W  Access denied finding property "ro.vendor.game_aisr_enable"
+2026-11-02 15:21:39.544  2621-2717  TrafficStats            com.m3.veil                          D  tagSocket(134) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:39.552  2621-2718  TrafficStats            com.m3.veil                          D  tagSocket(138) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:39.563  2621-2719  TrafficStats            com.m3.veil                          D  tagSocket(139) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:39.575  2621-2695  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-02 15:21:39.577  2621-2695  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-02 15:21:39.577  2621-2708  org.webrtc.Logging      com.m3.veil                          I  NativeLibrary: Native library has already been loaded.
+2026-11-02 15:21:39.577  2621-2695  org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: createAudioDeviceModule
+2026-11-02 15:21:39.577  2621-2695  org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW NS will not be used.
+2026-11-02 15:21:39.577  2621-2695  org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW AEC will be used.
+2026-11-02 15:21:39.579  2621-2708  org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: PeerConnectionFactory was initialized without an injected Loggable. Any existing Loggable will be deleted.
+2026-11-02 15:21:39.581  2621-2621  Choreographer           com.m3.veil                          I  Skipped 105 frames!  The application may be doing too much work on its main thread.
+2026-11-02 15:21:39.582  2621-2695  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: ctor@[name=VeilRtcWorker, id=769]
+2026-11-02 15:21:39.582  2621-2695  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: ctor@[name=VeilRtcWorker, id=769]
+2026-11-02 15:21:39.582  2621-2708  org.webrtc.Logging      com.m3.veil                          I  EglBase14Impl: Using OpenGL ES version 2
+2026-11-02 15:21:39.588  2621-2695  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioTrackExternal: ctor@[name=VeilRtcWorker, id=769]
+2026-11-02 15:21:39.594  2621-2708  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-02 15:21:39.595  2621-2708  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioManagerExternal: Sample rate is set to 48000 Hz
+2026-11-02 15:21:39.596  2621-2708  org.webrtc.Logging      com.m3.veil                          E  JavaAudioDeviceModule: HW NS not supported
+2026-11-02 15:21:39.596  2621-2708  org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: createAudioDeviceModule
+2026-11-02 15:21:39.597  2621-2708  org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW NS will not be used.
+2026-11-02 15:21:39.598  2621-2708  org.webrtc.Logging      com.m3.veil                          I  JavaAudioDeviceModule: HW AEC will be used.
+2026-11-02 15:21:39.598  2621-2708  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: ctor@[name=pool-3-thread-1, id=778]
+2026-11-02 15:21:39.599  2621-2708  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: ctor@[name=pool-3-thread-1, id=778]
+2026-11-02 15:21:39.600  2621-2708  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioTrackExternal: ctor@[name=pool-3-thread-1, id=778]
+2026-11-02 15:21:39.630  2621-2695  AudioCapabilities       com.m3.veil                          W  Unsupported mime audio/ima-adpcm
+2026-11-02 15:21:39.644  2621-2695  AudioCapabilities       com.m3.veil                          W  Unsupported mime audio/mpeg-L1
+2026-11-02 15:21:39.647  2621-2690  TrafficStats            com.m3.veil                          D  tagSocket(161) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:39.648  2621-2695  AudioCapabilities       com.m3.veil                          W  Unsupported mime audio/mpeg-L2
+2026-11-02 15:21:39.663  2621-2621  VRI[SplashActivity]     com.m3.veil                          D  performTraversals relayoutWindow: maybeSyncSeqId=-1 ,mSyncSeqId=0 ,relayoutResult=3
+2026-11-02 15:21:39.717  2621-2729  mali_gralloc            com.m3.veil                          I  register: id=0x2a40002400f, importpid=-1
+2026-11-02 15:21:39.720  2621-2729  mali_gralloc            com.m3.veil                          I  register: id=0x2a400024010, importpid=-1
+2026-11-02 15:21:39.722  2621-2729  mali_gralloc            com.m3.veil                          I  register: id=0x2a400024011, importpid=-1
+2026-11-02 15:21:39.726  2621-2729  mali_gralloc            com.m3.veil                          I  register: id=0x2a400024012, importpid=-1
+2026-11-02 15:21:39.771  2621-2654  Parcel                  com.m3.veil                          W  Expecting binder but got null!
+2026-11-02 15:21:39.778  2621-2634  OpenGLRenderer          com.m3.veil                          I  Davey! duration=1942ms; Flags=1, FrameTimelineVsyncId=115766374, IntendedVsync=775468519339352, Vsync=775470269339387, InputEventId=0, HandleInputStart=775470275733184, AnimationStart=775470275762799, PerformTraversalsStart=775470276843799, DrawStart=775470403240607, FrameDeadline=775468536006019, FrameInterval=775470275102068, FrameStartTime=16666667, SyncQueued=775470416831530, SyncStart=775470416985761, IssueDrawCommandsStart=775470420190838, SwapBuffers=775470457249991, FrameCompleted=775470461970068, DequeueBufferDuration=39615, QueueBufferDuration=416693, GpuCompleted=775470461970068, SwapBuffersCompleted=775470461614914, DisplayPresentTime=7236828305694880358, CommandSubmissionCompleted=775470457249991, 
+2026-11-02 15:21:39.837  2621-2668  VeilMeshDaemon          com.m3.veil                          I  Network available -> re-syncing signaling & draining P2P outbox
+2026-11-02 15:21:39.908  2621-2621  com.m3.veil             com.m3.veil                          W  type=1400 audit(0.0:1010194): avc: denied { read } for name="u:object_r:unipnp_prop:s0" dev="tmpfs" ino=19495 scontext=u:r:untrusted_app:s0:c129,c256,c512,c768 tcontext=u:object_r:unipnp_prop:s0 tclass=file permissive=0 app=com.m3.veil
+2026-11-02 15:21:39.912  2621-2621  com.m3.veil             com.m3.veil                          W  type=1400 audit(0.0:1010195): avc: denied { read } for name="u:object_r:unipnp_prop:s0" dev="tmpfs" ino=19495 scontext=u:r:untrusted_app:s0:c129,c256,c512,c768 tcontext=u:object_r:unipnp_prop:s0 tclass=file permissive=0 app=com.m3.veil
+2026-11-02 15:21:39.914  2621-2621  libc                    com.m3.veil                          W  Access denied finding property "persist.unipnp.debug"
+2026-11-02 15:21:39.914  2621-2621  libc                    com.m3.veil                          W  Access denied finding property "persist.unipnp.debug"
+2026-11-02 15:21:39.964  2621-2629  System                  com.m3.veil                          W  A resource failed to call close. 
+2026-11-02 15:21:40.004  2621-2725  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInAEC(true)
+2026-11-02 15:21:40.004  2621-2725  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setAEC(true)
+2026-11-02 15:21:40.007  2621-2708  CallMediaFactory        com.m3.veil                          I  WebRTC call stack initialised
+2026-11-02 15:21:40.008  2621-2724  org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onNetworkThreadReady
+2026-11-02 15:21:40.012  2621-2726  org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onSignalingThreadReady
+2026-11-02 15:21:40.012  2621-2725  org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onWorkerThreadReady
+2026-11-02 15:21:40.015  2621-2722  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioRecordExternal: enableBuiltInAEC(true)
+2026-11-02 15:21:40.015  2621-2722  org.webrtc.Logging      com.m3.veil                          I  WebRtcAudioEffectsExternal: setAEC(true)
+2026-11-02 15:21:40.016  2621-2721  org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onNetworkThreadReady
+2026-11-02 15:21:40.016  2621-2722  org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onWorkerThreadReady
+2026-11-02 15:21:40.016  2621-2723  org.webrtc.Logging      com.m3.veil                          I  PeerConnectionFactory: onSignalingThreadReady
+2026-11-02 15:21:40.105  2621-2741  CallEngine              com.m3.veil                          I  CallEngine ready for veil_096df98db26ed89e48dc66eb91be (e2ee=true, turn=true)
+2026-11-02 15:21:40.114  2621-2695  TurnCredentialManager   com.m3.veil                          I  Rotated RFC 5389 Ephemeral TURN Credentials: TurnCredentials{user='1793658100:6a065567e7b2f901', ttlRemaining=719m}
+2026-11-02 15:21:40.149  2621-2716  SovereignIdentity       com.m3.veil                          I  Subscribed to ephemeral signals on wss://relay.damus.io for veil_096df98db26ed89e48dc66eb91be
+2026-11-02 15:21:40.188  2621-2721  org.webrtc.Logging      com.m3.veil                          I  NetworkMonitor: Start monitoring with native observer -5476376609684528736 fieldTrialsString: 
+2026-11-02 15:21:40.219  2621-2668  org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: Network handle: 978363273229 becomes available: 227
+2026-11-02 15:21:40.239  2621-2668  org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 978363273229 capabilities changed: [ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED LinkUpBandwidth>=2300Kbps LinkDnBandwidth>=17218Kbps TransportInfo: <SSID: <unknown ssid>, BSSID: 02:00:00:00:00:00, MAC: 02:00:00:00:00:00, IP: /192.168.1.6, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 5, RSSI: -50, Link speed: 96Mbps, Tx Link speed: 96Mbps, Max Supported Tx Link speed: 96Mbps, Rx Link speed: 86Mbps, Max Supported Rx Link speed: 96Mbps, Frequency: 5825MHz, Net ID: -1, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: -1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>> SignalStrength: -50 UnderlyingNetworks: Null]
+2026-11-02 15:21:40.248  2621-2668  org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 978363273229 link properties changed
+2026-11-02 15:21:40.430  2621-2696  TrafficStats            com.m3.veil                          D  tagSocket(129) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:40.875  2621-2627  com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 6152KB AllocSpace bytes, 0(0B) LOS objects, 16% free, 10016KB/11MB, paused 1.949ms,4.410ms total 472.297ms
+2026-11-02 15:21:40.995  2621-2718  SovereignIdentity       com.m3.veil                          I  Subscribed to ephemeral signals on wss://relay.primal.net for veil_096df98db26ed89e48dc66eb91be
+2026-11-02 15:21:41.102  2621-2627  com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 5908KB AllocSpace bytes, 12(240KB) LOS objects, 49% free, 5956KB/11MB, paused 2.111ms,5.411ms total 84.776ms
+2026-11-02 15:21:41.210  2621-3137  TrafficStats            com.m3.veil                          D  tagSocket(213) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:41.256  2621-3140  TrafficStats            com.m3.veil                          D  tagSocket(247) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:41.929  2621-2621  ActivityThread          com.m3.veil                          D  ++ activityComponent:com.m3.veil/com.m3.veil.ui.main.MainActivity counts:1 ALEAK_CLEAR_SUPPORT:true
+2026-11-02 15:21:41.934  2621-2621  TranActivi...pturboImpl com.m3.veil                          D  attach
+2026-11-02 15:21:41.979  2621-2696  TrafficStats            com.m3.veil                          D  tagSocket(100) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:42.132  2621-2621  TranClassInfo           com.m3.veil                          D  instance successfully. com.transsion.hubcore.widget.TranOverScrollerImpl@e6ce42d from com.transsion.hubcore.widget.ITranOverScroller
+2026-11-02 15:21:42.132  2621-2621  TranClassInfo           com.m3.veil                          D  instance successfully. com.transsion.hubcore.flingmanager.TranFlingManagerImpl@9b10d62 from com.transsion.hubcore.flingmanager.ITranFlingManager
+2026-11-02 15:21:42.132  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:21:42.523  2621-2627  com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 3392KB AllocSpace bytes, 5(140KB) LOS objects, 40% free, 7873KB/12MB, paused 2.294ms,6.889ms total 156.992ms
+2026-11-02 15:21:42.763  2621-2621  CheckTime               com.m3.veil                          W  App running slow: Executing activity onCreate took 828ms
+2026-11-02 15:21:43.143  2621-2621  OnBackInvokedCallback   com.m3.veil                          W  OnBackInvokedCallback is not enabled for the application.
+                                                                                                    Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+2026-11-02 15:21:43.144  2621-2621  TranActivi...pturboImpl com.m3.veil                          D  onResumeHork
+2026-11-02 15:21:43.266  2621-2621  Choreographer           com.m3.veil                          I  Skipped 82 frames!  The application may be doing too much work on its main thread.
+2026-11-02 15:21:43.421  2621-2621  VRI[MainActivity]       com.m3.veil                          D  performTraversals relayoutWindow: maybeSyncSeqId=-1 ,mSyncSeqId=0 ,relayoutResult=3
+2026-11-02 15:21:43.438  2621-3152  mali_gralloc            com.m3.veil                          I  register: id=0x2a400024018, importpid=-1
+2026-11-02 15:21:43.440  2621-3152  mali_gralloc            com.m3.veil                          I  register: id=0x2a400024019, importpid=-1
+2026-11-02 15:21:43.450  2621-3152  mali_gralloc            com.m3.veil                          I  register: id=0x2a40002401a, importpid=-1
+2026-11-02 15:21:43.457  2621-3152  mali_gralloc            com.m3.veil                          I  register: id=0x2a40002401b, importpid=-1
+2026-11-02 15:21:43.491  2621-2696  TrafficStats            com.m3.veil                          D  tagSocket(100) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:43.532  2621-2627  com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 5545KB AllocSpace bytes, 14(536KB) LOS objects, 49% free, 8403KB/16MB, paused 2.113ms,3.151ms total 149.931ms
+2026-11-02 15:21:43.599  2621-2646  TrafficStats            com.m3.veil                          D  tagSocket(270) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:43.610  2621-2648  TrafficStats            com.m3.veil                          D  tagSocket(271) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:43.966  2621-2621  Compatibil...geReporter com.m3.veil                          D  Compat change id reported: 171228096; UID 10129; state: ENABLED
+2026-11-02 15:21:44.349  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:21:44.408  2621-2696  TrafficStats            com.m3.veil                          D  tagSocket(100) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:44.463  2621-2696  TrafficStats            com.m3.veil                          D  tagSocket(100) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:44.482  2621-2696  TurnCredentialManager   com.m3.veil                          I  Completed Multi-Region Edge Relay Probing. Fleet Status:
+2026-11-02 15:21:44.482  2621-2696  TurnCredentialManager   com.m3.veil                          I    -> RelayNode[cloudflare-stun (Cloudflare Anycast STUN): stun.cloudflare.com, rtt=17ms]
+2026-11-02 15:21:44.482  2621-2696  TurnCredentialManager   com.m3.veil                          I    -> RelayNode[google-stun-1 (Google Global STUN 1): stun.l.google.com, rtt=37ms]
+2026-11-02 15:21:44.482  2621-2696  TurnCredentialManager   com.m3.veil                          I    -> RelayNode[anycast-global (Global Anycast Edge): openrelay.metered.ca, rtt=UNREACHABLE]
+2026-11-02 15:21:44.482  2621-2696  TurnCredentialManager   com.m3.veil                          I    -> RelayNode[global-standard (Global Standard Relay): standard.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-02 15:21:44.482  2621-2696  TurnCredentialManager   com.m3.veil                          I    -> RelayNode[us-edge-1 (North America Edge): us.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-02 15:21:44.482  2621-2696  TurnCredentialManager   com.m3.veil                          I    -> RelayNode[eu-edge-1 (Europe Central Edge): eu.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-02 15:21:44.482  2621-2696  TurnCredentialManager   com.m3.veil                          I    -> RelayNode[ap-edge-1 (Asia-Pacific Edge): ap.relay.metered.ca, rtt=UNREACHABLE]
+2026-11-02 15:21:44.491  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:44.493  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:44.496  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:44.497  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:44.735  2621-2627  com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 10MB AllocSpace bytes, 4(80KB) LOS objects, 49% free, 10048KB/19MB, paused 2.725ms,3.242ms total 196.164ms
+2026-11-02 15:21:44.788  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:44.790  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:44.822  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:44.827  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:44.971  2621-2627  com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 5764KB AllocSpace bytes, 4(80KB) LOS objects, 44% free, 10MB/19MB, paused 2.283ms,3.277ms total 137.090ms
+2026-11-02 15:21:45.496  2621-2627  com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 11MB AllocSpace bytes, 0(0B) LOS objects, 49% free, 11MB/22MB, paused 4.123ms,3.380ms total 219.715ms
+2026-11-02 15:21:45.622  2621-3140  TrafficStats            com.m3.veil                          D  tagSocket(134) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:45.627  2621-3137  TrafficStats            com.m3.veil                          D  tagSocket(100) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:45.731  2621-2627  com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 6168KB AllocSpace bytes, 2(40KB) LOS objects, 45% free, 12MB/22MB, paused 1.827ms,3.361ms total 120.207ms
+2026-11-02 15:21:46.002  2621-2717  TrafficStats            com.m3.veil                          D  tagSocket(213) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:46.007  2621-2719  TrafficStats            com.m3.veil                          D  tagSocket(139) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:46.076  2621-3179  TrafficStats            com.m3.veil                          D  tagSocket(282) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:46.087  2621-3178  TrafficStats            com.m3.veil                          D  tagSocket(283) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:46.435  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:21:46.777  2621-2627  com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 9329KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 11MB/23MB, paused 1.791ms,3.382ms total 112.262ms
+2026-11-02 15:21:47.047  2621-2654  Parcel                  com.m3.veil                          W  Expecting binder but got null!
+2026-11-02 15:21:47.061  2621-2632  OpenGLRenderer          com.m3.veil                          I  Davey! duration=5157ms; Flags=1, FrameTimelineVsyncId=115767427, IntendedVsync=775472584805414, Vsync=775473951202738, InputEventId=0, HandleInputStart=775473960275566, AnimationStart=775473960279758, PerformTraversalsStart=775473961056681, DrawStart=775477458420140, FrameDeadline=775472601472081, FrameInterval=775473960119604, FrameStartTime=16663382, SyncQueued=775477687549179, SyncStart=775477687704371, IssueDrawCommandsStart=775477688938140, SwapBuffers=775477738660909, FrameCompleted=775477742574255, DequeueBufferDuration=29576, QueueBufferDuration=653731, GpuCompleted=775477742574255, SwapBuffersCompleted=775477740236371, DisplayPresentTime=8390010587881431341, CommandSubmissionCompleted=775477738660909, 
+2026-11-02 15:21:47.062  2621-2632  OpenGLRenderer          com.m3.veil                          I  Davey! duration=5160ms; Flags=1, FrameTimelineVsyncId=115767427, IntendedVsync=775472584805414, Vsync=775473951202738, InputEventId=0, HandleInputStart=775473960275566, AnimationStart=775473960279758, PerformTraversalsStart=775473961056681, DrawStart=775477741209217, FrameDeadline=775472601472081, FrameInterval=775473960119604, FrameStartTime=16663382, SyncQueued=775477741839525, SyncStart=775477741967563, IssueDrawCommandsStart=775477742099140, SwapBuffers=775477743776448, FrameCompleted=775477745751140, DequeueBufferDuration=32962, QueueBufferDuration=422000, GpuCompleted=775477745751140, SwapBuffersCompleted=775477745108025, DisplayPresentTime=15728640, CommandSubmissionCompleted=775477743776448, 
+2026-11-02 15:21:47.097  2621-2621  Choreographer           com.m3.veil                          I  Skipped 229 frames!  The application may be doing too much work on its main thread.
+2026-11-02 15:21:47.184  2621-2654  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a400024010, base=0x0, importpid=2621
+2026-11-02 15:21:47.184  2621-2654  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a400024011, base=0x0, importpid=2621
+2026-11-02 15:21:47.190  2621-2621  VRI[SplashActivity]     com.m3.veil                          D  performTraversals relayoutWindow: maybeSyncSeqId=-1 ,mSyncSeqId=0 ,relayoutResult=2
+2026-11-02 15:21:47.195  2621-2632  OpenGLRenderer          com.m3.veil                          I  Davey! duration=3910ms; Flags=0, FrameTimelineVsyncId=115767761, IntendedVsync=775473967733681, Vsync=775477783432441, InputEventId=0, HandleInputStart=775477791520217, AnimationStart=775477791524448, PerformTraversalsStart=775477797815832, DrawStart=775477807340640, FrameDeadline=775474001062788, FrameInterval=775477791186986, FrameStartTime=16662440, SyncQueued=775477867351871, SyncStart=775477867546563, IssueDrawCommandsStart=775477868285948, SwapBuffers=775477874164217, FrameCompleted=775477878135986, DequeueBufferDuration=24193, QueueBufferDuration=504193, GpuCompleted=775477878135986, SwapBuffersCompleted=775477875729217, DisplayPresentTime=7597416872071463028, CommandSubmissionCompleted=775477874164217, 
+2026-11-02 15:21:47.201  2621-2621  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a400024012, base=0x0, importpid=2621
+2026-11-02 15:21:47.202  2621-2621  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a40002400f, base=0x0, importpid=2621
+2026-11-02 15:21:47.218  2621-3186  ProfileInstaller        com.m3.veil                          D  Installing profile for com.m3.veil
+2026-11-02 15:21:47.428  2621-2627  com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 12MB AllocSpace bytes, 4(208KB) LOS objects, 44% free, 12MB/23MB, paused 4.575ms,4.102ms total 132.353ms
+2026-11-02 15:21:47.564  2621-2648  TrafficStats            com.m3.veil                          D  tagSocket(173) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:47.565  2621-2646  TrafficStats            com.m3.veil                          D  tagSocket(268) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:47.572  2621-2621  CallEngine              com.m3.veil                          D  recorded ended call 66a6fd46-7dcb-49a0-8661-d2ad362edd54 (from veil_2f580686a121fb51977179e92c04)
+2026-11-02 15:21:47.573  2621-2621  CallEngine              com.m3.veil                          D  recorded ended call 66a6fd46-7dcb-49a0-8661-d2ad362edd54 (from veil_2f580686a121fb51977179e92c04)
+2026-11-02 15:21:47.573  2621-2621  CallEngine              com.m3.veil                          I  ignoring invite for already-ended call 66a6fd46-7dcb-49a0-8661-d2ad362edd54
+2026-11-02 15:21:47.584  2621-2621  ActivityThread          com.m3.veil                          D  mToDestroying.remove:ActivityRecord{c4444 token=android.os.BinderProxy@45d79b3 {com.m3.veil/com.m3.veil.ui.splash.SplashActivity}}
+2026-11-02 15:21:47.667  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:47.668  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:47.676  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:47.677  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:47.727  2621-3322  StatusController        com.m3.veil                          I  Purged remote status segment: 337c1806-49e3-4585-9ce3-37af49c900ff
+2026-11-02 15:21:47.733  2621-3323  StatusController        com.m3.veil                          I  Purged remote status segment: 024b5b0c-604f-455d-9c6d-52cc70e675d9
+2026-11-02 15:21:47.925  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:47.925  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:47.944  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:47.945  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:47.994  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:47.995  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.007  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.008  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.040  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.041  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.048  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.049  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.072  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.073  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.080  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.081  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.108  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.109  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.120  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.122  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.152  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.153  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.165  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.166  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.238  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.239  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.251  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.251  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:21:48.267  2621-2621  Choreographer           com.m3.veil                          I  Skipped 31 frames!  The application may be doing too much work on its main thread.
+2026-11-02 15:21:48.364  2621-2621  CallEngine              com.m3.veil                          D  recorded ended call 66a6fd46-7dcb-49a0-8661-d2ad362edd54 (from veil_2f580686a121fb51977179e92c04)
+2026-11-02 15:21:48.364  2621-2621  CallEngine              com.m3.veil                          I  ignoring invite for already-ended call 66a6fd46-7dcb-49a0-8661-d2ad362edd54
+2026-11-02 15:21:48.364  2621-2621  CallEngine              com.m3.veil                          D  recorded ended call 66a6fd46-7dcb-49a0-8661-d2ad362edd54 (from veil_2f580686a121fb51977179e92c04)
+2026-11-02 15:21:48.460  2621-2627  com.m3.veil             com.m3.veil                          I  Background concurrent mark compact GC freed 10MB AllocSpace bytes, 6(120KB) LOS objects, 49% free, 13MB/26MB, paused 5.497ms,5.837ms total 107.454ms
+2026-11-02 15:21:49.546  2621-2626  com.m3.veil             com.m3.veil                          I  Compiler allocated 8641KB to compile void com.m3.veil.webrtc.WebRtcManager.processInboundPayload(java.lang.String, java.lang.String)
+2026-11-02 15:21:51.156  2621-2695  WebRtcManager           com.m3.veil                          D  stopCallAudioHardware executing for peer: veil_2f580686a121fb51977179e92c04
+2026-11-02 15:21:51.158  2621-2723  WebRtcManager           com.m3.veil                          D  ICE Connection State with veil_2f580686a121fb51977179e92c04: CLOSED
+2026-11-02 15:21:51.171  2621-2621  CallEngine              com.m3.veil                          D  recorded ended call 66a6fd46-7dcb-49a0-8661-d2ad362edd54 (from veil_2f580686a121fb51977179e92c04)
+2026-11-02 15:21:54.123  2621-2646  TrafficStats            com.m3.veil                          D  tagSocket(91) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:54.125  2621-2648  TrafficStats            com.m3.veil                          D  tagSocket(100) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:58.265  2621-2648  TrafficStats            com.m3.veil                          D  tagSocket(91) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:21:58.272  2621-2646  TrafficStats            com.m3.veil                          D  tagSocket(100) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:00.349  2621-3137  TrafficStats            com.m3.veil                          D  tagSocket(263) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:00.354  2621-3140  TrafficStats            com.m3.veil                          D  tagSocket(267) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:02.482  2621-2695  WebRtcManager           com.m3.veil                          I  Resetting local offer (polite=true, stale=false) to accept remote offer from veil_2f580686a121fb51977179e92c04
+2026-11-02 15:22:02.490  2621-2723  WebRtcManager           com.m3.veil                          D  ICE Connection State with veil_2f580686a121fb51977179e92c04: CLOSED
+2026-11-02 15:22:02.530  2621-2723  WebRtcManager           com.m3.veil                          D  ICE Connection State with veil_2f580686a121fb51977179e92c04: CHECKING
+2026-11-02 15:22:02.582  2621-2646  TrafficStats            com.m3.veil                          D  tagSocket(222) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:02.582  2621-2648  TrafficStats            com.m3.veil                          D  tagSocket(213) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:02.618  2621-2627  com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 11MB AllocSpace bytes, 0(0B) LOS objects, 8% free, 24MB/26MB, paused 1.565ms,3.878ms total 118.162ms
+2026-11-02 15:22:03.195  2621-2723  WebRtcManager           com.m3.veil                          D  ICE Connection State with veil_2f580686a121fb51977179e92c04: CONNECTED
+2026-11-02 15:22:03.196  2621-2621  VeilMessagesCtrl        com.m3.veil                          I  WebRTC mesh connection established with peer: veil_2f580686a121fb51977179e92c04
+2026-11-02 15:22:03.232  2621-2723  WebRtcManager           com.m3.veil                          D  DataChannel [veil-ctrl] state with veil_2f580686a121fb51977179e92c04: OPEN
+2026-11-02 15:22:03.232  2621-2723  WebRtcManager           com.m3.veil                          D  DataChannel [veil-msg] state with veil_2f580686a121fb51977179e92c04: OPEN
+2026-11-02 15:22:03.235  2621-2723  WebRtcManager           com.m3.veil                          D  DataChannel [veil-media] state with veil_2f580686a121fb51977179e92c04: OPEN
+2026-11-02 15:22:03.236  2621-2723  WebRtcManager           com.m3.veil                          D  DataChannel [veil-swarm] state with veil_2f580686a121fb51977179e92c04: OPEN
+2026-11-02 15:22:03.836  2621-2627  com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 10MB AllocSpace bytes, 0(0B) LOS objects, 38% free, 16MB/26MB, paused 1.042ms,6.377ms total 48.632ms
+2026-11-02 15:22:05.278  2621-2668  org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 978363273229 capabilities changed: [ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED LinkUpBandwidth>=1904Kbps LinkDnBandwidth>=17218Kbps TransportInfo: <SSID: <unknown ssid>, BSSID: 02:00:00:00:00:00, MAC: 02:00:00:00:00:00, IP: /192.168.1.6, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 5, RSSI: -53, Link speed: 96Mbps, Tx Link speed: 96Mbps, Max Supported Tx Link speed: 96Mbps, Rx Link speed: 86Mbps, Max Supported Rx Link speed: 96Mbps, Frequency: 5825MHz, Net ID: -1, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: -1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>> SignalStrength: -53 UnderlyingNetworks: Null]
+2026-11-02 15:22:07.563  2621-2646  TrafficStats            com.m3.veil                          D  tagSocket(174) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:07.567  2621-2648  TrafficStats            com.m3.veil                          D  tagSocket(134) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:10.130  2621-3137  TrafficStats            com.m3.veil                          D  tagSocket(213) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:10.132  2621-3140  TrafficStats            com.m3.veil                          D  tagSocket(222) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:10.132  2621-3613  TrafficStats            com.m3.veil                          D  tagSocket(284) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:10.132  2621-3612  TrafficStats            com.m3.veil                          D  tagSocket(285) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:11.287  2621-2668  org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 978363273229 capabilities changed: [ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED LinkUpBandwidth>=2218Kbps LinkDnBandwidth>=17218Kbps TransportInfo: <SSID: <unknown ssid>, BSSID: 02:00:00:00:00:00, MAC: 02:00:00:00:00:00, IP: /192.168.1.6, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 5, RSSI: -50, Link speed: 96Mbps, Tx Link speed: 96Mbps, Max Supported Tx Link speed: 96Mbps, Rx Link speed: 86Mbps, Max Supported Rx Link speed: 96Mbps, Frequency: 5825MHz, Net ID: -1, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: -1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>> SignalStrength: -50 UnderlyingNetworks: Null]
+2026-11-02 15:22:13.811  2621-3140  TrafficStats            com.m3.veil                          D  tagSocket(134) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:13.812  2621-3137  TrafficStats            com.m3.veil                          D  tagSocket(213) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:15.299  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:15.300  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:15.309  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:15.310  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:16.089  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:16.090  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:16.099  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:16.101  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:17.309  2621-3137  TrafficStats            com.m3.veil                          D  tagSocket(174) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:17.312  2621-3140  TrafficStats            com.m3.veil                          D  tagSocket(134) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:17.531  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:17.532  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:17.543  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:17.544  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:20.051  2621-3613  TrafficStats            com.m3.veil                          D  tagSocket(220) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:20.053  2621-3612  TrafficStats            com.m3.veil                          D  tagSocket(139) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:22.844  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:22.845  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:22.857  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:22.858  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:24.123  2621-3613  TrafficStats            com.m3.veil                          D  tagSocket(134) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:24.124  2621-3612  TrafficStats            com.m3.veil                          D  tagSocket(139) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:25.981  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:25.982  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:25.993  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:25.994  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.140  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.140  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.146  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.147  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.273  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.274  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.279  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.280  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.289  2621-3140  TrafficStats            com.m3.veil                          D  tagSocket(143) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:26.292  2621-3137  TrafficStats            com.m3.veil                          D  tagSocket(213) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:26.709  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.710  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.720  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:26.721  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.077  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.079  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.088  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.089  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.224  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.226  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.230  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.231  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.461  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.462  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.468  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.469  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.675  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.676  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.682  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.683  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.839  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.841  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.845  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:27.846  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:28.021  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:28.023  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:28.029  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:28.030  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:28.296  2621-3612  TrafficStats            com.m3.veil                          D  tagSocket(175) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:28.297  2621-3613  TrafficStats            com.m3.veil                          D  tagSocket(255) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:30.487  2621-3137  TrafficStats            com.m3.veil                          D  tagSocket(134) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:30.492  2621-3140  TrafficStats            com.m3.veil                          D  tagSocket(205) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:32.438  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:32.439  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:32.449  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:32.450  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:32.541  2621-3613  TrafficStats            com.m3.veil                          D  tagSocket(143) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:32.541  2621-3612  TrafficStats            com.m3.veil                          D  tagSocket(175) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:36.279  2621-2621  ActivityThread          com.m3.veil                          D  ++ activityComponent:com.m3.veil/com.m3.veil.ui.chat.ChatActivity counts:1 ALEAK_CLEAR_SUPPORT:true
+2026-11-02 15:22:36.281  2621-2621  TranActivi...pturboImpl com.m3.veil                          D  attach
+2026-11-02 15:22:36.512  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:36.524  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:36.524  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:36.628  2621-2621  OnBackInvokedCallback   com.m3.veil                          W  OnBackInvokedCallback is not enabled for the application.
+                                                                                                    Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+2026-11-02 15:22:36.628  2621-2621  TranActivi...pturboImpl com.m3.veil                          D  onResumeHork
+2026-11-02 15:22:36.702  2621-2621  VRI[ChatActivity]       com.m3.veil                          D  performTraversals relayoutWindow: maybeSyncSeqId=-1 ,mSyncSeqId=0 ,relayoutResult=3
+2026-11-02 15:22:36.708  2621-3689  mali_gralloc            com.m3.veil                          I  register: id=0x2a40002401c, importpid=-1
+2026-11-02 15:22:36.710  2621-3689  mali_gralloc            com.m3.veil                          I  register: id=0x2a40002401d, importpid=-1
+2026-11-02 15:22:36.712  2621-3689  mali_gralloc            com.m3.veil                          I  register: id=0x2a40002401e, importpid=-1
+2026-11-02 15:22:36.715  2621-3689  mali_gralloc            com.m3.veil                          I  register: id=0x2a40002401f, importpid=-1
+2026-11-02 15:22:37.238  2621-2654  Parcel                  com.m3.veil                          W  Expecting binder but got null!
+2026-11-02 15:22:37.247  2621-3605  OpenGLRenderer          com.m3.veil                          I  Davey! duration=999ms; Flags=1, FrameTimelineVsyncId=115789051, IntendedVsync=775526937458588, Vsync=775527337328804, InputEventId=0, HandleInputStart=775527337416681, AnimationStart=775527337418681, PerformTraversalsStart=775527337679874, DrawStart=775527873276950, FrameDeadline=775526954125255, FrameInterval=775527337410951, FrameStartTime=16662174, SyncQueued=775527883735643, SyncStart=775527883864758, IssueDrawCommandsStart=775527884320950, SwapBuffers=775527930253412, FrameCompleted=775527936651950, DequeueBufferDuration=20577, QueueBufferDuration=337231, GpuCompleted=775527936651950, SwapBuffersCompleted=775527931196758, DisplayPresentTime=0, CommandSubmissionCompleted=775527930253412, 
+2026-11-02 15:22:37.265  2621-3605  OpenGLRenderer          com.m3.veil                          I  Davey! duration=1009ms; Flags=1, FrameTimelineVsyncId=115789051, IntendedVsync=775526937458588, Vsync=775527337328804, InputEventId=0, HandleInputStart=775527337416681, AnimationStart=775527337418681, PerformTraversalsStart=775527337679874, DrawStart=775527932852373, FrameDeadline=775526954125255, FrameInterval=775527337410951, FrameStartTime=16662114, SyncQueued=775527934155489, SyncStart=775527934273604, IssueDrawCommandsStart=775527934937181, SwapBuffers=775527942249412, FrameCompleted=775527947517258, DequeueBufferDuration=30846, QueueBufferDuration=429000, GpuCompleted=775527947517258, SwapBuffersCompleted=775527943429681, DisplayPresentTime=775516772674074, CommandSubmissionCompleted=775527942249412, 
+2026-11-02 15:22:37.276  2621-3612  TrafficStats            com.m3.veil                          D  tagSocket(139) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:37.279  2621-3613  TrafficStats            com.m3.veil                          D  tagSocket(204) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:37.293  2621-2621  Choreographer           com.m3.veil                          I  Skipped 37 frames!  The application may be doing too much work on its main thread.
+2026-11-02 15:22:37.542  2621-2627  com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 7348KB AllocSpace bytes, 3(124KB) LOS objects, 27% free, 19MB/26MB, paused 1.917ms,5.620ms total 57.243ms
+2026-11-02 15:22:38.205  2621-2621  Choreographer           com.m3.veil                          I  Skipped 42 frames!  The application may be doing too much work on its main thread.
+2026-11-02 15:22:38.297  2621-3605  OpenGLRenderer          com.m3.veil                          I  Davey! duration=787ms; Flags=0, FrameTimelineVsyncId=115789796, IntendedVsync=775528187131313, Vsync=775528886956397, InputEventId=0, HandleInputStart=775528898704911, AnimationStart=775528898707296, PerformTraversalsStart=775528900334450, DrawStart=775528952212103, FrameDeadline=775528220460216, FrameInterval=775528898628873, FrameStartTime=16662236, SyncQueued=775528955451796, SyncStart=775528955588219, IssueDrawCommandsStart=775528956371796, SwapBuffers=775528967682065, FrameCompleted=775528974638950, DequeueBufferDuration=29693, QueueBufferDuration=475461, GpuCompleted=775528974638950, SwapBuffersCompleted=775528968989757, DisplayPresentTime=0, CommandSubmissionCompleted=775528967682065, 
+2026-11-02 15:22:39.943  2621-2621  Choreographer           com.m3.veil                          I  Skipped 104 frames!  The application may be doing too much work on its main thread.
+2026-11-02 15:22:40.028  2621-2654  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a400024018, base=0x0, importpid=2621
+2026-11-02 15:22:40.028  2621-2654  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a400024019, base=0x0, importpid=2621
+2026-11-02 15:22:40.028  2621-2654  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a40002401a, base=0x0, importpid=2621
+2026-11-02 15:22:40.029  2621-2654  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a40002401b, base=0x0, importpid=2621
+2026-11-02 15:22:40.029  2621-2654  OpenGLRenderer          com.m3.veil                          D  endAllActiveAnimators on 0xb400007cf62e2b00 (RippleDrawable) with handle 0xb400007cf61d2740
+2026-11-02 15:22:40.034  2621-2621  VRI[MainActivity]       com.m3.veil                          D  performTraversals relayoutWindow: maybeSyncSeqId=-1 ,mSyncSeqId=0 ,relayoutResult=2
+2026-11-02 15:22:40.046  2621-2635  OpenGLRenderer          com.m3.veil                          I  Davey! duration=1821ms; Flags=0, FrameTimelineVsyncId=115790259, IntendedVsync=775528903607257, Vsync=775530636477201, InputEventId=621261895, HandleInputStart=775530637300179, AnimationStart=775530637302679, PerformTraversalsStart=775530637882025, DrawStart=775530702272141, FrameDeadline=775528936935733, FrameInterval=775530637148141, FrameStartTime=16661809, SyncQueued=775530707671371, SyncStart=775530707784371, IssueDrawCommandsStart=775530708639102, SwapBuffers=775530718035064, FrameCompleted=775530725516487, DequeueBufferDuration=22654, QueueBufferDuration=534615, GpuCompleted=775530725516487, SwapBuffersCompleted=775530720391564, DisplayPresentTime=0, CommandSubmissionCompleted=775530718035064, 
+2026-11-02 15:22:40.402  2621-3613  TrafficStats            com.m3.veil                          D  tagSocket(105) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:40.404  2621-3612  TrafficStats            com.m3.veil                          D  tagSocket(175) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:42.021  2621-2621  Choreographer           com.m3.veil                          I  Skipped 123 frames!  The application may be doing too much work on its main thread.
+2026-11-02 15:22:42.146  2621-3605  OpenGLRenderer          com.m3.veil                          I  Davey! duration=2173ms; Flags=0, FrameTimelineVsyncId=115790600, IntendedVsync=775530653443252, Vsync=775532703443293, InputEventId=477136825, HandleInputStart=775532715377908, AnimationStart=775532715380139, PerformTraversalsStart=775532715610793, DrawStart=775532804288024, FrameDeadline=775530686771821, FrameInterval=775532715277447, FrameStartTime=16661902, SyncQueued=775532808329831, SyncStart=775532808409754, IssueDrawCommandsStart=775532809201062, SwapBuffers=775532820392524, FrameCompleted=775532826789254, DequeueBufferDuration=29500, QueueBufferDuration=342154, GpuCompleted=775532826789254, SwapBuffersCompleted=775532821385601, DisplayPresentTime=775530835448717, CommandSubmissionCompleted=775532820392524, 
+2026-11-02 15:22:42.401  2621-3140  TrafficStats            com.m3.veil                          D  tagSocket(139) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:42.402  2621-3137  TrafficStats            com.m3.veil                          D  tagSocket(247) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:42.465  2621-2621  OnBackInvokedCallback   com.m3.veil                          W  OnBackInvokedCallback is not enabled for the application.
+                                                                                                    Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+2026-11-02 15:22:42.466  2621-2621  TranActivi...pturboImpl com.m3.veil                          D  onResumeHork
+2026-11-02 15:22:42.475  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.476  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.486  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.486  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.509  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.509  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.514  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.515  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.547  2621-2621  VRI[MainActivity]       com.m3.veil                          D  performTraversals relayoutWindow: maybeSyncSeqId=-1 ,mSyncSeqId=0 ,relayoutResult=3
+2026-11-02 15:22:42.554  2621-3702  mali_gralloc            com.m3.veil                          I  register: id=0x2a400024021, importpid=-1
+2026-11-02 15:22:42.557  2621-3702  mali_gralloc            com.m3.veil                          I  register: id=0x2a400024022, importpid=-1
+2026-11-02 15:22:42.559  2621-3702  mali_gralloc            com.m3.veil                          I  register: id=0x2a400024023, importpid=-1
+2026-11-02 15:22:42.564  2621-3702  mali_gralloc            com.m3.veil                          I  register: id=0x2a400024024, importpid=-1
+2026-11-02 15:22:42.690  2621-2627  com.m3.veil             com.m3.veil                          I  Background young concurrent mark compact GC freed 11MB AllocSpace bytes, 21(612KB) LOS objects, 44% free, 13MB/24MB, paused 1.467ms,6.150ms total 60.277ms
+2026-11-02 15:22:42.698  2621-3322  com.m3.veil             com.m3.veil                          W  Monitor::Inflate: Install failed 0x2177678
+2026-11-02 15:22:42.699  2621-2738  StatusController        com.m3.veil                          I  Purged remote status segment: 024b5b0c-604f-455d-9c6d-52cc70e675d9
+2026-11-02 15:22:42.699  2621-3322  StatusController        com.m3.veil                          I  Purged remote status segment: 337c1806-49e3-4585-9ce3-37af49c900ff
+2026-11-02 15:22:42.721  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.721  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.729  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.729  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.752  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.752  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.757  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.758  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.773  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.773  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.780  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.781  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.795  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.796  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.801  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.802  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.817  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.818  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.822  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.823  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.838  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.839  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.845  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.846  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.861  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.861  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.867  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:42.868  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:43.092  2621-2621  ActivityThread          com.m3.veil                          D  mToDestroying.remove:ActivityRecord{2623432 token=android.os.BinderProxy@d1d0160 {com.m3.veil/com.m3.veil.ui.chat.ChatActivity}}
+2026-11-02 15:22:43.105  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:43.106  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:43.108  2621-2654  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a40002401e, base=0x0, importpid=2621
+2026-11-02 15:22:43.108  2621-2654  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a40002401f, base=0x0, importpid=2621
+2026-11-02 15:22:43.109  2621-2654  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a40002401c, base=0x0, importpid=2621
+2026-11-02 15:22:43.109  2621-2654  mali_gralloc            com.m3.veil                          I  unregister: id=0x2a40002401d, base=0x0, importpid=2621
+2026-11-02 15:22:44.282  2621-2621  VeilSchedulerDaemon     com.m3.veil                          D  VeilSchedulerDaemon awakened by AlarmManager wake lock
+2026-11-02 15:22:44.390  2621-2668  org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 978363273229 capabilities changed: [ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED LinkUpBandwidth>=1776Kbps LinkDnBandwidth>=17218Kbps TransportInfo: <SSID: <unknown ssid>, BSSID: 02:00:00:00:00:00, MAC: 02:00:00:00:00:00, IP: /192.168.1.6, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 5, RSSI: -50, Link speed: 96Mbps, Tx Link speed: 96Mbps, Max Supported Tx Link speed: 96Mbps, Rx Link speed: 86Mbps, Max Supported Rx Link speed: 96Mbps, Frequency: 5825MHz, Net ID: -1, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: -1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>> SignalStrength: -50 UnderlyingNetworks: Null]
+2026-11-02 15:22:44.949  2621-3612  TrafficStats            com.m3.veil                          D  tagSocket(105) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:44.951  2621-3613  TrafficStats            com.m3.veil                          D  tagSocket(202) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:45.559  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:45.622  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:46.330  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:46.733  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:46.734  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:46.785  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:46.862  2621-2621  Choreographer           com.m3.veil                          I  Skipped 31 frames!  The application may be doing too much work on its main thread.
+2026-11-02 15:22:46.946  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:46.947  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:46.958  2621-3140  TrafficStats            com.m3.veil                          D  tagSocket(174) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:46.961  2621-3137  TrafficStats            com.m3.veil                          D  tagSocket(134) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:46.964  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:46.976  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:47.897  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:47.897  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:47.904  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:47.906  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:47.929  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:47.930  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:47.934  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:47.935  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:47.959  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:47.998  2621-2621  TranFlingManagerImpl    com.m3.veil                          D  onOverScrollerFinish()
+2026-11-02 15:22:48.050  2621-3323  StatusController        com.m3.veil                          I  Purged remote status segment: 024b5b0c-604f-455d-9c6d-52cc70e675d9
+2026-11-02 15:22:48.052  2621-2738  StatusController        com.m3.veil                          I  Purged remote status segment: 337c1806-49e3-4585-9ce3-37af49c900ff
+2026-11-02 15:22:48.063  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.064  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.068  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.069  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.121  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.122  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.127  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.127  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.140  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.141  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.146  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.147  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.160  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.161  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.166  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.167  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.180  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.180  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.185  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.186  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.199  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.201  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.205  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.206  2621-3168  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.219  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.220  2621-3169  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.225  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:48.226  2621-3167  OpenGLRenderer          com.m3.veil                          D  --- Failed to create image decoder with message 'unimplemented'
+2026-11-02 15:22:50.055  2621-3137  TrafficStats            com.m3.veil                          D  tagSocket(177) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:50.057  2621-3140  TrafficStats            com.m3.veil                          D  tagSocket(105) with statsTag=0xffffffff, statsUid=-1
+2026-11-02 15:22:50.399  2621-2668  org.webrtc.Logging      com.m3.veil                          I  NetworkMonitorAutoDetect: handle: 978363273229 capabilities changed: [ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&VALIDATED&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED LinkUpBandwidth>=2181Kbps LinkDnBandwidth>=17218Kbps TransportInfo: <SSID: <unknown ssid>, BSSID: 02:00:00:00:00:00, MAC: 02:00:00:00:00:00, IP: /192.168.1.6, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 5, RSSI: -51, Link speed: 96Mbps, Tx Link speed: 96Mbps, Max Supported Tx Link speed: 96Mbps, Rx Link speed: 78Mbps, Max Supported Rx Link speed: 96Mbps, Frequency: 5825MHz, Net ID: -1, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: -1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>> SignalStrength: -51 UnderlyingNetworks: Null]

@@ -1351,9 +1351,11 @@ public class StatusController {
 
                                     Boolean isDeleted = doc.getBoolean("deleted");
                                     if (Boolean.TRUE.equals(isDeleted) || purgedStatusIds.contains(sId)) {
-                                        purgeRemoteStatus(sId, aId);
-                                        VeilFeatureManager.getInstance(appContext).removePeerStatus(sId);
-                                        updated = true;
+                                        if (statusItemCache.containsKey(sId) || !purgedStatusIds.contains(sId)) {
+                                            purgeRemoteStatus(sId, aId);
+                                            VeilFeatureManager.getInstance(appContext).removePeerStatus(sId);
+                                            updated = true;
+                                        }
                                         continue;
                                     }
 
@@ -2407,15 +2409,28 @@ public class StatusController {
      */
     public void purgeRemoteStatus(String statusId, @Nullable String authorId) {
         if (statusId == null) return;
-        persistPurgedStatusId(statusId);
+        boolean alreadyPurged = purgedStatusIds.contains(statusId);
         StatusSegment removedNow = statusItemCache.remove(statusId);
+        boolean removedFromChain = false;
         for (Map.Entry<String, PeerStatusChain> entry : allPeerChains.entrySet()) {
             PeerStatusChain chain = entry.getValue();
+            if (chain.segments != null) {
+                for (StatusSegment s : chain.segments) {
+                    if (s != null && statusId.equals(s.id)) {
+                        removedFromChain = true;
+                        break;
+                    }
+                }
+            }
             chain.removeSegment(statusId);
             if (chain.segments.isEmpty()) {
                 allPeerChains.remove(entry.getKey());
             }
         }
+        if (alreadyPurged && removedNow == null && !removedFromChain) {
+            return;
+        }
+        persistPurgedStatusId(statusId);
         ioExecutor.execute(() -> {
             try {
                 if (removedNow != null) {
