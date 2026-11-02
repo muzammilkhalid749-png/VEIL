@@ -173,11 +173,13 @@ public class ChatActivity extends AppCompatActivity {
     private View btnAudioCall;
     private View btnVideoCall;
 
-    // Multi-Selection In-Call Micro-Pill
+    // Multi-Selection In-Call Micro-Pill & Avatar
+    private ImageView multiSelectAvatar;
     private View multiSelectCallMicroPill;
     private View multiSelectCallPulseDot;
     private TextView tvMultiSelectCallPillText;
     private ObjectAnimator multiSelectCallPulseAnimator;
+    private PopupWindow floatingReactionPopup;
 
     private ObjectAnimator chatCallPulseAnimator;
     private Handler chatCallTickerHandler;
@@ -4728,8 +4730,24 @@ public class ChatActivity extends AppCompatActivity {
 
         messagesRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                super.onScrollStateChanged(recyclerView, newState);
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
+                    dismissFloatingReactionPopup();
+                }
+                if (newState == RecyclerView.SCROLL_STATE_IDLE && highlightPosition != -1) {
+                    RecyclerView.ViewHolder holder = messagesRecyclerView.findViewHolderForAdapterPosition(highlightPosition);
+                    if (holder != null) blinkView(holder);
+                    highlightPosition = -1;
+                }
+            }
+
+            @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
+                if (Math.abs(dy) > 4) {
+                    dismissFloatingReactionPopup();
+                }
                 LinearLayoutManager lm = (LinearLayoutManager) recyclerView.getLayoutManager();
                 if (lm != null && layoutScrollToBottom != null && messagesAdapter != null) {
                     int lastVisible = lm.findLastVisibleItemPosition();
@@ -4750,15 +4768,6 @@ public class ChatActivity extends AppCompatActivity {
                             }).start();
                         }
                     }
-                }
-            }
-
-            @Override
-            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
-                if (newState == RecyclerView.SCROLL_STATE_IDLE && highlightPosition != -1) {
-                    RecyclerView.ViewHolder holder = messagesRecyclerView.findViewHolderForAdapterPosition(highlightPosition);
-                    if (holder != null) blinkView(holder);
-                    highlightPosition = -1;
                 }
             }
         });
@@ -5538,11 +5547,21 @@ public class ChatActivity extends AppCompatActivity {
         View btnForward = findViewById(R.id.btnMultiSelectForward);
         View btnDelete = findViewById(R.id.btnMultiSelectDelete);
         View btnMore = findViewById(R.id.btnMultiSelectMore);
-        View btnSelectAll = findViewById(R.id.btnMultiSelectAll);
 
+        multiSelectAvatar = findViewById(R.id.multiSelectAvatar);
         multiSelectCallMicroPill = findViewById(R.id.multiSelectCallMicroPill);
         multiSelectCallPulseDot = findViewById(R.id.multiSelectCallPulseDot);
         tvMultiSelectCallPillText = findViewById(R.id.tvMultiSelectCallPillText);
+
+        if (multiSelectAvatar != null) {
+            UiAnimator.attachSpringPress(multiSelectAvatar);
+            multiSelectAvatar.setOnClickListener(v -> {
+                View pa = findViewById(R.id.profileArea);
+                if (pa != null) {
+                    pa.performClick();
+                }
+            });
+        }
 
         if (multiSelectCallMicroPill != null) {
             UiAnimator.attachSpringPress(multiSelectCallMicroPill);
@@ -5557,19 +5576,6 @@ public class ChatActivity extends AppCompatActivity {
         if (btnClose != null) {
             UiAnimator.attachSpringPress(btnClose);
             btnClose.setOnClickListener(v -> exitMultiSelectionMode());
-        }
-        if (btnSelectAll != null) {
-            UiAnimator.attachSpringPress(btnSelectAll);
-            btnSelectAll.setOnClickListener(v -> {
-                if (messagesAdapter != null) {
-                    List<Message> current = messagesAdapter.getSelectedMessages();
-                    if (current.size() >= messagesAdapter.getItemCount() && messagesAdapter.getItemCount() > 0) {
-                        messagesAdapter.clearSelection();
-                    } else {
-                        messagesAdapter.selectAllMessages();
-                    }
-                }
-            });
         }
         if (btnReply != null) {
             UiAnimator.attachSpringPress(btnReply);
@@ -5689,49 +5695,74 @@ public class ChatActivity extends AppCompatActivity {
         }
         if (btnMore != null) {
             UiAnimator.attachSpringPress(btnMore);
-            btnMore.setOnClickListener(v -> {
-                if (messagesAdapter == null) return;
-                List<Message> selected = messagesAdapter.getSelectedMessages();
-                exitMultiSelectionMode();
-                if (!selected.isEmpty()) {
-                    showMessageActionsBottomSheet(selected.get(0));
-                }
-            });
+            btnMore.setOnClickListener(this::showMultiSelectOverflowMenu);
         }
+    }
 
-        int[] quickReactIds = {
-                R.id.quickReactHeart,
-                R.id.quickReactThumbsUp,
-                R.id.quickReactLaugh,
-                R.id.quickReactFire,
-                R.id.quickReactWow,
-                R.id.quickReactPray
-        };
-        View.OnClickListener quickReactClick = v -> {
-            if (messagesAdapter == null || !(v instanceof TextView)) return;
-            List<Message> selected = messagesAdapter.getSelectedMessages();
-            if (selected.isEmpty()) return;
-            Message target = selected.get(0);
-            String emoji = ((TextView) v).getText().toString();
-            String reactorKey = com.m3.veil.manager.VeilFeatureManager.getInstance(this).isAnonymousReactionEnabled()
-                    ? "anon_" + currentUserId.substring(0, Math.min(4, currentUserId.length()))
-                    : currentUserId;
-            String existing = target.getReactions() != null ? target.getReactions().get(reactorKey) : null;
-            String newEmoji = emoji.equals(existing) ? "" : emoji;
-            com.m3.veil.manager.VeilMessagesController.getInstance(this)
-                    .sendReaction(chatId, target.getId(), reactorKey, newEmoji);
-            exitMultiSelectionMode();
-        };
-        for (int id : quickReactIds) {
-            View rv = findViewById(id);
-            if (rv != null) {
-                UiAnimator.attachSpringPress(rv);
-                rv.setOnClickListener(quickReactClick);
+    private void showMultiSelectOverflowMenu(View anchorView) {
+        if (messagesAdapter == null || anchorView == null) return;
+        android.widget.PopupMenu popup = new android.widget.PopupMenu(this, anchorView);
+        android.view.Menu menu = popup.getMenu();
+
+        List<Message> selected = messagesAdapter.getSelectedMessages();
+        int selectedCount = selected.size();
+        int totalCount = messagesAdapter.getItemCount();
+        boolean isAllSelected = (selectedCount >= totalCount && totalCount > 0);
+
+        menu.add(0, 1, 0, isAllSelected ? "Deselect all" : "Select all");
+        if (selectedCount == 1) {
+            menu.add(0, 2, 1, "Message info");
+        }
+        menu.add(0, 3, 2, "Clear selection");
+
+        popup.setOnMenuItemClickListener(item -> {
+            int id = item.getItemId();
+            if (id == 1) {
+                if (isAllSelected) {
+                    messagesAdapter.clearSelection();
+                } else {
+                    messagesAdapter.selectAllMessages();
+                }
+                return true;
+            } else if (id == 2) {
+                List<Message> sel = messagesAdapter.getSelectedMessages();
+                if (!sel.isEmpty()) {
+                    exitMultiSelectionMode();
+                    showMessageActionsBottomSheet(sel.get(0));
+                }
+                return true;
+            } else if (id == 3) {
+                exitMultiSelectionMode();
+                return true;
             }
+            return false;
+        });
+        popup.show();
+    }
+
+    private void updateMultiSelectAvatar() {
+        if (multiSelectAvatar == null) return;
+        String avSource = null;
+        if (currentLocalChat != null && currentLocalChat.getAvatar() != null && !currentLocalChat.getAvatar().trim().isEmpty()) {
+            avSource = currentLocalChat.getAvatar();
+        }
+        if (avSource == null && cachedRecipientUser != null && cachedRecipientUser.getAvatar() != null && !cachedRecipientUser.getAvatar().trim().isEmpty()) {
+            avSource = cachedRecipientUser.getAvatar();
+        }
+        if (avSource == null && getIntent() != null) {
+            avSource = getIntent().getStringExtra("recipientAvatar");
+        }
+        boolean isGrp = (chatId != null && (chatId.startsWith("group_") || chatId.startsWith("channel_")))
+                || (currentLocalChat != null && currentLocalChat.isGroup());
+        if (isGrp) {
+            com.m3.veil.utils.VeilAvatarLoader.loadAvatar(multiSelectAvatar, avSource, recipientName, true);
+        } else {
+            com.m3.veil.utils.VeilAvatarLoader.loadPeerAvatar(multiSelectAvatar, recipientId, avSource, recipientName);
         }
     }
 
     private void exitMultiSelectionMode() {
+        dismissFloatingReactionPopup();
         if (messagesAdapter != null) {
             messagesAdapter.clearSelection();
         } else {
@@ -5742,10 +5773,7 @@ public class ChatActivity extends AppCompatActivity {
     private void onMultiSelectionChanged(int selectedCount, List<Message> selectedMessages) {
         View normalToolbar = findViewById(R.id.toolbar);
         View multiSelectBar = findViewById(R.id.multiSelectBar);
-        View quickReactBar = findViewById(R.id.multiSelectQuickReactBar);
-        View layoutQuickReactDock = findViewById(R.id.layoutQuickReactDock);
         TextView tvCount = findViewById(R.id.tvMultiSelectCount);
-        TextView btnSelectAll = findViewById(R.id.btnMultiSelectAll);
         View btnReply = findViewById(R.id.btnMultiSelectReply);
         View btnEdit = findViewById(R.id.btnMultiSelectEdit);
         View btnCopy = findViewById(R.id.btnMultiSelectCopy);
@@ -5754,12 +5782,17 @@ public class ChatActivity extends AppCompatActivity {
 
         if (selectedCount <= 0) {
             if (multiSelectBar != null) multiSelectBar.setVisibility(View.GONE);
-            if (quickReactBar != null) quickReactBar.setVisibility(View.GONE);
             if (multiSelectCallMicroPill != null) multiSelectCallMicroPill.setVisibility(View.GONE);
+            if (multiSelectAvatar != null) multiSelectAvatar.setVisibility(View.GONE);
             stopMultiSelectCallPulseAnimation();
+            dismissFloatingReactionPopup();
             if (normalToolbar != null) normalToolbar.setVisibility(View.VISIBLE);
             updateChatCallHeaderUi();
             return;
+        }
+
+        if (selectedCount != 1) {
+            dismissFloatingReactionPopup();
         }
 
         if (normalToolbar != null) normalToolbar.setVisibility(View.GONE);
@@ -5768,7 +5801,7 @@ public class ChatActivity extends AppCompatActivity {
             tvCount.setText(String.valueOf(selectedCount));
         }
 
-        // Synchronize in-call micro-pill during multi-selection mode
+        // Show Call Micro-Pill if in call, otherwise show User DP
         CallEngine engine = CallEngine.getInstance(this);
         boolean inCall = engine != null && engine.isInCall();
         CallInfo info = inCall ? engine.getCallInfo() : null;
@@ -5776,36 +5809,30 @@ public class ChatActivity extends AppCompatActivity {
             inCall = false;
         }
 
-        if (multiSelectCallMicroPill != null) {
-            if (inCall) {
+        if (inCall) {
+            if (multiSelectCallMicroPill != null) {
                 multiSelectCallMicroPill.setVisibility(View.VISIBLE);
                 renderMultiSelectCallPillText(info);
                 startMultiSelectCallPulseAnimation();
                 startChatCallTicker();
-            } else {
+            }
+            if (multiSelectAvatar != null) multiSelectAvatar.setVisibility(View.GONE);
+        } else {
+            if (multiSelectCallMicroPill != null) {
                 multiSelectCallMicroPill.setVisibility(View.GONE);
                 stopMultiSelectCallPulseAnimation();
+            }
+            if (multiSelectAvatar != null) {
+                multiSelectAvatar.setVisibility(View.VISIBLE);
+                updateMultiSelectAvatar();
             }
         }
 
         boolean single = (selectedCount == 1 && !selectedMessages.isEmpty());
         Message first = single ? selectedMessages.get(0) : null;
 
-        if (quickReactBar != null) {
-            quickReactBar.setVisibility(View.VISIBLE);
-            if (layoutQuickReactDock != null) {
-                layoutQuickReactDock.setVisibility(single ? View.VISIBLE : View.GONE);
-            }
-        }
-
-        if (btnSelectAll != null && messagesAdapter != null) {
-            int total = messagesAdapter.getItemCount();
-            boolean isAll = selectedCount >= total && total > 0;
-            btnSelectAll.setText(isAll ? "Deselect all" : "Select all");
-        }
-
         if (btnReply != null) btnReply.setVisibility(single ? View.VISIBLE : View.GONE);
-        if (btnMore != null) btnMore.setVisibility(single ? View.VISIBLE : View.GONE);
+        if (btnMore != null) btnMore.setVisibility(View.VISIBLE);
         if (btnEdit != null) {
             btnEdit.setVisibility(single && canEditMessage(first) ? View.VISIBLE : View.GONE);
         }
@@ -5828,13 +5855,132 @@ public class ChatActivity extends AppCompatActivity {
         }
     }
 
+    private void showFloatingReactionBarAboveMessage(Message message, View anchorView) {
+        if (isFinishing() || isDestroyed() || message == null || anchorView == null) return;
+        dismissFloatingReactionPopup();
+
+        View popupView = getLayoutInflater().inflate(R.layout.layout_floating_reaction_bar, null);
+        floatingReactionPopup = new PopupWindow(
+                popupView,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                false
+        );
+        floatingReactionPopup.setOutsideTouchable(true);
+        floatingReactionPopup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        floatingReactionPopup.setElevation(16f);
+
+        int[] reactIds = {
+                R.id.floatingReactHeart,
+                R.id.floatingReactThumbsUp,
+                R.id.floatingReactLaugh,
+                R.id.floatingReactFire,
+                R.id.floatingReactWow,
+                R.id.floatingReactPray
+        };
+
+        View.OnClickListener emojiClick = v -> {
+            if (!(v instanceof TextView)) return;
+            String emoji = ((TextView) v).getText().toString();
+            String reactorKey = com.m3.veil.manager.VeilFeatureManager.getInstance(this).isAnonymousReactionEnabled()
+                    ? "anon_" + currentUserId.substring(0, Math.min(4, currentUserId.length()))
+                    : currentUserId;
+            String existing = message.getReactions() != null ? message.getReactions().get(reactorKey) : null;
+            String newEmoji = emoji.equals(existing) ? "" : emoji;
+            com.m3.veil.manager.VeilMessagesController.getInstance(this)
+                    .sendReaction(chatId, message.getId(), reactorKey, newEmoji);
+            try {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            } catch (Exception ignored) {}
+            dismissFloatingReactionPopup();
+            exitMultiSelectionMode();
+        };
+
+        for (int id : reactIds) {
+            View ev = popupView.findViewById(id);
+            if (ev != null) {
+                UiAnimator.attachSpringPress(ev);
+                ev.setOnClickListener(emojiClick);
+            }
+        }
+
+        View btnAddMore = popupView.findViewById(R.id.floatingReactAddMore);
+        if (btnAddMore != null) {
+            UiAnimator.attachSpringPress(btnAddMore);
+            btnAddMore.setOnClickListener(v -> {
+                dismissFloatingReactionPopup();
+                exitMultiSelectionMode();
+                showMessageActionsBottomSheet(message);
+            });
+        }
+
+        popupView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        int popupWidth = popupView.getMeasuredWidth();
+        int popupHeight = popupView.getMeasuredHeight();
+
+        int[] loc = new int[2];
+        anchorView.getLocationOnScreen(loc);
+        int anchorX = loc[0];
+        int anchorY = loc[1];
+
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        int screenWidth = dm.widthPixels;
+        int margin = (int) (12 * dm.density);
+
+        int targetX = anchorX + (anchorView.getWidth() / 2) - (popupWidth / 2);
+        if (targetX < margin) {
+            targetX = margin;
+        } else if (targetX + popupWidth > screenWidth - margin) {
+            targetX = screenWidth - margin - popupWidth;
+        }
+
+        int targetY = anchorY - popupHeight - (int) (6 * dm.density);
+        int topLimit = (int) (70 * dm.density);
+        if (targetY < topLimit) {
+            targetY = anchorY + anchorView.getHeight() + (int) (6 * dm.density);
+        }
+
+        try {
+            floatingReactionPopup.showAtLocation(anchorView, Gravity.NO_GRAVITY, targetX, targetY);
+            popupView.setAlpha(0f);
+            popupView.setScaleX(0.7f);
+            popupView.setScaleY(0.7f);
+            popupView.animate()
+                    .alpha(1f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(200)
+                    .setInterpolator(new android.view.animation.OvershootInterpolator(1.2f))
+                    .start();
+        } catch (Exception ignored) {}
+    }
+
+    private void dismissFloatingReactionPopup() {
+        if (floatingReactionPopup != null) {
+            try {
+                if (floatingReactionPopup.isShowing()) {
+                    floatingReactionPopup.dismiss();
+                }
+            } catch (Exception ignored) {}
+            floatingReactionPopup = null;
+        }
+    }
+
     private void showReactionDialog(Message message, View anchorView) {
         if (message == null || message.getId() == null || "deleted".equals(message.getType())
                 || "system".equals(message.getType()) || "date_header".equals(message.getType())
                 || "unread_divider".equals(message.getType())) {
             return;
         }
-        showMessageActionsBottomSheet(message);
+        try {
+            if (anchorView != null) {
+                anchorView.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            }
+        } catch (Exception ignored) {}
+        if (messagesAdapter != null) {
+            messagesAdapter.startSelection(message);
+        }
+        showFloatingReactionBarAboveMessage(message, anchorView);
     }
 
     private void showMessageActionsBottomSheet(Message message) {
@@ -11551,6 +11697,7 @@ public class ChatActivity extends AppCompatActivity {
         stopChatCallTicker();
         stopChatCallPulseAnimation();
         stopMultiSelectCallPulseAnimation();
+        dismissFloatingReactionPopup();
         if (speedChatTimer != null) {
             speedChatTimer.cancel();
         }
@@ -11713,17 +11860,26 @@ public class ChatActivity extends AppCompatActivity {
             }
         }
 
-        // Synchronize in-call micro-pill inside multiSelectBar
+        // Synchronize in-call micro-pill & avatar inside multiSelectBar
         View multiSelectBar = findViewById(R.id.multiSelectBar);
         boolean isMultiSelectActive = (multiSelectBar != null && multiSelectBar.getVisibility() == View.VISIBLE);
-        if (multiSelectCallMicroPill != null) {
-            if (inCall && isMultiSelectActive) {
-                multiSelectCallMicroPill.setVisibility(View.VISIBLE);
-                renderMultiSelectCallPillText(info);
-                startMultiSelectCallPulseAnimation();
+        if (isMultiSelectActive) {
+            if (inCall) {
+                if (multiSelectCallMicroPill != null) {
+                    multiSelectCallMicroPill.setVisibility(View.VISIBLE);
+                    renderMultiSelectCallPillText(info);
+                    startMultiSelectCallPulseAnimation();
+                }
+                if (multiSelectAvatar != null) multiSelectAvatar.setVisibility(View.GONE);
             } else {
-                multiSelectCallMicroPill.setVisibility(View.GONE);
-                stopMultiSelectCallPulseAnimation();
+                if (multiSelectCallMicroPill != null) {
+                    multiSelectCallMicroPill.setVisibility(View.GONE);
+                    stopMultiSelectCallPulseAnimation();
+                }
+                if (multiSelectAvatar != null) {
+                    multiSelectAvatar.setVisibility(View.VISIBLE);
+                    updateMultiSelectAvatar();
+                }
             }
         }
 

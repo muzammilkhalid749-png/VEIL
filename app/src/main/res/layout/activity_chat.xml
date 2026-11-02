@@ -249,8 +249,8 @@
             android:layout_height="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
             android:visibility="gone">
 
             <ImageView
@@ -265,25 +265,23 @@
                 android:focusable="true"
                 android:contentDescription="Exit selection mode" />
 
-            <TextView
-                android:id="@+id/tvMultiSelectCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="1"
-                android:textColor="@color/text_primary"
-                android:textSize="17sp"
-                android:fontFamily="sans-serif-medium"
-                android:textStyle="bold"
-                android:fontFeatureSettings="tnum"
-                android:singleLine="true" />
+            <!-- Recipient User DP (shown when NO active call) -->
+            <de.hdodenhof.circleimageview.CircleImageView
+                android:id="@+id/multiSelectAvatar"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_marginStart="4dp"
+                android:src="@drawable/ic_person"
+                android:clickable="true"
+                android:focusable="true"
+                android:visibility="visible" />
 
-            <!-- Active / Ringing VoIP Call Micro-Pill during Selection Mode -->
+            <!-- Active / Ringing VoIP Call Micro-Pill (shown when active call ongoing) -->
             <LinearLayout
                 android:id="@+id/multiSelectCallMicroPill"
                 android:layout_width="wrap_content"
                 android:layout_height="30dp"
-                android:layout_marginStart="10dp"
+                android:layout_marginStart="6dp"
                 android:gravity="center_vertical"
                 android:background="@drawable/bg_appbar_call_micropill"
                 android:paddingStart="9dp"
@@ -312,6 +310,19 @@
                     android:singleLine="true"
                     android:ellipsize="end" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvMultiSelectCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="1"
+                android:textColor="@color/text_primary"
+                android:textSize="17sp"
+                android:fontFamily="sans-serif-medium"
+                android:textStyle="bold"
+                android:fontFeatureSettings="tnum"
+                android:singleLine="true" />
 
             <!-- Flexible Space to push action icons to the right -->
             <View
@@ -403,126 +414,6 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:contentDescription="More options" />
-
-        </LinearLayout>
-
-        <!-- Minimal Quick-Reaction & Selection Floating Dock Strip -->
-        <LinearLayout
-            android:id="@+id/multiSelectQuickReactBar"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingTop="2dp"
-            android:paddingBottom="4dp"
-            android:visibility="gone">
-
-            <!-- Floating pill dock containing reaction emojis -->
-            <LinearLayout
-                android:id="@+id/layoutQuickReactDock"
-                android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/bg_quick_react_dock"
-                android:paddingStart="4dp"
-                android:paddingEnd="4dp">
-
-                <TextView
-                    android:id="@+id/quickReactHeart"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:gravity="center"
-                    android:text="❤️"
-                    android:textSize="17sp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true" />
-
-                <TextView
-                    android:id="@+id/quickReactThumbsUp"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:gravity="center"
-                    android:text="👍"
-                    android:textSize="17sp"
-                    android:layout_marginStart="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true" />
-
-                <TextView
-                    android:id="@+id/quickReactLaugh"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:gravity="center"
-                    android:text="😂"
-                    android:textSize="17sp"
-                    android:layout_marginStart="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true" />
-
-                <TextView
-                    android:id="@+id/quickReactFire"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:gravity="center"
-                    android:text="🔥"
-                    android:textSize="17sp"
-                    android:layout_marginStart="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true" />
-
-                <TextView
-                    android:id="@+id/quickReactWow"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:gravity="center"
-                    android:text="😮"
-                    android:textSize="17sp"
-                    android:layout_marginStart="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true" />
-
-                <TextView
-                    android:id="@+id/quickReactPray"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:gravity="center"
-                    android:text="🙏"
-                    android:textSize="17sp"
-                    android:layout_marginStart="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true" />
-
-            </LinearLayout>
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-
-            <TextView
-                android:id="@+id/btnMultiSelectAll"
-                android:layout_width="wrap_content"
-                android:layout_height="30dp"
-                android:gravity="center"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:text="Select all"
-                android:textColor="@color/colorPrimary"
-                android:textSize="12sp"
-                android:fontFamily="sans-serif-medium"
-                android:textStyle="bold"
-                android:background="@drawable/bg_select_all_pill"
-                android:clickable="true"
-                android:focusable="true" />
 
         </LinearLayout>
 
