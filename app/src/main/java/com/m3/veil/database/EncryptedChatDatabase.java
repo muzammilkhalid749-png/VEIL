@@ -369,6 +369,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
     // RAM Cache Layer for 0ms reads (modeled after Telegram MessagesStorage in-memory caches)
     private final Map<String, Chat> ramChatCache = new ConcurrentHashMap<>();
     private final java.util.Set<String> unblockedCache = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    private final android.util.LruCache<String, com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest> manifestCache = new android.util.LruCache<>(200);
+    private static volatile boolean sManifestTableEnsured = false;
     private final Map<String, List<Message>> ramMessageListCache = new ConcurrentHashMap<>();
     private final Map<String, Message> ramSingleMessageCache = new ConcurrentHashMap<>();
 
@@ -2382,6 +2384,20 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     null);
         } catch (Exception ignored) {}
         notifyChatsChanged();
+    }
+
+    public String getChatWallpaperFast(String chatId) {
+        if (chatId == null) return null;
+        Chat cached = ramChatCache.get(chatId);
+        if (cached != null && cached.getWallpaperColor() != null && !cached.getWallpaperColor().isEmpty()) {
+            return cached.getWallpaperColor();
+        }
+        return null;
+    }
+
+    public com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest getSovereignProfileManifestFast(String uid) {
+        if (uid == null || uid.isEmpty()) return null;
+        return manifestCache.get(uid);
     }
 
     public synchronized String getChatWallpaper(String chatId) {
@@ -5235,28 +5251,40 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         db.delete(TABLE_SCHEDULED_MESSAGES, COL_SCHED_ID + " = ?", new String[]{id});
     }
 
+    private void ensureManifestTable(SQLiteDatabase db) {
+        if (sManifestTableEnsured) return;
+        synchronized (EncryptedChatDatabase.class) {
+            if (sManifestTableEnsured) return;
+            try {
+                db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_SOVEREIGN_MANIFEST + " (" +
+                        COL_SM_UID + " TEXT PRIMARY KEY, " +
+                        COL_SM_USERNAME + " TEXT, " +
+                        COL_SM_DISPLAY_NAME + " TEXT, " +
+                        COL_SM_BIO + " TEXT, " +
+                        COL_SM_AVATAR_BASE64 + " TEXT, " +
+                        COL_SM_MOOD + " TEXT, " +
+                        COL_SM_XP + " INTEGER, " +
+                        COL_SM_KARMA + " INTEGER, " +
+                        COL_SM_VEIL_COINS + " INTEGER, " +
+                        COL_SM_PERSONAS_JSON + " TEXT, " +
+                        COL_SM_PUBLIC_KEY + " TEXT, " +
+                        COL_SM_SHOW_USERNAME_IN_GROUP + " INTEGER DEFAULT 0, " +
+                        COL_SM_ALLOW_MENTIONS + " TEXT DEFAULT 'everyone', " +
+                        COL_SM_UPDATED_AT + " INTEGER, " +
+                        COL_SM_SIGNATURE + " TEXT" +
+                        ");");
+                ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_SHOW_USERNAME_IN_GROUP, "INTEGER DEFAULT 0");
+                ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_ALLOW_MENTIONS, "TEXT DEFAULT 'everyone'");
+                sManifestTableEnsured = true;
+            } catch (Exception ignored) {}
+        }
+    }
+
     public synchronized void saveSovereignProfileManifest(com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest) {
         if (manifest == null || manifest.uid == null || manifest.uid.isEmpty()) return;
+        manifestCache.put(manifest.uid, manifest);
         SQLiteDatabase db = getEncryptedDb();
-        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_SOVEREIGN_MANIFEST + " (" +
-                COL_SM_UID + " TEXT PRIMARY KEY, " +
-                COL_SM_USERNAME + " TEXT, " +
-                COL_SM_DISPLAY_NAME + " TEXT, " +
-                COL_SM_BIO + " TEXT, " +
-                COL_SM_AVATAR_BASE64 + " TEXT, " +
-                COL_SM_MOOD + " TEXT, " +
-                COL_SM_XP + " INTEGER, " +
-                COL_SM_KARMA + " INTEGER, " +
-                COL_SM_VEIL_COINS + " INTEGER, " +
-                COL_SM_PERSONAS_JSON + " TEXT, " +
-                COL_SM_PUBLIC_KEY + " TEXT, " +
-                COL_SM_SHOW_USERNAME_IN_GROUP + " INTEGER DEFAULT 0, " +
-                COL_SM_ALLOW_MENTIONS + " TEXT DEFAULT 'everyone', " +
-                COL_SM_UPDATED_AT + " INTEGER, " +
-                COL_SM_SIGNATURE + " TEXT" +
-                ");");
-        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_SHOW_USERNAME_IN_GROUP, "INTEGER DEFAULT 0");
-        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_ALLOW_MENTIONS, "TEXT DEFAULT 'everyone'");
+        ensureManifestTable(db);
         ContentValues cv = new ContentValues();
         cv.put(COL_SM_UID, manifest.uid);
         cv.put(COL_SM_USERNAME, manifest.username);
@@ -5278,31 +5306,19 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
 
     public synchronized com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest getSovereignProfileManifest(String uid) {
         if (uid == null || uid.isEmpty()) return null;
+        com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest cached = manifestCache.get(uid);
+        if (cached != null) return cached;
         SQLiteDatabase db = getEncryptedDb();
-        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_SOVEREIGN_MANIFEST + " (" +
-                COL_SM_UID + " TEXT PRIMARY KEY, " +
-                COL_SM_USERNAME + " TEXT, " +
-                COL_SM_DISPLAY_NAME + " TEXT, " +
-                COL_SM_BIO + " TEXT, " +
-                COL_SM_AVATAR_BASE64 + " TEXT, " +
-                COL_SM_MOOD + " TEXT, " +
-                COL_SM_XP + " INTEGER, " +
-                COL_SM_KARMA + " INTEGER, " +
-                COL_SM_VEIL_COINS + " INTEGER, " +
-                COL_SM_PERSONAS_JSON + " TEXT, " +
-                COL_SM_PUBLIC_KEY + " TEXT, " +
-                COL_SM_SHOW_USERNAME_IN_GROUP + " INTEGER DEFAULT 0, " +
-                COL_SM_ALLOW_MENTIONS + " TEXT DEFAULT 'everyone', " +
-                COL_SM_UPDATED_AT + " INTEGER, " +
-                COL_SM_SIGNATURE + " TEXT" +
-                ");");
-        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_SHOW_USERNAME_IN_GROUP, "INTEGER DEFAULT 0");
-        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_ALLOW_MENTIONS, "TEXT DEFAULT 'everyone'");
+        ensureManifestTable(db);
         Cursor c = db.query(TABLE_SOVEREIGN_MANIFEST, null, COL_SM_UID + " = ?", new String[]{uid}, null, null, null);
         if (c != null) {
             try {
                 if (c.moveToFirst()) {
-                    return cursorToSovereignProfileManifest(c);
+                    com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest m = cursorToSovereignProfileManifest(c);
+                    if (m != null) {
+                        manifestCache.put(uid, m);
+                    }
+                    return m;
                 }
             } finally {
                 c.close();
@@ -5317,25 +5333,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         while (clean.startsWith("@")) clean = clean.substring(1).trim();
         if (clean.isEmpty()) return null;
         SQLiteDatabase db = getEncryptedDb();
-        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_SOVEREIGN_MANIFEST + " (" +
-                COL_SM_UID + " TEXT PRIMARY KEY, " +
-                COL_SM_USERNAME + " TEXT, " +
-                COL_SM_DISPLAY_NAME + " TEXT, " +
-                COL_SM_BIO + " TEXT, " +
-                COL_SM_AVATAR_BASE64 + " TEXT, " +
-                COL_SM_MOOD + " TEXT, " +
-                COL_SM_XP + " INTEGER, " +
-                COL_SM_KARMA + " INTEGER, " +
-                COL_SM_VEIL_COINS + " INTEGER, " +
-                COL_SM_PERSONAS_JSON + " TEXT, " +
-                COL_SM_PUBLIC_KEY + " TEXT, " +
-                COL_SM_SHOW_USERNAME_IN_GROUP + " INTEGER DEFAULT 0, " +
-                COL_SM_ALLOW_MENTIONS + " TEXT DEFAULT 'everyone', " +
-                COL_SM_UPDATED_AT + " INTEGER, " +
-                COL_SM_SIGNATURE + " TEXT" +
-                ");");
-        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_SHOW_USERNAME_IN_GROUP, "INTEGER DEFAULT 0");
-        ensureColumnExists(db, TABLE_SOVEREIGN_MANIFEST, COL_SM_ALLOW_MENTIONS, "TEXT DEFAULT 'everyone'");
+        ensureManifestTable(db);
         Cursor c = db.query(TABLE_SOVEREIGN_MANIFEST, null, "LOWER(" + COL_SM_USERNAME + ") = ?", new String[]{clean.toLowerCase(java.util.Locale.ROOT)}, null, null, null);
         if (c != null) {
             try {
@@ -5389,21 +5387,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
         List<com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest> list = new ArrayList<>();
         if (query == null) return list;
         SQLiteDatabase db = getEncryptedDb();
-        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_SOVEREIGN_MANIFEST + " (" +
-                COL_SM_UID + " TEXT PRIMARY KEY, " +
-                COL_SM_USERNAME + " TEXT, " +
-                COL_SM_DISPLAY_NAME + " TEXT, " +
-                COL_SM_BIO + " TEXT, " +
-                COL_SM_AVATAR_BASE64 + " TEXT, " +
-                COL_SM_MOOD + " TEXT, " +
-                COL_SM_XP + " INTEGER, " +
-                COL_SM_KARMA + " INTEGER, " +
-                COL_SM_VEIL_COINS + " INTEGER, " +
-                COL_SM_PERSONAS_JSON + " TEXT, " +
-                COL_SM_PUBLIC_KEY + " TEXT, " +
-                COL_SM_UPDATED_AT + " INTEGER, " +
-                COL_SM_SIGNATURE + " TEXT" +
-                ");");
+        ensureManifestTable(db);
         String q = "%" + query.toLowerCase(java.util.Locale.ROOT) + "%";
         Cursor cursor = db.query(TABLE_SOVEREIGN_MANIFEST, null,
                 "LOWER(" + COL_SM_USERNAME + ") LIKE ? OR LOWER(" + COL_SM_DISPLAY_NAME + ") LIKE ? OR LOWER(" + COL_SM_UID + ") LIKE ?",

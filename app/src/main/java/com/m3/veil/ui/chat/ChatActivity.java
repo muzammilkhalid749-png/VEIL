@@ -416,6 +416,10 @@ public class ChatActivity extends AppCompatActivity {
     private boolean isP2PActive = false;
     private boolean isActivityResumed = false;
     private int newMessagesWhileScrolledUp = 0;
+    private String localChatWallpaper = null;
+    private boolean hasQueriedWallpaperAsync = false;
+    private static android.graphics.drawable.Drawable sCachedWallpaperDrawable = null;
+    private static String sCachedWallpaperKey = null;
 
     private final com.m3.veil.manager.VeilMessagesController.MessagesObserver messagesControllerObserver =
             new com.m3.veil.manager.VeilMessagesController.MessagesObserver() {
@@ -3232,14 +3236,34 @@ public class ChatActivity extends AppCompatActivity {
             isNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
         }
 
-        String rawWallpaper = null;
-        if (chatId != null) {
-            rawWallpaper = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChatWallpaper(chatId);
-            if (currentLocalChat != null) {
-                currentLocalChat.setWallpaperColor(rawWallpaper);
-            }
-        } else if (currentLocalChat != null) {
+        String rawWallpaper = localChatWallpaper;
+        if (rawWallpaper == null && currentLocalChat != null && currentLocalChat.getWallpaperColor() != null) {
             rawWallpaper = currentLocalChat.getWallpaperColor();
+            localChatWallpaper = rawWallpaper;
+        }
+        if (rawWallpaper == null && chatId != null) {
+            rawWallpaper = com.m3.veil.database.EncryptedChatDatabase.getInstance(this).getChatWallpaperFast(chatId);
+            if (rawWallpaper != null) {
+                localChatWallpaper = rawWallpaper;
+                if (currentLocalChat != null) {
+                    currentLocalChat.setWallpaperColor(rawWallpaper);
+                }
+            } else if (!hasQueriedWallpaperAsync) {
+                hasQueriedWallpaperAsync = true;
+                final String targetChatId = chatId;
+                dbExecutor.execute(() -> {
+                    String wp = com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).getChatWallpaper(targetChatId);
+                    if (wp != null && !wp.isEmpty()) {
+                        runOnUiThread(() -> {
+                            localChatWallpaper = wp;
+                            if (currentLocalChat != null) {
+                                currentLocalChat.setWallpaperColor(wp);
+                            }
+                            applyChatWallpaper();
+                        });
+                    }
+                });
+            }
         }
         rawWallpaper = resolveThemeAdaptiveWallpaper(rawWallpaper, isNight);
 
@@ -3268,25 +3292,42 @@ public class ChatActivity extends AppCompatActivity {
                         android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, colors);
                 chatRoot.setBackground(gd);
             } else if (wpValue != null && ("image".equals(wpType) || wpValue.startsWith("file:") || wpValue.startsWith("content:") || wpValue.startsWith("/"))) {
-                android.net.Uri uri = wpValue.startsWith("/") ? android.net.Uri.fromFile(new File(wpValue)) : android.net.Uri.parse(wpValue);
-                android.graphics.drawable.Drawable d = null;
-                try {
-                    java.io.InputStream is = getContentResolver().openInputStream(uri);
-                    if (is != null) {
-                        d = android.graphics.drawable.Drawable.createFromStream(is, uri.toString());
-                        is.close();
-                    }
-                } catch (Exception ex) {
-                    d = android.graphics.drawable.Drawable.createFromPath(uri.getPath());
-                }
-                if (d != null) {
-                    if (wpDim > 0) {
-                        int alpha = Math.max(0, Math.min(230, (int) (wpDim * 2.3f)));
-                        d.setColorFilter(android.graphics.Color.argb(alpha, 0, 0, 0), android.graphics.PorterDuff.Mode.SRC_ATOP);
-                    }
-                    chatRoot.setBackground(d);
+                String cacheKey = wpValue + ":" + wpDim;
+                if (sCachedWallpaperDrawable != null && cacheKey.equals(sCachedWallpaperKey)) {
+                    chatRoot.setBackground(sCachedWallpaperDrawable);
                 } else {
                     applyDefaultWallpaperBackground(chatRoot, isNight, amoled);
+                    final String targetWpValue = wpValue;
+                    final int targetWpDim = wpDim;
+                    dbExecutor.execute(() -> {
+                        try {
+                            android.net.Uri uri = targetWpValue.startsWith("/") ? android.net.Uri.fromFile(new File(targetWpValue)) : android.net.Uri.parse(targetWpValue);
+                            android.graphics.drawable.Drawable d = null;
+                            try {
+                                java.io.InputStream is = getContentResolver().openInputStream(uri);
+                                if (is != null) {
+                                    d = android.graphics.drawable.Drawable.createFromStream(is, uri.toString());
+                                    is.close();
+                                }
+                            } catch (Exception ex) {
+                                d = android.graphics.drawable.Drawable.createFromPath(uri.getPath());
+                            }
+                            if (d != null) {
+                                if (targetWpDim > 0) {
+                                    int alpha = Math.max(0, Math.min(230, (int) (targetWpDim * 2.3f)));
+                                    d.setColorFilter(android.graphics.Color.argb(alpha, 0, 0, 0), android.graphics.PorterDuff.Mode.SRC_ATOP);
+                                }
+                                final android.graphics.drawable.Drawable finalD = d;
+                                sCachedWallpaperDrawable = finalD;
+                                sCachedWallpaperKey = cacheKey;
+                                runOnUiThread(() -> {
+                                    if (!isFinishing() && !isDestroyed()) {
+                                        chatRoot.setBackground(finalD);
+                                    }
+                                });
+                            }
+                        } catch (Throwable ignored) {}
+                    });
                 }
             } else if (wpValue != null && wpValue.startsWith("#")) {
                 int baseColor = android.graphics.Color.parseColor(wpValue);
@@ -7661,7 +7702,8 @@ public class ChatActivity extends AppCompatActivity {
         if (groupMessagesListener != null) groupMessagesListener.remove();
         groupMessagesListener = db.collection("groups").document(chatId)
                 .collection("messages")
-                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(50)
                 .addSnapshotListener(this, (snapshots, error) -> {
                     if (error != null || snapshots == null) return;
                     final List<com.google.firebase.firestore.DocumentSnapshot> docs = snapshots.getDocuments();
@@ -7841,18 +7883,11 @@ public class ChatActivity extends AppCompatActivity {
     private void attachDirectRealtimeListeners() {
         if (chatId == null || db == null) return;
 
-        // Initiate WebRTC mesh link when opening conversation
-        if (recipientId != null && !recipientId.isEmpty()) {
-            com.m3.veil.manager.PersonaManager pm = com.m3.veil.manager.PersonaManager.getInstance(this);
-            if (!pm.isSelfForActivePersona(recipientId) && pm.findLocalPersonaByPeerId(recipientId) == null) {
-                com.m3.veil.webrtc.WebRtcManager.getInstance(this).initiateConnection(recipientId);
-            }
-        }
-
         if (directMessagesListener != null) directMessagesListener.remove();
         directMessagesListener = db.collection("groups").document(chatId)
                 .collection("messages")
-                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(50)
                 .addSnapshotListener(this, (snapshots, error) -> {
                     if (error != null) {
                         Log.e("ChatActivity", "Direct message listener error on groups: " + error.getMessage(), error);
@@ -7864,7 +7899,8 @@ public class ChatActivity extends AppCompatActivity {
         if (directChatsMirrorListener != null) directChatsMirrorListener.remove();
         directChatsMirrorListener = db.collection("chats").document(chatId)
                 .collection("messages")
-                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(50)
                 .addSnapshotListener(this, (snapshots, error) -> {
                     if (error != null) return;
                     processDirectFirestoreSnapshots(snapshots);
@@ -7903,7 +7939,7 @@ public class ChatActivity extends AppCompatActivity {
         if (docs == null || docs.isEmpty()) return;
         final boolean hasFocusNow = hasWindowFocus();
         dbExecutor.execute(() -> {
-            if (chatId == null || isChatBlocked || com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isPeerOrChatBlocked(chatId, recipientId)) return;
+            if (chatId == null || isChatBlocked) return;
             boolean changed = false;
             boolean isDirectAccepted = isGroupChatContext()
                     || com.m3.veil.database.EncryptedChatDatabase.getInstance(ChatActivity.this).isDirectChatAcceptedByPeer(chatId, currentUserId, recipientId);
@@ -10626,7 +10662,13 @@ public class ChatActivity extends AppCompatActivity {
         if (chatId == null) return;
         com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet sheet =
                 com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet.newInstance(chatId, recipientId, false);
-        sheet.setOnWallpaperAppliedListener(val -> applyChatWallpaper());
+        sheet.setOnWallpaperAppliedListener(val -> {
+            localChatWallpaper = val;
+            sCachedWallpaperDrawable = null;
+            sCachedWallpaperKey = null;
+            hasQueriedWallpaperAsync = false;
+            applyChatWallpaper();
+        });
         sheet.show(getSupportFragmentManager(), "ThemeWallpaperBottomSheet");
     }
 
@@ -11068,7 +11110,13 @@ public class ChatActivity extends AppCompatActivity {
         if (chatId == null) return;
         com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet sheet =
                 com.m3.veil.ui.chat.sheets.ThemeWallpaperBottomSheet.newInstance(chatId, null, true);
-        sheet.setOnWallpaperAppliedListener(val -> applyChatWallpaper());
+        sheet.setOnWallpaperAppliedListener(val -> {
+            localChatWallpaper = val;
+            sCachedWallpaperDrawable = null;
+            sCachedWallpaperKey = null;
+            hasQueriedWallpaperAsync = false;
+            applyChatWallpaper();
+        });
         sheet.show(getSupportFragmentManager(), "ThemeWallpaperBottomSheet");
     }
 

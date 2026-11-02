@@ -3958,8 +3958,8 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             this.scheduleTurnFallback(peerId);
             final PeerConnection pc = this.getOrCreatePeerConnection(peerId, true);
             MediaConstraints sdpConstraints = new MediaConstraints();
-            sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
-            sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"));
+            sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "false"));
+            sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"));
             pc.createOffer(new SimpleSdpObserver() {
                public void onCreateSuccess(final SessionDescription sessionDescription) {
                   if (pc.signalingState() != PeerConnection.SignalingState.STABLE) {
@@ -4041,8 +4041,8 @@ public class WebRtcManager implements SignalingClient.SignalingListener {
             public void onSetSuccess() {
                WebRtcManager.this.drainPendingIceCandidates(fromUserId, pc);
                MediaConstraints sdpConstraints = new MediaConstraints();
-               sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
-               sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"));
+               sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "false"));
+               sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"));
                pc.createAnswer(new SimpleSdpObserver() {
                   public void onCreateSuccess(final SessionDescription sessionDescription) {
                      pc.setLocalDescription(new SimpleSdpObserver() {

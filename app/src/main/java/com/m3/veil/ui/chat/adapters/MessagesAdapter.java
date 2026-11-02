@@ -162,7 +162,7 @@ public class MessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         if (!hasValidName && senderId != null && ctx != null) {
             try {
                 com.m3.veil.database.EncryptedChatDatabase db = com.m3.veil.database.EncryptedChatDatabase.getInstance(ctx);
-                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest = db.getSovereignProfileManifest(senderId);
+                com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.SovereignProfileManifest manifest = db.getSovereignProfileManifestFast(senderId);
                 if (manifest != null) {
                     preferUsername = manifest.showUsernameInGroup;
                     if (username == null || username.trim().isEmpty()) {
