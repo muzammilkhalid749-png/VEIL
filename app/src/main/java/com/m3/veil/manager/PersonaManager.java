@@ -56,6 +56,10 @@ public class PersonaManager {
     private final Gson gson = new Gson();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<PersonaSwitchListener> listeners = new CopyOnWriteArrayList<>();
+    private final List<Persona> inMemoryPersonas = new CopyOnWriteArrayList<>();
+    private volatile Persona inMemoryActivePersona = null;
+    private volatile String inMemoryActivePersonaId = PRIMARY_PERSONA_ID;
+    private volatile String inMemoryActivePeerId = null;
 
     public static synchronized PersonaManager getInstance(Context context) {
         if (instance == null) {
@@ -280,6 +284,26 @@ public class PersonaManager {
     }
 
     private void syncPrefsMirror(List<Persona> personas, String activeId) {
+        if (personas != null) {
+            inMemoryPersonas.clear();
+            inMemoryPersonas.addAll(personas);
+            String targetActiveId = activeId != null ? activeId : PRIMARY_PERSONA_ID;
+            inMemoryActivePersonaId = targetActiveId;
+            Persona resolvedActive = null;
+            for (Persona p : personas) {
+                if (p != null && (p.isActive() || targetActiveId.equals(p.getId()))) {
+                    resolvedActive = p;
+                    break;
+                }
+            }
+            if (resolvedActive == null && !personas.isEmpty()) {
+                resolvedActive = personas.get(0);
+            }
+            inMemoryActivePersona = resolvedActive;
+            if (resolvedActive != null) {
+                inMemoryActivePeerId = getPersonaPeerId(resolvedActive);
+            }
+        }
         try {
             prefs.edit()
                     .putString(KEY_PERSONAS, gson.toJson(personas))
@@ -288,17 +312,27 @@ public class PersonaManager {
         } catch (Exception ignored) {}
     }
 
-    public synchronized List<Persona> getPersonas() {
+    public List<Persona> getPersonas() {
+        if (!inMemoryPersonas.isEmpty()) {
+            return new ArrayList<>(inMemoryPersonas);
+        }
         EncryptedChatDatabase masterDb = EncryptedChatDatabase.getMasterDatabase(appContext);
         List<Persona> list = masterDb.getAllPersonasFromDb();
         if (list.isEmpty()) {
             ensureInitializedAndRepaired();
             list = masterDb.getAllPersonasFromDb();
         }
+        if (!list.isEmpty()) {
+            inMemoryPersonas.clear();
+            inMemoryPersonas.addAll(list);
+            syncPrefsMirror(list, prefs.getString(KEY_ACTIVE_PERSONA, PRIMARY_PERSONA_ID));
+        }
         return list;
     }
 
-    public synchronized Persona getActivePersona() {
+    public Persona getActivePersona() {
+        Persona cached = inMemoryActivePersona;
+        if (cached != null) return cached;
         List<Persona> list = getPersonas();
         String savedId = prefs.getString(KEY_ACTIVE_PERSONA, PRIMARY_PERSONA_ID);
         if ("default".equals(savedId) || TextUtils.isEmpty(savedId)) {
@@ -306,17 +340,26 @@ public class PersonaManager {
         }
         for (int i = 0; i < list.size(); i++) {
             Persona p = list.get(i);
-            if (p.isActive() || p.getId().equals(savedId)) {
+            if (p != null && (p.isActive() || p.getId().equals(savedId))) {
                 if (i >= BillingManager.MAX_FREE_PERSONAS && !BillingManager.getInstance(appContext).isPremiumActive()) {
                     continue;
                 }
+                inMemoryActivePersona = p;
+                inMemoryActivePersonaId = p.getId();
+                inMemoryActivePeerId = getPersonaPeerId(p);
                 return p;
             }
         }
-        return list.isEmpty() ? new Persona(PRIMARY_PERSONA_ID, "Sovereign Node", "sovereign_node", "default_1", "Encrypted by default.", "sovereign_node", true, "Focused", 0xFF7C4DFF, false, 0L) : list.get(0);
+        Persona fallback = list.isEmpty() ? new Persona(PRIMARY_PERSONA_ID, "Sovereign Node", "sovereign_node", "default_1", "Encrypted by default.", "sovereign_node", true, "Focused", 0xFF7C4DFF, false, 0L) : list.get(0);
+        inMemoryActivePersona = fallback;
+        inMemoryActivePersonaId = fallback.getId();
+        inMemoryActivePeerId = getPersonaPeerId(fallback);
+        return fallback;
     }
 
-    public synchronized String getActivePersonaId() {
+    public String getActivePersonaId() {
+        String cachedId = inMemoryActivePersonaId;
+        if (cachedId != null && !cachedId.isEmpty()) return cachedId;
         Persona active = getActivePersona();
         return active != null ? active.getId() : PRIMARY_PERSONA_ID;
     }
@@ -325,14 +368,19 @@ public class PersonaManager {
      * Returns the P2P/Signaling/Firestore identity key for the currently active persona.
      * Persona 1 uses the primary UID; Persona 2+ uses its isolated keyPairId so chats/groups never collide.
      */
-    public synchronized String getActivePersonaPeerId() {
-        return getPersonaPeerId(getActivePersona());
+    public String getActivePersonaPeerId() {
+        String cachedPeerId = inMemoryActivePeerId;
+        if (cachedPeerId != null && !cachedPeerId.isEmpty()) return cachedPeerId;
+        Persona active = getActivePersona();
+        String peerId = getPersonaPeerId(active);
+        inMemoryActivePeerId = peerId;
+        return peerId;
     }
 
     /**
      * Returns the canonical P2P/Firestore peerId for any given Persona.
      */
-    public synchronized String getPersonaPeerId(Persona persona) {
+    public String getPersonaPeerId(Persona persona) {
         UserPreferences userPrefs = new UserPreferences(appContext);
         String baseUid = userPrefs.getUserId();
         if (TextUtils.isEmpty(baseUid)) {
@@ -354,7 +402,7 @@ public class PersonaManager {
     /**
      * Finds a local Persona on this device matching the given peerId / userId / keyPairId, or null if external peer.
      */
-    public synchronized Persona findLocalPersonaByPeerId(String peerOrUserId) {
+    public Persona findLocalPersonaByPeerId(String peerOrUserId) {
         if (TextUtils.isEmpty(peerOrUserId)) return null;
         String clean = peerOrUserId.trim();
         List<Persona> list = getPersonas();
@@ -401,7 +449,7 @@ public class PersonaManager {
      * Strictly checks whether candidateId belongs to the CURRENTLY ACTIVE persona ONLY.
      * Other personas belonging to the same user on this device return FALSE so they are treated as completely separate peer identities.
      */
-    public synchronized boolean isSelfForActivePersona(String candidateId) {
+    public boolean isSelfForActivePersona(String candidateId) {
         if (TextUtils.isEmpty(candidateId)) return false;
         String clean = candidateId.trim();
         if ("me".equalsIgnoreCase(clean)) return true;

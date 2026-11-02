@@ -3276,7 +3276,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                             String vMode = cursor.getString(2);
                             long expAt = cursor.getLong(3);
                             String senderId = cursor.getString(4);
-                            if (com.m3.veil.manager.AuthManager.getInstance().isMyUserId(this.context, senderId)) {
+                            if (myIds.contains(senderId)) {
                                 continue;
                             }
 
@@ -3313,7 +3313,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     updateArgsList.toArray(new String[0]));
             for (Message m : ramSingleMessageCache.values()) {
                 if (m != null && chatId.equals(m.getChatId()) && m.getSenderId() != null) {
-                    if (!com.m3.veil.manager.AuthManager.getInstance().isMyUserId(this.context, m.getSenderId()) && !myIds.contains(m.getSenderId())) {
+                    if (!myIds.contains(m.getSenderId())) {
                         if (!m.isMediaRequiringActionToRead()) {
                             m.setDelivered(true);
                             m.setRead(true);
@@ -3472,6 +3472,8 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
             myId = com.m3.veil.utils.SovereignIdentityAndDirectoryEngine.getInstance(this.context).getCurrentUserId();
         }
         if (myId == null || myId.isEmpty()) return updated;
+        java.util.Set<String> myIds = com.m3.veil.manager.AuthManager.getInstance().getMyUserIds(this.context);
+        myIds.add(myId);
         SQLiteDatabase db = getEncryptedDb();
         long effectiveReadAt = readAt > 0 ? readAt : System.currentTimeMillis();
 
@@ -3489,7 +3491,7 @@ public class EncryptedChatDatabase extends SQLiteOpenHelper {
                     String sId = c.getString(4);
                     String mType = c.getString(5);
                     // Only process outbound messages sent by the local user
-                    if (sId != null && !com.m3.veil.manager.AuthManager.getInstance().isMyUserId(this.context, sId)) {
+                    if (sId != null && !myIds.contains(sId)) {
                         continue;
                     }
                     boolean isMediaAction = Message.isMediaRequiringActionToRead(mType);
