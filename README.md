@@ -1,43 +1,42 @@
-# VEIL — Pure P2P WebRTC Mesh Messenger & Private Community
+# VEIL
 
-VEIL is an advanced, privacy-first Android messaging application designed for serverless Peer-to-Peer (P2P) communication over WebRTC DataChannels, featuring multi-hop Store-and-Forward mesh synchronization, SQLCipher local vault encryption, and Telegram-grade custom Canvas UI architecture.
+VEIL is a serverless, peer-to-peer encrypted communication protocol and native Android client written in Java. It is designed to operate without centralized metadata servers, phone-number registration, or persistent third-party data retention.
 
----
+## Overview
 
-## ⚡ Key Architectural Highlights
+Most mobile messengers rely on central servers for account identity, message routing, and group state management. VEIL replaces centralized infrastructure with a local-first architecture that combines decentralized relay signaling, direct WebRTC peer-to-peer transport, frame-level media encryption, and encrypted local storage.
 
-- **Pure P2P WebRTC Mesh**: Zero intermediary chat servers for 1:1 and multi-participant communication. Encrypted direct DataChannels with automatic STUN/TURN fallback.
-- **Store-and-Forward Mesh Engine**: Persistent SQLite Outbox queue delivering encrypted payloads across offline/asynchronous network boundaries.
-- **Telegram-Parity Canvas Views**: Custom 120 FPS high-performance views (`VeilDialogCell`, `ChatMessageCell`) with light/dark adaptive palettes, dynamic cluster shapes, and swipe-to-reply physics.
-- **Multi-Persona Anonymous Identity**: Instantly switch personas and mood profiles without exposing phone numbers or real-world identifiers.
-- **Cryptographic Security Vault**: SQLCipher database encryption, Hardware Keystore integration, Argon2id/PBKDF2 key derivation, Decoy PIN duress workspace, and Safe Word panic wipe.
-- **Real-Time Communication**: P2P Audio/Video calls with mutual consent upgrades, in-call video face masking, voice modulation filters, and WebRTC streaming.
-- **Discovery & Matchmaking Hub**: Blind Roulette speed-chat matchmaking and public Broadcast Channels directory.
+## Core Architecture
 
----
+* **Decentralized Signaling:** Uses Nostr relays (NIP-44 / NIP-59 gift-wrapped events) for asynchronous peer discovery, session negotiation, and push wakeups without exposing social graphs.
+* **P2P Transport & NAT Traversal:** Establishes direct peer-to-peer WebRTC data and media channels (`SovereignNatTraversalEngine`) with STUN/TURN fallback for carrier-grade NAT (CGNAT) environments.
+* **Dual-Topology Group Calling:** Supports full-mesh WebRTC routing for small groups and dynamic cascaded-tree forwarding (`CallEngine`) to minimize bandwidth overhead on mobile connections.
+* **End-to-End & Frame-Level Encryption:** Implements Group Sender-Key Ratchets for messaging and SFrame per-frame encryption for real-time audio and video streams, ensuring intermediate relays or forwarding nodes cannot inspect media payloads.
+* **Encrypted Local Persistence:** Stores message envelopes, ratchet states, and identity keys locally using SQLCipher (`AES-256`).
+* **Non-Custodial Vault & eCash:** Integrates deterministic BIP-39 key derivation and Chaumian blind-signature ecash (Cashu NUT-13 / NUT-28) via `VeilVaultEngine` for private peer-to-peer transfers.
+* **Programmatic UI Rendering:** Uses custom Java view layouts and canvas drawing for high-frame-rate chat cells and real-time spatial audio call indicators.
 
-## 🛠 Tech Stack
+## Repository Structure
 
-- **Platform**: Native Android (Java 17 / 21)
-- **Database**: SQLCipher (AES-256 encrypted SQLite)
-- **Signaling & Presence**: WebRTC, Firebase Firestore & Cloud Messaging
-- **UI Framework**: Custom Canvas views, Material Components 3, UCrop Studio
-- **Security**: Android Keystore, Argon2id, PBKDF2, FLAG_SECURE
+* `app/src/main/java/com/m3/veil/` — Core Android client implementation
+  * `call/` — WebRTC session controllers, SFrame media encryptors, and mesh/cascaded-tree routing engines
+  * `crypto/` — Sender-Key ratchet state machines, key derivation, and envelope encryption
+  * `network/` — Nostr WebSocket relay pools, ICE candidate negotiation, and NAT traversal utilities
+  * `vault/` — Non-custodial BIP-39 wallet and Cashu blind-signature implementation
+  * `ui/` — Programmatic Java layouts, chat cells, and call micro-pill components
 
----
-
-## 🚀 Building & Running
+## Building from Source
 
 ### Prerequisites
-- Android Studio Hedgehog (2023.1.1) or later
-- JDK 17+
-- Android SDK 34+
 
-### Clone & Build
-```bash
-git clone https://github.com/muzammilkhalid749-png/VEIL.git
-cd VEIL
-./gradlew assembleDebug
-```
-The compiled APK will be generated at:
-`app/build/outputs/apk/debug/app-universal-debug.apk`
+* Android Studio (Ladybug or newer)
+* JDK 17+
+* Android SDK Platform 34+
+
+### Build Steps
+
+1. Clone the repository:
+   ```bash
+   git clone [https://github.com/muzammilkhalid749-png/VEIL.git](https://github.com/muzammilkhalid749-png/VEIL.git)
+   cd VEIL
+   
